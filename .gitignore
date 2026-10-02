@@ -1,0 +1,42 @@
+# --- Unreal Engine generated / local-only folders (project lives in Saltbound/) ---
+Saltbound/Binaries/
+Saltbound/Intermediate/
+Saltbound/DerivedDataCache/
+Saltbound/Saved/
+Saltbound/Build/
+Saltbound/.vs/
+Saltbound/.idea/
+Saltbound/Platforms/*/Binaries/
+Saltbound/Plugins/*/Binaries/
+Saltbound/Plugins/*/Intermediate/
+
+# Generated IDE project files (regenerate via Tools/GenerateProjectFiles.ps1)
+*.sln
+*.slnx
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.vcxproj*
+.vscode/
+
+# Packaged builds
+/Builds/
+
+# Blender backups and temp files
+*.blend1
+*.blend2
+*.blend@
+
+# Python
+__pycache__/
+*.pyc
+
+# OS cruft
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Local, machine-specific tool configuration
+.claude/settings.local.json
