@@ -56,16 +56,35 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **To verify:** The visual quality of the Water plugin versus the custom ocean in the test scene, and
   the cost of each.
 
-### D7 · Boat motion model (Provisional, verified with a moving-platform test in M2)
-- **Decision direction:** The boat is a kinematic actor driven by our own integrator. Heave, pitch and roll
-  come from wave samples through damped springs; surge, sway and yaw come from sail, keel and rudder forces.
-  The player uses CharacterMovement's based movement on the deck. The character ticks after its base, so
-  the deck and the player stay in sync within a frame.
+### D7 · Boat motion model: kinematic deck + CharacterMovement based movement (Adopted, M2)
+- **Decision:** The boat is a kinematic actor driven by our own integrator. Heave, pitch and roll come
+  from wave samples through damped springs; surge, sway and yaw come from sail, keel and rudder forces.
+  The player uses CharacterMovement's based movement on the deck; the character ticks after its base.
+- **Evidence (M2):** On a kinematic test deck (up to 1 m heave, 16° roll, 6 m/s, 25°/s turning), a
+  standing player drifts 1 cm or less over 12 s. Camera jitter RMS is 0.06 cm or less, there is no
+  sliding after stopping, and the player never leaves the deck.
+- **Additions required:** Kinematic decks report angular velocity (`ISaltKinematicBase`) so leaving the
+  deck imparts the tangential velocity. `bStayBasedInAir` keeps jumps in the deck's frame; without it a
+  jump on a turning deck landed 24–66 cm off.
 - **Why:** Gameplay feel stays controllable, stability is deterministic, and the tick-order lag of
-  physics-simulated bases is avoided.
+  physics-simulated bases is avoided. Physics collision response (rocks, dock) must be handled by our
+  integrator (sweeps), which is the main cost of this choice.
 
 ### D8 · Performance target (Adopted, M1; re-measure each milestone)
 - **Hardware:** Ryzen 7 7800X3D (8C/16T), RTX 4070 SUPER (12 GB), 32 GB RAM, 2560×1440 @ 165 Hz display.
 - **Target:** Stable 60 fps in a standalone Development build at 2560×1440, with Lumen GI/reflections
   (hardware ray tracing), Virtual Shadow Maps and TSR at about 67–75 % screen percentage, on the Epic or
   High scalability level. Editor and PIE numbers are recorded separately and are not used for sign-off.
+
+### D9 · Input, HUD and interaction defined in code (Adopted, M2)
+- **Decision:** Enhanced Input actions and mappings are created at runtime (`USaltInputConfig`). The HUD
+  builds its widget tree in C++. Interactables are box components on a dedicated `Interaction` trace
+  channel, and several can live on one actor. Control stations are interactables that the player steps into.
+- **Why:** Bindings and HUD stay reviewable in one place without binary assets, and each part is easy to
+  test automatically.
+- **Consequence:** A key-rebinding menu will need either player-mappable key settings on these runtime
+  actions or a migration to input assets.
+
+### D10 · Legacy input scales disabled (Adopted, M2)
+- **Decision:** `bEnableLegacyInputScales=False`. Look sensitivity is explicit: degrees per engine-scaled
+  mouse count, times `sb.MouseSensitivity`. Positive pitch input looks up.
