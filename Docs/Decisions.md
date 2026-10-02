@@ -46,15 +46,22 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   generated mesh gets box-projected UVs, because a missing UV0 produces degenerate tangents.
 - **Consequences:** Imports are repeatable and print verification data (size, collision, slots).
 
-### D6 · Water approach (Provisional, to be confirmed by the water spike in M3)
-- **Finding:** The engine Water plugin is still flagged *Experimental* in 5.8. Its buoyancy expects a
-  physics-simulated body, which is the main jitter risk for a character walking on a moving deck.
-- **Leaning:** A custom ocean, using one Gerstner wave set evaluated identically in C++ (boat, buoyancy,
-  queries) and in the material (vertex displacement, normals). Parameters and per-wave phases are pushed
-  from C++ each frame through a Material Parameter Collection. The surface is a camera-following clipmap
-  mesh with Single Layer Water shading.
-- **To verify:** The visual quality of the Water plugin versus the custom ocean in the test scene, and
-  the cost of each.
+### D6 · Custom shared-Gerstner ocean instead of the engine Water plugin (Adopted, M3)
+- **Finding (spike, 2026-10-03):** The Water plugin is still *Experimental* in 5.8 and built around
+  Landscape. Without one, the automated setup rendered broken surfaces even after adding a water zone, a
+  seabed terrain component and extents (evidence: `Docs/Evidence/M3_WaterPluginSpike_NoLandscape.png`).
+  Its CPU wave query approximates the horizontal inversion per wave and uses float time. Its buoyancy
+  expects physics-simulated bodies.
+- **Decision:** Custom ocean. One wave set (up to 8 Gerstner waves plus 4 calm zones) is evaluated by
+  `FSaltWaveField` (C++) and `Saltbound/Shaders/SaltOcean.ush` (embedded in `M_Ocean`). Phases are
+  computed in double precision on the CPU and pushed through `MPC_Ocean` each frame. Geometry is a CDLOD
+  quadtree of instanced grid tiles with vertex morphing (no cracks, no swimming), using Single Layer Water
+  shading, analytic per-pixel normals, two ripple layers, and Jacobian crest foam plus depth-based shore foam.
+- **Evidence:** It worked on the first render. CPU-positioned probe spheres stay half-submerged across
+  wave phases, and the high oblique view shows no cracks.
+- **Trade-offs:** No built-in underwater rendering, rivers or shoreline tooling (not needed now). The two
+  wave implementations must be kept in sync. Rendering-only distance fade of short waves means distant
+  surfaces differ slightly from CPU queries; this is irrelevant for gameplay near the viewer.
 
 ### D7 · Boat motion model: kinematic deck + CharacterMovement based movement (Adopted, M2)
 - **Decision:** The boat is a kinematic actor driven by our own integrator. Heave, pitch and roll come

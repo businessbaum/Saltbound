@@ -1,0 +1,94 @@
+// Saltbound - shared Gerstner ocean (shader side).
+//
+// MUST stay in sync with Source/Saltbound/Ocean/SaltWaveTypes.cpp (CPU side). Both evaluate:
+//   theta_i  = dot(K_i, P0) - Phase_i
+//   Disp.xy  = sum D_i * H_i * att * cos(theta_i)       (D_i = K_i / |K_i|)
+//   Disp.z   = sum A_i * att * sin(theta_i)
+//   att      = calm-zone attenuation at P0 (min over zones, smoothstep falloff)
+// Units: centimetres, radians. Phases are wrapped to [0, 2pi) on the CPU in double precision.
+// Rendering-only addition: waves shorter than the sampling footprint fade out with view distance
+// (FadeK = distance * fade scale; wavelength factor = saturate(lambda / FadeK - 1)). CPU queries use
+// FadeK = 0 (no fade), which matches the rendered surface near the viewer where gameplay happens.
+//
+// This file is embedded into Custom material expressions by Tools/ue_scripts/setup_ocean.py
+// (the struct trick lets a single Custom node define helper functions).
+
+struct FSaltOcean
+{
+	float4 WA[8];    // Kx, Ky, Amplitude, Horizontal amplitude
+	float  Ph[8];    // phases
+	float4 Calm[4];  // centre X, centre Y, inner radius, outer radius
+	float4 CalmMin;  // amplitude factor at each zone centre
+	int    Count;
+
+	void Init(float4 W0, float4 W1, float4 W2, float4 W3, float4 W4, float4 W5, float4 W6, float4 W7,
+		float4 P0123, float4 P4567, float4 C0, float4 C1, float4 C2, float4 C3, float4 CMin, float WaveCount)
+	{
+		WA[0] = W0; WA[1] = W1; WA[2] = W2; WA[3] = W3; WA[4] = W4; WA[5] = W5; WA[6] = W6; WA[7] = W7;
+		Ph[0] = P0123.x; Ph[1] = P0123.y; Ph[2] = P0123.z; Ph[3] = P0123.w;
+		Ph[4] = P4567.x; Ph[5] = P4567.y; Ph[6] = P4567.z; Ph[7] = P4567.w;
+		Calm[0] = C0; Calm[1] = C1; Calm[2] = C2; Calm[3] = C3;
+		CalmMin = CMin;
+		Count = (int)clamp(WaveCount, 0.0, 8.0);
+	}
+
+	float Attenuation(float2 P)
+	{
+		float Att = 1.0;
+		[unroll] for (int j = 0; j < 4; j++)
+		{
+			const float R = length(P - Calm[j].xy);
+			const float T = saturate((R - Calm[j].z) / max(Calm[j].w - Calm[j].z, 1.0));
+			const float S = T * T * (3.0 - 2.0 * T);
+			Att = min(Att, lerp(CalmMin[j], 1.0, S));
+		}
+		return Att;
+	}
+
+	float Fade(float2 K, float FadeK)
+	{
+		const float Lambda = 6.2831853 / max(length(K), 1e-6);
+		return saturate(Lambda / max(FadeK, 1e-3) - 1.0);
+	}
+
+	float3 Displacement(float2 P0, float FadeK)
+	{
+		const float Att = Attenuation(P0);
+		float3 Disp = 0;
+		for (int i = 0; i < Count; i++)
+		{
+			const float2 K = WA[i].xy;
+			const float2 D = K / max(length(K), 1e-6);
+			const float F = Att * Fade(K, FadeK);
+			float S, C;
+			sincos(dot(K, P0) - Ph[i], S, C);
+			Disp.xy += D * (WA[i].w * F * C);
+			Disp.z += WA[i].z * F * S;
+		}
+		return Disp;
+	}
+
+	// World-space normal and horizontal Jacobian (1 = undisturbed, < ~0.5 = compressed crest -> foam).
+	void NormalAndJacobian(float2 P0, float FadeK, out float3 Normal, out float Jacobian)
+	{
+		const float Att = Attenuation(P0);
+		float3 Dx = float3(1, 0, 0);
+		float3 Dy = float3(0, 1, 0);
+		for (int i = 0; i < Count; i++)
+		{
+			const float2 K = WA[i].xy;
+			const float2 D = K / max(length(K), 1e-6);
+			const float F = Att * Fade(K, FadeK);
+			const float A = WA[i].z * F;
+			const float H = WA[i].w * F;
+			float S, C;
+			sincos(dot(K, P0) - Ph[i], S, C);
+			Dx.xy += D * (-H * S * K.x);
+			Dx.z += A * C * K.x;
+			Dy.xy += D * (-H * S * K.y);
+			Dy.z += A * C * K.y;
+		}
+		Normal = normalize(cross(Dx, Dy));
+		Jacobian = Dx.x * Dy.y - Dx.y * Dy.x;
+	}
+};

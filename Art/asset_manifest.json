@@ -5,5 +5,29 @@
     "dest": "/Game/Saltbound/Props",
     "nanite": false,
     "collision": "ucx"
+  },
+  "SM_OceanTile32": {
+    "fbx": "Water/SM_OceanTile32.fbx",
+    "dest": "/Game/Saltbound/Water",
+    "nanite": false,
+    "collision": "none",
+    "bounds_extension": [
+      8,
+      8,
+      250
+    ],
+    "_note": "xy in cells (instance scale = cell size), z in cm"
+  },
+  "SM_OceanTile16": {
+    "fbx": "Water/SM_OceanTile16.fbx",
+    "dest": "/Game/Saltbound/Water",
+    "nanite": false,
+    "collision": "none",
+    "bounds_extension": [
+      8,
+      8,
+      250
+    ],
+    "_note": "xy in cells (instance scale = cell size), z in cm"
   }
 }

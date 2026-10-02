@@ -8,6 +8,8 @@ Per entry:
   dest      content folder, e.g. /Game/Saltbound/Props
   nanite    build Nanite data (default false)
   collision "ucx" (use UCX_ hulls from the file), "complex" (use complex as simple), or "none"
+  bounds_extension  optional [x, y, z] added to the mesh bounds on both sides (local units), for meshes
+                    displaced in the material (e.g. ocean tiles)
 Material slots are matched by name to existing material instances anywhere under /Game/Saltbound.
 Unreal never creates materials from the FBX; missing ones fall back to MI_Placeholder.
 """
@@ -95,6 +97,12 @@ def import_entry(name, entry):
         mode = entry.get("collision", "ucx")
         flag = unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE if mode == "complex" else unreal.CollisionTraceFlag.CTF_USE_DEFAULT
         body.set_editor_property("collision_trace_flag", flag)
+    if "bounds_extension" in entry:
+        ext = unreal.Vector(*entry["bounds_extension"])
+        sm.set_editor_property("positive_bounds_extension", ext)
+        sm.set_editor_property("negative_bounds_extension", ext)
+    if entry.get("collision") == "none" and body:
+        body.set_editor_property("collision_trace_flag", unreal.CollisionTraceFlag.CTF_USE_SIMPLE_AS_COMPLEX)
     unreal.EditorAssetLibrary.save_asset(asset_path, only_if_is_dirty=False)
 
     bounds = sm.get_bounding_box()
