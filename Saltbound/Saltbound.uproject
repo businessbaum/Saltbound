@@ -2,7 +2,7 @@
 	"FileVersion": 3,
 	"EngineAssociation": "{4CD2E2A6-4BBE-F935-8C3B-6C9E21E684C2}",
 	"Category": "",
-	"Description": "",
+	"Description": "Saltbound - atmospheric first-person sailing and exploration game.",
 	"Modules": [
 		{
 			"Name": "Saltbound",
@@ -10,7 +10,6 @@
 			"LoadingPhase": "Default",
 			"AdditionalDependencies": [
 				"Engine",
-				"AIModule",
 				"UMG"
 			]
 		}
@@ -24,15 +23,27 @@
 			]
 		},
 		{
-			"Name": "StateTree",
+			"Name": "PythonScriptPlugin",
 			"Enabled": true
 		},
 		{
-			"Name": "GameplayStateTree",
+			"Name": "EditorScriptingUtilities",
 			"Enabled": true
 		},
 		{
 			"Name": "ModelContextProtocol",
+			"Enabled": true
+		},
+		{
+			"Name": "EditorToolset",
+			"Enabled": true
+		},
+		{
+			"Name": "ConfigSettingsToolset",
+			"Enabled": true
+		},
+		{
+			"Name": "AutomationTestToolset",
 			"Enabled": true
 		}
 	]
