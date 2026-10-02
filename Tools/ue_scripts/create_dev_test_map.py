@@ -17,7 +17,8 @@ eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 if sb_ue.eal.does_asset_exist(MAP):
     les.load_level(MAP)
     for actor in eas.get_all_level_actors():
-        if not isinstance(actor, (unreal.WorldSettings, unreal.Brush)):
+        # Keep only the world settings and the level's default brush (exact class; volumes derive from Brush).
+        if not isinstance(actor, unreal.WorldSettings) and actor.get_class() != unreal.Brush.static_class():
             eas.destroy_actor(actor)
 else:
     les.new_level(MAP)
@@ -61,5 +62,17 @@ ref_y.static_mesh_component.set_static_mesh(unreal.load_asset("/Engine/BasicShap
 ref_y.set_actor_scale3d(unreal.Vector(0.2, 0.2, 0.2))
 
 spawn(unreal.PlayerStart, (0, 0, 100), label="PlayerStart")
+
+# Milestone 2: kinematic moving deck with a helm (player/station/moving-base tests).
+if hasattr(unreal, "SaltDevMovingPlatform"):
+    platform = spawn(unreal.SaltDevMovingPlatform, (-1200, 600, 150), (0, 0, 0), "DevMovingPlatform")
+    grid = unreal.load_asset("/Game/LevelPrototyping/Materials/MI_PrototypeGrid_Gray_02")
+    accent = unreal.load_asset("/Game/LevelPrototyping/Materials/MI_PrototypeGrid_TopDark")
+    for comp in platform.get_components_by_class(unreal.StaticMeshComponent):
+        comp.set_material(0, grid if comp.get_name() == "Deck" else accent)
+    # Boarding ramp from the floor to the open stern.
+    ramp = spawn(unreal.StaticMeshActor, (-1780, 600, 0), (0, 0, 0), "BoardingRamp")
+    ramp.static_mesh_component.set_static_mesh(unreal.load_asset("/Game/LevelPrototyping/Meshes/SM_Ramp"))
+
 les.save_current_level()
 print("SB_MAP_OK", MAP)
