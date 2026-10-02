@@ -29,5 +29,47 @@
       250
     ],
     "_note": "xy in cells (instance scale = cell size), z in cm"
+  },
+  "SM_TestDeckSection": {
+    "fbx": "VisualTest/SM_TestDeckSection.fbx",
+    "dest": "/Game/Saltbound/Dev/VisualTest",
+    "nanite": false,
+    "collision": "ucx"
+  },
+  "SM_Lantern": {
+    "fbx": "VisualTest/SM_Lantern.fbx",
+    "dest": "/Game/Saltbound/Props",
+    "nanite": false,
+    "collision": "ucx"
+  },
+  "SM_DockSection": {
+    "fbx": "VisualTest/SM_DockSection.fbx",
+    "dest": "/Game/Saltbound/Environment/Harbor",
+    "nanite": true,
+    "collision": "ucx"
+  },
+  "SM_Rock_Coast_A": {
+    "fbx": "VisualTest/SM_Rock_Coast_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Rocks",
+    "nanite": true,
+    "collision": "complex"
+  },
+  "SM_Rock_Coast_B": {
+    "fbx": "VisualTest/SM_Rock_Coast_B.fbx",
+    "dest": "/Game/Saltbound/Environment/Rocks",
+    "nanite": true,
+    "collision": "complex"
+  },
+  "SM_Rock_Coast_C": {
+    "fbx": "VisualTest/SM_Rock_Coast_C.fbx",
+    "dest": "/Game/Saltbound/Environment/Rocks",
+    "nanite": true,
+    "collision": "complex"
+  },
+  "SM_Landmark_Spire": {
+    "fbx": "VisualTest/SM_Landmark_Spire.fbx",
+    "dest": "/Game/Saltbound/Environment/Rocks",
+    "nanite": true,
+    "collision": "complex"
   }
 }

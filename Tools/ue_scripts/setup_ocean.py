@@ -192,8 +192,8 @@ def make_material(mpc, ush):
 
     # --- water volume (Single Layer Water output)
     slw = sb_ue.expr(m, unreal.MaterialExpressionSingleLayerWaterMaterialOutput, 0, 1200)
-    scat = sb_ue.vector_param(m, "ScatteringCoefficients", (0.012, 0.042, 0.048, 1), -400, 1100, "Volume")
-    absorb = sb_ue.vector_param(m, "AbsorptionCoefficients", (0.42, 0.085, 0.055, 1), -400, 1200, "Volume")
+    scat = sb_ue.vector_param(m, "ScatteringCoefficients", (0.004, 0.013, 0.022, 1), -400, 1100, "Volume")
+    absorb = sb_ue.vector_param(m, "AbsorptionCoefficients", (0.6, 0.18, 0.09, 1), -400, 1200, "Volume")
     phase_g = sb_ue.scalar_param(m, "PhaseG", 0.2, -400, 1300, "Volume")
     behind = sb_ue.vector_param(m, "ColorScaleBehindWater", (0.9, 0.9, 0.9, 1), -400, 1400, "Volume")
     link(scat, "", slw, "ScatteringCoefficients")

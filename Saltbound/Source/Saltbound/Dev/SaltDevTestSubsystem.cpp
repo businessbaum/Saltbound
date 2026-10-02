@@ -14,6 +14,12 @@
 #include "Kismet/GameplayStatics.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Saltbound.h"
+#include "World/SaltLightingRig.h"
+#include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
+#include "RHI.h"
+#include "RenderCore.h"
+#include "UnrealClient.h"
 
 #if !UE_BUILD_SHIPPING
 namespace
@@ -47,6 +53,28 @@ namespace
 			if (USaltDevTestSubsystem* T = GetTests(World))
 			{
 				T->ConfigurePlatform(ArgOr(Args, 0, 1.f), Args.Num() > 1, ArgOr(Args, 1, 0.f), ArgOr(Args, 2, 0.f));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdPerf(
+		TEXT("sb.Dev.Perf"),
+		TEXT("Measure frame / GPU / thread times for N seconds (default 10) and log an SB_PERF line."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (USaltDevTestSubsystem* T = GetTests(World))
+			{
+				T->StartPerf(ArgOr(Args, 0, 10.f));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdBenchmark(
+		TEXT("sb.Dev.Benchmark"),
+		TEXT("Measure performance for each lighting preset (Day, Evening, Dusk). Args: [SecondsPerPreset=10]"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (USaltDevTestSubsystem* T = GetTests(World))
+			{
+				T->RunBenchmark(ArgOr(Args, 0, 10.f));
 			}
 		}));
 
@@ -176,6 +204,60 @@ void USaltDevTestSubsystem::ConfigurePlatform(float MotionScale, bool bForce, fl
 		It->ForcedSpeed = Speed;
 		It->ForcedTurnRate = TurnRate;
 	}
+}
+
+void USaltDevTestSubsystem::StartPerf(float Seconds)
+{
+	PerfDuration = PerfRemaining = FMath::Max(1.f, Seconds);
+	PerfFrame.Reset();
+	PerfGpu.Reset();
+	PerfGame.Reset();
+	PerfRender.Reset();
+	UE_LOG(LogSaltbound, Display, TEXT("SB_PERF START seconds=%.1f"), PerfDuration);
+}
+
+namespace
+{
+	void Stats(TArray<float> V, float& OutAvg, float& OutP95, float& OutMax)
+	{
+		OutAvg = OutP95 = OutMax = 0.f;
+		if (V.Num() == 0)
+		{
+			return;
+		}
+		double Sum = 0.0;
+		for (float X : V) { Sum += X; }
+		OutAvg = (float)(Sum / V.Num());
+		V.Sort();
+		OutP95 = V[FMath::Min(V.Num() - 1, (int32)(V.Num() * 0.95f))];
+		OutMax = V.Last();
+	}
+}
+
+void USaltDevTestSubsystem::RunBenchmark(float SecondsPerPreset)
+{
+	Steps.Reset();
+	Steps.Add({TEXT("Warmup"), 6.f, nullptr, nullptr, nullptr});
+	for (const TCHAR* Preset : { TEXT("Day"), TEXT("Evening"), TEXT("Dusk") })
+	{
+		const FString Name(Preset);
+		Steps.Add({TEXT("Apply_") + Name, 4.f, [this, Name]()
+		{
+			for (TActorIterator<ASaltLightingRig> It(GetWorld()); It; ++It)
+			{
+				It->ApplyPreset(FName(*Name));
+			}
+		}, nullptr, nullptr});
+		Steps.Add({TEXT("Measure_") + Name, SecondsPerPreset + 0.5f, [this, Name, SecondsPerPreset]()
+		{
+			PerfLabel = Name;
+			StartPerf(SecondsPerPreset);
+		}, nullptr, nullptr});
+	}
+	Steps.Add({TEXT("Done"), 0.f, []() { UE_LOG(LogSaltbound, Display, TEXT("SB_BENCH DONE")); }, nullptr, nullptr});
+	StepIndex = 0;
+	StepTime = 0.f;
+	bStepStarted = false;
 }
 
 void USaltDevTestSubsystem::ResetPlayer()
@@ -351,6 +433,30 @@ void USaltDevTestSubsystem::RunMovementSuite(float MotionScale, float Speed, flo
 void USaltDevTestSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	if (PerfRemaining > 0.f)
+	{
+		PerfFrame.Add(DeltaTime * 1000.f);
+		PerfGpu.Add((float)FPlatformTime::ToMilliseconds(RHIGetGPUFrameCycles(0)));
+		PerfGame.Add((float)FPlatformTime::ToMilliseconds(GGameThreadTime));
+		PerfRender.Add((float)FPlatformTime::ToMilliseconds(GRenderThreadTime));
+		PerfRemaining -= DeltaTime;
+		if (PerfRemaining <= 0.f)
+		{
+			float FA, FP, FM, GA, GP, GM, TA, TP, TM, RA, RP, RM;
+			Stats(PerfFrame, FA, FP, FM);
+			Stats(PerfGpu, GA, GP, GM);
+			Stats(PerfGame, TA, TP, TM);
+			Stats(PerfRender, RA, RP, RM);
+			FIntPoint Res(0, 0);
+			if (GEngine && GEngine->GameViewport && GEngine->GameViewport->Viewport)
+			{
+				Res = GEngine->GameViewport->Viewport->GetSizeXY();
+			}
+			const IConsoleVariable* SP = IConsoleManager::Get().FindConsoleVariable(TEXT("r.ScreenPercentage"));
+			UE_LOG(LogSaltbound, Display, TEXT("SB_PERF label=%s frames=%d fpsAvg=%.1f frameAvg=%.2fms frameP95=%.2fms frameMax=%.2fms gpuAvg=%.2fms gpuP95=%.2fms game=%.2fms render=%.2fms res=%dx%d screenPct=%.1f"),
+				*PerfLabel, PerfFrame.Num(), FA > 0.f ? 1000.f / FA : 0.f, FA, FP, FM, GA, GP, TA, RA, Res.X, Res.Y, SP ? SP->GetFloat() : -1.f);
+		}
+	}
 	// Zero-duration steps chain within one frame; timed steps tick once per frame.
 	while (Steps.IsValidIndex(StepIndex))
 	{

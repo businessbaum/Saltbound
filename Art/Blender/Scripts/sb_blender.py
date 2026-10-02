@@ -83,7 +83,11 @@ def soften(obj, width=0.004, segments=2, harden=True):
 def apply_modifiers(obj):
     bpy.context.view_layer.objects.active = obj
     for m in list(obj.modifiers):
-        bpy.ops.object.modifier_apply(modifier=m.name)
+        try:
+            bpy.ops.object.modifier_apply(modifier=m.name)
+        except RuntimeError:
+            # Disabled modifiers (e.g. a zero-width bevel) have no effect; drop them.
+            obj.modifiers.remove(m)
 
 
 def join(objects, name):
@@ -129,6 +133,119 @@ def world_box_uv(obj, metres_per_uv=1.0, layer="UVMap"):
     return obj
 
 
+def add_cylinder(name, radius, depth, center=(0, 0, 0), axis="Z", segments=16, material=None, radius_top=None, collection=None):
+    """Capped cylinder (optionally tapered) along an axis, centred at center."""
+    bm = bmesh.new()
+    r2 = radius if radius_top is None else radius_top
+    bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=segments, radius1=radius, radius2=r2, depth=depth, calc_uvs=True)
+    rot = {"Z": None, "X": ("Y", math.pi / 2), "Y": ("X", -math.pi / 2)}[axis]
+    if rot:
+        from mathutils import Matrix
+        bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=Matrix.Rotation(rot[1], 3, rot[0]))
+    bmesh.ops.translate(bm, verts=bm.verts, vec=Vector(center))
+    for f in bm.faces:
+        f.smooth = len(f.verts) == 4
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    obj = new_object(name, mesh, collection)
+    if material:
+        obj.data.materials.append(material)
+    return obj
+
+
+def add_torus(name, major, minor, center=(0, 0, 0), rotation=(0, 0, 0), major_segments=24, minor_segments=8, material=None):
+    bpy.ops.mesh.primitive_torus_add(major_radius=major, minor_radius=minor, major_segments=major_segments,
+                                     minor_segments=minor_segments, location=center, rotation=rotation, generate_uvs=True)
+    bpy.ops.object.shade_smooth()
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.data.name = name
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    # Bake location into vertices so joins keep positions; origin stays at world 0.
+    for v in obj.data.vertices:
+        v.co += obj.location
+    obj.location = (0, 0, 0)
+    if material:
+        obj.data.materials.append(material)
+    return obj
+
+
+def transform_obj(obj, rotation=(0, 0, 0), pivot=(0, 0, 0)):
+    """Rotate mesh data (radians, XYZ euler) around a pivot; keeps the object origin at world 0."""
+    from mathutils import Euler, Matrix
+    m = Matrix.Translation(Vector(pivot)) @ Euler(rotation).to_matrix().to_4x4() @ Matrix.Translation(-Vector(pivot))
+    obj.data.transform(m)
+    return obj
+
+
+def bake_vertex_masks(obj, wear=1.0, crevice=1.0, waterline=None, wet_height=0.4, seed=0, island_variation=True,
+                      mode="bevel", bevel_max=0.012):
+    """Vertex colour masks used by M_SB_Surface (stored in the 'Col' corner attribute, linear):
+    R = edge wear, G = crevice dirt + wetness below waterline+wet_height, B = random per connected part.
+
+    mode "bevel": hard-surface parts built with soften(); faces with an edge shorter than bevel_max are the
+    rounded edges and get full wear, flat faces get none (low-poly flat faces have no interior vertices,
+    so vertex convexity would smear wear across them). mode "convexity": dense organic meshes (rocks)."""
+    import random
+    rnd = random.Random(seed)
+    me = obj.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    bm.normal_update()
+    convex = {}
+    for v in bm.verts:
+        if not v.link_edges:
+            convex[v.index] = 0.0
+            continue
+        acc = 0.0
+        for e in v.link_edges:
+            o = e.other_vert(v)
+            d = v.co - o.co
+            if d.length > 1e-6:
+                acc += v.normal.dot(d.normalized())
+        convex[v.index] = acc / len(v.link_edges)
+    # Connected islands -> per-part random value.
+    island_val = {}
+    if island_variation:
+        seen = set()
+        for f in bm.faces:
+            if f.index in seen:
+                continue
+            val = rnd.random()
+            stack = [f]
+            while stack:
+                cur = stack.pop()
+                if cur.index in seen:
+                    continue
+                seen.add(cur.index)
+                island_val[cur.index] = val
+                for e in cur.edges:
+                    for nf in e.link_faces:
+                        if nf.index not in seen:
+                            stack.append(nf)
+    layer = bm.loops.layers.float_color.get("Col") or bm.loops.layers.float_color.new("Col")
+    for f in bm.faces:
+        b = island_val.get(f.index, 0.5)
+        is_bevel = mode == "bevel" and min(e.calc_length() for e in f.edges) < bevel_max
+        for loop in f.loops:
+            c = convex[loop.vert.index]
+            if mode == "bevel":
+                r = min(wear, 1.0) if is_bevel else 0.0
+            else:
+                r = min(max(c * 4.0 * wear, 0.0), 1.0)
+            g = min(max(-c * 4.0 * crevice, 0.0), 1.0)
+            if waterline is not None:
+                z = loop.vert.co.z
+                g = max(g, min(max((waterline + wet_height - z) / max(wet_height, 1e-3), 0.0), 1.0))
+            loop[layer] = (r, g, b, 1.0)
+    bm.to_mesh(me)
+    bm.free()
+    me.color_attributes.active_color = me.color_attributes["Col"]
+    return obj
+
+
 def jitter_vertices(obj, amount=0.002, seed=1):
     """Subtle irregularity so hand-made objects do not look machine-perfect."""
     rnd = random.Random(seed)
@@ -168,7 +285,7 @@ def export_fbx(objects, rel_path):
         mesh_smooth_type="FACE",
         use_tspace=True,
         use_triangles=False,
-        colors_type="SRGB",
+        colors_type="LINEAR",
         add_leaf_bones=False,
         bake_anim=False,
         path_mode="STRIP",

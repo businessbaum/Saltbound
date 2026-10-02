@@ -15,6 +15,8 @@ class ASaltDevMovingPlatform;
  *   sb.Dev.RunMovementTests [MotionScale=1] [Speed=300] [TurnRate=8]
  *   sb.Dev.Platform <MotionScale> [Speed] [TurnRate]   (Speed/TurnRate force a constant drive; omit to use the helm)
  *   sb.Dev.ResetPlayer
+ *   sb.Dev.Perf [Seconds=10]   (frame / GPU / game / render thread times -> SB_PERF log line)
+ *   sb.Dev.Benchmark [Seconds=10]  (Day, Evening, Dusk presets in sequence; SB_PERF per preset, SB_BENCH DONE)
  */
 UCLASS()
 class SALTBOUND_API USaltDevTestSubsystem : public UTickableWorldSubsystem
@@ -29,6 +31,8 @@ public:
 	void RunMovementSuite(float MotionScale, float Speed, float TurnRate);
 	void ConfigurePlatform(float MotionScale, bool bForce, float Speed, float TurnRate);
 	void ResetPlayer();
+	void StartPerf(float Seconds);
+	void RunBenchmark(float SecondsPerPreset);
 	bool IsRunning() const { return Steps.IsValidIndex(StepIndex); }
 
 private:
@@ -79,4 +83,9 @@ private:
 	FVector LandLocal = FVector::ZeroVector;
 	bool bWasAirborne = false;
 	bool bLanded = false;
+
+	float PerfRemaining = 0.f;
+	float PerfDuration = 0.f;
+	TArray<float> PerfFrame, PerfGpu, PerfGame, PerfRender;
+	FString PerfLabel;
 };
