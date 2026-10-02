@@ -40,3 +40,6 @@ Desktop.ini
 
 # Local, machine-specific tool configuration
 .claude/settings.local.json
+
+# Intermediate exports (regenerated from Art/Blender/Scripts)
+/Art/Export/

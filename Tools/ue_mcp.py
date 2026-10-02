@@ -6,7 +6,7 @@ Usage:
   python Tools/ue_mcp.py call EditorToolset.EditorAppToolset CaptureViewport '{"bShowUI": false}'
   python Tools/ue_mcp.py capture out.png [x y z pitch yaw roll]
 """
-import base64, json, os, sys, urllib.error, urllib.request
+import base64, json, os, sys, time, urllib.error, urllib.request
 
 URL = os.environ.get("SALTBOUND_MCP_URL", "http://127.0.0.1:8000/mcp")
 _sid = None
@@ -56,11 +56,15 @@ def text_of(result):
     return "\n".join(c.get("text", "") for c in result.get("content", []) if c.get("type") == "text")
 
 
-def capture(path, pose=None, show_ui=False):
+def capture(path, pose=None, show_ui=False, settle=1.5):
     if pose:
         x, y, z, p, yw, r = pose
         xf = {"location": {"x": x, "y": y, "z": z}, "rotation": {"pitch": p, "yaw": yw, "roll": r},
               "scale": {"x": 1, "y": 1, "z": 1}}
+        # Move the real viewport first and let it render a few frames: capturing from an unvisited
+        # pose uses stale occlusion (HZB) data and silently drops meshes.
+        call_tool("EditorToolset.EditorAppToolset", "SetCameraTransform", {"transform": xf})
+        time.sleep(settle)
     else:
         xf = json.loads(text_of(call_tool("EditorToolset.EditorAppToolset", "GetCameraTransform")))["returnValue"]
     args = {"bShowUI": show_ui, "captureTransform": xf,

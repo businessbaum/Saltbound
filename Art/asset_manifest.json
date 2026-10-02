@@ -1,0 +1,9 @@
+{
+  "_comment": "Blender export -> Unreal import manifest. fbx paths are relative to Art/Export. Run: python Tools/ue_exec.py Tools/ue_scripts/import_assets.py [AssetName ...]",
+  "SM_Crate_Small": {
+    "fbx": "Props/SM_Crate_Small.fbx",
+    "dest": "/Game/Saltbound/Props",
+    "nanite": false,
+    "collision": "ucx"
+  }
+}
