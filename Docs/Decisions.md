@@ -181,3 +181,58 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Surface:** three ripple layers (a fine near layer stops calm water turning into a mirror), crisper ripple
   normals and roughness 0.028 near the viewer, for the sun glitter of the reference.
 - **Cost:** pixel shader 1458 instructions (three Jacobian evaluations). Measure with D18.
+
+### D20 · Hand-made timber module (Adopted)
+- **Owner brief (2026-10-03):** the dock should look like a stylised, weathered, hand-made pirate dock:
+  chunky planks with irregular profiles, gentle bends and twists, uneven edges, chipped or split ends,
+  varied worn bevels, broad grain grooves, rough tapered posts, and several distinct variants.
+- **Decision:** `Art/Blender/Scripts/sb_timber.py` builds every board and post individually from its own seed.
+  - `rough_plank`: a subdivided box with width and thickness drift, bend, twist, wobbly long edges, cupping,
+    2–4 broad grain grooves and local worn chamfers. One end may be slanted, chipped or split. The bevel is
+    either rounded or angular. U runs along the board, so the grain follows it.
+  - `rough_post`: an irregular polygon section with taper, uneven faces and a sloping worn top.
+  - Used by the dock, the crate and the boat deck section. The boat uses less wear: it is cared for.
+- **Finding:** On densely subdivided boards, the edge-length rule in `bake_vertex_masks` marked every narrow
+  face as a bevel. This painted leopard-like wear blotches across whole boards.
+  `sb_blender.soften_marked()` now tags the real bevel faces (face attribute `sb_bevel`), and the mask bake
+  uses that tag for tagged meshes.
+
+### D21 · Stylised realism pass: lighting, sky, grading (Adopted)
+- **Owner feedback:** "Our graphics sometimes look too realistic. Sea of Thieves is a bit more comic."
+  The owner wants simplified, expressive geometry with convincing light and movement.
+- **Research:**
+  - Rare's GDC 2018 talk: hand-painted textures; simplified structures combined into complex scenes; wear,
+    patches and repairs.
+  - SIGGRAPH 2018 "The Technical Art of Sea of Thieves": water colour blends deep and subsurface colours by
+    view angle, sun direction and a wave-peak mask; foam is softened and blended with hand-painted
+    textures; an area sun highlight; stylised, cartoon-edged clouds.
+- **Decision (lighting presets, `ASaltLightingRig`):**
+  - Golden sun (Day 5400 K) with a 2.2° disc. This gives a large soft sun reflection and softer shadow edges.
+  - Cool sky fill (tint 0.8/0.92/1.15) for blue shadows.
+  - Deeper blue sky: Rayleigh scale 0.045, Mie scale 0.0018.
+  - Low-lying blue haze (fog falloff 0.2) that fades distant islands into the horizon and keeps the sky
+    blue overhead.
+  - Grading: saturation 1.12, contrast 1.08, cool shadows, warm highlights.
+- **Clouds:** `MI_Clouds_Stylized` (`Tools/ue_scripts/setup_sky.py`) is an instance of the engine's simple
+  volumetric clouds with less coverage, denser and larger cumulus masses, and little fine erosion. It must
+  inherit from `m_SimpleVolumetricCloud_Inst`; the base material lacks its texture overrides and renders
+  no clouds.
+- **Shapes:** the boat section, crate and dock use chunky, slightly crooked timber (D20). Wood grain is
+  broader. Cracks on the rocks are fewer and longer.
+
+### D22 · Ocean v4: big swell, crest light by luminance, no seabed in reflections (Adopted)
+- **Waves:**
+  - Three long swells (68/47/33 m) from neighbouring directions interfere into irregular groups.
+  - Smaller waves layer on top. The steepness sum is 0.975, giving narrow crests.
+  - These are the C++ defaults of `ASaltOcean`. `L_VisualTest` uses amplitude 1.6 on the open sea and calms
+    the cove to 15 %.
+- **Shading:**
+  - Ripples come from a flowing, ridged normal map in three rotated layers that travel across the swell.
+  - Crest light appears only on thin, backlit crests. It is driven by the sun's luminance, not its colour:
+    an amber evening sun times teal turned the sea green.
+  - Breaking whitecaps are patchy, with drifting trails.
+- **Finding:** Steep wave faces reflect rays downward. Hardware-traced Lumen reflections then hit the sand
+  test seabed 18 m below and show beige streaks, which were first mistaken for foam and fog. The seabed is
+  hidden from ray tracing and distance fields.
+- **Lesson:** isolate such colours by switching inputs off one at a time (specular, then sun, then
+  geometry) instead of guessing.

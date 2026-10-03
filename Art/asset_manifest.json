@@ -33,7 +33,7 @@
   "SM_TestDeckSection": {
     "fbx": "VisualTest/SM_TestDeckSection.fbx",
     "dest": "/Game/Saltbound/Dev/VisualTest",
-    "nanite": false,
+    "nanite": true,
     "collision": "ucx"
   },
   "SM_Lantern": {

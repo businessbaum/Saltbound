@@ -1,61 +1,73 @@
-"""Pipeline test asset: small wooden crate with iron corner brackets.
+"""Small wooden crate (stylised, hand-made; see Decisions D16/D20). Also the pipeline test asset.
 
 Run: Tools/Build-BlenderAsset.ps1 build_test_crate
-Expected in Unreal: SM_Crate_Small, 60 x 40 x 40 cm, pivot bottom centre, 2 material slots, 1 convex collision.
-An iron plate on the +X face only verifies the forward axis.
+Expected in Unreal: SM_Crate_Small, about 62 x 42 x 42 cm, pivot bottom centre, 2 material slots, 1 convex
+collision. Chunky, slightly crooked planks (sb_timber) between square timber corner posts, a three-board
+lid, heavy iron corner brackets and an iron latch on the +X face (forward-axis marker).
 """
+import math
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import sb_blender as sb  # noqa: E402
+import sb_timber as tb  # noqa: E402
 
 sb.reset_scene()
 wood = sb.get_material("MI_Wood_Planks", (0.55, 0.36, 0.2, 1))
 iron = sb.get_material("MI_Metal_Iron", (0.15, 0.15, 0.16, 1))
 
 L, W, H = 0.60, 0.40, 0.40
+T = 0.028                      # plank thickness
+post = 0.05                    # corner post size
 parts = []
-plank_h = H / 3.0
-gap = 0.006
-# Long side planks (+Y / -Y)
+seed = 700
+plank_h = (H - 0.03) / 3.0
+half_pi = math.pi / 2
+# Long sides (+Y / -Y): planks along X, standing on edge.
 for side in (-1, 1):
     for i in range(3):
-        z = plank_h * (i + 0.5)
-        p = sb.add_box("plank", (L - 0.04, 0.018, plank_h - gap), (0, side * (W / 2 - 0.009), z), wood)
-        parts.append(sb.soften(p, 0.003))
-# End planks (+X / -X)
+        seed += 1
+        z = 0.03 + plank_h * (i + 0.5)
+        parts.append(tb.rough_plank("tb_side", L - 2 * post + 0.01, plank_h - 0.008, T, (0, side * (W / 2 - T / 2), z),
+                                    (half_pi, 0, 0), wood, seed, wear=0.6, grooves=(1, 2), split_chance=0.1, bevel=0.45))
+# Ends (+X / -X): planks along Y.
 for side in (-1, 1):
     for i in range(3):
-        z = plank_h * (i + 0.5)
-        p = sb.add_box("plank", (0.018, W - 0.04, plank_h - gap), (side * (L / 2 - 0.009), 0, z), wood)
-        parts.append(sb.soften(p, 0.003))
-# Lid and bottom
-for z in (0.009, H - 0.009):
-    p = sb.add_box("lid", (L - 0.004, W - 0.004, 0.018), (0, 0, z), wood)
-    parts.append(sb.soften(p, 0.003))
-# Corner posts
+        seed += 1
+        z = 0.03 + plank_h * (i + 0.5)
+        parts.append(tb.rough_plank("tb_end", W - 2 * post + 0.01, plank_h - 0.008, T, (side * (L / 2 - T / 2), 0, z),
+                                    (half_pi, 0, half_pi), wood, seed, wear=0.6, grooves=(1, 2), split_chance=0.1, bevel=0.45))
+# Corner posts: square timber.
 for sx in (-1, 1):
     for sy in (-1, 1):
-        p = sb.add_box("post", (0.04, 0.04, H), (sx * (L / 2 - 0.02), sy * (W / 2 - 0.02), H / 2), wood)
-        parts.append(sb.soften(p, 0.004))
-# Iron corner brackets (top and bottom corners)
+        seed += 1
+        parts.append(tb.rough_post("tb_post", post * 0.68, H - 0.01, (sx * (L / 2 - post / 2), sy * (W / 2 - post / 2), 0.0),
+                                   sides=4, taper=0.97, material=wood, seed=seed, top_wear=0.3))
+# Lid: three boards along X, slight overhang.
+for k in range(3):
+    seed += 1
+    w = (W + 0.02) / 3
+    parts.append(tb.rough_plank("tb_lid", L + 0.02, w - 0.006, T, (0, -W / 2 - 0.01 + w * (k + 0.5), H + T / 2 - 0.005),
+                                (0, 0, 0), wood, seed, wear=0.5, grooves=(1, 3), split_chance=0.15, bevel=0.45))
+# Bottom (hidden).
+parts.append(sb.add_box("bottom", (L - 0.01, W - 0.01, 0.02), (0, 0, 0.012), wood))
+# Heavy iron corner brackets: two plates wrapping each vertical corner, top and bottom.
 for sx in (-1, 1):
     for sy in (-1, 1):
-        for z in (0.03, H - 0.03):
-            p = sb.add_box("bracket", (0.07, 0.07, 0.06), (sx * (L / 2 - 0.03), sy * (W / 2 - 0.03), z), iron)
-            parts.append(sb.soften(p, 0.003, 1))
-# Forward marker: iron plate on the +X face only (axis check)
-p = sb.add_box("fwd_plate", (0.006, 0.12, 0.08), (L / 2 + 0.003, 0, H * 0.6), iron)
-parts.append(sb.soften(p, 0.002, 1))
-# Starboard marker: small iron plate on the -Y face (Blender) = +Y (Unreal right side)
-p = sb.add_box("stbd_plate", (0.06, 0.006, 0.06), (0.15, -(W / 2 + 0.003), H * 0.6), iron)
-parts.append(sb.soften(p, 0.002, 1))
+        for z in (0.06, H - 0.04):
+            parts.append(sb.soften(sb.add_box("bracket", (0.11, 0.008, 0.07), (sx * (L / 2 - 0.045), sy * (W / 2 + 0.004), z), iron), 0.003, 1))
+            parts.append(sb.soften(sb.add_box("bracket", (0.008, 0.11, 0.07), (sx * (L / 2 + 0.004), sy * (W / 2 - 0.045), z), iron), 0.003, 1))
+# Latch on +X (forward marker).
+parts.append(sb.soften(sb.add_box("latch", (0.012, 0.09, 0.07), (L / 2 + 0.008, 0, H - 0.05), iron), 0.003, 1))
+parts.append(sb.add_torus("latch_ring", 0.022, 0.006, (L / 2 + 0.02, 0, H - 0.1), (0, math.pi / 2, 0), 16, 6, iron))
+for p in parts:
+    if p.name.startswith(("bottom", "bracket", "latch")):
+        sb.world_box_uv(p, 1.0)
 
 crate = sb.join(parts, "SM_Crate_Small")
-sb.jitter_vertices(crate, 0.0008, seed=7)
-sb.world_box_uv(crate, metres_per_uv=1.0)
-sb.bake_vertex_masks(crate, wear=1.0, seed=7)
-ucx = sb.add_ucx_box("SM_Crate_Small", 1, (L, W, H), (0, 0, H / 2))
+sb.bake_vertex_masks(crate, wear=0.8, seed=7, bevel_max=0.02)
+ucx = sb.add_ucx_box("SM_Crate_Small", 1, (L + 0.02, W + 0.02, H + T), (0, 0, (H + T) / 2))
+print("SB_CRATE faces", len(crate.data.polygons))
 sb.save_blend("SM_Crate_Small")
 sb.export_fbx([crate, ucx], os.path.join("Props", "SM_Crate_Small.fbx"))

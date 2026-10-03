@@ -124,9 +124,9 @@ float2 S2 = Texture2DSample(RippleTex, RippleTexSampler, float2(dot(XY, A2) - Ti
 float2 S3 = Texture2DSample(RippleTex, RippleTexSampler, float2(dot(XY, A3) - Time * RippleSpeed3, dot(XY, B3)) / RippleTile3 + 0.61).xy * 2.0 - 1.0;
 float2 RippleSlope = (S1.x * A1 + S1.y * B1) * (RippleStrength * MidFade)
                    + (S2.x * A2 + S2.y * B2) * (RippleStrength * 0.8 * RippleFade)
-                   + (S3.x * A3 + S3.y * B3) * (RippleStrength * 0.55 * NearFade);
+                   + (S3.x * A3 + S3.y * B3) * (RippleStrength * 1.3 * NearFade);   // breaks sun streaks into sparkles
 // Wind ripples are stronger on the exposed faces and crests than down in the troughs.
-RippleSlope *= lerp(0.55, 1.25, saturate(Height / 160.0 + 0.5));
+RippleSlope *= lerp(0.6, 1.1, saturate(Height / 160.0 + 0.5));
 float3 N = normalize(GN + float3(RippleSlope, 0.0));
 
 // Foam. Lace texture laid out along the wind, drifting slowly with it (foam stays roughly in place while
@@ -173,7 +173,11 @@ float Thin = saturate(CrestH * CrestH * saturate(1.0 - GN.z) * ThinScale);
 float Forward = pow(saturate(dot(-V, L) * 0.6 + 0.4), SSSBacklitPower);
 float Facing = saturate(dot(GN, V) * 1.5);
 float Glow = Thin * Forward * (0.35 + 0.65 * Facing) + SSSAmbient * CrestH * CrestH * Facing;
-EmissiveOut = SSSColor * SunIllum * (Glow * SSSStrength * (1.0 - Foam));
+Glow *= lerp(1.0, 0.3, saturate(Dist / max(SSSFarDistance, 1.0)));   // far crests: hint, not neon
+// Light filtered through water stays teal: use the sun's brightness, not its colour (an amber evening sun
+// times teal would turn the crests green).
+float SunLum = dot(SunIllum, float3(0.2126, 0.7152, 0.0722));
+EmissiveOut = SSSColor * SunLum * (Glow * SSSStrength * (1.0 - Foam));
 return N;
 """
 
@@ -220,9 +224,9 @@ def make_material(mpc, ush):
                           texture=unreal.load_asset(DIR + "/Textures/T_OceanFoam_M"),
                           sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, group="Foam")
     scalars = {
-        "RippleTile1": (900.0, "Ripples"), "RippleTile2": (3800.0, "Ripples"), "RippleTile3": (240.0, "Ripples"),
+        "RippleTile1": (900.0, "Ripples"), "RippleTile2": (3800.0, "Ripples"), "RippleTile3": (150.0, "Ripples"),
         "RippleSpeed1": (90.0, "Ripples"), "RippleSpeed2": (160.0, "Ripples"), "RippleSpeed3": (45.0, "Ripples"),
-        "RippleStrength": (0.2, "Ripples"), "RippleFadeDistance": (25000.0, "Ripples"),
+        "RippleStrength": (0.12, "Ripples"), "RippleFadeDistance": (25000.0, "Ripples"),
         "FoamTile": (900.0, "Foam"), "FoamJStart": (0.62, "Foam"), "FoamJRange": (0.3, "Foam"),
         "FoamSoftness": (0.12, "Foam"), "FoamTrailLength": (650.0, "Foam"), "FoamTrailStrength": (0.85, "Foam"),
         "FoamDrift": (35.0, "Foam"), "BreakPatchiness": (2.2, "Foam"),
@@ -230,7 +234,7 @@ def make_material(mpc, ush):
         "MarbleAmount": (0.16, "Foam"), "MarbleOpacity": (0.35, "Foam"), "MarbleFadeDistance": (7000.0, "Foam"),
         "WaterRoughness": (0.03, "Surface"), "FarRoughness": (0.1, "Surface"), "FarRoughnessDistance": (30000.0, "Surface"),
         "SSSStrength": (0.11, "Crest light"), "SSSCrestStart": (25.0, "Crest light"), "SSSCrestRange": (160.0, "Crest light"),
-        "SSSBacklitPower": (2.5, "Crest light"), "SSSAmbient": (0.12, "Crest light"), "ThinScale": (6.0, "Crest light"),
+        "SSSBacklitPower": (2.5, "Crest light"), "SSSAmbient": (0.12, "Crest light"), "ThinScale": (6.0, "Crest light"), "SSSFarDistance": (12000.0, "Crest light"),
     }
     sp = {n: sb_ue.scalar_param(m, n, v, -1200, 1200 + i * 60, g) for i, (n, (v, g)) in enumerate(scalars.items())}
     scene_depth = sb_ue.expr(m, unreal.MaterialExpressionSceneDepthWithoutWater, -1500, 1800)
@@ -241,7 +245,7 @@ def make_material(mpc, ush):
 
     sun_dir = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightDirection, -1500, 2000)
     sun_illum = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightIlluminance, -1500, 2100)
-    sss_color = sb_ue.vector_param(m, "SSSColor", (0.15, 0.95, 0.85, 1), -1500, 2200, "Crest light")
+    sss_color = sb_ue.vector_param(m, "SSSColor", (0.18, 0.9, 0.85, 1), -1500, 2200, "Crest light")
     time = sb_ue.expr(m, unreal.MaterialExpressionTime, -1500, 2300)
     ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "RippleTex", "FoamTex", "WaterDepth", "SunDir", "SunIllum", "SSSColor", "Time"]
                  + list(scalars) + WAVE_PARAMS + OTHER_PARAMS)

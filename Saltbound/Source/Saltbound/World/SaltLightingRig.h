@@ -9,6 +9,7 @@
 class ADirectionalLight;
 class ASkyLight;
 class AExponentialHeightFog;
+class ASkyAtmosphere;
 class APostProcessVolume;
 
 USTRUCT(BlueprintType)
@@ -24,8 +25,16 @@ struct FSaltLightingPreset
 	/** Physical sun illuminance; the sky atmosphere attenuates and colours it near the horizon. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sun", meta = (Units = "lux")) float SunIlluminance = 90000.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sun", meta = (Units = "K")) float SunTemperature = 5800.f;
+	/** Apparent sun diameter. Larger than the real 0.53 deg gives the big, soft sun reflection on the sea
+	 *  (Sea of Thieves uses an area highlight for this) and softer shadow edges. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sun", meta = (Units = "deg")) float SunSourceAngle = 0.5357f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sky") float SkyLightIntensity = 1.f;
+	/** Tint of the sky light: cool shadows against the golden sun. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sky") FLinearColor SkyLightTint = FLinearColor::White;
+	/** Atmosphere: Rayleigh scale (sky blue depth) and Mie scale (whitish haze near the horizon). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sky") float RayleighScale = 0.0331f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sky") float MieScale = 0.003996f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fog") float FogDensity = 0.012f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fog") float FogHeightFalloff = 0.06f;
@@ -41,6 +50,10 @@ struct FSaltLightingPreset
 	/** Global grading: saturation and a gentle colour cast. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grading") float Saturation = 0.95f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grading") FLinearColor Gain = FLinearColor(1.f, 1.f, 1.f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grading") float Contrast = 1.f;
+	/** Split toning: colour of the shadows and of the highlights (multiplied in). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grading") FLinearColor ShadowGain = FLinearColor(1.f, 1.f, 1.f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grading") FLinearColor HighlightGain = FLinearColor(1.f, 1.f, 1.f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Props") bool bLanternsLit = false;
 };
@@ -81,6 +94,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Scene") TObjectPtr<ASkyLight> SkyLight;
 	UPROPERTY(EditAnywhere, Category = "Scene") TObjectPtr<AExponentialHeightFog> Fog;
 	UPROPERTY(EditAnywhere, Category = "Scene") TObjectPtr<APostProcessVolume> PostProcess;
+	UPROPERTY(EditAnywhere, Category = "Scene") TObjectPtr<ASkyAtmosphere> Atmosphere;
 
 private:
 	void ResolveSceneActors();

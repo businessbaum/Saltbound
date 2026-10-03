@@ -4,6 +4,19 @@ Reference: Sea of Thieves for the sea, rocks and wood (owner-supplied reference 
 Saltbound aims for a calmer, original look with less exaggerated shapes. **Stylised, not realistic.**
 Quality means crisp, readable, hand-painted material detail without blur, on simple chunky shapes.
 
+## Stylised realism (D21)
+Sea of Thieves looks like a painted pirate adventure brought into 3D: believable light, water and atmosphere,
+combined with deliberately simplified, slightly exaggerated, hand-crafted shapes.
+- **Shapes:** bold and slightly crooked. Boards bend, buildings lean, rocks have broad angular faces,
+  objects have chunky proportions. Use `sb_timber` for anything made of wood.
+- **Textures:** large readable details (grooves, chips, broad colour variation), never dense photographic
+  detail.
+- **Materials:** wood worn and matte, metal with strong highlights, water glossy and deep.
+- **Colour:**
+  - Rich but controlled: turquoise sea, warm sand, golden sun, cool shadows.
+  - Darker, muted objects let the bright areas stand out.
+- **Light:** soft atmospheric light plus strong directional sun. Haze fades distant islands into the sky.
+
 ## Principles
 - **Shapes:** chunky and readable, with believable proportions. Planks 3–4 cm thick, rails about 8 cm.
   Soft bevels of 3–8 mm on every hard edge (`sb.soften`). Slight irregularity: plank length/height jitter,

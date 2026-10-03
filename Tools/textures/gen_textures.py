@@ -205,11 +205,12 @@ def wood_field(size, seed=0, rings=90.0, line_w=0.07):
 def wood_grain():
     """Hand-painted straight-grain wood (tinted per material), 1 tile = 1 m at 2048 px, grain along U."""
     size = 2048
-    latewood, knot_dark, band, fibers, broad = wood_field(size)
-    albedo = (0.6 + 0.06 * broad + 0.035 * (band - 0.5) - 0.14 * latewood - 0.05 * np.abs(fibers)
-              + 0.02 * fibers - 0.3 * knot_dark)
+    # Broad, readable grain (stylised): lines ~2.2 cm apart, wider, fibres faint.
+    latewood, knot_dark, band, fibers, broad = wood_field(size, rings=45.0, line_w=0.11)
+    albedo = (0.6 + 0.07 * broad + 0.035 * (band - 0.5) - 0.13 * latewood - 0.02 * np.abs(fibers)
+              + 0.01 * fibers - 0.3 * knot_dark)
     rgb = np.stack([albedo * 1.00, albedo * 0.92, albedo * 0.82], -1)
-    height = -latewood * 0.45 + fibers * 0.35 - knot_dark * 0.4 + band * 0.05
+    height = -latewood * 0.6 + fibers * 0.15 - knot_dark * 0.4 + band * 0.08
     save_rgb(os.path.join(OUT, "Wood", "T_WoodGrain_D.png"), rgb)
     save_normal(os.path.join(OUT, "Wood", "T_WoodGrain_N.png"), height_to_normal(height, 3.0))
     ao = 1.0 - 0.12 * latewood - 0.2 * knot_dark
@@ -344,12 +345,13 @@ def rock():
     # 2. Cracks: thin segments of a warped Voronoi border network, partly hidden.
     f1, f2 = worley_grid(size, 3, 4, seed=73, warp=warp)
     e = f2 - f1
-    show = crisp(n01(spectral_noise(size, 2, 9, -1.7, seed=74)), 0.6, 0.01)
-    crack = crisp(0.018 - e, 0.0, 0.006) * show
+    # Low-frequency reveal mask: few, long cracks instead of many short marks.
+    show = crisp(n01(spectral_noise(size, 1, 4, -1.9, seed=74)), 0.58, 0.01)
+    crack = crisp(0.02 - e, 0.0, 0.006) * show
     crack_lip = np.clip(np.roll(crack, 3, axis=0) - crack, 0, 1)       # light edge just below the groove
     # 3. Chips: a few angular cells, recessed with a lit top edge and a shaded bottom edge.
     f1c, f2c, cid = worley_cells(size, 26, seed=79, warp=warp)
-    pick = (np.random.default_rng(80).random(26 * 26) < 0.04)[cid]
+    pick = (np.random.default_rng(80).random(26 * 26) < 0.025)[cid]
     chip = pick * crisp(f2c - f1c, 0.05, 0.02)
     chip_top = np.clip(chip - np.roll(chip, 4, axis=0), 0, 1)
     chip_bottom = np.clip(chip - np.roll(chip, -4, axis=0), 0, 1)
@@ -404,27 +406,29 @@ def paint_surface():
 
 
 def canvas():
-    """Painted canvas for roofs, covers and later sails (1 tile = 0.5 m at UVScale 2, 2048 px): a visible
-    plain weave (64 threads per tile), a sewn seam with stitches across U, soft creases and weathering."""
+    """Painted canvas for roofs, covers and later sails (1 tile = 1 m, 2048 px), stylised: broad sewn
+    panels (seam every 0.5 m along V) with slightly different tones, a row of stitches beside each seam,
+    soft diagonal creases, low-contrast weave, weathering stains."""
     size = 2048
     y, x = np.mgrid[0:size, 0:size] / size
-    n = 96
+    n = 64
     warp = np.sin(2 * np.pi * x * n) * np.sign(np.sin(np.pi * y * n))
     weft = np.sin(2 * np.pi * y * n) * -np.sign(np.sin(np.pi * x * n))
     weave = 0.5 + 0.25 * (warp + weft)
-    slub = spectral_noise(size, 2, 40, -1.5, seed=95)
-    creases = spectral_noise_dir(size, 2, 20, -1.6, 96, 80.0, 5.0)
-    # Seam: a double fold line at v = 0.5 with a row of stitches beside it.
-    sv = np.abs(y - 0.5)
-    seam = np.clip(1.0 - sv / 0.012, 0, 1)
-    fold = np.clip(1.0 - np.abs(sv - 0.016) / 0.004, 0, 1)
-    stitches = np.clip(1.0 - np.abs(sv - 0.03) / 0.0035, 0, 1) * (np.sin(2 * np.pi * x * 80) > 0.2)
-    grime = n01(spectral_noise(size, 1, 10, -1.8, seed=97))
-    albedo = (0.6 + 0.06 * (weave - 0.5) + 0.04 * slub + 0.03 * creases - 0.08 * fold - 0.1 * stitches
-              + 0.03 * seam - 0.06 * grime)
+    creases = spectral_noise_dir(size, 2, 14, -1.7, 96, 60.0, 4.0)
+    stains = n01(spectral_noise(size, 1, 8, -1.8, seed=97))
+    panel = np.floor(y * 2.0)
+    panel_tone = np.where(panel % 2 == 0, 0.02, -0.02)
+    sv = np.abs(((y * 2.0) % 1.0) - 0.0)
+    sv = np.minimum(sv, 1.0 - sv) / 2.0                 # distance to the nearest seam (tile units)
+    seam = np.clip(1.0 - sv / 0.01, 0, 1)
+    fold = np.clip(1.0 - np.abs(sv - 0.014) / 0.004, 0, 1)
+    stitches = np.clip(1.0 - np.abs(sv - 0.026) / 0.004, 0, 1) * (np.sin(2 * np.pi * x * 70) > 0.1)
+    albedo = (0.6 + 0.025 * (weave - 0.5) + 0.04 * creases + panel_tone - 0.1 * fold - 0.12 * stitches
+              + 0.03 * seam - 0.07 * stains)
     save_rgb(os.path.join(OUT, "Fabric", "T_Canvas_D.png"), np.stack([albedo, albedo * 0.98, albedo * 0.93], -1))
-    height = weave * 0.6 + slub * 0.2 + creases * 1.2 + seam * 0.8 - fold * 0.6 + stitches * 0.4
-    save_normal(os.path.join(OUT, "Fabric", "T_Canvas_N.png"), height_to_normal(height, 1.6))
+    height = weave * 0.3 + creases * 1.6 + seam * 1.0 - fold * 0.8 + stitches * 0.5
+    save_normal(os.path.join(OUT, "Fabric", "T_Canvas_N.png"), height_to_normal(height, 2.2))
 
 
 def macro_noise():

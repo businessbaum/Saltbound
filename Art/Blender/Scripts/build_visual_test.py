@@ -74,117 +74,157 @@ def export(name, obj, cols, folder="VisualTest"):
 
 # --------------------------------------------------------------------------------------------------
 def deck_section():
+    """4 m slice of the starter boat (3.4 m beam), stylised and hand-made (D20/D21): chunky teak boards,
+    square timber stanchions, planked bulwarks and deckhouse with a slight inward lean, heavy cap rail,
+    thick cambered canvas roof, big brass portholes. Cared for, so less worn than the harbour timber.
+    Pivot: deck surface, midships. Design waterline 0.75 m below the deck."""
+    import sb_timber as tb
     rng = random.Random(3)
     parts = []
     L = 4.0
     x0, x1 = -L / 2, L / 2
-    # Deck planking (teak) over a dark caulking bed: narrow planks, butt joints at random positions.
-    pw, seam, th = 0.08, 0.007, 0.03
-    width = 2.90
-    n = int(width / (pw + seam))
-    ys = -(n * (pw + seam)) / 2 + pw / 2
-    for i in range(n):
-        y = ys + i * (pw + seam)
-        split = rng.uniform(-1.3, 1.3)
+    half_pi = math.pi / 2
+    seed = [300]
+
+    def nseed():
+        seed[0] += 1
+        return seed[0]
+
+    def board(name, length, width, thick, center, rot, mat, wear=0.3, grooves=(1, 2), bevel=0.7):
+        b = tb.rough_plank(name, length, width, thick, center, rot, M[mat], nseed(), wear=wear, grooves=grooves,
+                           split_chance=0.0, bevel=bevel)
+        parts.append(b)
+        return b
+
+    # Deck: chunky teak boards over a dark caulking bed, butt joints at random positions.
+    width, th = 2.9, 0.045
+    y = -width / 2
+    while y < width / 2 - 0.05:
+        pw = min(rng.uniform(0.12, 0.145), width / 2 - y)
+        split = rng.uniform(-1.2, 1.2)
         for xa, xb in ((x0, split), (split, x1)):
-            plank(parts, "deck", (xb - xa - 0.004, pw, th), ((xa + xb) / 2, y, -th / 2 + rng.uniform(-0.0012, 0.0012)), "MI_Wood_Teak", bevel=0.003)
-    plank(parts, "caulk", (L, width + 0.02, 0.02), (0, 0, -0.012), "MI_Caulk_Dark", bevel=0.0, segments=1)
+            board("tb_deck", xb - xa - 0.006, pw - 0.008, th, ((xa + xb) / 2, y + pw / 2, -th / 2), (0, 0, 0), "MI_Wood_Teak",
+                  wear=0.3)
+        y += pw
+    plank(parts, "caulk", (L, width + 0.02, 0.02), (0, 0, -0.03), "MI_Caulk_Dark", bevel=0.0, segments=1)
+
     for s in (-1, 1):
-        # Margin boards (varnished) and covering board.
-        plank(parts, "margin", (L, 0.20, 0.035), (0, s * 1.555, -0.0175 + 0.003), "MI_Wood_Varnish", bevel=0.004)
-        # Stanchions every 0.6 m, bulwark lining (cream inside), hull-paint skin outside, varnished cap rail.
-        for k in range(7):
-            x = x0 + 0.2 + k * 0.6
-            plank(parts, "stanchion", (0.06, 0.06, 0.50), (x, s * 1.665, 0.25), "MI_Wood_Varnish", bevel=0.005)
+        board("tb_margin", L, 0.2, 0.055, (0, s * 1.555, -0.02), (0, 0, 0), "MI_Wood_Varnish", wear=0.3)
+        for k in range(6):
+            x = x0 + 0.33 + k * 0.67
+            parts.append(tb.rough_post("tb_stanchion", 0.043, 0.5, (x, s * 1.66, 0.0), sides=4, taper=0.9,
+                                       material=M["MI_Wood_Varnish"], seed=nseed(), top_wear=0.2))
         gangway = (0.25, 1.05) if s > 0 else None
-        for z0, h in ((0.02, 0.22), (0.26, 0.22)):
-            spans = [(x0, x1)] if gangway is None else [(x0, gangway[0]), (gangway[1], x1)]
+        spans = [(x0, x1)] if gangway is None else [(x0, gangway[0]), (gangway[1], x1)]
+        for z0, h in ((0.02, 0.23), (0.25, 0.23)):
             for xa, xb in spans:
-                plank(parts, "bulwark_in", (xb - xa, 0.025, h - 0.006), ((xa + xb) / 2, s * 1.685, z0 + h / 2), "MI_Paint_Cream", bevel=0.003)
-                plank(parts, "bulwark_out", (xb - xa, 0.012, h + 0.012), ((xa + xb) / 2, s * 1.704, z0 + h / 2), "MI_Paint_Hull", bevel=0.002)
-        spans = [(x0, x1)] if gangway is None else [(x0, gangway[0] + 0.03), (gangway[1] - 0.03, x1)]
-        for xa, xb in spans:
-            plank(parts, "caprail", (xb - xa, 0.13, 0.045), ((xa + xb) / 2, s * 1.68, 0.5225), "MI_Wood_Varnish", bevel=0.008)
-        # Hull strakes below the deck: convex section y = 1.70 - 0.55 t^2, z = -1.5 t.
+                board("tb_bulwark_in", xb - xa, h - 0.012, 0.03, ((xa + xb) / 2, s * 1.69, z0 + h / 2), (half_pi, 0, 0),
+                      "MI_Paint_Cream", wear=0.25, bevel=0.6)
+                board("tb_bulwark_out", xb - xa, h - 0.004, 0.026, ((xa + xb) / 2, s * 1.718, z0 + h / 2), (half_pi, 0, 0),
+                      "MI_Paint_Hull", wear=0.25, bevel=0.5)
+        cap = [(x0, x1)] if gangway is None else [(x0, gangway[0] + 0.03), (gangway[1] - 0.03, x1)]
+        for xa, xb in cap:
+            board("tb_caprail", xb - xa, 0.16, 0.065, ((xa + xb) / 2, s * 1.69, 0.5), (0, 0, 0), "MI_Wood_Varnish", wear=0.4)
+        # Hull strakes below the deck: convex section y = 1.72 - 0.55 t^2, z = -1.5 t.
         steps = 8
         for k in range(steps):
             t0, t1 = k / steps, (k + 1) / steps
-            ya, za = 1.70 - 0.55 * t0 ** 2, -1.5 * t0
-            yb, zb = 1.70 - 0.55 * t1 ** 2, -1.5 * t1
+            ya, za = 1.72 - 0.55 * t0 ** 2, -1.5 * t0
+            yb, zb = 1.72 - 0.55 * t1 ** 2, -1.5 * t1
             zc = (za + zb) / 2
             mat = "MI_Paint_Cream" if k == 0 else ("MI_Paint_Boottop" if abs(zc + 0.75) < 0.1 else "MI_Paint_Hull")
             ln = math.hypot(yb - ya, zb - za)
-            ang = math.atan2(ya - yb, za - zb)  # strake tilt from vertical
-            p = plank(parts, "strake", (L, 0.035, ln - 0.004), (0, s * (ya + yb) / 2, zc), mat, bevel=0.004)
-            sb.transform_obj(p, (s * ang, 0, 0), (0, s * (ya + yb) / 2, zc))
-        # Section end caps (temporary: this is a slice of the boat).
+            ang = math.atan2(ya - yb, za - zb)
+            board("tb_strake", L, ln - 0.006, 0.04, (0, s * (ya + yb) / 2, zc), (half_pi + s * ang, 0, 0), mat,
+                  wear=0.2, grooves=(0, 1), bevel=0.6)
     for xe in (x0 - 0.01, x1 + 0.01):
-        plank(parts, "endcap", (0.02, 3.38, 1.55), (xe, 0, -0.75), "MI_Paint_Boottop", bevel=0.0, segments=1)
+        plank(parts, "endcap", (0.02, 3.42, 1.55), (xe, 0, -0.75), "MI_Paint_Boottop", bevel=0.0, segments=1)
 
-    # Deckhouse (aft part of the section): cream walls, varnished corner posts and trim, canvas roof.
-    cx0, cx1, hw, wh = -1.9, -0.3, 0.72, 0.95
+    # Deckhouse: planked cream walls leaning slightly inward, chunky varnished corner posts and trim.
+    cx0, cx1, hw, wh = -1.9, -0.3, 0.72, 0.98
+    rows = 4
+    bh = wh / rows
+    lean = 0.035                           # inward offset of the top row
     for s in (-1, 1):
-        plank(parts, "cabin_side", (cx1 - cx0, 0.04, wh), ((cx0 + cx1) / 2, s * hw, wh / 2), "MI_Paint_Cream", bevel=0.005)
+        for r in range(rows):
+            off = lean * (r + 0.5) / rows
+            board("tb_cabin_side", cx1 - cx0 - 0.04, bh - 0.008, 0.04, ((cx0 + cx1) / 2, s * (hw - off), bh * (r + 0.5)),
+                  (half_pi - s * 0.035, 0, 0), "MI_Paint_Cream", wear=0.25, bevel=0.6)
         for x in (-1.5, -0.8):
-            ring = sb.add_torus("porthole", 0.085, 0.016, (x, s * (hw + 0.02), 0.58), (math.pi / 2, 0, 0), 24, 8, M["MI_Metal_Brass"])
+            ring = sb.add_torus("porthole", 0.105, 0.026, (x, s * (hw - 0.012 + 0.02), 0.58), (math.pi / 2, 0, 0), 28, 10, M["MI_Metal_Brass"])
             parts.append(ring)
-            plank(parts, "porthole_glass", (0.15, 0.01, 0.15), (x, s * (hw + 0.012), 0.58), "MI_Glass_Dark", bevel=0.0, segments=1)
+            parts.append(sb.add_cylinder("porthole_glass", 0.09, 0.012, (x, s * (hw - 0.012 + 0.012), 0.58), "Y", 24, M["MI_Glass_Dark"]))
         for x in (cx0, cx1):
-            plank(parts, "corner_post", (0.07, 0.07, wh + 0.02), (x, s * hw, (wh + 0.02) / 2), "MI_Wood_Varnish", bevel=0.008)
-    plank(parts, "cabin_back", (0.04, 2 * hw, wh), (cx0, 0, wh / 2), "MI_Paint_Cream", bevel=0.005)
-    # Front wall with a door opening (0.62 wide, 0.86 high) and varnished frame + door.
-    dw, dh = 0.62, 0.86
+            parts.append(tb.rough_post("tb_corner", 0.06, wh + 0.03, (x, s * (hw - lean / 2), 0.0), sides=4, taper=0.94,
+                                       material=M["MI_Wood_Varnish"], seed=nseed(), top_wear=0.0))
+    for r in range(rows):
+        off = lean * (r + 0.5) / rows
+        board("tb_cabin_back", 2 * (hw - off) - 0.04, bh - 0.008, 0.04, (cx0 + off, 0, bh * (r + 0.5)), (half_pi, 0, half_pi),
+              "MI_Paint_Cream", wear=0.25, bevel=0.6)
+    # Front wall with a door opening (0.64 wide, 0.86 high): boards beside the door, a header, a planked door.
+    dw, dh = 0.64, 0.86
     side_w = hw - dw / 2
     for s in (-1, 1):
-        plank(parts, "cabin_front", (0.04, side_w, wh), (cx1, s * (dw / 2 + side_w / 2), wh / 2), "MI_Paint_Cream", bevel=0.005)
-        plank(parts, "door_jamb", (0.06, 0.05, dh), (cx1 + 0.01, s * (dw / 2 - 0.025), dh / 2), "MI_Wood_Varnish", bevel=0.006)
-    plank(parts, "cabin_header", (0.04, dw, wh - dh), (cx1, 0, dh + (wh - dh) / 2), "MI_Paint_Cream", bevel=0.004)
-    plank(parts, "door_head", (0.06, dw, 0.05), (cx1 + 0.01, 0, dh - 0.025), "MI_Wood_Varnish", bevel=0.006)
-    for k in range(5):
-        plank(parts, "door_board", (0.03, (dw - 0.1) / 5 - 0.004, dh - 0.07), (cx1 - 0.01, -dw / 2 + 0.05 + (k + 0.5) * (dw - 0.1) / 5, (dh - 0.07) / 2 + 0.01), "MI_Wood_Varnish", bevel=0.003)
-    plank(parts, "door_sill", (0.12, dw + 0.06, 0.06), (cx1 + 0.03, 0, 0.03), "MI_Wood_Varnish", bevel=0.008)
-    # Trim band and cambered canvas roof with handrails.
+        for r in range(rows):
+            off = lean * (r + 0.5) / rows
+            board("tb_cabin_front", side_w - 0.02 - off, bh - 0.008, 0.04, (cx1 - off, s * (dw / 2 + (side_w - off) / 2), bh * (r + 0.5)),
+                  (half_pi, 0, half_pi), "MI_Paint_Cream", wear=0.25, bevel=0.6)
+        parts.append(tb.rough_post("tb_jamb", 0.04, dh, (cx1 + 0.01, s * (dw / 2 - 0.02), 0.0), sides=4, taper=0.97,
+                                   material=M["MI_Wood_Varnish"], seed=nseed(), top_wear=0.0))
+    board("tb_header", dw + 0.1, wh - dh, 0.045, (cx1 - lean * 0.9, 0, dh + (wh - dh) / 2), (half_pi, 0, half_pi), "MI_Paint_Cream", wear=0.2)
+    board("tb_door_head", dw + 0.12, 0.07, 0.07, (cx1 + 0.01, 0, dh), (half_pi, 0, half_pi), "MI_Wood_Varnish", wear=0.3)
+    for k in range(4):
+        bw = (dw - 0.06) / 4
+        board("tb_door", dh - 0.06, bw - 0.006, 0.035, (cx1 - 0.005, -dw / 2 + 0.03 + (k + 0.5) * bw, (dh - 0.06) / 2 + 0.02),
+              (0, -half_pi, 0), "MI_Wood_Varnish", wear=0.25, bevel=0.5)
+    parts.append(sb.add_torus("door_ring", 0.035, 0.008, (cx1 + 0.03, 0.18, 0.48), (0, math.pi / 2, 0), 16, 6, M["MI_Metal_Brass"]))
+    board("tb_sill", dw + 0.08, 0.14, 0.07, (cx1 + 0.03, 0, 0.035), (0, 0, half_pi), "MI_Wood_Varnish", wear=0.4)
+    # Trim band at the top of the walls, thick cambered canvas roof, roof handrails.
     for s in (-1, 1):
-        plank(parts, "trim", (cx1 - cx0 + 0.1, 0.05, 0.07), ((cx0 + cx1) / 2, s * (hw + 0.005), wh - 0.035), "MI_Wood_Varnish", bevel=0.006)
-    roof = sb.add_box("roof", (cx1 - cx0 + 0.16, 2 * hw + 0.16, 0.04), ((cx0 + cx1) / 2, 0, wh + 0.02), M["MI_Canvas"])
+        board("tb_trim", cx1 - cx0 + 0.14, 0.09, 0.05, ((cx0 + cx1) / 2, s * (hw - lean + 0.02), wh - 0.045), (half_pi, 0, 0),
+              "MI_Wood_Varnish", wear=0.3)
+    roof = sb.add_box("roof", (cx1 - cx0 + 0.3, 2 * hw + 0.24, 0.08), ((cx0 + cx1) / 2, 0, wh + 0.04), M["MI_Canvas"])
     for v in roof.data.vertices:
-        v.co.z += 0.05 * (1.0 - (v.co.y / (hw + 0.08)) ** 2)
-    sb.soften(roof, 0.006, 2)
+        v.co.z += 0.09 * (1.0 - (v.co.y / (hw + 0.12)) ** 2)
+    sb.soften(roof, 0.02, 3)
     parts.append(roof)
     for s in (-1, 1):
-        plank(parts, "handrail", (1.3, 0.035, 0.045), ((cx0 + cx1) / 2, s * 0.55, wh + 0.13), "MI_Wood_Varnish", bevel=0.008)
-        for x in (-1.6, -1.1, -0.6):
-            plank(parts, "handrail_foot", (0.06, 0.035, 0.07), (x, s * 0.55, wh + 0.075), "MI_Wood_Varnish", bevel=0.006)
+        board("tb_handrail", 1.35, 0.05, 0.06, ((cx0 + cx1) / 2, s * 0.55, wh + 0.2), (0, 0, 0), "MI_Wood_Varnish", wear=0.3)
+        for x in (-1.65, -1.1, -0.55):
+            parts.append(tb.rough_post("tb_handrail_foot", 0.03, 0.12, (x, s * 0.55, wh + 0.09), sides=4, taper=0.9,
+                                       material=M["MI_Wood_Varnish"], seed=nseed(), top_wear=0.0))
 
-    # Foredeck hatch: varnished coaming, teak lid with brass hinges.
-    hx, hs = 1.2, 0.62
+    # Foredeck hatch: chunky varnished coaming, teak lid boards, brass hinges.
+    hx, hs = 1.2, 0.66
     for s in (-1, 1):
-        plank(parts, "coaming", (hs, 0.05, 0.11), (hx, s * (hs / 2 - 0.025), 0.055), "MI_Wood_Varnish", bevel=0.006)
-        plank(parts, "coaming", (0.05, hs - 0.1, 0.11), (hx + s * (hs / 2 - 0.025), 0, 0.055), "MI_Wood_Varnish", bevel=0.006)
-    for k in range(6):
-        plank(parts, "hatch_lid", (hs + 0.04, (hs + 0.04) / 6 - 0.006, 0.03), (hx, -(hs + 0.04) / 2 + (k + 0.5) * (hs + 0.04) / 6, 0.125), "MI_Wood_Teak", bevel=0.003)
+        board("tb_coaming", hs, 0.13, 0.06, (hx, s * (hs / 2 - 0.03), 0.065), (half_pi, 0, 0), "MI_Wood_Varnish", wear=0.3)
+        board("tb_coaming", hs - 0.12, 0.13, 0.06, (hx + s * (hs / 2 - 0.03), 0, 0.065), (half_pi, 0, half_pi), "MI_Wood_Varnish", wear=0.3)
+    for k in range(5):
+        w = (hs + 0.06) / 5
+        board("tb_hatch_lid", hs + 0.06, w - 0.008, 0.04, (hx, -(hs + 0.06) / 2 + (k + 0.5) * w, 0.15), (0, 0, 0), "MI_Wood_Teak", wear=0.3)
     for y in (-0.18, 0.18):
-        plank(parts, "hinge", (0.09, 0.05, 0.008), (hx - hs / 2 - 0.03, y, 0.143), "MI_Metal_Brass", bevel=0.002, segments=1)
+        plank(parts, "hinge", (0.11, 0.06, 0.012), (hx - hs / 2 - 0.04, y, 0.17), "MI_Metal_Brass", bevel=0.003, segments=1)
 
     # Brass cleat on the starboard covering board and a coiled rope next to it.
     cl_x, cl_y = 1.65, -1.52
-    plank(parts, "cleat_base", (0.09, 0.04, 0.04), (cl_x, cl_y, 0.02), "MI_Metal_Brass", bevel=0.008)
-    parts.append(sb.add_cylinder("cleat_horn", 0.014, 0.24, (cl_x, cl_y, 0.05), "X", 10, M["MI_Metal_Brass"], radius_top=0.010))
+    plank(parts, "cleat_base", (0.1, 0.05, 0.05), (cl_x, cl_y, 0.025), "MI_Metal_Brass", bevel=0.01)
+    parts.append(sb.add_cylinder("cleat_horn", 0.018, 0.27, (cl_x, cl_y, 0.06), "X", 12, M["MI_Metal_Brass"], radius_top=0.013))
     for k in range(4):
-        r = 0.16 - k * 0.025
-        parts.append(sb.add_torus("rope", r, 0.012, (1.2, -1.15, 0.013 + k * 0.004), (0, 0, k * 0.4), 32, 6, M["MI_Rope_Hemp"]))
+        r = 0.17 - k * 0.028
+        parts.append(sb.add_torus("rope", r, 0.016, (1.2, -1.15, 0.017 + k * 0.005), (0, 0, k * 0.4), 32, 8, M["MI_Rope_Hemp"]))
     for k in range(3):
-        parts.append(sb.add_torus("rope", 0.15, 0.012, (1.2, -1.15, 0.036 + k * 0.022), (0, 0, 1.0 + k), 32, 6, M["MI_Rope_Hemp"]))
+        parts.append(sb.add_torus("rope", 0.16, 0.016, (1.2, -1.15, 0.045 + k * 0.028), (0, 0, 1.0 + k), 32, 8, M["MI_Rope_Hemp"]))
 
     ucx = [
-        ((L, 3.38, 0.06), (0, 0, -0.03)),                        # deck
-        ((L, 0.10, 0.55), (0, -1.68, 0.275)),                    # starboard bulwark
-        ((1.25, 0.10, 0.55), (x0 + 0.625, 1.68, 0.275)),         # port bulwark aft of the gangway
-        ((x1 - 1.05, 0.10, 0.55), ((1.05 + x1) / 2, 1.68, 0.275)),
-        ((cx1 - cx0 + 0.08, 2 * hw + 0.08, wh + 0.1), ((cx0 + cx1) / 2, 0, (wh + 0.1) / 2)),  # deckhouse
-        ((hs + 0.04, hs + 0.04, 0.14), (hx, 0, 0.07)),            # hatch
+        ((L, 3.42, 0.06), (0, 0, -0.03)),                        # deck
+        ((L, 0.12, 0.56), (0, -1.69, 0.28)),                     # starboard bulwark
+        ((1.25, 0.12, 0.56), (x0 + 0.625, 1.69, 0.28)),          # port bulwark aft of the gangway
+        ((x1 - 1.05, 0.12, 0.56), ((1.05 + x1) / 2, 1.69, 0.28)),
+        ((cx1 - cx0 + 0.1, 2 * hw + 0.1, wh + 0.12), ((cx0 + cx1) / 2, 0, (wh + 0.12) / 2)),  # deckhouse
+        ((hs + 0.06, hs + 0.06, 0.18), (hx, 0, 0.09)),            # hatch
     ]
-    obj, cols = finish(parts, "SM_TestDeckSection", 3, waterline=-0.75, wet=0.12, ucx=ucx, wear=0.9)
+    obj, cols = finish(parts, "SM_TestDeckSection", 3, waterline=-0.75, wet=0.12, ucx=ucx, wear=0.8, jitter=0.0)
+    print("SB_DECK faces", len(obj.data.polygons))
     sb.save_blend("SM_TestDeckSection")
     export("SM_TestDeckSection", obj, cols)
 

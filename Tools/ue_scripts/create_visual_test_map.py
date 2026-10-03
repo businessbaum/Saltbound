@@ -55,7 +55,9 @@ skc = sky.get_component_by_class(unreal.SkyLightComponent)
 skc.set_mobility(unreal.ComponentMobility.MOVABLE)
 skc.set_editor_property("real_time_capture", True)
 spawn(unreal.ExponentialHeightFog, (0, 0, -200), label="HeightFog")
-spawn(unreal.VolumetricCloud, label="Clouds")
+clouds = spawn(unreal.VolumetricCloud, label="Clouds")
+clouds.get_component_by_class(unreal.VolumetricCloudComponent).set_editor_property(
+    "material", unreal.load_asset("/Game/Saltbound/Environment/Sky/MI_Clouds_Stylized"))
 pp = spawn(unreal.PostProcessVolume, label="GlobalPostProcess")
 pp.set_editor_property("unbound", True)
 rig = spawn(unreal.SaltLightingRig, (0, 0, 300), label="LightingRig")
@@ -72,7 +74,11 @@ ocean.set_editor_property("amplitude_scale", 1.6)   # powerful open-sea swell (o
 
 # --- seabed --------------------------------------------------------------------------------------------
 CUBE = "/Engine/BasicShapes/Cube"
-mesh("Seabed", CUBE, (0, 0, -1800), scale=(1200, 1200, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
+seabed = mesh("Seabed", CUBE, (0, 0, -1800), scale=(1200, 1200, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
+# Steep wave faces reflect rays downward; hardware-traced Lumen reflections would show the sand as beige
+# streaks on the open sea. The deep seabed is only seen through the water, never in reflections.
+seabed.static_mesh_component.set_editor_property("visible_in_ray_tracing", False)
+seabed.static_mesh_component.set_editor_property("affect_distance_field_lighting", False)
 mesh("ShoreSlope", CUBE, (-200, 0, -700), (-10.0, 0, 0), scale=(40, 50, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
 
 # --- coast -------------------------------------------------------------------------------------------

@@ -80,6 +80,30 @@ def soften(obj, width=0.004, segments=2, harden=True):
     return obj
 
 
+def soften_marked(obj, width=0.004, segments=2, harden=True):
+    """soften() for subdivided meshes: the new bevel faces are tagged in the face attribute 'sb_bevel'
+    (and every face in 'sb_tagged'), so bake_vertex_masks() puts edge wear on the real bevels only.
+    The edge-length rule cannot tell bevels from the narrow faces of a densely subdivided board.
+    Applies the modifiers. Assumes the object uses material slot 0 only."""
+    marker = bpy.data.materials.get("SB_BevelMarker") or bpy.data.materials.new("SB_BevelMarker")
+    obj.data.materials.append(marker)
+    mark_index = len(obj.data.materials) - 1
+    soften(obj, width, segments, harden)
+    obj.modifiers["SoftBevel"].material = mark_index
+    apply_modifiers(obj)
+    me = obj.data
+    n = len(me.polygons)
+    mats = [0] * n
+    me.polygons.foreach_get("material_index", mats)
+    bevel = [1 if m == mark_index else 0 for m in mats]
+    for name, values in (("sb_bevel", bevel), ("sb_tagged", [1] * n)):
+        attr = me.attributes.get(name) or me.attributes.new(name, "INT", "FACE")
+        attr.data.foreach_set("value", values)
+    me.polygons.foreach_set("material_index", [0] * n)
+    me.materials.pop(index=mark_index)
+    return obj
+
+
 def apply_modifiers(obj):
     bpy.context.view_layer.objects.active = obj
     for m in list(obj.modifiers):
@@ -236,9 +260,14 @@ def bake_vertex_masks(obj, wear=1.0, crevice=1.0, waterline=None, wet_height=0.4
                         if nf.index not in seen:
                             stack.append(nf)
     layer = bm.loops.layers.float_color.get("Col") or bm.loops.layers.float_color.new("Col")
+    tagged = bm.faces.layers.int.get("sb_tagged")
+    bevel_tag = bm.faces.layers.int.get("sb_bevel")
     for f in bm.faces:
         b = island_val.get(f.index, 0.5)
-        is_bevel = mode == "bevel" and min(e.calc_length() for e in f.edges) < bevel_max
+        if tagged is not None and f[tagged]:
+            is_bevel = mode == "bevel" and bool(f[bevel_tag])
+        else:
+            is_bevel = mode == "bevel" and min(e.calc_length() for e in f.edges) < bevel_max
         for loop in f.loops:
             c = convex[loop.vert.index]
             if mode == "bevel":

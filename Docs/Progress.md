@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-03 (session 2, visual revision 2 after owner feedback).
+Last updated: 2026-10-03 (session 2, visual revision 3: stylised realism).
 
 ## Milestone status
 
@@ -8,7 +8,7 @@ Last updated: 2026-10-03 (session 2, visual revision 2 after owner feedback).
 |---|---|
 | M1 Infrastructure & foundation | **Done** (verified) |
 | M2 First-person player & moving-platform tests | **Done** (verified in PIE and standalone) |
-| M3 Visual test scene | **Revision 2 in review** (owner feedback on water, rocks, wood applied; see below) |
+| M3 Visual test scene | **Revision 3 in review** (stylised realism pass after owner feedback; see below) |
 | M4 Starting boat & navigable water | Next (technical parts can start without the decisions) |
 | M5 Starting harbor & complete loop | Planned |
 
@@ -34,6 +34,9 @@ Owner feedback received so far (2026-10-03):
   Then: "The carvings in the stones look horrible – I mean material detail, no blur, visibly readable
   material", with Sea of Thieves reference images for rocks, deck wood and sea. Applied in revision 2
   (D16–D19). Rock shapes were confirmed as better; material and wood were iterated after that.
+- Session 2, later: detailed briefs to restyle the dock and the ocean to Sea of Thieves reference images,
+  then: "Our graphics sometimes look too realistic – Sea of Thieves is a bit more comic: stylised realism."
+  Applied in revision 3 (D20–D22).
 
 ## M1 – Infrastructure (done)
 - Git + LFS repository at `Saltbound_all/` (template baseline is the first commit), clean template.
@@ -117,6 +120,26 @@ for a higher screen percentage (for example 75 %) and more content.
 - **Fix:** editor crash when rebuilding materials (D17). Content defaults no longer load in constructors.
 - **Evidence:** latest captures in `Docs/Evidence/M3_rev2/`.
 
+### M3 revision 3 (session 2, stylised realism)
+- **Hand-made timber (D20):**
+  - `sb_timber.py` builds individually bent, twisted and worn boards and hewn posts.
+  - It is used for the dock (68 pieces), the crate, and the boat deck section. The boat has planked
+    bulwarks, a planked deckhouse with an inward lean, chunky rails, a timber door, big portholes and a thick
+    roof.
+- **Lighting, sky and grading (D21):**
+  - Golden sun with a large disc, cool sky fill, deeper blue sky, low blue haze.
+  - Split-tone grading.
+  - Stylised cumulus clouds (`MI_Clouds_Stylized`).
+- **Ocean v4 (D22):**
+  - Big rolling swell with layered waves, flowing ridged ripples, patchy breaking whitecaps.
+  - Crest light from sun luminance.
+  - Crisp white sun glints. The seabed is hidden from reflections.
+- **Materials:**
+  - Broad-grain warm wood; weathered grey-brown dock timber with per-board colour and roughness.
+  - Teak and varnish are less orange. Canvas has sewn panels. Rock cracks are fewer and longer.
+- **Captures:** first-person and low-sea shots were added (`11_dock_fp` … `14_sea_low_cross`). Evidence is
+  in `Docs/Evidence/M3_rev3/`.
+
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
 |---|---|---|
@@ -134,10 +157,10 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`
 
 ## Known issues and limitations
-- **Performance after revision 2 is not re-measured.** Native resolution (D18) and the heavier ocean pixel
-  shader (1458 instructions) need a standalone benchmark with the editor closed.
-- **Sun glitter towards a low sun looks golden.** The sun's colour through the atmosphere is warm. The
-  reference shows white glitter.
+- **Performance:** revision 2 measured in standalone, 2560×1440 native, editor closed:
+  - Day 75.7 fps (GPU 12.5 ms), Evening 69.6 fps (GPU 13.6 ms), Dusk 72.1 fps (GPU 13.1 ms).
+  - This is within D8 (60 fps), but the headroom shrank from about 2× to 1.2×.
+  - Revision 3 (big swell, 215k-triangle Nanite boat section, denser clouds) has not been measured yet.
 - The Jacobian foam trail samples the dominant wave direction only.
 - **Vsync frame pacing:** with vsync on, the standalone build runs at about 55–60 fps even though the GPU
   needs only about 7.5 ms. Default display settings (vsync off or a frame cap, later a settings menu) are needed.

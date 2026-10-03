@@ -64,7 +64,7 @@ def _plank_uv(bm, length_axis_offset, rng):
 
 
 def rough_plank(name, length, width, thick, center, rotation=(0.0, 0.0, 0.0), material=None, seed=0,
-                wear=1.0, grooves=(2, 4), split_chance=0.25):
+                wear=1.0, grooves=(2, 4), split_chance=0.25, bevel=1.0):
     """Weathered board along local X. `wear` scales bends, chamfers and end damage (0 = clean board)."""
     rng = random.Random(seed)
     nx = max(4, int(length / 0.12))
@@ -79,7 +79,7 @@ def rough_plank(name, length, width, thick, center, rotation=(0.0, 0.0, 0.0), ma
     thick_drift = Wave1D(rng, 2, 1.0)
     # Broad grain grooves along the board (top face only).
     groove_list = []
-    for _ in range(rng.randint(*grooves)):
+    for _ in range(rng.randint(*grooves) if grooves else 0):
         groove_list.append((rng.uniform(-0.75, 0.75), Wave1D(rng, 2, 1.0), rng.uniform(0.0015, 0.0035) * (0.5 + 0.5 * wear),
                             rng.uniform(0.06, 0.13), rng.uniform(-0.5, 0.2), rng.uniform(0.3, 0.5)))
     # Worn chamfers on the top long edges: (side, s centre, half length in s, depth).
@@ -140,8 +140,7 @@ def rough_plank(name, length, width, thick, center, rotation=(0.0, 0.0, 0.0), ma
         obj.data.materials.append(material)
     # Worn bevels: some boards rounded, some with broad angular facets.
     rounded = rng.random() < 0.55
-    sb.soften(obj, rng.uniform(0.006, 0.012) if rounded else rng.uniform(0.008, 0.016), 3 if rounded else 1)
-    sb.apply_modifiers(obj)
+    sb.soften_marked(obj, bevel * (rng.uniform(0.006, 0.012) if rounded else rng.uniform(0.008, 0.016)), 3 if rounded else 1)
     m = Matrix.Translation(Vector(center)) @ Euler(rotation).to_matrix().to_4x4()
     obj.data.transform(m)
     for p in obj.data.polygons:
@@ -205,7 +204,6 @@ def rough_post(name, radius, height, center_bottom, sides=None, taper=0.85, mate
     if material:
         obj.data.materials.append(material)
     # Hewn look: flat faces with rounded corners (bevel + hardened normals), not a smooth cylinder.
-    sb.soften(obj, radius * rng.uniform(0.05, 0.09), 2)
-    sb.apply_modifiers(obj)
+    sb.soften_marked(obj, radius * rng.uniform(0.05, 0.09), 2)
     obj.data.transform(Matrix.Translation(Vector(center_bottom)))
     return obj

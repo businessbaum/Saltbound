@@ -322,9 +322,9 @@ def main():
     rope_tex = {"BaseTexture": TEX + "/Fabric/T_Rope_D", "NormalTexture": TEX + "/Fabric/T_Rope_N"}
     lib = {
         # Boat: warm, cared for
-        "MI_Wood_Teak": dict(vectors={"Tint": (0.26, 0.135, 0.065, 1), "WearColor": (0.42, 0.24, 0.11, 1), "GrimeColor": (0.55, 0.45, 0.38, 1)},
+        "MI_Wood_Teak": dict(vectors={"Tint": (0.2, 0.12, 0.068, 1), "WearColor": (0.42, 0.24, 0.11, 1), "GrimeColor": (0.55, 0.45, 0.38, 1)},
                              scalars={"RoughScale": 0.95, "WearStrength": 0.9, "GrimeAmount": 0.8, "VarAmount": 0.2}, textures=wood_textures()),
-        "MI_Wood_Varnish": dict(vectors={"Tint": (0.12, 0.05, 0.022, 1), "WearColor": (0.3, 0.14, 0.05, 1)},
+        "MI_Wood_Varnish": dict(vectors={"Tint": (0.095, 0.05, 0.028, 1), "WearColor": (0.3, 0.14, 0.05, 1)},
                                 scalars={"RoughScale": 0.45, "RoughOffset": -0.05, "NormalStrength": 0.6, "WearStrength": 0.8, "WearRoughness": 0.55}, textures=wood_textures()),
         "MI_Paint_Cream": dict(vectors={"Tint": (0.74, 0.64, 0.45, 1), "WearColor": (0.3, 0.17, 0.08, 1), "VarTint": (1.0, 0.97, 0.92, 1)},
                                scalars={"TexNormalize": 2.6, "NormalStrength": 0.6, "RoughScale": 1.1, "VarAmount": 0.04, "VarHue": 0.3, "WearStrength": 1.15, "WearRoughness": 0.7},
@@ -346,7 +346,7 @@ def main():
         "MI_Glass_Dark": dict(vectors={"Tint": (0.02, 0.03, 0.035, 1)},
                               scalars={"TexNormalize": 1.0, "NormalStrength": 0.0, "RoughScale": 0.0, "RoughOffset": 0.06, "WearStrength": 0.0, "GrimeAmount": 0.0},
                               textures={"BaseTexture": "/Engine/EngineResources/WhiteSquareTexture"}),
-        "MI_Canvas": dict(vectors={"Tint": (0.62, 0.58, 0.5, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.8, "RoughScale": 1.6, "WearStrength": 0.0, "UVScale": 2.0}, textures=canvas_textures()),
+        "MI_Canvas": dict(vectors={"Tint": (0.55, 0.51, 0.43, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 1.0, "RoughScale": 1.6, "WearStrength": 0.0, "UVScale": 1.0}, textures=canvas_textures()),
         # Harbour: weathered, cooler
         # Weathered dock timber (D20): desaturated grey-brown, olive-brown board variation, matte, broad grain;
         # edge accents only where the wear mask breaks through (no continuous pale outlines).
@@ -359,7 +359,9 @@ def main():
                                         "VarTint": (0.92, 1.0, 0.8, 1)},
                                scalars={"RoughScale": 1.0, "NormalStrength": 1.2, "VarAmount": 0.12, "VarHue": 0.6, "VarRough": 0.1,
                                         "WearStrength": 0.5, "GrimeAmount": 1.2, "GrimeRoughness": 0.35}, textures=weathered_textures()),
-        "MI_Wood_Planks": dict(vectors={"Tint": (0.3, 0.2, 0.12, 1), "WearColor": (0.4, 0.32, 0.22, 1)}, scalars={"RoughScale": 1.2}, textures=wood_textures()),
+        "MI_Wood_Planks": dict(vectors={"Tint": (0.14, 0.1, 0.065, 1), "WearColor": (0.3, 0.24, 0.16, 1), "VarTint": (0.95, 1.0, 0.8, 1)},
+                               scalars={"RoughScale": 1.0, "VarAmount": 0.18, "VarHue": 0.6, "VarRough": 0.1, "WearStrength": 0.7},
+                               textures=weathered_textures()),
     }
     for name, kw in lib.items():
         sb_ue.make_mi(name, MI, surf, **kw)
