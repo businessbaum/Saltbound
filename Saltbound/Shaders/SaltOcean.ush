@@ -135,6 +135,33 @@ struct FSaltOcean
 		return lerp(TroughCalm, 1.0, Crest) * lerp(1.0 - QuietAmount, 1.0, smoothstep(0.3, 0.7, Quiet));
 	}
 
+	// Drifting quiet-patch texture coordinates (aligned with the main swell; Drift = RippleOffsets.w).
+	float2 QuietUV(float2 P, float QuietTile, float Drift)
+	{
+		const float2 WDir = normalize(WA[0].xy + float2(1e-6, 0.0));
+		return float2(dot(P, WDir), dot(P, float2(-WDir.y, WDir.x))) / QuietTile + float2(0.13, 0.71) - float2(Drift * 0.5, 0.0);
+	}
+
+	// Displacement of the rendered surface at the Lagrangian position P0: swells plus the wind-sea cascades 0
+	// (waves >= 6 m) and 1 (0.9-6 m, following the short-wave mask), with mips chosen from the vertex spacing
+	// CellSize. Used by the vertex shader and by the underwater pass (surface height above the camera).
+	float3 SurfaceDisplacement(float2 P0, float FadeK, float CellSize, float4 C0, float4 C1, float MipBias,
+		Texture2D T0, SamplerState S0, Texture2D T1, SamplerState S1, Texture2D QuietTex, SamplerState QuietSampler,
+		float QuietTile, float Drift, float TroughCalm, float QuietAmount, float Gain1)
+	{
+		float3 D = Displacement(P0, FadeK);
+		const float F = Attenuation(P0) * ChopFactor(P0);
+		const float Mip0 = max(log2(CellSize * C0.x * C0.w) + MipBias, 0.0);
+		const float Mip1 = max(log2(CellSize * C1.x * C1.w) + MipBias, 0.0);
+		const float4 A0 = Texture2DSampleLevel(T0, S0, TileUV(P0, C0), Mip0);
+		const float4 A1 = Texture2DSampleLevel(T1, S1, TileUV(P0, C1), Mip1);
+		D += float3(ToWorld(A0.xy, C0), A0.z) * F;
+		const float Quiet = Texture2DSampleLevel(QuietTex, QuietSampler, QuietUV(P0, QuietTile, Drift), 0.0).b;
+		const float Mask = ShortWaveMask(D.z / max(Chop.w, 1.0), Quiet, TroughCalm, QuietAmount);
+		D += float3(ToWorld(A1.xy, C1), A1.z) * (F * Gain1 * Mask);
+		return D;
+	}
+
 	// Adds the Gerstner waves' surface tangents dP/dx0 (Tx) and dP/dy0 (Ty); start from (1,0,0) / (0,1,0).
 	void SwellTangents(float2 P0, float FadeK, inout float3 Dx, inout float3 Dy)
 	{
@@ -156,7 +183,7 @@ struct FSaltOcean
 		}
 	}
 
-	// World-space normal and horizontal Jacobian (1 = undisturbed, < ~0.5 = compressed crest -> foam).
+	// World-space normal and horizontal Jacobian (1 = undisturbed, < 1 = compressed crest).
 	void NormalAndJacobian(float2 P0, float FadeK, out float3 Normal, out float Jacobian)
 	{
 		const float Att = Attenuation(P0);
@@ -179,26 +206,5 @@ struct FSaltOcean
 		}
 		Normal = normalize(cross(Dx, Dy));
 		Jacobian = Dx.x * Dy.y - Dx.y * Dy.x;
-	}
-
-	// Horizontal Jacobian of the same water (Lagrangian P0) DeltaT seconds ago: phases run back by
-	// omega * DeltaT (deep water: omega = sqrt(g k)). Used for foam that stays behind breaking crests.
-	float JacobianAt(float2 P0, float FadeK, float DeltaT)
-	{
-		const float Att = Attenuation(P0);
-		const float ChopF = ChopFactor(P0);
-		float2 Dx = float2(1, 0);
-		float2 Dy = float2(0, 1);
-		for (int i = 0; i < Count; i++)
-		{
-			const float2 K = WA[i].xy;
-			const float Kl = max(length(K), 1e-6);
-			const float2 D = K / Kl;
-			const float H = WA[i].w * WaveFactor(i, Att, ChopF) * Fade(K, FadeK);
-			const float S = sin(dot(K, P0) - Ph[i] + sqrt(980.665 * Kl) * DeltaT);
-			Dx += D * (-H * S * K.x);
-			Dy += D * (-H * S * K.y);
-		}
-		return Dx.x * Dy.y - Dx.y * Dy.x;
 	}
 };

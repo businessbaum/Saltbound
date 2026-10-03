@@ -9,6 +9,7 @@
 
 class UInstancedStaticMeshComponent;
 class UMaterialInterface;
+class UPostProcessComponent;
 class UTextureRenderTarget2D;
 class UMaterialParameterCollection;
 class UStaticMesh;
@@ -202,6 +203,26 @@ public:
 	UPROPERTY(VisibleInstanceOnly, Transient, Category = "Rendering")
 	int32 DebugTileCount = 0;
 
+	// Underwater ---------------------------------------------------------------
+	/** The sea seen from below: the same displaced tiles drawn with reversed culling (Snell's window, total
+	 *  internal reflection). */
+	UPROPERTY(EditAnywhere, Category = "Underwater")
+	TObjectPtr<UMaterialInterface> UnderMaterial;
+
+	/** Post-process pass for a submerged camera (fog, light lost with depth). It finds the surface above
+	 *  the camera itself on the GPU, so it matches the rendered waves exactly. */
+	UPROPERTY(EditAnywhere, Category = "Underwater")
+	TObjectPtr<UMaterialInterface> UnderwaterPostMaterial;
+
+	/** Underside and post-process pass are switched on while the camera is below or less than this far
+	 *  above the surface (CPU estimate; generous, because the GPU surface also has the shorter waves). */
+	UPROPERTY(EditAnywhere, Category = "Underwater", meta = (ClampMin = "0", Units = "cm"))
+	float UnderwaterActivationHeight = 500.f;
+
+	/** Camera height above the surface at the camera (negative = under water), CPU estimate, last frame. */
+	UFUNCTION(BlueprintPure, Category = "Ocean")
+	float GetCameraHeightAboveWater() const { return CameraHeightAboveWater; }
+
 private:
 	/** Resolves unset content defaults (SaltContent.h) and assigns meshes and material to the tiles. */
 	void ApplyContent();
@@ -217,8 +238,11 @@ private:
 	/** Applies the spectrum to the CPU field and queues this frame's FFT simulation. */
 	void SimulateWindSea(float DeltaSeconds);
 	void UpdateTiles(bool bForce);
+	/** Switches the underside tiles and the underwater pass on near or below the surface. */
+	void UpdateUnderwater(const FVector& View);
 	bool SelectNode(const FVector2D& Center, double Size, int32 Lod, const FVector& View, TArray<FTileInstance>& OutFull, TArray<FTileInstance>& OutQuarter) const;
-	void ApplyTiles(UInstancedStaticMeshComponent* Component, const TArray<FTileInstance>& Tiles);
+	/** ZSign -1: the component has a mirrored Z scale (reversed culling), instances compensate. */
+	void ApplyTiles(UInstancedStaticMeshComponent* Component, const TArray<FTileInstance>& Tiles, double ZSign = 1.0);
 	bool GetViewLocation(FVector& OutLocation) const;
 	double RangeOf(int32 Lod) const { return Lod < 0 ? 0.0 : Lod0Range * FMath::Pow(2.0, (double)Lod); }
 
@@ -227,7 +251,22 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TObjectPtr<UInstancedStaticMeshComponent> QuarterTiles;
+
+	/** Underside copies of the tiles (mirrored Z scale: front faces are culled, the surface is seen from
+	 *  below only). */
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	TObjectPtr<UInstancedStaticMeshComponent> UnderFullTiles;
+
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	TObjectPtr<UInstancedStaticMeshComponent> UnderQuarterTiles;
+
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	TObjectPtr<UPostProcessComponent> UnderwaterPost;
+
 	FSaltWaveField Field;
+	float CameraHeightAboveWater = 1.0e6f;
+	bool bUnderwaterActive = false;
+	double LastContentRetry = -1.0e9;
 	double OceanTime = 0.0;
 	/** Wave phases of the previous frame: the material evaluates last frame's displacement with them
 	 *  (PreviousFrameSwitch), so the velocity buffer contains the wave motion and TSR can reproject. */

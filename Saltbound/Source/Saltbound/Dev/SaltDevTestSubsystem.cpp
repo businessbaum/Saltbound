@@ -15,6 +15,7 @@
 #include "Interaction/SaltStationComponent.h"
 #include "Ocean/SaltOceanSubsystem.h"
 #include "Kismet/GameplayStatics.h"
+#include "Player/SaltCharacterMovementComponent.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
 #include "Saltbound.h"
@@ -162,6 +163,61 @@ namespace
 		{
 			GIsDumpingMovie = Args.Num() > 0 ? FMath::Max(0, FCString::Atoi(*Args[0])) : 0;
 			UE_LOG(LogSaltbound, Display, TEXT("SB_DUMP frames=%d"), GIsDumpingMovie);
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdTeleport(
+		TEXT("sb.Dev.Teleport"),
+		TEXT("Place the player's feet at a world location and view through the player again: sb.Dev.Teleport <X> <Y> <Z> [Yaw=0] [Pitch=0]"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			APlayerController* PC = World ? UGameplayStatics::GetPlayerController(World, 0) : nullptr;
+			ASaltPlayerCharacter* P = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr;
+			if (!P || Args.Num() < 3)
+			{
+				return;
+			}
+			P->TeleportFeetTo(FVector(ArgOr(Args, 0, 0.f), ArgOr(Args, 1, 0.f), ArgOr(Args, 2, 0.f)), ArgOr(Args, 3, 0.f));
+			PC->SetControlRotation(FRotator(ArgOr(Args, 4, 0.f), ArgOr(Args, 3, 0.f), 0.f));
+			PC->SetViewTarget(P);
+			if (USaltDevTestSubsystem* T = GetTests(World))
+			{
+				T->SetFloatingCamera(nullptr, false, 0.f);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdInput(
+		TEXT("sb.Dev.Input"),
+		TEXT("Simulated player input for tests: sb.Dev.Input <Forward> <Right> [Up 0|1] [Dive 0|1] (all zero = release)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			APlayerController* PC = World ? UGameplayStatics::GetPlayerController(World, 0) : nullptr;
+			if (ASaltPlayerCharacter* P = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr)
+			{
+				P->SetDebugMoveInput(FVector2D(ArgOr(Args, 1, 0.f), ArgOr(Args, 0, 0.f)));
+				P->DebugJump(ArgOr(Args, 2, 0.f) != 0.f);
+				P->DebugDive(ArgOr(Args, 3, 0.f) != 0.f);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdWaterState(
+		TEXT("sb.Dev.WaterState"),
+		TEXT("Log the player's water state (movement mode, immersion, surface height) and the camera's height above the water."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			APlayerController* PC = World ? UGameplayStatics::GetPlayerController(World, 0) : nullptr;
+			ASaltPlayerCharacter* P = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr;
+			const USaltCharacterMovementComponent* Move = P ? Cast<USaltCharacterMovementComponent>(P->GetCharacterMovement()) : nullptr;
+			if (!Move)
+			{
+				return;
+			}
+			const FVector Feet = P->GetActorLocation() - FVector(0.f, 0.f, P->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+			const FVector Cam = PC->PlayerCameraManager ? PC->PlayerCameraManager->GetCameraLocation() : FVector::ZeroVector;
+			const USaltOceanSubsystem* Ocean = World->GetSubsystem<USaltOceanSubsystem>();
+			const float CamWater = Ocean ? (float)Ocean->SampleWater(FVector2D(Cam.X, Cam.Y)).Location.Z : 0.f;
+			UE_LOG(LogSaltbound, Display, TEXT("SB_WATER mode=%s inWater=%d immersion=%.2f surface=%.1f feet=(%.0f, %.0f, %.1f) speed=%.0f velZ=%.0f cam=%.1f camAboveWater=%.1f"),
+				*Move->GetMovementName(), Move->IsInWater() ? 1 : 0, Move->ImmersionDepth(), Move->GetWaterSurfaceZ(),
+				Feet.X, Feet.Y, Feet.Z, Move->Velocity.Size2D(), Move->Velocity.Z, Cam.Z, Cam.Z - CamWater);
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdResetPlayer(

@@ -40,6 +40,13 @@ SHOTS = {
         ("17_ref_rough", (22000, -6000, 350), (-11, 145, 0)),
         ("18_ref_calm", (22000, -6000, 150), (10, 152, 0)),
         ("19_elevated", (22000, -6000, 1800), (-26, 60, 0)),
+        # Under the water (D28; owner references: Sea of Thieves underwater). Z is the height above the water
+        # (negative = depth) when recorded with record_clip.py --float 0.
+        ("20_under_pier", (300, 600, -150), (-8, 10, 0)),
+        ("21_under_dropoff", (1800, -800, -300), (-15, 20, 0)),
+        ("22_under_lookup", (2500, 300, -250), (50, 30, 0)),
+        ("23_under_bank", (2400, 1000, -120), (-12, 25, 0)),
+        ("24_under_open_sea", (22000, -6000, -300), (35, 120, 0)),
     ],
 }
 

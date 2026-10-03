@@ -39,6 +39,7 @@ void USaltInputConfig::Build()
 	LookGamepad = MakeAction(this, TEXT("IA_LookGamepad"), EInputActionValueType::Axis2D);
 	Jump = MakeAction(this, TEXT("IA_Jump"), EInputActionValueType::Boolean);
 	Sprint = MakeAction(this, TEXT("IA_Sprint"), EInputActionValueType::Boolean);
+	Dive = MakeAction(this, TEXT("IA_Dive"), EInputActionValueType::Boolean);
 	Interact = MakeAction(this, TEXT("IA_Interact"), EInputActionValueType::Boolean);
 
 	DefaultContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Default"));
@@ -63,6 +64,9 @@ void USaltInputConfig::Build()
 	C->MapKey(Jump, EKeys::Gamepad_FaceButton_Bottom);
 	C->MapKey(Sprint, EKeys::LeftShift);
 	C->MapKey(Sprint, EKeys::Gamepad_LeftThumbstick);
+	C->MapKey(Dive, EKeys::LeftControl);
+	C->MapKey(Dive, EKeys::C);
+	C->MapKey(Dive, EKeys::Gamepad_FaceButton_Right);
 	C->MapKey(Interact, EKeys::E);
 	C->MapKey(Interact, EKeys::Gamepad_FaceButton_Left);
 }

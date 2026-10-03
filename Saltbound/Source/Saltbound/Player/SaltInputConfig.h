@@ -31,6 +31,8 @@ public:
 	UPROPERTY(Transient) TObjectPtr<UInputAction> LookGamepad;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Jump;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Sprint;
+	/** Swim downwards (held). Jump swims upwards / climbs out of the water. */
+	UPROPERTY(Transient) TObjectPtr<UInputAction> Dive;
 	/** Use the focused object; leaves a control station when at one. */
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Interact;
 

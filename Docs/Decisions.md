@@ -422,3 +422,80 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - Shots `17_ref_rough`, `18_ref_calm`, `19_elevated`.
 - **Cost:** pixel shader 1359 instructions (was 1540; 36 analytic wave evaluations replaced by 9 texture
   samples). The FFT runs 3 × 256² every frame.
+
+### D28 · Underwater: swimming, view from below, seabed (Adopted)
+- **Owner brief (2026-10-04):**
+  - "Continue with making the movements and vision for under the water. Create a sea [floor], nothing
+    special for now. Just a bit sea grass and stuff."
+  - Later, with three Sea of Thieves underwater references: "atmosphere without special decorations. Add
+    uneven sand to the ground. add a bit of sea grass. comic style."
+  - Also: "remove the lines pattern from every stone texture".
+- **Swimming (`USaltCharacterMovementComponent`):**
+  - The sea moves, so it cannot be a static water volume. The component samples the ocean surface at the
+    character every tick and assigns a brushless, transient water `APhysicsVolume` itself (overlap
+    updates are off), with hysteresis: it swims from 60 % immersion and stops below 45 % (wading out).
+  - `ImmersionDepth()` drives Unreal's buoyancy (1.2: the eyes float about 10–20 cm above calm water).
+  - No constant swim braking: it cancelled the buoyant lift every frame, so swimmers sank and stayed down.
+    Fluid friction 2.0 (proportional to speed) damps bobbing and stops horizontal drift instead.
+  - Controls: W swims where you look (look down to dive), Space rises, Ctrl / C / B (gamepad) dives,
+    Shift swims faster.
+  - Climbing out: Space at a ledge (pier deck, boat side, flat rock) runs a 0.6 s scripted climb, up first
+    and then onto the ledge, in the ledge's component space so it also works on a moving boat. Ledges are
+    found by probing for a walkable top ahead (left and right too, for posts), not by requiring a wall;
+    piers are open frames. Reach is 3 m from the feet; the pier deck is 2.6 m above a swimmer's feet.
+- **View from below (`ASaltOcean`):**
+  - The ocean tiles are drawn a second time by `UnderFullTiles` / `UnderQuarterTiles`. These components
+    have a mirrored Z scale, so a negative determinant reverses culling and they show only from below.
+    They use the same vertex displacement with `M_OceanUnder` (unlit):
+    - Snell's window: sky and sun refracted through the local wave normal, exact dielectric Fresnel.
+    - Total internal reflection outside the window shows the lit water body.
+    - Comic wave shading: faces turned to the sun are lighter.
+  - Both the underside tiles and the post-process pass are switched on only when the camera is within 5 m
+    of the surface or below it (CPU estimate).
+- **Underwater pass (`M_PP_Underwater`, unbound post-process component on the ocean, before DOF):**
+  - It finds the surface above the camera on the GPU, from the same displacement as the vertex shader
+    (fixed-point inversion of the horizontal displacement), so it matches the rendered waves exactly.
+    The CPU mirror lacks the shorter waves.
+  - Model (`Shaders/SaltUnderwater.ush`, shared with the underside):
+    - Light lost on the way down: by depth below the water level, along the refracted sun.
+    - View fog: by distance.
+    - In-scattered light: integrated in closed form along the ray, because the light changes with depth.
+      A single average depth turned everything below the horizon black.
+  - Extinction follows the region's water (`Look*`). The in-scatter colour is stylised: `UnderwaterColor`
+    turquoise (0.12, 0.48, 0.62), with visibility about 25–35 m, like the references.
+  - Finding: post-process materials see absolute luminance. The engine removes pre-exposure before the
+    pass and reapplies it after, so the in-scatter needs no exposure factor. `View.PreExposure` and
+    EyeAdaptation both made it vanish. This was proven with a split-screen test of the three scales.
+- **Seabed (`Art/Blender/Scripts/build_seabed.py`, `SM_Seabed`, 180 × 140 m, 1 m cells, not Nanite):**
+  - Beach behind the coastal rocks, wadeable shallows.
+  - About 2.3 m under the pier, whose posts reach 2.5 m down.
+  - A drop-off past the pier end to the 17.5 m floor.
+  - The former sandbank block is now a plateau of the heightfield, and ridges rise towards the headlands.
+  - Uneven sand: broad mounds plus ripples.
+  - Not Nanite, because a Nanite mesh collides with its reduced fallback (879 triangles), which lost
+    the ripples underfoot.
+  - The small shoreline rocks are now placed on the actual ground by line traces.
+- **Caustics:** an emissive term in `M_SB_Rock` (sand, rocks), only below the water level on upward
+  faces. Two drifting patterns of a simulated caustic texture (`T_Caustics_M`, rays bent by a wavy
+  surface and splatted), combined by minimum, projected along the sun.
+- **Sea grass:**
+  - Three Blender clumps of chunky curved ribbon blades.
+  - `M_SB_SeaGrass`: two-sided, root-to-tip colour ramp, per-clump variation, sway by world position
+    offset.
+  - 34 patches (398 clumps) at 1.2–14 m depth, kept off the pier and the rocks, using `ASaltInstanceScatter`
+    (HISM, culled at 50–70 m).
+- **Stone textures:** the crack network and the lit/shaded chip outlines are removed from `T_Rock_*`. Only
+  tone patches, faint chips and specks remain; the stone's shape comes from the geometry.
+- **Pipeline fix:**
+  - `setup_ocean.py` used to recreate every `MPC_Ocean` entry, which gave them new IDs. Any material not
+    rebuilt in the same run then failed ("invalid parameter") and rendered the default checker material.
+  - Entries are now kept and only new ones are appended. The script takes `ocean` / `under` / `post`
+    arguments to rebuild parts.
+- **Verification:**
+  - `Tools/swim_test.py` (PIE) passes 5/5: enter and float, dive, rise, climb out onto the pier, walk off
+    the pier into the sea.
+  - Underwater shots 20–24.
+  - Evidence: `Docs/Evidence/Underwater_rev1/` (contact sheet, two clips).
+- **Cost:**
+  - Underside material 532 instructions; post-process 754 (only near or below the surface).
+  - The ocean vertex work doubles while the camera is within 5 m of the surface.

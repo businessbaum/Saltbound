@@ -108,6 +108,8 @@ void ASaltPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 	Input->BindAction(Cfg->Jump, ETriggerEvent::Completed, this, &ASaltPlayerCharacter::HandleJumpCompleted);
 	Input->BindAction(Cfg->Sprint, ETriggerEvent::Started, this, &ASaltPlayerCharacter::HandleSprintStarted);
 	Input->BindAction(Cfg->Sprint, ETriggerEvent::Completed, this, &ASaltPlayerCharacter::HandleSprintCompleted);
+	Input->BindAction(Cfg->Dive, ETriggerEvent::Started, this, &ASaltPlayerCharacter::HandleDiveStarted);
+	Input->BindAction(Cfg->Dive, ETriggerEvent::Completed, this, &ASaltPlayerCharacter::HandleDiveCompleted);
 	Input->BindAction(Cfg->Interact, ETriggerEvent::Started, this, &ASaltPlayerCharacter::HandleInteract);
 }
 
@@ -116,7 +118,11 @@ void ASaltPlayerCharacter::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	const FVector2D EffectiveMove = DebugMoveInput.IsNearlyZero() ? MoveInput : DebugMoveInput;
-	if (ActiveStation)
+	if (bClimbing)
+	{
+		TickClimb(DeltaSeconds);
+	}
+	else if (ActiveStation)
 	{
 		ActiveStation->SetControlInput(EffectiveMove);
 		TickStation(DeltaSeconds);
@@ -127,7 +133,21 @@ void ASaltPlayerCharacter::Tick(float DeltaSeconds)
 		{
 			ApplyMoveInput(DebugMoveInput);
 		}
-		GetCharacterMovement()->MaxWalkSpeed = bSprinting ? SprintSpeed : WalkSpeed;
+		UCharacterMovementComponent* Move = GetCharacterMovement();
+		Move->MaxWalkSpeed = bSprinting ? SprintSpeed : WalkSpeed;
+		Move->MaxSwimSpeed = bSprinting ? SwimSprintSpeed : SwimSpeed;
+		if (IsSwimming())
+		{
+			// Space rises (or climbs out at a ledge), Dive sinks; buoyancy holds the head at the surface.
+			if (bSwimUpHeld && TryClimbOutOfWater())
+			{
+				bSwimUpHeld = false;
+			}
+			else
+			{
+				AddMovementInput(FVector::UpVector, (bSwimUpHeld ? 1.f : 0.f) - (bSwimDownHeld ? 1.f : 0.f));
+			}
+		}
 	}
 
 	UpdateInteractionFocus();
@@ -157,8 +177,15 @@ void ASaltPlayerCharacter::ApplyMoveInput(const FVector2D& Input)
 	}
 	const FRotator YawRot(0.f, Controller->GetControlRotation().Yaw, 0.f);
 	const FRotationMatrix M(YawRot);
-	AddMovementInput(M.GetUnitAxis(EAxis::X), Input.Y);
+	// Swimming follows the view, including its pitch (look down and swim forward to dive).
+	const FVector Forward = IsSwimming() ? Controller->GetControlRotation().Vector() : M.GetUnitAxis(EAxis::X);
+	AddMovementInput(Forward, Input.Y);
 	AddMovementInput(M.GetUnitAxis(EAxis::Y), Input.X);
+}
+
+bool ASaltPlayerCharacter::IsSwimming() const
+{
+	return GetCharacterMovement() && GetCharacterMovement()->IsSwimming();
 }
 
 void ASaltPlayerCharacter::HandleLookMouse(const FInputActionValue& Value)
@@ -189,7 +216,8 @@ void ASaltPlayerCharacter::ApplyLook(float YawDelta, float PitchDelta)
 
 void ASaltPlayerCharacter::HandleJumpStarted()
 {
-	if (!ActiveStation)
+	bSwimUpHeld = true;
+	if (!ActiveStation && !IsSwimming())
 	{
 		Jump();
 	}
@@ -197,7 +225,99 @@ void ASaltPlayerCharacter::HandleJumpStarted()
 
 void ASaltPlayerCharacter::HandleJumpCompleted()
 {
+	bSwimUpHeld = false;
 	StopJumping();
+}
+
+void ASaltPlayerCharacter::HandleDiveStarted()
+{
+	bSwimDownHeld = true;
+}
+
+void ASaltPlayerCharacter::HandleDiveCompleted()
+{
+	bSwimDownHeld = false;
+}
+
+bool ASaltPlayerCharacter::TryClimbOutOfWater()
+{
+	// A walkable top within reach just ahead (pier deck, boat side, flat rock), with room to stand. Piers are
+	// open frames, so this probes for the top directly instead of requiring a wall in front.
+	USaltCharacterMovementComponent* Move = Cast<USaltCharacterMovementComponent>(GetCharacterMovement());
+	UWorld* World = GetWorld();
+	if (!Move || !Move->IsSwimming() || !Controller || !World)
+	{
+		return false;
+	}
+	const UCapsuleComponent* Capsule = GetCapsuleComponent();
+	const float Half = Capsule->GetScaledCapsuleHalfHeight();
+	const float Radius = Capsule->GetScaledCapsuleRadius();
+	const FVector Center = GetActorLocation();
+	const float Feet = Center.Z - Half;
+	// Only at the surface (head out of the water).
+	if (Move->GetWaterSurfaceZ() > Center.Z + Half - 15.f)
+	{
+		return false;
+	}
+	const FVector Forward = FRotationMatrix(FRotator(0.f, Controller->GetControlRotation().Yaw, 0.f)).GetUnitAxis(EAxis::X);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(SaltClimbOut), false, this);
+	const FVector Side(-Forward.Y, Forward.X, 0.f);
+	for (const float Ahead : { Radius + 25.f, Radius + 50.f, Radius + 75.f })
+	for (const float Lateral : { 0.f, -35.f, 35.f })
+	{
+		// Straight ahead first, then a little to either side (pier posts, rails).
+		const FVector Probe = Center + Forward * Ahead + Side * Lateral;
+		const FVector From(Probe.X, Probe.Y, Feet + ClimbOutReach + 40.f);
+		FHitResult Top;
+		if (!World->LineTraceSingleByChannel(Top, From, FVector(Probe.X, Probe.Y, Feet), ECC_Visibility, Params)
+			|| Top.bStartPenetrating || Top.ImpactNormal.Z < 0.7f)
+		{
+			continue;
+		}
+		const float Rise = Top.ImpactPoint.Z - Feet;
+		if (Rise > ClimbOutReach || Top.ImpactPoint.Z < Move->GetWaterSurfaceZ() + 20.f)
+		{
+			continue;
+		}
+		// Stand a little further in than the edge.
+		const FVector End = FVector(Top.ImpactPoint.X, Top.ImpactPoint.Y, Top.ImpactPoint.Z + Half + 2.f) + Forward * 15.f;
+		const FVector Raised(Center.X, Center.Y, End.Z);   // the climb rises here first
+		if (!IsCapsuleSpotFree(End) || !IsCapsuleSpotFree(Raised))
+		{
+			continue;
+		}
+		USceneComponent* Base = Top.GetComponent();
+		const FTransform BaseXf = Base ? Base->GetComponentTransform() : FTransform::Identity;
+		ClimbBase = Base;
+		ClimbStartLocal = BaseXf.InverseTransformPosition(Center);
+		ClimbEndLocal = BaseXf.InverseTransformPosition(End);
+		ClimbAlpha = 0.f;
+		bClimbing = true;
+		Move->SuppressWater(ClimbOutTime + 0.4f);
+		Move->StopMovementImmediately();
+		Move->SetMovementMode(MOVE_None);
+		UE_LOG(LogSaltbound, Log, TEXT("Climbing out of the water onto %s (%.0f cm)"), *GetNameSafe(Top.GetActor()), Rise);
+		return true;
+	}
+	return false;
+}
+
+void ASaltPlayerCharacter::TickClimb(float DeltaSeconds)
+{
+	ClimbAlpha = FMath::Min(1.f, ClimbAlpha + DeltaSeconds / FMath::Max(ClimbOutTime, 0.1f));
+	const FTransform BaseXf = ClimbBase.IsValid() ? ClimbBase->GetComponentTransform() : FTransform::Identity;
+	const FVector Start = BaseXf.TransformPosition(ClimbStartLocal);
+	const FVector End = BaseXf.TransformPosition(ClimbEndLocal);
+	// Up first (head and shoulders over the edge), then forward onto the ledge.
+	const float Up = FMath::InterpEaseInOut(0.f, 1.f, FMath::Min(ClimbAlpha / 0.65f, 1.f), 2.f);
+	const float Over = FMath::InterpEaseInOut(0.f, 1.f, FMath::Clamp((ClimbAlpha - 0.35f) / 0.65f, 0.f, 1.f), 2.f);
+	const FVector P(FMath::Lerp(Start.X, End.X, Over), FMath::Lerp(Start.Y, End.Y, Over), FMath::Lerp(Start.Z, End.Z, Up));
+	SetActorLocation(P, false, nullptr, ETeleportType::None);
+	if (ClimbAlpha >= 1.f)
+	{
+		bClimbing = false;
+		GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+	}
 }
 
 void ASaltPlayerCharacter::HandleSprintStarted()
@@ -389,6 +509,7 @@ void ASaltPlayerCharacter::TeleportFeetTo(const FVector& FeetLocation, float Yaw
 	{
 		LeaveStation();
 	}
+	bClimbing = false;
 	const float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	SetActorLocationAndRotation(FeetLocation + FVector(0.f, 0.f, HalfHeight + 2.f), FRotator(0.f, Yaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 	GetCharacterMovement()->StopMovementImmediately();

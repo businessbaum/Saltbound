@@ -3,6 +3,7 @@
 #include "Ocean/SaltOcean.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/PostProcessComponent.h"
 #include "Core/SaltContent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -87,6 +88,21 @@ ASaltOcean::ASaltOcean()
 	};
 	FullTiles = MakeTiles(TEXT("FullTiles"));
 	QuarterTiles = MakeTiles(TEXT("QuarterTiles"));
+	// Seen from below: same tiles, mirrored Z scale (a negative determinant reverses culling, so these draw
+	// only where the camera looks at the surface from underneath). Hidden until the camera gets close.
+	UnderFullTiles = MakeTiles(TEXT("UnderFullTiles"));
+	UnderQuarterTiles = MakeTiles(TEXT("UnderQuarterTiles"));
+	for (UInstancedStaticMeshComponent* C : { UnderFullTiles.Get(), UnderQuarterTiles.Get() })
+	{
+		C->SetRelativeScale3D(FVector(1.0, 1.0, -1.0));
+		C->SetVisibility(false);
+	}
+	// Underwater fog and light loss; blended in only near or below the surface (UpdateUnderwater).
+	UnderwaterPost = CreateDefaultSubobject<UPostProcessComponent>(TEXT("UnderwaterPost"));
+	UnderwaterPost->SetupAttachment(Root);
+	UnderwaterPost->bUnbound = true;
+	UnderwaterPost->BlendWeight = 0.f;
+	UnderwaterPost->Priority = 10.f;
 
 	// Content defaults (MPC, material, tile meshes) are resolved in OnConstruction; see SaltContent.h.
 
@@ -130,6 +146,17 @@ void ASaltOcean::ApplyContent()
 	QuarterTiles->SetStaticMesh(QuarterTileMesh);
 	FullTiles->SetMaterial(0, Material);
 	QuarterTiles->SetMaterial(0, Material);
+	SaltContent::ResolveDefault<UMaterialInterface>(UnderMaterial, SaltContent::OceanUnderMaterial);
+	SaltContent::ResolveDefault<UMaterialInterface>(UnderwaterPostMaterial, SaltContent::UnderwaterPostMaterial);
+	UnderFullTiles->SetStaticMesh(TileMesh);
+	UnderQuarterTiles->SetStaticMesh(QuarterTileMesh);
+	UnderFullTiles->SetMaterial(0, UnderMaterial);
+	UnderQuarterTiles->SetMaterial(0, UnderMaterial);
+	UnderwaterPost->Settings.WeightedBlendables.Array.Reset();
+	if (UnderwaterPostMaterial)
+	{
+		UnderwaterPost->Settings.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, UnderwaterPostMaterial));
+	}
 	for (int32 c = 0; c < SaltOceanFFT::NumCascades; ++c)
 	{
 		SaltContent::ResolveDefault<UTextureRenderTarget2D>(FFTDisp[c], SaltContent::OceanFFTTarget(TEXT("Disp"), c));
@@ -157,10 +184,16 @@ SaltOceanFFT::FSpectrum ASaltOcean::GetSpectrum() const
 
 void ASaltOcean::SimulateWindSea(float DeltaSeconds)
 {
-	// Maps saved before the FFT targets existed: construction does not re-run on load in the editor.
-	if (!FFTDisp[0] || !FFTAux[SaltOceanFFT::NumCascades - 1])
+	// Maps saved before the FFT targets or the underwater materials existed: construction does not re-run on
+	// load in the editor (retried every few seconds, so a missing asset does not load every frame).
+	if (!FFTDisp[0] || !FFTAux[SaltOceanFFT::NumCascades - 1] || !UnderMaterial || !UnderwaterPostMaterial)
 	{
-		ApplyContent();
+		const double Now = FPlatformTime::Seconds();
+		if (Now - LastContentRetry > 2.0)
+		{
+			LastContentRetry = Now;
+			ApplyContent();
+		}
 	}
 	const SaltOceanFFT::FSpectrum Spectrum = GetSpectrum();
 	Field.SetSpectrum(Spectrum, bWindSea && WindSeaHeight > 0.f);
@@ -233,6 +266,24 @@ void ASaltOcean::Tick(float DeltaSeconds)
 	SimulateWindSea(Step);
 	PushParameters();
 	UpdateTiles(false);
+	FVector View;
+	GetViewLocation(View);
+	UpdateUnderwater(View);
+}
+
+void ASaltOcean::UpdateUnderwater(const FVector& View)
+{
+	CameraHeightAboveWater = (float)(View.Z - Field.Sample(FVector2D(View.X, View.Y)).Location.Z);
+	const bool bActive = CameraHeightAboveWater < UnderwaterActivationHeight;
+	if (bActive == bUnderwaterActive)
+	{
+		return;
+	}
+	bUnderwaterActive = bActive;
+	UnderFullTiles->SetVisibility(bActive);
+	UnderQuarterTiles->SetVisibility(bActive);
+	// The post-process material itself decides on the GPU surface whether the camera is submerged.
+	UnderwaterPost->BlendWeight = bActive ? 1.f : 0.f;
 }
 
 FSaltWaterSample ASaltOcean::SampleSurface(FVector2D WorldXY) const
@@ -352,6 +403,8 @@ void ASaltOcean::UpdateTiles(bool bForce)
 	}
 	ApplyTiles(FullTiles, Full);
 	ApplyTiles(QuarterTiles, Quarter);
+	ApplyTiles(UnderFullTiles, Full, -1.0);
+	ApplyTiles(UnderQuarterTiles, Quarter, -1.0);
 	DebugTileCount = Full.Num() + Quarter.Num();
 }
 
@@ -387,12 +440,13 @@ bool ASaltOcean::SelectNode(const FVector2D& Center, double Size, int32 Lod, con
 	return true;
 }
 
-void ASaltOcean::ApplyTiles(UInstancedStaticMeshComponent* Component, const TArray<FTileInstance>& Tiles)
+void ASaltOcean::ApplyTiles(UInstancedStaticMeshComponent* Component, const TArray<FTileInstance>& Tiles, double ZSign)
 {
 	Component->ClearInstances();
 	TArray<FTransform> Transforms;
 	Transforms.Reserve(Tiles.Num());
-	const double Z = Field.WaterLevel;
+	// Instance transforms are relative to the component; a mirrored component maps -Z back to the level.
+	const double Z = Field.WaterLevel * ZSign;
 	for (const FTileInstance& T : Tiles)
 	{
 		Transforms.Add(FTransform(FQuat::Identity, FVector(T.Center.X, T.Center.Y, Z), FVector(T.CellSize, T.CellSize, 1.f)));

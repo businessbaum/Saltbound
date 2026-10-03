@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 3, ocean revision 6: FFT ocean; foam removed).
+Last updated: 2026-10-04 (session 3, underwater revision 1: swimming, view from below, seabed, D28).
 
 ## Milestone status
 
@@ -182,13 +182,33 @@ for a higher screen percentage (for example 75 %) and more content.
 - **Evidence:** `Docs/Evidence/Ocean_rev6/` (references compared with before and after, Rough / Calm /
   Flat, low and elevated views).
 
+### Underwater revision 1 (session 3, D28)
+- **Swimming:**
+  - Enter the sea anywhere: from the pier, by wading in, or by teleporting in. The swimmer floats with the
+    eyes just above the water and rides the waves.
+  - W swims where you look, Space rises, Ctrl / C dives, Shift swims faster.
+  - Space at the pier, the boat or a flat rock climbs out.
+  - Walking off the pier drops you into the sea; in the shallows you wade out.
+- **View from below:**
+  - The sea surface seen from underneath: Snell's window with sky and sun, total internal reflection
+    outside it, comic wave shading.
+  - Turquoise underwater fog after the owner's Sea of Thieves references (light lost with depth,
+    visibility about 30 m).
+- **Seabed:** sculpted sand (beach, pier ridge, drop-off, sandbank, mounds and ripples), animated caustic
+  light on sand and rocks, 34 swaying sea-grass patches.
+- **Stone textures:** no crack lines and no chip outlines any more (owner feedback).
+- **Evidence:** `Docs/Evidence/Underwater_rev1/` (contact sheet, a drop-off clip, a look-up clip in the
+  open sea).
+- **Test:** `python Tools/swim_test.py` (PIE, 5 checks, all pass).
+
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
 |---|---|---|
 | Move | W A S D / arrow keys | Left stick |
 | Look | Mouse | Right stick |
 | Sprint | Left Shift (hold) | Left stick click |
-| Jump | Space | A / Cross |
+| Jump / swim up / climb out of the water | Space | A / Cross |
+| Dive (while swimming) | Left Ctrl / C | B / Circle |
 | Interact / leave station | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
 
@@ -202,6 +222,8 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.RunMovementTests [motion speed turn]`, `sb.Dev.Platform <motion> [speed turn]`
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`
+- `sb.Dev.Teleport X Y Z [Yaw] [Pitch]` (feet position), `sb.Dev.Input <Forward> <Right> [Up] [Dive]` (simulated
+  input), `sb.Dev.WaterState` (logs `SB_WATER`: movement mode, immersion, surface, camera height above the water)
 
 ## Known issues and limitations
 - **Performance:** revision 2 measured in standalone, 2560×1440 native, editor closed:
@@ -222,8 +244,17 @@ Developer console (`~`, non-shipping builds):
 - **Ocean (D26):**
   - The ocean does not reflect itself: it is not in the ray-tracing scene, and horizon occlusion only
     approximates this.
-  - No spray yet (`SprayAmount` is unused). No underwater rendering.
+  - No spray yet (`SprayAmount` is unused).
   - Cloud positions follow wall-clock time, so captures minutes apart reflect different clouds.
+- **Underwater (D28):**
+  - The waterline is not split: with the camera exactly at the surface, the near plane can show a thin band
+    of the wrong side for a frame.
+  - No god rays, bubbles or particles yet. The underside does not show objects above the water (boat hulls
+    above the waterline) through Snell's window.
+  - Sea grass ignores the player (no bending). Caustics are emissive, so they also show in shadows under the
+    pier.
+  - Performance with the underside tiles and the underwater pass has not been benchmarked in a packaged
+    build yet (also outstanding for the FFT ocean itself).
 - **Vsync frame pacing:** with vsync on, the standalone build runs at about 55–60 fps even though the GPU
   needs only about 7.5 ms. Default display settings (vsync off or a frame cap, later a settings menu) are needed.
 - **Benchmarking:** always close the editor first. A running editor renders in the background (throttling
@@ -252,3 +283,5 @@ Developer console (`~`, non-shipping builds):
 5. Water polish: bow wave and wake, spray at crests (`SprayAmount`), verification captures of all
    region × weather × time-of-day combinations, curved (non-Gerstner) crests against the remaining banding.
 6. Display settings menu: vsync/frame cap, screen percentage.
+7. Underwater after the owner's review: waterline split at the camera, god rays and bubbles, sea grass
+   bending around the player, a packaged-build benchmark of the FFT ocean plus the underwater rendering.

@@ -1,0 +1,91 @@
+// Saltbound - light under the water (D28), shared by M_OceanUnder (the surface seen from below) and
+// M_PP_Underwater (fog for a submerged camera), so the underside's water colour and the fog agree.
+//
+// The scene is lit as if there were no water: the sun and sky reach the seabed unattenuated. The
+// post-process pass removes the light lost on the way down (LightPath, by depth below the water level) and on
+// the way to the camera (view-distance fog), and adds the light scattered by the water itself (InScatter).
+// Coefficients are the region's Single Layer Water absorption / scattering (1/m, MPC_Ocean Look*), scaled
+// by MPC_Ocean UnderwaterFog / UnderwaterSky. Units: centimetres, lux, cd/m2.
+//
+// This file is embedded into Custom material expressions by Tools/ue_scripts/setup_ocean.py.
+
+struct FSaltUnderwaterLight
+{
+	float3 L;        // direction to the sun (air)
+	float3 Lw;       // direction to the sun under water (refracted towards the vertical)
+	float3 Sun;      // sun illuminance after the atmosphere (lux)
+	float3 Ambient;  // sky light on a horizontal surface (lux), approximated from the sun
+	float3 SigT;     // extinction (1/cm)
+	float3 Albedo;   // single-scattering albedo of the water (physical, or the stylised underwater colour)
+	float4 Fog;      // view fog scale, in-scatter brightness, light-path scale, sun forward scatter
+	float4 Sky;      // sky ambient / sun, sky radiance / sun, sun glint through the surface, phase g
+
+	float Luma(float3 C)
+	{
+		return dot(C, float3(0.2126, 0.7152, 0.0722));
+	}
+
+	// InColor: stylised in-scatter colour (rgb) and how much it replaces the physical albedo (a).
+	void Init(float3 SunDir, float3 SunIllum, float3 Absorption, float3 Scattering, float4 InFog, float4 InSky, float4 InColor)
+	{
+		L = normalize(SunDir);
+		const float2 H = L.xy / 1.333;
+		Lw = float3(H, sqrt(saturate(1.0 - dot(H, H))));
+		Sun = SunIllum;
+		Ambient = float3(0.55, 0.75, 1.0) * (Luma(SunIllum) * InSky.x);
+		SigT = (Absorption + Scattering) * 0.01;
+		Albedo = lerp(Scattering / max(Absorption + Scattering, 1e-4), InColor.rgb, saturate(InColor.a));
+		Fog = InFog;
+		Sky = InSky;
+	}
+
+	// Light lost per cm of depth, along the refracted sun direction.
+	float3 DepthLoss()
+	{
+		return SigT * (Fog.z / max(Lw.z, 0.2));
+	}
+
+	// Share of the surface light that reaches a depth (cm).
+	float3 LightPath(float Depth)
+	{
+		return exp(-DepthLoss() * max(Depth, 0.0));
+	}
+
+	// Radiance the water at a depth (cm) scatters towards a viewer looking along Dir: sky and sun light
+	// scattered evenly, plus a forward-scattering glow around the sun.
+	float3 InScatter(float3 Dir, float Depth)
+	{
+		const float G = Sky.w;
+		const float CosT = dot(Dir, Lw);
+		const float Phase = (1.0 - G * G) / (12.566371 * pow(max(1.0 + G * G - 2.0 * G * CosT, 1e-4), 1.5));
+		const float3 SunDown = Sun * saturate(L.z);
+		const float3 Light = (SunDown + Ambient) * 0.0795775 + SunDown * (Phase * Fog.w);
+		return Albedo * Light * (Fog.y * LightPath(Depth));
+	}
+
+	// In-scattered radiance gathered along a ray of length Dist starting Depth cm below the surface. The light
+	// changes with depth along the ray, so the fog integral is exp(-A s) with A = view extinction - depth
+	// loss * Dir.z (closed form: looking down, the water darkens with distance; looking up, it brightens).
+	float3 InScatterRay(float3 Dir, float Depth, float Dist)
+	{
+		const float3 SigV = SigT * Fog.x;
+		const float3 A = SigV - DepthLoss() * Dir.z;
+		const float3 SafeA = max(abs(A), 1e-7) * (step(0.0, A) * 2.0 - 1.0);
+		return InScatter(Dir, Depth) * (SigV * (1.0 - exp(-SafeA * Dist)) / SafeA);
+	}
+
+	// A scene colour (absolute luminance, as post-process materials see it) at distance Dist along Dir from a
+	// camera CamDepth below the water level, the surface point PointDepth below it.
+	float3 Apply(float3 Color, float3 Dir, float Dist, float CamDepth, float PointDepth)
+	{
+		const float3 Tv = exp(-SigT * (Fog.x * Dist));
+		return Color * LightPath(PointDepth) * Tv + InScatterRay(Dir, CamDepth, Dist);
+	}
+
+	// Sky and sun seen through the surface along the refracted direction T (in air).
+	float3 SkyThrough(float3 T)
+	{
+		const float3 SkyColor = lerp(float3(0.75, 0.85, 1.0), float3(0.3, 0.5, 1.0), saturate(T.z));
+		return SkyColor * (Luma(Sun) * Sky.y) + Sun * (Sky.z * pow(saturate(dot(T, L)), 400.0));
+	}
+};

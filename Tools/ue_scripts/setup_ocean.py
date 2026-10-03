@@ -11,6 +11,12 @@
                                     and light through thin crests (pixel); no foam (removed, D27);
                                     HLSL from Saltbound/Shaders/SaltOcean.ush
   /Game/Saltbound/Water/MI_Ocean    instance (all tuning parameters, see Docs/Decisions.md D23-D27)
+  /Game/Saltbound/Water/M_OceanUnder (+ MI_) the sea seen from below (D28): same vertex displacement, drawn by
+                                    ASaltOcean's mirrored underside tiles; Snell's window (refracted sky and
+                                    sun), total internal reflection of the water body outside it
+  /Game/Saltbound/Water/M_PP_Underwater (+ MI_) post-process pass for a submerged camera (D28): finds the
+                                    surface above the camera on the GPU, then view-distance fog, light lost
+                                    with depth and in-scattered light from the region's water (MPC Look*)
 """
 import math
 import os
@@ -23,6 +29,7 @@ import sb_ue  # noqa: E402
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 USH = os.path.join(REPO_ROOT, "Saltbound", "Shaders", "SaltOcean.ush")
+UNDER_USH = os.path.join(REPO_ROOT, "Saltbound", "Shaders", "SaltUnderwater.ush")
 DIR = "/Game/Saltbound/Water"
 FFT_DIR = DIR + "/FFT"
 mel = sb_ue.mel
@@ -37,6 +44,12 @@ PREV_PARAMS = ["PrevPhase0123", "PrevPhase4567", "PrevPhase891011"]
 CASCADE_PARAMS = ["Cascade0", "Cascade1", "Cascade2"]
 FIELD_PARAMS = PHASE_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals"] + CASCADE_PARAMS
 LOOK_PARAMS = ["LookAbsorption", "LookScattering", "LookCrest"]
+# Underwater look shared by M_OceanUnder and M_PP_Underwater (D28):
+#   UnderwaterFog = (view fog scale, in-scatter brightness, light-path scale, sun forward scatter)
+#   UnderwaterSky = (sky ambient / sun, sky radiance / sun, sun glint, forward-scatter phase g)
+#   UnderwaterColor = (stylised in-scatter colour rgb, share replacing the physical albedo) - turquoise like the
+#                     owner's Sea of Thieves references, while extinction still follows the region's water
+UNDER_PARAMS = ["UnderwaterFog", "UnderwaterSky", "UnderwaterColor"]
 PS_EXTRA = ["RippleOffsets", "LookCrest"]
 
 
@@ -53,6 +66,7 @@ MPC_DEFAULTS = {
     "Cascade0": cascade_default(0), "Cascade1": cascade_default(1), "Cascade2": cascade_default(2),
     "LookAbsorption": (1.35, 0.26, 0.15, 1), "LookScattering": (0.01, 0.065, 0.1, 1),
     "LookCrest": (0.1, 0.95, 0.9, 1),
+    "UnderwaterFog": (0.12, 1.0, 0.3, 0.3), "UnderwaterSky": (0.25, 0.06, 0.3, 0.6), "UnderwaterColor": (0.12, 0.48, 0.62, 1.0),
 }
 
 
@@ -60,10 +74,13 @@ MPC_DEFAULTS = {
 def make_mpc():
     mpc = sb_ue.get_or_create_asset("MPC_Ocean", DIR, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
     names = (WAVE_PARAMS + PHASE_PARAMS + PREV_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals", "RippleOffsets"]
-             + CASCADE_PARAMS + LOOK_PARAMS)
+             + CASCADE_PARAMS + LOOK_PARAMS + UNDER_PARAMS)
+    # Keep existing entries: each has an ID that materials reference. Recreated entries get new IDs and every
+    # material not rebuilt in the same run fails to compile ("invalid parameter") and renders the default material.
+    existing = {str(p.get_editor_property("parameter_name")): p for p in mpc.get_editor_property("vector_parameters")}
     params = []
     for name in names:
-        p = unreal.CollectionVectorParameter()
+        p = existing.get(name) or unreal.CollectionVectorParameter()
         p.set_editor_property("parameter_name", name)
         p.set_editor_property("default_value", unreal.LinearColor(*MPC_DEFAULTS.get(name, (0, 0, 0, 0))))
         params.append(p)
@@ -141,35 +158,21 @@ float MorphK = saturate((Dist - MorphStart) / max(MorphEnd - MorphStart, 1.0));
 // Robust parity of the integer grid coordinate (odd vertices collapse onto the lower even neighbour).
 float2 Odd = LocalPos.xy - 2.0 * floor((LocalPos.xy + 0.5) * 0.5);
 float2 XY = WorldPos.xy - Odd * (MorphK * CellSize);
-// Swells (Gerstner).
-float3 D = O.Displacement(XY, max(Dist * FadeScale, CellSize * 4.0));
-// Wind sea: FFT cascades 0 (waves >= 6 m) and 1 (0.9-6 m) shape the geometry; cascade 2 (ripples) is
-// shading only. The mip level follows the vertex spacing, so waves the grid cannot carry are filtered
-// out instead of aliasing. The velocity pass (IsPrev = 1) reads last frame's textures.
-float F = O.Attenuation(XY) * O.ChopFactor(XY);
-float2 UV0 = O.TileUV(XY, Cascade0);
-float2 UV1 = O.TileUV(XY, Cascade1);
-float Mip0 = max(log2(CellSize * Cascade0.x * Cascade0.w) + VSMipBias, 0.0);
-float Mip1 = max(log2(CellSize * Cascade1.x * Cascade1.w) + VSMipBias, 0.0);
-float4 S0;
-float4 S1;
+// Swells (Gerstner) plus the wind sea: FFT cascades 0 (waves >= 6 m) and 1 (0.9-6 m) shape the geometry;
+// cascade 2 (ripples) is shading only. The mip level follows the vertex spacing, so waves the grid cannot
+// carry are filtered out instead of aliasing. The velocity pass (IsPrev = 1) reads last frame's textures.
+float FadeK = max(Dist * FadeScale, CellSize * 4.0);
+float3 D;
 if (IsPrev > 0.5)
 {
-    S0 = Texture2DSampleLevel(DispPrev0, DispPrev0Sampler, UV0, Mip0);
-    S1 = Texture2DSampleLevel(DispPrev1, DispPrev1Sampler, UV1, Mip1);
+    D = O.SurfaceDisplacement(XY, FadeK, CellSize, Cascade0, Cascade1, VSMipBias, DispPrev0, DispPrev0Sampler,
+        DispPrev1, DispPrev1Sampler, QuietTex, QuietTexSampler, QuietTile, RippleOffsets.w, TroughCalm, QuietAmount, WindSeaVS1);
 }
 else
 {
-    S0 = Texture2DSampleLevel(Disp0, Disp0Sampler, UV0, Mip0);
-    S1 = Texture2DSampleLevel(Disp1, Disp1Sampler, UV1, Mip1);
+    D = O.SurfaceDisplacement(XY, FadeK, CellSize, Cascade0, Cascade1, VSMipBias, Disp0, Disp0Sampler,
+        Disp1, Disp1Sampler, QuietTex, QuietTexSampler, QuietTile, RippleOffsets.w, TroughCalm, QuietAmount, WindSeaVS1);
 }
-D += float3(O.ToWorld(S0.xy, Cascade0), S0.z) * F;
-// Medium waves follow the short-wave mask (same as the pixel shader: geometry and normals agree).
-float2 WDir = normalize(O.WA[0].xy + float2(1e-6, 0.0));
-float2 QuietUV = float2(dot(XY, WDir), dot(XY, float2(-WDir.y, WDir.x))) / QuietTile + float2(0.13, 0.71) - float2(RippleOffsets.w * 0.5, 0.0);
-float Quiet = Texture2DSampleLevel(QuietTex, QuietTexSampler, QuietUV, 0.0).b;
-float Mask = O.ShortWaveMask(D.z / max(O.Chop.w, 1.0), Quiet, TroughCalm, QuietAmount);
-D += float3(O.ToWorld(S1.xy, Cascade1), S1.z) * (F * WindSeaVS1 * Mask);
 P0 = float3(XY, D.z);
 return float3(XY - WorldPos.xy, 0.0) + D;
 """
@@ -293,6 +296,115 @@ SCALARS = {
 
 VS_TEXTURES = ["Disp0", "Disp1", "DispPrev0", "DispPrev1"]
 PS_TEXTURES = ["Disp0", "Disp1", "Disp2", "Deriv0", "Deriv1", "Deriv2", "Aux0", "Aux1", "Aux2"]
+UNDER_TEXTURES = ["Disp0", "Disp1", "Disp2", "Deriv0", "Deriv1", "Deriv2"]
+VS_ONLY = ["VSMipBias", "WindSeaVS1"]
+VS_SCALARS = VS_ONLY + ["TroughCalm", "QuietAmount", "QuietTile"]
+
+# --- the sea seen from below (M_OceanUnder) ---------------------------------------------------------
+UNDER_PS_CODE = INIT + """
+float Dist = distance(CamPos, WorldPos);
+float2 XY = P0.xy;
+float FadeK = Dist * FadeScale;
+float F = O.Attenuation(XY) * O.ChopFactor(XY);
+// Surface normal of the displaced surface, as in M_Ocean (ripples fade with distance).
+float3 Tx = float3(1, 0, 0);
+float3 Ty = float3(0, 1, 0);
+O.SwellTangents(XY, FadeK, Tx, Ty);
+float2 UV0 = O.TileUV(XY, Cascade0);
+float2 UV1 = O.TileUV(XY, Cascade1);
+float2 UV2 = O.TileUV(XY, Cascade2);
+float4 A0 = Texture2DSample(Disp0, Disp0Sampler, UV0);
+float4 G0 = Texture2DSample(Deriv0, Deriv0Sampler, UV0);
+float4 A1 = Texture2DSample(Disp1, Disp1Sampler, UV1);
+float4 G1 = Texture2DSample(Deriv1, Deriv1Sampler, UV1);
+float4 A2 = Texture2DSample(Disp2, Disp2Sampler, UV2);
+float4 G2 = Texture2DSample(Deriv2, Deriv2Sampler, UV2);
+float Quiet = Texture2DSampleLevel(QuietTex, QuietTexSampler, O.QuietUV(XY, QuietTile, RippleOffsets.w), 0.0).b;
+float Mask = O.ShortWaveMask(P0.z / max(O.Chop.w, 1.0), Quiet, TroughCalm, QuietAmount);
+float F1 = F * Mask;
+float F2 = F * lerp(RippleFloor, 1.0, Mask) * saturate(1.0 - Dist / max(RippleFadeDistance, 1.0));
+float2 H0 = O.ToWorld(G0.xy, Cascade0) * F;
+float3 M0 = O.TensorToWorld(float3(G0.z, G0.w, A0.w), Cascade0) * F;
+float2 H1 = O.ToWorld(G1.xy, Cascade1) * F1;
+float3 M1 = O.TensorToWorld(float3(G1.z, G1.w, A1.w), Cascade1) * F1;
+float2 H2 = O.ToWorld(G2.xy, Cascade2) * F2;
+float3 M2 = O.TensorToWorld(float3(G2.z, G2.w, A2.w), Cascade2) * F2;
+Tx += float3(M0.x + M1.x + M2.x, M0.z + M1.z + M2.z, H0.x + H1.x + H2.x);
+Ty += float3(M0.z + M1.z + M2.z, M0.y + M1.y + M2.y, H0.y + H1.y + H2.y);
+float3 N = normalize(cross(Tx, Ty));
+
+// --- Seen from below (water -> air, n = 1.333): inside Snell's window (about 49 degrees around the local
+// normal) the sky and the sun are refracted into view; outside it, total internal reflection mirrors the
+// lit water body. The underwater pass then fogs this like any other surface.
+FSaltUnderwaterLight U;
+U.Init(SunDir, SunIllum, LookAbsorption.rgb, LookScattering.rgb, UnderwaterFog, UnderwaterSky, UnderwaterColor);
+float3 I = normalize(WorldPos - CamPos);
+N *= (dot(I, N) < 0.0) ? -1.0 : 1.0;
+float CosI = saturate(dot(I, N));
+const float Eta = 1.333;
+float Sin2T = Eta * Eta * (1.0 - CosI * CosI);
+float3 Deep = U.InScatterRay(reflect(I, N), 0.0, 100000.0);
+float3 Color = Deep;
+if (Sin2T < 1.0)
+{
+    float CosT = sqrt(1.0 - Sin2T);
+    float3 T = normalize(Eta * I + (CosT - Eta * CosI) * N);
+    float Rs = (Eta * CosI - CosT) / (Eta * CosI + CosT);
+    float Rp = (CosI - Eta * CosT) / (CosI + Eta * CosT);
+    float R = saturate(0.5 * (Rs * Rs + Rp * Rp));
+    Color = lerp(U.SkyThrough(T), Deep, R);
+}
+// Comic wave shading: faces turned towards the sun pass more light, the others less, so the moving surface
+// reads as rippled light instead of a flat ceiling (WaveShading = strength, WaveShadingSlope = contrast).
+float Tilt = dot(N, U.Lw) - U.Lw.z;
+return Color * (1.0 + WaveShading * clamp(Tilt * WaveShadingSlope, -1.0, 1.0));
+"""
+
+UNDER_SCALARS = dict({n: SCALARS[n] for n in VS_SCALARS + ["RippleFloor", "RippleFadeDistance"]},
+                     WaveShading=(0.35, "Underwater"), WaveShadingSlope=(6.0, "Underwater"))
+
+# --- underwater post-process (M_PP_Underwater) --------------------------------------------------------
+# Surface height above the camera from the same displacement as the vertex shader at the finest LOD (the
+# horizontal displacement is inverted by fixed-point iteration). Positive = the camera is under water.
+PP_CAMERA_CODE = INIT + """
+float2 P = CamPos.xy;
+float3 D = 0;
+[unroll] for (int k = 0; k < 4; k++)
+{
+    D = O.SurfaceDisplacement(P, CameraCellSize * 4.0, CameraCellSize, Cascade0, Cascade1, VSMipBias, Disp0, Disp0Sampler,
+        Disp1, Disp1Sampler, QuietTex, QuietTexSampler, QuietTile, RippleOffsets.w, TroughCalm, QuietAmount, WindSeaVS1);
+    P = CamPos.xy - D.xy;
+}
+return Globals.y + D.z - CamPos.z;
+"""
+
+PP_UV_CODE = """
+// Slight wobble of the image under water.
+float2 W = float2(sin(UV.y * 37.0 + Time * 1.7) + sin(UV.y * 13.0 - Time * 1.1), cos(UV.x * 29.0 + Time * 1.3));
+return UV + W * (DistortAmount * step(0.0, CamDepth));
+"""
+
+PP_FOG_CODE = """
+if (CamDepth <= 0.0)
+{
+    return SceneColor.rgb;
+}
+FSaltUnderwaterLight U;
+U.Init(SunDir, SunIllum, LookAbsorption.rgb, LookScattering.rgb, UnderwaterFog, UnderwaterSky, UnderwaterColor);
+float RelLen = length(PixelRel);
+float3 Dir = PixelRel / max(RelLen, 1e-3);
+float Dist = min(RelLen, MaxFogDistance);   // sky: very far, clamped
+float PointDepth = Globals.y - (CamPos.z + Dir.z * Dist);
+// Diagnostics (exposure-independent bands on the scene): DebugView 1 = red every 5 m of view distance,
+// green every 1 m of depth below the water level.
+if (DebugView > 0.5)
+{
+    return SceneColor.rgb * float3(frac(Dist / 500.0), frac(PointDepth / 100.0), 0.1) * 3.0;
+}
+// Post-process materials see absolute luminance (pre-exposure is removed before and reapplied after), so
+// the in-scattered light (cd/m2) is added as is.
+return U.Apply(SceneColor.rgb, Dir, Dist, max(Globals.y - CamPos.z, 0.0), max(PointDepth, 0.0));
+"""
 
 
 def rt_name(param):
@@ -300,51 +412,56 @@ def rt_name(param):
     return "RT_Ocean%s%s" % (kind, c)
 
 
-def make_material(mpc, ush, rts):
-    m = sb_ue.reset_material("M_Ocean", DIR)
-    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
-    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
-    m.set_editor_property("tangent_space_normal", False)
-    m.set_editor_property("used_with_instanced_static_meshes", True)
+def ocean_inputs(m, mpc, rts, textures, scalars):
+    """MPC parameters, camera, FFT texture objects (shared wrap sampler, so the sampler count stays low),
+    the quiet-patch texture and scalar parameters. Returns a node context."""
+    names = WAVE_PARAMS + FIELD_PARAMS + ["RippleOffsets"] + LOOK_PARAMS + UNDER_PARAMS
+    ctx = {"nodes": {n: mpc_param(m, mpc, n, -2400, -1600 + i * 60) for i, n in enumerate(names)}}
+    ctx["cam"] = sb_ue.expr(m, unreal.MaterialExpressionCameraPositionWS, -2400, 0)
+    ctx["tex"] = {}
+    for i, p in enumerate(sorted(set(textures))):
+        ctx["tex"][p] = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -2000, -1600 + i * 90, parameter_name=p,
+                                   texture=rts[rt_name(p)], sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR,
+                                   sampler_source=unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS, group="FFT")
+    # Low-frequency noise (blue channel of the old foam pattern) for the drifting quiet patches.
+    ctx["quiet_tex"] = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -1200, 1050, parameter_name="QuietTex",
+                                  texture=unreal.load_asset(DIR + "/Textures/T_OceanFoam_M"),
+                                  sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, group="Waves")
+    ctx["sp"] = {n: sb_ue.scalar_param(m, n, v, -1200, 1200 + i * 60, g) for i, (n, (v, g)) in enumerate(scalars.items())}
+    return ctx
 
-    names = WAVE_PARAMS + FIELD_PARAMS + ["RippleOffsets"] + LOOK_PARAMS
-    nodes = {n: mpc_param(m, mpc, n, -2400, -1600 + i * 60) for i, n in enumerate(names)}
-    cam = sb_ue.expr(m, unreal.MaterialExpressionCameraPositionWS, -2400, 0)
 
-    # FFT textures: one parameter node each, shared by the vertex and pixel code (shared wrap sampler,
-    # so the sampler count stays low).
-    tex = {}
-    for i, p in enumerate(sorted(set(VS_TEXTURES + PS_TEXTURES))):
-        tex[p] = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -2000, -1600 + i * 90, parameter_name=p,
-                            texture=rts[rt_name(p)], sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR,
-                            sampler_source=unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS, group="FFT")
+def link_inputs(ctx, node, names):
+    """Connects context nodes (MPC parameters, textures, scalars) to the custom node inputs of the same name."""
+    for n in names:
+        src = ctx["nodes"].get(n) or ctx["tex"].get(n) or ctx["sp"].get(n)
+        if src is None:
+            raise RuntimeError("no input node for " + n)
+        link(src, "", node, n)
 
-    # --- vertex: morph + displacement
+
+def ocean_vertex(m, mpc, ush, ctx):
+    """Vertex shader of the surface materials: CDLOD morph, swells and FFT wind sea, plus last frame's
+    displacement for the velocity pass. Returns the interpolated Lagrangian position P0 (xy) and height (z)."""
+    nodes = ctx["nodes"]
     wp_vs = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -2000, 200,
                        world_position_shader_offset=unreal.WorldPositionIncludedOffsets.WPT_EXCLUDE_ALL_SHADER_OFFSETS)
     lp = sb_ue.expr(m, unreal.MaterialExpressionLocalPosition, -2000, 300)
     cd = [sb_ue.expr(m, unreal.MaterialExpressionPerInstanceCustomData, -2000, 400 + i * 80, data_index=i) for i in range(3)]
     fade_vs = sb_ue.scalar_param(m, "WaveFadeVS", 0.03, -2000, 650, "Waves")
-    vs_only = ["VSMipBias", "WindSeaVS1"]
-    vs_scalars = vs_only + ["TroughCalm", "QuietAmount", "QuietTile"]
     vs_inputs = (["WorldPos", "LocalPos", "CamPos", "CellSize", "MorphStart", "MorphEnd", "FadeScale", "IsPrev", "QuietTex", "RippleOffsets"]
-                 + vs_scalars + VS_TEXTURES + WAVE_PARAMS + FIELD_PARAMS)
-    # Low-frequency noise (blue channel of the old foam pattern) for the drifting quiet patches.
-    quiet_tex = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -1200, 1050, parameter_name="QuietTex",
-                           texture=unreal.load_asset(DIR + "/Textures/T_OceanFoam_M"),
-                           sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, group="Waves")
+                 + VS_SCALARS + VS_TEXTURES + WAVE_PARAMS + FIELD_PARAMS)
     vs = custom(m, -1500, 300, "SaltOcean VS (morph + swells + FFT wind sea)", ush + "\n" + VS_CODE, vs_inputs, F3, [("P0", F3)])
     link(wp_vs, "", vs, "WorldPos")
     link(lp, "", vs, "LocalPos")
-    link(cam, "", vs, "CamPos")
+    link(ctx["cam"], "", vs, "CamPos")
     link(cd[0], "", vs, "CellSize")
     link(cd[1], "", vs, "MorphStart")
     link(cd[2], "", vs, "MorphEnd")
     link(fade_vs, "", vs, "FadeScale")
-    link(quiet_tex, "", vs, "QuietTex")
+    link(ctx["quiet_tex"], "", vs, "QuietTex")
     link(nodes["RippleOffsets"], "", vs, "RippleOffsets")
-    for p in VS_TEXTURES:
-        link(tex[p], "", vs, p)
+    link_inputs(ctx, vs, VS_TEXTURES + VS_SCALARS)
     # Last frame's displacement for the velocity pass: PreviousFrameSwitch picks PrevPhase* for the swells
     # and IsPrev = 1 (last frame's FFT textures). Without it the waves get zero motion vectors and TSR
     # reprojects history onto moving water (D23). UsePrevFramePhases = 0 restores that for A/B tests.
@@ -364,23 +481,36 @@ def make_material(mpc, ush, rts):
     link(zero, "", is_prev, "Current Frame")
     link(use_prev, "", is_prev, "Previous Frame")
     link(is_prev, "", vs, "IsPrev")
-    for n in WAVE_PARAMS + FIELD_PARAMS:
-        if n not in PHASE_PARAMS:
-            link(nodes[n], "", vs, n)
-    sp = {n: sb_ue.scalar_param(m, n, v, -1200, 1200 + i * 60, g) for i, (n, (v, g)) in enumerate(SCALARS.items())}
-    for n in vs_scalars:
-        link(sp[n], "", vs, n)
+    link_inputs(ctx, vs, [n for n in WAVE_PARAMS + FIELD_PARAMS if n not in PHASE_PARAMS])
     sb_ue.to_prop(vs, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
     interp = sb_ue.expr(m, unreal.MaterialExpressionVertexInterpolator, -1200, 500)
     link(vs, "P0", interp, "")
+    return interp
+
+
+def sun_nodes(m, x, y, position=None):
+    """Sun direction and illuminance after the atmosphere (optionally evaluated at a given world position)."""
+    sun_dir = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightDirection, x, y)
+    sun_illum = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightIlluminance, x, y + 100)
+    if position is not None:
+        link(position, "", sun_illum, "World Position")
+    return sun_dir, sun_illum
+
+
+def make_material(mpc, ush, rts):
+    m = sb_ue.reset_material("M_Ocean", DIR)
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+    m.set_editor_property("tangent_space_normal", False)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    ctx = ocean_inputs(m, mpc, rts, VS_TEXTURES + PS_TEXTURES, SCALARS)
+    interp = ocean_vertex(m, mpc, ush, ctx)
 
     # --- pixel: normals, roughness, crest light
     wp_ps = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -1200, 700)
     fade_ps = sb_ue.scalar_param(m, "WaveFadePS", 0.002, -1200, 800, "Waves")
-    sun_dir = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightDirection, -1500, 2000)
-    sun_illum = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightIlluminance, -1500, 2100)
-
-    ps_scalars = [n for n in SCALARS if n not in vs_only]
+    sun_dir, sun_illum = sun_nodes(m, -1500, 2000)
+    ps_scalars = [n for n in SCALARS if n not in VS_ONLY]
     ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "QuietTex", "SunDir", "SunIllum"]
                  + PS_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA)
     ps = custom(m, -700, 900, "SaltOcean PS (surface normal, roughness, crest light)", ush + "\n" + PS_CODE, ps_inputs, F3,
@@ -389,15 +519,10 @@ def make_material(mpc, ush, rts):
     link(sun_illum, "", ps, "SunIllum")
     link(interp, "", ps, "P0")
     link(wp_ps, "", ps, "WorldPos")
-    link(cam, "", ps, "CamPos")
+    link(ctx["cam"], "", ps, "CamPos")
     link(fade_ps, "", ps, "FadeScale")
-    link(quiet_tex, "", ps, "QuietTex")
-    for p in PS_TEXTURES:
-        link(tex[p], "", ps, p)
-    for n in ps_scalars:
-        link(sp[n], "", ps, n)
-    for n in WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA:
-        link(nodes[n], "", ps, n)
+    link(ctx["quiet_tex"], "", ps, "QuietTex")
+    link_inputs(ctx, ps, PS_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA)
 
     sb_ue.to_prop(ps, "", unreal.MaterialProperty.MP_NORMAL)
     # No surface layer on the water (opacity 0 = pure Single Layer Water).
@@ -408,6 +533,7 @@ def make_material(mpc, ush, rts):
     sb_ue.to_prop(ps, "SpecularOut", unreal.MaterialProperty.MP_SPECULAR)
 
     # --- water volume (Single Layer Water output): absorption and scattering per region (MPC Look*).
+    nodes = ctx["nodes"]
     slw = sb_ue.expr(m, unreal.MaterialExpressionSingleLayerWaterMaterialOutput, 0, 1200)
     phase_g = sb_ue.scalar_param(m, "PhaseG", 0.2, -400, 1300, "Volume")
     behind = sb_ue.vector_param(m, "ColorScaleBehindWater", (0.9, 0.9, 0.9, 1), -400, 1400, "Volume")
@@ -428,18 +554,124 @@ def make_material(mpc, ush, rts):
     return m
 
 
-def main():
-    with open(USH, encoding="utf-8") as f:
-        ush = f.read()
-    mpc = make_mpc()
-    rts = make_targets()
-    m = make_material(mpc, ush, rts)
-    mi = sb_ue.make_mi("MI_Ocean", DIR, m)
+def above_water_position(m, ctx, x, y):
+    """World position 10 m above the still water at the camera, where the atmosphere's sun illuminance is
+    sampled (a point below the planet's ground would be in the planet's shadow)."""
+    c = custom(m, x, y, "Above the water at the camera", "return float3(CamPos.xy, Globals.y + 1000.0);", ["CamPos", "Globals"], F3)
+    link(ctx["cam"], "", c, "CamPos")
+    link(ctx["nodes"]["Globals"], "", c, "Globals")
+    return c
+
+
+def make_under_material(mpc, ush, under_ush, rts):
+    """The sea seen from below: unlit, drawn by ASaltOcean's mirrored underside tiles (reversed culling)."""
+    m = sb_ue.reset_material("M_OceanUnder", DIR)
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    ctx = ocean_inputs(m, mpc, rts, VS_TEXTURES + UNDER_TEXTURES, UNDER_SCALARS)
+    interp = ocean_vertex(m, mpc, ush, ctx)
+    wp_ps = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -1200, 700)
+    fade_ps = sb_ue.scalar_param(m, "WaveFadePS", 0.002, -1200, 800, "Waves")
+    sun_dir, sun_illum = sun_nodes(m, -1500, 2000, above_water_position(m, ctx, -1800, 2100))
+    ps_scalars = ["TroughCalm", "QuietAmount", "QuietTile", "RippleFloor", "RippleFadeDistance", "WaveShading", "WaveShadingSlope"]
+    ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "QuietTex", "SunDir", "SunIllum", "RippleOffsets"]
+                 + UNDER_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + LOOK_PARAMS + UNDER_PARAMS)
+    ps = custom(m, -700, 900, "SaltOcean underside (Snell's window, total internal reflection)",
+                ush + "\n" + under_ush + "\n" + UNDER_PS_CODE, ps_inputs, F3)
+    link(sun_dir, "", ps, "SunDir")
+    link(sun_illum, "", ps, "SunIllum")
+    link(interp, "", ps, "P0")
+    link(wp_ps, "", ps, "WorldPos")
+    link(ctx["cam"], "", ps, "CamPos")
+    link(fade_ps, "", ps, "FadeScale")
+    link(ctx["quiet_tex"], "", ps, "QuietTex")
+    link_inputs(ctx, ps, ["RippleOffsets"] + UNDER_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + LOOK_PARAMS + UNDER_PARAMS)
+    sb_ue.to_prop(ps, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(m)
+    sb_ue.eal.save_loaded_asset(m)
+    return m
+
+
+def make_post_material(mpc, ush, under_ush, rts):
+    """Post-process pass (before depth of field): changes the image only while the camera is under the GPU
+    surface; ASaltOcean blends it in near and below the surface."""
+    m = sb_ue.reset_material("M_PP_Underwater", DIR)
+    m.set_editor_property("material_domain", unreal.MaterialDomain.MD_POST_PROCESS)
+    m.set_editor_property("blendable_location", unreal.BlendableLocation.BL_SCENE_COLOR_BEFORE_DOF)
+    scalars = dict({n: SCALARS[n] for n in VS_SCALARS},
+                   CameraCellSize=(25.0, "Underwater"), MaxFogDistance=(30000.0, "Underwater"), DistortAmount=(0.0012, "Underwater"),
+                   DebugView=(0.0, "Diagnostics"))
+    ctx = ocean_inputs(m, mpc, rts, ["Disp0", "Disp1"], scalars)
+    cam_in = ["CamPos", "QuietTex", "RippleOffsets", "Disp0", "Disp1", "CameraCellSize"] + VS_SCALARS + WAVE_PARAMS + FIELD_PARAMS
+    camera = custom(m, -1500, 300, "Surface above the camera (GPU)", ush + "\n" + PP_CAMERA_CODE, cam_in, F1)
+    link(ctx["cam"], "", camera, "CamPos")
+    link(ctx["quiet_tex"], "", camera, "QuietTex")
+    link_inputs(ctx, camera, [n for n in cam_in if n not in ("CamPos", "QuietTex")])
+
+    screen = sb_ue.expr(m, unreal.MaterialExpressionScreenPosition, -1500, 700)
+    time = sb_ue.expr(m, unreal.MaterialExpressionTime, -1500, 800)
+    uv = custom(m, -1100, 700, "Underwater wobble", PP_UV_CODE, ["UV", "Time", "CamDepth", "DistortAmount"],
+                unreal.CustomMaterialOutputType.CMOT_FLOAT2)
+    link(screen, "ViewportUV", uv, "UV")
+    link(time, "", uv, "Time")
+    link(camera, "", uv, "CamDepth")
+    link(ctx["sp"]["DistortAmount"], "", uv, "DistortAmount")
+    scene = sb_ue.expr(m, unreal.MaterialExpressionSceneTexture, -800, 700, scene_texture_id=unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
+    link(uv, "", scene, "UVs")
+    # Camera to pixel, reconstructed from scene depth (post-process domain).
+    pixel_rel = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -800, 900,
+                           world_position_shader_offset=unreal.WorldPositionIncludedOffsets.WPT_CAMERA_RELATIVE)
+    sun_dir, sun_illum = sun_nodes(m, -800, 1200, above_water_position(m, ctx, -1100, 1300))
+
+    fog_in = (["SceneColor", "PixelRel", "CamPos", "CamDepth", "SunDir", "SunIllum", "Globals", "MaxFogDistance", "DebugView"]
+              + LOOK_PARAMS + UNDER_PARAMS)
+    fog = custom(m, -400, 800, "Underwater fog and light", under_ush + "\n" + PP_FOG_CODE, fog_in, F3)
+    link(scene, "Color", fog, "SceneColor")
+    link(pixel_rel, "", fog, "PixelRel")
+    link(ctx["cam"], "", fog, "CamPos")
+    link(camera, "", fog, "CamDepth")
+    link(sun_dir, "", fog, "SunDir")
+    link(sun_illum, "", fog, "SunIllum")
+    link_inputs(ctx, fog, ["Globals", "MaxFogDistance", "DebugView"] + LOOK_PARAMS + UNDER_PARAMS)
+    sb_ue.to_prop(fog, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(m)
+    sb_ue.eal.save_loaded_asset(m)
+    return m
+
+
+def make_instance(name, parent):
+    mi = sb_ue.make_mi(name, DIR, parent)
     # Instance overrides from earlier experiments would mask the master defaults: start clean.
     mel.clear_all_material_instance_parameters(mi)
     mel.update_material_instance(mi)
     sb_ue.eal.save_loaded_asset(mi)
-    print("SB_OCEAN_ASSETS_OK", m.get_path_name(), mel.get_statistics(m).num_pixel_shader_instructions)
+    return mi
+
+
+def main():
+    """Optional arguments pick materials to rebuild: ocean, under, post (default: all)."""
+    parts = sys.argv[1:] or ["ocean", "under", "post"]
+    with open(USH, encoding="utf-8") as f:
+        ush = f.read()
+    with open(UNDER_USH, encoding="utf-8") as f:
+        under_ush = f.read()
+    mpc = make_mpc()
+    rts = make_targets()
+    stats = []
+    if "ocean" in parts:
+        m = make_material(mpc, ush, rts)
+        make_instance("MI_Ocean", m)
+        stats.append(("ocean", m))
+    if "under" in parts:
+        under = make_under_material(mpc, ush, under_ush, rts)
+        make_instance("MI_OceanUnder", under)
+        stats.append(("under", under))
+    if "post" in parts:
+        post = make_post_material(mpc, ush, under_ush, rts)
+        make_instance("MI_PP_Underwater", post)
+        stats.append(("post", post))
+    print("SB_OCEAN_ASSETS_OK", " ".join("%s=%d" % (n, mel.get_statistics(x).num_pixel_shader_instructions) for n, x in stats))
 
 
 if __name__ == "__main__":

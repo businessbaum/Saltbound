@@ -2,6 +2,7 @@
 
 A small cove: coastal rocks, a two-section pier, the boat deck section moored alongside (riding the waves),
 lanterns, a distant landmark in the fog, the ocean with a calm zone, and a lighting rig (Day / Evening).
+Under the water (D28): a sculpted sand seabed (beach, pier ridge, drop-off, sandbank) with sea-grass patches.
 """
 import math
 import os
@@ -72,15 +73,27 @@ ocean.set_editor_property("calm_zones", [zone])
 
 # --- seabed --------------------------------------------------------------------------------------------
 CUBE = "/Engine/BasicShapes/Cube"
+UW = "/Game/Saltbound/Environment/Underwater/"
 seabed = mesh("Seabed", CUBE, (0, 0, -1800), scale=(1200, 1200, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
+# Sculpted cove floor (build_seabed.py): beach behind the rocks, about 2.3 m under the pier, a drop-off to the
+# 17.5 m floor, and the shallow sandbank east of the pier (light ground: how each region's water reads).
+cove_floor = mesh("Seabed_Cove", UW + "SM_Seabed", (0, 0, 0))
 # Steep wave faces reflect rays downward; hardware-traced Lumen reflections would show the sand as beige
-# streaks on the open sea. The deep seabed is only seen through the water, never in reflections.
-seabed.static_mesh_component.set_editor_property("visible_in_ray_tracing", False)
-seabed.static_mesh_component.set_editor_property("affect_distance_field_lighting", False)
-mesh("ShoreSlope", CUBE, (-200, 0, -700), (-10.0, 0, 0), scale=(40, 50, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
-# Shallow sandbank (1.5-4 m deep) east of the pier: shows how each region's water reads over light ground.
-sandbank = mesh("Sandbank", CUBE, (3200, 1800, -260), (0, 25, 2.5), scale=(22, 14, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
-sandbank.static_mesh_component.set_editor_property("visible_in_ray_tracing", False)
+# streaks on the open sea. The seabed is only seen through the water, never in reflections.
+for floor in (seabed, cove_floor):
+    floor.static_mesh_component.set_editor_property("visible_in_ray_tracing", False)
+    floor.static_mesh_component.set_editor_property("affect_distance_field_lighting", False)
+world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+
+
+def ground(x, y, top=800.0):
+    """Highest surface below (x, y): (z, actor) or (None, None)."""
+    hit = unreal.SystemLibrary.line_trace_single(world, unreal.Vector(x, y, top), unreal.Vector(x, y, -2500.0),
+                                                 unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, True, [], unreal.DrawDebugTrace.NONE, True)
+    if hit is None:
+        return None, None
+    t = hit.to_tuple()
+    return t[4].z, t[9]
 # A distant region zone (2 km east): sailing there blends into the Ancient Isles palette.
 region_zone = spawn(unreal.SaltRegionZone, (200000, 0, 0), label="RegionZone_AncientIsles")
 region_zone.set_editor_property("region", "AncientIsles")
@@ -121,8 +134,11 @@ for label, m, loc, yaw, s in rocks:
         d = reach * rng.uniform(0.75, 1.15)
         kind = "SM_Rock_Scatter_A" if rng.random() < 0.55 else "SM_Rock_Scatter_B"
         sc = rng.uniform(0.7, 1.6) * (1.3 if kind.endswith("A") else 1.0)
-        z = rng.uniform(-18.0, 4.0) * sc
-        mesh("Scatter_%03d" % scatter_n, R + kind, (loc[0] + math.cos(a) * d, loc[1] + math.sin(a) * d, z),
+        px, py = loc[0] + math.cos(a) * d, loc[1] + math.sin(a) * d
+        # Resting on the ground below (the sand or the big rock), partly sunk in.
+        gz, _ = ground(px, py)
+        z = (gz if gz is not None else 0.0) + rng.uniform(-6.0, 10.0) * sc
+        mesh("Scatter_%03d" % scatter_n, R + kind, (px, py, z),
              (rng.uniform(-12, 12), rng.uniform(0, 360), rng.uniform(-12, 12)), sc)
         scatter_n += 1
 mesh("Landmark_Spire", R + "SM_Landmark_Spire", (42000, 15000, -600), (0, 35, 0), 2.0)
@@ -155,6 +171,39 @@ attach(crate, boat)
 spawn(unreal.SaltLantern, (1310, -70, 110), (0, -30, 0), "Lantern_Dock")
 mesh("Crate_Dock", "/Game/Saltbound/Props/SM_Crate_Small", (1180, -60, 110), (0, 25, 0))
 mesh("Crate_Dock2", "/Game/Saltbound/Props/SM_Crate_Small", (1185, -62, 150.5), (0, 12, 0), 0.85)
+
+# --- sea grass (D28): a few patches on the sand, 1.2-14 m deep, never under the pier or on rocks -----------
+grng = random.Random(11)
+grass = {"A": [], "B": [], "C": []}
+patches = 0
+while patches < 34:
+    cx, cy = grng.uniform(-1200.0, 6500.0), grng.uniform(-4200.0, 4200.0)
+    cz, actor = ground(cx, cy)
+    if cz is None or actor != cove_floor or not -1300.0 < cz < -150.0:
+        continue
+    patches += 1
+    radius = grng.uniform(180.0, 480.0)
+    for _ in range(grng.randint(6, 20)):
+        r = radius * math.sqrt(grng.random())
+        a = grng.uniform(0.0, 2.0 * math.pi)
+        x, y = cx + r * math.cos(a), cy + r * math.sin(a)
+        if -450.0 < x < 1700.0 and abs(y) < 320.0:
+            continue
+        z, actor = ground(x, y)
+        if z is None or actor != cove_floor or not -1400.0 < z < -120.0:
+            continue
+        # Taller clumps in the patch centre and in deeper water; short ones at the rim.
+        centre = 1.0 - r / radius
+        kind = "A" if grng.random() < 0.25 + 0.5 * centre else ("B" if grng.random() < 0.6 else "C")
+        sc = grng.uniform(0.8, 1.25) * (1.0 + min(-z / 1400.0, 1.0) * 0.4)
+        grass[kind].append(unreal.Transform(unreal.Vector(x, y, z - 3.0),
+                                            unreal.Rotator(roll=grng.uniform(-6, 6), pitch=grng.uniform(-6, 6), yaw=grng.uniform(0, 360)),
+                                            unreal.Vector(sc, sc, sc)))
+for kind, transforms in grass.items():
+    scatter = spawn(unreal.SaltInstanceScatter, (0, 0, 0), label="SeaGrass_" + kind)
+    scatter.set_instances(unreal.load_asset(UW + "SM_SeaGrass_" + kind),
+                          unreal.load_asset("/Game/Saltbound/Materials/Instances/MI_SeaGrass"), transforms, 5000.0, 7000.0, False)
+print("SB_SEAGRASS patches=%d clumps=%s" % (patches, {k: len(v) for k, v in grass.items()}))
 
 spawn(unreal.PlayerStart, (380, -10, 110 + 92), (0, 0, 0), "PlayerStart")
 rig.set_editor_property("start_region", "ShoresOfPlenty")

@@ -56,6 +56,8 @@ public:
 	void DebugInteract() { HandleInteract(); }
 	/** Programmatic jump press/release for automated tests. */
 	void DebugJump(bool bPressed) { bPressed ? HandleJumpStarted() : HandleJumpCompleted(); }
+	/** Programmatic dive press/release for automated tests. */
+	void DebugDive(bool bPressed) { bPressed ? HandleDiveStarted() : HandleDiveCompleted(); }
 
 	// Tunables ----------------------------------------------------------------
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Movement", meta = (ClampMin = "0", Units = "cm/s"))
@@ -63,6 +65,23 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Movement", meta = (ClampMin = "0", Units = "cm/s"))
 	float SprintSpeed = 420.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0", Units = "cm/s"))
+	float SwimSpeed = 300.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0", Units = "cm/s"))
+	float SwimSprintSpeed = 460.f;
+
+	/** Highest ledge above the feet that the player can climb onto from the water (pier deck, boat side). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0", Units = "cm"))
+	float ClimbOutReach = 300.f;
+
+	/** Duration of the climb out of the water (up first, then forward onto the ledge). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0.1", Units = "s"))
+	float ClimbOutTime = 0.6f;
+
+	/** True while swimming in the sea (surface or under water). */
+	bool IsSwimming() const;
 
 	/** Camera height above the feet (capsule height is 176 cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "100", ClampMax = "180", Units = "cm"))
@@ -105,7 +124,12 @@ private:
 	void HandleJumpCompleted();
 	void HandleSprintStarted();
 	void HandleSprintCompleted();
+	void HandleDiveStarted();
+	void HandleDiveCompleted();
 	void HandleInteract();
+	/** Starts climbing onto a walkable ledge in front when swimming at the surface. */
+	bool TryClimbOutOfWater();
+	void TickClimb(float DeltaSeconds);
 
 	void ApplyMoveInput(const FVector2D& Input);
 	void ApplyLook(float YawDelta, float PitchDelta);
@@ -129,4 +153,13 @@ private:
 	FVector2D MoveInput = FVector2D::ZeroVector;
 	FVector2D DebugMoveInput = FVector2D::ZeroVector;
 	bool bSprinting = false;
+	bool bSwimUpHeld = false;
+	bool bSwimDownHeld = false;
+
+	/** Climb out of the water: capsule centre path in the space of the ledge's component (boats move). */
+	bool bClimbing = false;
+	float ClimbAlpha = 0.f;
+	FVector ClimbStartLocal = FVector::ZeroVector;
+	FVector ClimbEndLocal = FVector::ZeroVector;
+	TWeakObjectPtr<USceneComponent> ClimbBase;
 };

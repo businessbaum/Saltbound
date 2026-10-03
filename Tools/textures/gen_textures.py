@@ -358,10 +358,10 @@ def crisp(x, edge, width=0.004):
 def rock():
     """Hand-painted stone, crisp (Sea of Thieves reference) for triplanar use: tile ~2.5 m at 2048 px.
 
-    Flat tone patches with hard edges (posterised noise), a sparse network of painted cracks (dark groove
-    line with a light lower lip), angular chips (Voronoi cells, lighter inside, lit upper edge and shaded
-    lower edge), a few crisp specks and very little fine grain. Smooth areas stay calm in between, so
-    the eye reads defined shapes instead of soft noise."""
+    Flat tone patches with hard edges (posterised noise), a few faint angular tone patches (Voronoi cells), a
+    few crisp specks and very little fine grain. Smooth areas stay calm in between, so the eye reads defined
+    shapes instead of soft noise. No lines (owner feedback, D28): neither the painted crack network nor the
+    lit / shaded outlines of the chips; the stone shape comes from the geometry."""
     size = 2048
     y, x = np.mgrid[0:size, 0:size] / size
     warp = (spectral_noise(size, 1, 6, -1.8, seed=76) * 0.03, spectral_noise(size, 1, 6, -1.8, seed=77) * 0.03)
@@ -370,30 +370,21 @@ def rock():
     levels = sum(crisp(tone_src, t, 0.006) for t in (0.3, 0.5, 0.7)) / 3.0
     hue_src = n01(spectral_noise(size, 2, 8, -1.8, seed=72))
     warm = crisp(hue_src, 0.62, 0.006)
-    # 2. Cracks: thin segments of a warped Voronoi border network, partly hidden.
-    f1, f2 = worley_grid(size, 3, 4, seed=73, warp=warp)
-    e = f2 - f1
-    # Low-frequency reveal mask: few, long cracks instead of many short marks.
-    show = crisp(n01(spectral_noise(size, 1, 4, -1.9, seed=74)), 0.58, 0.01)
-    crack = crisp(0.02 - e, 0.0, 0.006) * show
-    crack_lip = np.clip(np.roll(crack, 3, axis=0) - crack, 0, 1)       # light edge just below the groove
-    # 3. Chips: a few angular cells, recessed with a lit top edge and a shaded bottom edge.
+    # 2. Chips: a few angular cells, only a faint tone change (no outlines, no relief).
     f1c, f2c, cid = worley_cells(size, 26, seed=79, warp=warp)
     pick = (np.random.default_rng(80).random(26 * 26) < 0.025)[cid]
     chip = pick * crisp(f2c - f1c, 0.05, 0.02)
-    chip_top = np.clip(chip - np.roll(chip, 4, axis=0), 0, 1)
-    chip_bottom = np.clip(chip - np.roll(chip, -4, axis=0), 0, 1)
-    # 4. Specks and grain.
+    # 3. Specks and grain.
     specks_l = crisp(n01(spectral_noise(size, 90, 300, -1.0, seed=81)), 0.9, 0.01)
     specks_d = crisp(n01(spectral_noise(size, 90, 300, -1.0, seed=82)), 0.91, 0.01)
     grain = spectral_noise(size, 200, 600, -0.8, seed=83)
-    v = (0.5 + 0.07 * (levels - 0.5) - 0.03 * chip + 0.07 * chip_top - 0.06 * chip_bottom
-         - 0.2 * crack + 0.06 * crack_lip + 0.035 * specks_l - 0.06 * specks_d + 0.008 * grain)
+    v = (0.5 + 0.07 * (levels - 0.5) - 0.03 * chip
+         + 0.035 * specks_l - 0.06 * specks_d + 0.008 * grain)
     rgb = np.stack([v * (1.0 + 0.04 * warm), v * (1.0 + 0.01 * warm), v * (1.0 - 0.04 * warm)], -1)
     save_rgb(os.path.join(OUT, "Rock", "T_Rock_D.png"), rgb)
-    height = -crack * 1.0 - chip * 0.7 + spectral_noise(size, 2, 12, -1.8, seed=86) * 0.25
+    height = spectral_noise(size, 2, 12, -1.8, seed=86) * 0.25
     save_normal(os.path.join(OUT, "Rock", "T_Rock_N.png"), height_to_normal(height, 6.0))
-    ao = 1.0 - 0.45 * crack - 0.15 * chip_bottom
+    ao = np.ones_like(v)
     rough = np.clip(0.82 - 0.06 * chip + 0.04 * (levels - 0.5), 0, 1)
     save_rgb(os.path.join(OUT, "Rock", "T_Rock_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
 
@@ -468,7 +459,30 @@ def macro_noise():
     save_rgb(os.path.join(OUT, "Common", "T_MacroNoise_M.png"), np.stack([r, g, b], -1))
 
 
+def caustics():
+    """Caustic light under a wavy surface, two independent patterns (R, G) for animation (the material
+    drifts them apart and takes the minimum, a crisp moving web). Simulated: rays fall straight down through a
+    periodic wavy surface, are deflected by its slope and splatted into a density map (tiles perfectly)."""
+    size, rays = 512, 2048
+    out = []
+    for seed, bend in ((91, 0.045), (92, 0.05)):
+        h = spectral_noise(rays, 3, 9, -2.2, seed=seed) + 0.35 * spectral_noise(rays, 9, 20, -1.6, seed=seed + 10)
+        gx = (np.roll(h, -1, axis=1) - np.roll(h, 1, axis=1)) * 0.5 * rays
+        gy = (np.roll(h, -1, axis=0) - np.roll(h, 1, axis=0)) * 0.5 * rays
+        g = max(np.abs(gx).max(), np.abs(gy).max())
+        y, x = (np.mgrid[0:rays, 0:rays] + 0.5) / rays
+        px = np.mod(x + bend * gx / g, 1.0)
+        py = np.mod(y + bend * gy / g, 1.0)
+        dens, _, _ = np.histogram2d(py.ravel(), px.ravel(), bins=size, range=[[0, 1], [0, 1]])
+        dens /= dens.mean()
+        # Slight periodic blur, then a soft-knee tone curve: dark gaps, bright focused lines.
+        dens = (dens + 0.5 * (np.roll(dens, 1, 0) + np.roll(dens, -1, 0) + np.roll(dens, 1, 1) + np.roll(dens, -1, 1))) / 3.0
+        out.append(np.clip((dens - 0.55) / 2.2, 0, 1) ** 0.75)
+    save_rgb(os.path.join(OUT, "Common", "T_Caustics_M.png"), np.stack([out[0], out[1], np.zeros_like(out[0])], -1))
+
+
 GENERATORS = {
+    "caustics": caustics,
     "ocean_ripples": ocean_ripples,
     "ocean_ripples_soft": ocean_ripples_soft,
     "ocean_foam": ocean_foam,

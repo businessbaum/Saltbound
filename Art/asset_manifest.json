@@ -83,5 +83,30 @@
     "dest": "/Game/Saltbound/Environment/Rocks",
     "nanite": true,
     "collision": "complex"
+  },
+  "SM_Seabed": {
+    "fbx": "VisualTest/SM_Seabed.fbx",
+    "dest": "/Game/Saltbound/Environment/Underwater",
+    "nanite": false,
+    "collision": "complex",
+    "_note": "Sculpted sand seabed of the visual test cove (build_seabed.py); placed at the world origin. Not Nanite: the complex collision must keep the ripples (a Nanite mesh collides with its reduced fallback)."
+  },
+  "SM_SeaGrass_A": {
+    "fbx": "VisualTest/SM_SeaGrass_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Underwater",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_SeaGrass_B": {
+    "fbx": "VisualTest/SM_SeaGrass_B.fbx",
+    "dest": "/Game/Saltbound/Environment/Underwater",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_SeaGrass_C": {
+    "fbx": "VisualTest/SM_SeaGrass_C.fbx",
+    "dest": "/Game/Saltbound/Environment/Underwater",
+    "nanite": false,
+    "collision": "none"
   }
 }
