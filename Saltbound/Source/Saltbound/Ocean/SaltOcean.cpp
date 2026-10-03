@@ -5,6 +5,7 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Core/SaltContent.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
@@ -29,13 +30,14 @@ namespace SaltOceanParams
 	static const FName Chop(TEXT("Chop"));
 	static const FName Globals(TEXT("Globals"));
 	static const FName Ripples(TEXT("RippleOffsets"));
+	static const FName Cascade[SaltOceanFFT::NumCascades] = { TEXT("Cascade0"), TEXT("Cascade1"), TEXT("Cascade2") };
 }
 
 namespace
 {
 	FAutoConsoleCommandWithWorldAndArgs CmdOceanFreeze(
 		TEXT("sb.Ocean.Freeze"),
-		TEXT("Freeze ocean time (waves, ripples, foam): sb.Ocean.Freeze 0|1"),
+		TEXT("Freeze ocean time (waves and surface detail): sb.Ocean.Freeze 0|1"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			for (TActorIterator<ASaltOcean> It(World); It; ++It)
@@ -88,13 +90,10 @@ ASaltOcean::ASaltOcean()
 
 	// Content defaults (MPC, material, tile meshes) are resolved in OnConstruction; see SaltContent.h.
 
-	// Open-sea default, revision 5 (owner reference: Sea of Thieves; D24). A clear hierarchy of scale:
-	// - three long swells from neighbouring directions interfere into irregular groups; they carry most of
-	//   the height and of the horizontal (Gerstner) displacement: broad troughs, narrower crests;
-	// - medium waves (21-6 m) are visible on the swell faces but clearly subordinate (ak ~0.09 vs ~0.1-0.13)
-	//   and vary in patches (ChopVariation), so wave faces are not uniformly crumpled;
-	// - short waves (< 4 m) are mostly shading detail.
-	// Heights are for SeaState scale 1 ("Rough" uses 1.3); sum of steepness 0.995 keeps the surface free of loops.
+	// Open-sea default, revision 6 (owner references: Sea of Thieves, rough and calm; D27). Three long
+	// swells from neighbouring directions interfere into irregular groups and carry the slow rolling motion;
+	// the wind sea on top of them (FFT spectrum: Wind Sea properties) supplies the varied, interconnected
+	// wave shapes. Heights are for SeaState WaveHeight 1 ("Rough").
 	auto Add = [this](float Dir, float Lambda, float Amp, float Steep, float Phase)
 	{
 		FSaltWaveSpec S;
@@ -105,18 +104,9 @@ ASaltOcean::ASaltOcean()
 		S.PhaseOffset = Phase;
 		Waves.Add(S);
 	};
-	Add(20.f, 7400.f, 118.f, 0.24f, 0.0f);
-	Add(41.f, 5300.f, 86.f, 0.19f, 1.3f);
-	Add(4.f, 3900.f, 52.f, 0.14f, 2.1f);
-	Add(63.f, 2100.f, 30.f, 0.10f, 4.0f);
-	Add(-22.f, 1450.f, 19.f, 0.08f, 0.7f);
-	Add(31.f, 930.f, 11.f, 0.07f, 5.2f);
-	Add(82.f, 610.f, 6.5f, 0.055f, 3.3f);
-	Add(-41.f, 410.f, 3.6f, 0.045f, 1.9f);
-	Add(13.f, 280.f, 2.2f, 0.03f, 2.8f);
-	Add(54.f, 190.f, 1.3f, 0.02f, 0.4f);
-	Add(-63.f, 130.f, 0.75f, 0.015f, 4.6f);
-	Add(101.f, 90.f, 0.45f, 0.01f, 3.7f);
+	Add(20.f, 8200.f, 85.f, 0.18f, 0.0f);
+	Add(41.f, 5900.f, 60.f, 0.15f, 1.3f);
+	Add(4.f, 4300.f, 38.f, 0.11f, 2.1f);
 }
 
 void ASaltOcean::OnConstruction(const FTransform& Transform)
@@ -126,6 +116,7 @@ void ASaltOcean::OnConstruction(const FTransform& Transform)
 	RebuildWaveField();
 	LastSelectionView = FVector(1.0e12);
 	UpdateTiles(true);
+	SimulateWindSea(0.f);
 	PushParameters();
 }
 
@@ -139,6 +130,54 @@ void ASaltOcean::ApplyContent()
 	QuarterTiles->SetStaticMesh(QuarterTileMesh);
 	FullTiles->SetMaterial(0, Material);
 	QuarterTiles->SetMaterial(0, Material);
+	for (int32 c = 0; c < SaltOceanFFT::NumCascades; ++c)
+	{
+		SaltContent::ResolveDefault<UTextureRenderTarget2D>(FFTDisp[c], SaltContent::OceanFFTTarget(TEXT("Disp"), c));
+		SaltContent::ResolveDefault<UTextureRenderTarget2D>(FFTDispPrev[c], SaltContent::OceanFFTTarget(TEXT("DispPrev"), c));
+		SaltContent::ResolveDefault<UTextureRenderTarget2D>(FFTDeriv[c], SaltContent::OceanFFTTarget(TEXT("Deriv"), c));
+		SaltContent::ResolveDefault<UTextureRenderTarget2D>(FFTAux[c], SaltContent::OceanFFTTarget(TEXT("Aux"), c));
+	}
+}
+
+SaltOceanFFT::FSpectrum ASaltOcean::GetSpectrum() const
+{
+	SaltOceanFFT::FSpectrum S;
+	S.SignificantHeight = bWindSea ? WindSeaHeight : 0.f;
+	S.PeakWavelength = WindSeaPeakWavelength;
+	S.WindDirectionDeg = WindDirection;
+	S.Gamma = WindSeaGamma;
+	S.SpreadPeak = WindSeaSpread;
+	S.SpreadMin = WindSeaSpreadMin;
+	S.ShortWaveLength = ShortWaveLength;
+	S.CascadeGain = FVector3f(CascadeGain);
+	S.CascadeChop = FVector3f(CascadeChop);
+	S.Seed = (uint32)FMath::Max(WindSeaSeed, 0);
+	return S;
+}
+
+void ASaltOcean::SimulateWindSea(float DeltaSeconds)
+{
+	// Maps saved before the FFT targets existed: construction does not re-run on load in the editor.
+	if (!FFTDisp[0] || !FFTAux[SaltOceanFFT::NumCascades - 1])
+	{
+		ApplyContent();
+	}
+	const SaltOceanFFT::FSpectrum Spectrum = GetSpectrum();
+	Field.SetSpectrum(Spectrum, bWindSea && WindSeaHeight > 0.f);
+	SaltOceanFFT::FTargets Targets;
+	for (int32 c = 0; c < SaltOceanFFT::NumCascades; ++c)
+	{
+		Targets.Disp[c] = FFTDisp[c];
+		Targets.DispPrev[c] = FFTDispPrev[c];
+		Targets.Deriv[c] = FFTDeriv[c];
+		Targets.Aux[c] = FFTAux[c];
+	}
+	// Always simulated (a zero spectrum clears the textures, e.g. for windless flat water).
+	SaltOceanFFT::FFrame Frame;
+	Frame.Spectrum = Spectrum;
+	Frame.Time = OceanTime;
+	Frame.DeltaTime = DeltaSeconds;
+	SaltOceanFFT::Enqueue(Frame, Targets);
 }
 
 void ASaltOcean::BeginPlay()
@@ -187,12 +226,11 @@ void ASaltOcean::Tick(float DeltaSeconds)
 		PrevPhases[i] = Field.Waves.IsValidIndex(i) ? Field.Waves[i].Phase : 0.f;
 	}
 	bHavePrevPhases = true;
-	if (!bFreezeTime)
-	{
-		OceanTime += (double)DeltaSeconds * TimeScale;
-	}
+	const float Step = bFreezeTime ? 0.f : DeltaSeconds * TimeScale;
+	OceanTime += (double)Step;
 	Field.WaterLevel = GetActorLocation().Z;
 	Field.SetTime(OceanTime);
+	SimulateWindSea(Step);
 	PushParameters();
 	UpdateTiles(false);
 }
@@ -241,12 +279,21 @@ void ASaltOcean::PushParameters()
 	Inst->SetVectorParameterValue(SaltOceanParams::CalmMin, FLinearColor(Field.CalmMin[0], Field.CalmMin[1], Field.CalmMin[2], Field.CalmMin[3]));
 	// Chop patches (x: factor in calm patches, y: 2pi/patch size, z: swell count) and w: swell height
 	// (sum of swell amplitudes, cm) so the material can normalise crest masks for any sea state.
+	// W: typical crest height of the whole sea (swells + half the wind-sea significant height).
 	float SwellHeight = 0.f;
 	for (int32 i = 0; i < FMath::Min(Field.SwellCount, Field.Waves.Num()); ++i)
 	{
 		SwellHeight += Field.Waves[i].Amplitude;
 	}
-	Inst->SetVectorParameterValue(SaltOceanParams::Chop, FLinearColor(Field.ChopMin, Field.ChopFreq, (float)Field.SwellCount, FMath::Max(SwellHeight, 1.f)));
+	const float SeaHeight = SwellHeight + (bWindSea ? 0.5f * WindSeaHeight : 0.f);
+	Inst->SetVectorParameterValue(SaltOceanParams::Chop, FLinearColor(Field.ChopMin, Field.ChopFreq, (float)Field.SwellCount, FMath::Max(SeaHeight, 1.f)));
+	// FFT cascades: tile uv = R(rotation) * P0 / patch size + 0.5 / size (texel centres sit on lattice points).
+	for (int32 c = 0; c < SaltOceanFFT::NumCascades; ++c)
+	{
+		const SaltOceanFFT::FCascade& C = SaltOceanFFT::GetCascade(c);
+		const float Rot = FMath::DegreesToRadians(C.RotationDeg);
+		Inst->SetVectorParameterValue(SaltOceanParams::Cascade[c], FLinearColor(1.f / C.PatchSize, FMath::Cos(Rot), FMath::Sin(Rot), (float)SaltOceanFFT::Size));
+	}
 	// Z: ocean time for slow material animation (shore bands), wrapped hourly to keep float precision.
 	Inst->SetVectorParameterValue(SaltOceanParams::Globals, FLinearColor((float)Field.Waves.Num(), (float)Field.WaterLevel,
 		(float)FMath::Fmod(OceanTime, 3600.0), 0.f));
@@ -362,3 +409,4 @@ void ASaltOcean::ApplyTiles(UInstancedStaticMeshComponent* Component, const TArr
 	}
 	Component->MarkRenderStateDirty();
 }
+

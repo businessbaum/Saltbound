@@ -154,6 +154,16 @@ namespace
 			}
 		}));
 
+	FAutoConsoleCommandWithWorldAndArgs CmdDumpFrames(
+		TEXT("sb.Dev.DumpFrames"),
+		TEXT("Write the next N rendered frames to Saved/Screenshots (MovieFrameNNNNN) straight from the renderer, independent ")
+		TEXT("of other windows. With -UseFixedTimeStep -FPS=<n> every frame advances the game by exactly 1/n s (reproducible clips)."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			GIsDumpingMovie = Args.Num() > 0 ? FMath::Max(0, FCString::Atoi(*Args[0])) : 0;
+			UE_LOG(LogSaltbound, Display, TEXT("SB_DUMP frames=%d"), GIsDumpingMovie);
+		}));
+
 	FAutoConsoleCommandWithWorldAndArgs CmdResetPlayer(
 		TEXT("sb.Dev.ResetPlayer"),
 		TEXT("Teleport the player to the first PlayerStart."),

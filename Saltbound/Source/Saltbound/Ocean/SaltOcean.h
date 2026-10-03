@@ -9,6 +9,7 @@
 
 class UInstancedStaticMeshComponent;
 class UMaterialInterface;
+class UTextureRenderTarget2D;
 class UMaterialParameterCollection;
 class UStaticMesh;
 
@@ -64,7 +65,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves", meta = (ClampMin = "0"))
 	float TimeScale = 1.f;
 
-	/** Stops ocean time (waves, ripples and foam travel together). For diagnostics and comparisons;
+	/** Stops ocean time (waves and surface detail travel together). For diagnostics and comparisons;
 	 *  console: sb.Ocean.Freeze 0|1, sb.Ocean.Time <seconds>. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves")
 	bool bFreezeTime = false;
@@ -90,8 +91,55 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves")
 	TArray<FSaltCalmZone> CalmZones;
 
+	// Wind sea (FFT, see SaltOceanFFT.h) ---------------------------------------
+	/** Simulated wind sea on top of the Gerstner swells. Off = swells only (e.g. windless flat water). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea")
+	bool bWindSea = true;
+
+	/** Significant height of the wind sea (4 x standard deviation of the height). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea", meta = (ClampMin = "0", Units = "cm"))
+	float WindSeaHeight = 150.f;
+
+	/** Dominant wind-wave length (spectral peak). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea", meta = (ClampMin = "100", Units = "cm"))
+	float WindSeaPeakWavelength = 3500.f;
+
+	/** Direction the wind waves travel towards (degrees, 0 = +X). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea")
+	float WindDirection = 30.f;
+
+	/** JONSWAP peak enhancement: 1 = mature, broad sea; 3.3 = young sea with a pronounced dominant wave. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea", meta = (ClampMin = "1", ClampMax = "7"))
+	float WindSeaGamma = 3.3f;
+
+	/** Directional spreading at the peak (higher = longer, more parallel crests) and its floor for shorter
+	 *  and longer waves (lower = more crossing directions, short interrupted crests). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea", meta = (ClampMin = "0"))
+	float WindSeaSpread = 8.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea", meta = (ClampMin = "0"))
+	float WindSeaSpreadMin = 2.f;
+
+	/** Waves shorter than this are damped (low wind leaves smooth areas). 0 = no damping. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea", meta = (ClampMin = "0", Units = "cm"))
+	float ShortWaveLength = 0.f;
+
+	/** Amplitude per cascade: X waves >= 6 m, Y 0.9-6 m, Z ripples < 0.9 m. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea")
+	FVector CascadeGain = FVector(1.0, 1.0, 1.0);
+
+	/** Crest sharpness (horizontal displacement) per cascade. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea")
+	FVector CascadeChop = FVector(1.0, 1.0, 0.6);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea")
+	int32 WindSeaSeed = 1;
+
+	/** Current wind-sea spectrum (from the properties above). */
+	SaltOceanFFT::FSpectrum GetSpectrum() const;
+
 	/** Travel rates of the detail layers in tiles per second (tile sizes live in the material):
-	 *  X, Y, Z = ripple layers 1-3 (along their rotated wind frames), W = foam drift.
+	 *  X, Y, Z = unused (legacy ripple layers), W = drift of the quiet patches.
 	 *  Offsets are wrapped in double precision on the CPU, so ripples stop with bFreezeTime and never lose
 	 *  precision in long sessions. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves")
@@ -137,6 +185,19 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Rendering")
 	bool bAnimateInEditor = true;
 
+	/** FFT output textures per cascade (created by setup_ocean.py, sampled by M_Ocean). */
+	UPROPERTY(EditAnywhere, Category = "Rendering|FFT")
+	TObjectPtr<UTextureRenderTarget2D> FFTDisp[SaltOceanFFT::NumCascades];
+
+	UPROPERTY(EditAnywhere, Category = "Rendering|FFT")
+	TObjectPtr<UTextureRenderTarget2D> FFTDispPrev[SaltOceanFFT::NumCascades];
+
+	UPROPERTY(EditAnywhere, Category = "Rendering|FFT")
+	TObjectPtr<UTextureRenderTarget2D> FFTDeriv[SaltOceanFFT::NumCascades];
+
+	UPROPERTY(EditAnywhere, Category = "Rendering|FFT")
+	TObjectPtr<UTextureRenderTarget2D> FFTAux[SaltOceanFFT::NumCascades];
+
 	/** Debug: number of drawn tiles after the last selection. */
 	UPROPERTY(VisibleInstanceOnly, Transient, Category = "Rendering")
 	int32 DebugTileCount = 0;
@@ -153,6 +214,8 @@ private:
 	};
 
 	void PushParameters();
+	/** Applies the spectrum to the CPU field and queues this frame's FFT simulation. */
+	void SimulateWindSea(float DeltaSeconds);
 	void UpdateTiles(bool bForce);
 	bool SelectNode(const FVector2D& Center, double Size, int32 Lod, const FVector& View, TArray<FTileInstance>& OutFull, TArray<FTileInstance>& OutQuarter) const;
 	void ApplyTiles(UInstancedStaticMeshComponent* Component, const TArray<FTileInstance>& Tiles);
@@ -164,7 +227,6 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TObjectPtr<UInstancedStaticMeshComponent> QuarterTiles;
-
 	FSaltWaveField Field;
 	double OceanTime = 0.0;
 	/** Wave phases of the previous frame: the material evaluates last frame's displacement with them

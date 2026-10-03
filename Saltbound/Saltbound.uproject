@@ -5,6 +5,11 @@
 	"Description": "Saltbound - atmospheric first-person sailing and exploration game.",
 	"Modules": [
 		{
+			"Name": "SaltboundRender",
+			"Type": "Runtime",
+			"LoadingPhase": "PostConfigInit"
+		},
+		{
 			"Name": "Saltbound",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",

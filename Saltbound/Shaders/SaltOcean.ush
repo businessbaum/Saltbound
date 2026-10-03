@@ -1,4 +1,5 @@
-// Saltbound - shared Gerstner ocean (shader side).
+// Saltbound - shared Gerstner ocean (shader side): the long swells, plus helpers for sampling the FFT wind
+// sea (SaltOceanFFT.usf writes its textures; the material adds both).
 //
 // MUST stay in sync with Source/Saltbound/Ocean/SaltWaveTypes.cpp (CPU side). Both evaluate:
 //   theta_i  = dot(K_i, P0) - Phase_i
@@ -93,6 +94,66 @@ struct FSaltOcean
 			Disp.z += WA[i].z * F * S;
 		}
 		return Disp;
+	}
+
+	// --- FFT wind sea (SaltOceanFFT): cascade C = (1 / patch size, cos rot, sin rot, texture size). ---
+	// Tile coordinates are the world rotated by the cascade angle; texel centres sit on lattice points.
+	float2 TileUV(float2 P, float4 C)
+	{
+		return float2(C.y * P.x - C.z * P.y, C.z * P.x + C.y * P.y) * C.x + 0.5 / C.w;
+	}
+	// Tile-frame vector -> world (R^T v).
+	float2 ToWorld(float2 V, float4 C)
+	{
+		return float2(C.y * V.x + C.z * V.y, -C.z * V.x + C.y * V.y);
+	}
+	// Tile-frame symmetric tensor (xx, yy, xy) -> world (R^T M R).
+	float3 TensorToWorld(float3 M, float4 C)
+	{
+		const float Cc = C.y * C.y, Ss = C.z * C.z, Cs = C.y * C.z;
+		return float3(M.x * Cc + 2.0 * M.z * Cs + M.y * Ss,
+		              M.x * Ss - 2.0 * M.z * Cs + M.y * Cc,
+		              (M.y - M.x) * Cs + M.z * (Cc - Ss));
+	}
+
+	// 0 while a cascade texture is magnified (mip 0), 1 from mip 1 on. Slope moments only describe detail
+	// hidden inside the pixel once the texture is minified; under magnification bilinear filtering alone
+	// makes E[s^2] - E[s]^2 peak between texel centres (a grid pattern in the roughness).
+	float MinifyWeight(float2 UV, float4 C)
+	{
+		const float2 Dx = ddx(UV) * C.w;
+		const float2 Dy = ddy(UV) * C.w;
+		return saturate(0.5 * log2(max(max(dot(Dx, Dx), dot(Dy, Dy)), 1e-8)));
+	}
+
+	// Short waves ride on the long ones: dense and steep on high water (crests, forward faces), smoother in
+	// the troughs (hydrodynamic modulation), and calmer in broad drifting patches. Leaves smooth areas
+	// between the crest structures instead of an evenly crumpled surface. Hn = height / sea height.
+	float ShortWaveMask(float Hn, float Quiet, float TroughCalm, float QuietAmount)
+	{
+		const float Crest = smoothstep(-0.45, 0.35, Hn);
+		return lerp(TroughCalm, 1.0, Crest) * lerp(1.0 - QuietAmount, 1.0, smoothstep(0.3, 0.7, Quiet));
+	}
+
+	// Adds the Gerstner waves' surface tangents dP/dx0 (Tx) and dP/dy0 (Ty); start from (1,0,0) / (0,1,0).
+	void SwellTangents(float2 P0, float FadeK, inout float3 Dx, inout float3 Dy)
+	{
+		const float Att = Attenuation(P0);
+		const float ChopF = ChopFactor(P0);
+		for (int i = 0; i < Count; i++)
+		{
+			const float2 K = WA[i].xy;
+			const float2 D = K / max(length(K), 1e-6);
+			const float F = WaveFactor(i, Att, ChopF) * Fade(K, FadeK);
+			const float A = WA[i].z * F;
+			const float H = WA[i].w * F;
+			float S, C;
+			sincos(dot(K, P0) - Ph[i], S, C);
+			Dx.xy += D * (-H * S * K.x);
+			Dx.z += A * C * K.x;
+			Dy.xy += D * (-H * S * K.y);
+			Dy.z += A * C * K.y;
+		}
 	}
 
 	// World-space normal and horizontal Jacobian (1 = undisturbed, < ~0.5 = compressed crest -> foam).

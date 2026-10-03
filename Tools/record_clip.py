@@ -25,11 +25,16 @@ PACKAGED = os.path.join(ROOT, r"Builds\Development\Windows\Saltbound.exe")
 
 
 def find_window_handle(pids, timeout=120):
-    """Handle of the game's top-level window (PowerShell)."""
+    """Handle of the launched game's top-level window (PowerShell). Matches the process id, so an open
+    editor window ("Saltbound - Unreal Editor") is never picked up."""
     deadline = time.time() + timeout
+    ids = ",".join(str(p) for p in pids)
     while time.time() < deadline:
-        ps = ("Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -match 'Saltbound' } | "
-              "Select-Object -First 1 -ExpandProperty MainWindowHandle")
+        # The launched process or its children (the packaged Saltbound.exe starts the real game process).
+        ps = ("$ids = @(%s) + @(Get-CimInstance Win32_Process | Where-Object { @(%s) -contains $_.ParentProcessId } | "
+              "ForEach-Object { $_.ProcessId }); Get-Process -Id $ids -ErrorAction SilentlyContinue | Where-Object { "
+              "$_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -notmatch 'Unreal Editor' } | "
+              "Select-Object -First 1 -ExpandProperty MainWindowHandle" % (ids, ids))
         out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout.strip()
         if out:
             return out
@@ -45,6 +50,8 @@ def client_rect_on_screen(hwnd):
     user32.SetProcessDPIAware()
     user32.ShowWindow(hwnd, 9)          # SW_RESTORE
     user32.SetForegroundWindow(hwnd)
+    # Topmost: an open editor can keep the foreground; desktop duplication records whatever is on top.
+    user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040)   # HWND_TOPMOST, NOSIZE|NOMOVE|SHOWWINDOW
     rect = wintypes.RECT()
     user32.GetClientRect(hwnd, ctypes.byref(rect))
     pt = wintypes.POINT(0, 0)
@@ -66,24 +73,39 @@ def main():
     ap.add_argument("--fps", type=int, default=60)
     ap.add_argument("--warmup", type=float, default=14.0, help="seconds after launch before recording")
     ap.add_argument("--float", dest="float_height", type=float, default=None,
-                    help="ride the waves at this height (cm) above the water instead of the shot's fixed Z")
+                    help="ride the waves at this height (cm) above the water instead of the shot's fixed Z "
+                         "(0 = use the shot's Z as the height above the water)")
+    ap.add_argument("--fov", type=float, default=80.0, help="horizontal field of view (deg)")
+    ap.add_argument("--freeze", action="store_true",
+                    help="stop the ocean clock at --time (identical stills; the floating camera still settles)")
+    ap.add_argument("--dump", action="store_true",
+                    help="render-side capture (sb.Dev.DumpFrames) at a fixed time step of 1/--fps: every frame is the "
+                         "same ocean time in every run and other windows cannot cover the image; --warmup is game time")
+    ap.add_argument("--keep-frames", default=None, help="with --dump: also copy the PNG frames into this folder")
     ns = ap.parse_args()
+    if ns.dump:
+        return record_dump(ns)
     shot = {n: (loc, rot) for n, loc, rot in capture_shots.SHOTS["visualtest"]}[ns.shot]
     (x, y, z), (pitch, yaw, _roll) = shot
     rx, ry = ns.res.split("x")
+    if ns.float_height == 0:
+        ns.float_height = z
     # Commands run in order after the world is up; the ocean clock is set last, so every clip starts at
     # the same sea state regardless of loading time.
     cmds = ["r.VSync 0", "t.MaxFPS %d" % ns.fps, "sb.Lighting %s" % ns.preset] + list(ns.exec) + [
-        ("sb.Dev.Camera %g %g %g %g %g 80" % (x, y, z, pitch, yaw)) if ns.float_height is None else
-        ("sb.Dev.Camera %g %g %g %g %g 80 1" % (x, y, ns.float_height, pitch, yaw)),
+        ("sb.Dev.Camera %g %g %g %g %g %g" % (x, y, z, pitch, yaw, ns.fov)) if ns.float_height is None else
+        ("sb.Dev.Camera %g %g %g %g %g %g 1" % (x, y, ns.float_height, pitch, yaw, ns.fov)),
     ]
     delayed = ["sb.Dev.Delayed %g sb.Ocean.Time %g" % (ns.warmup - 1.0, ns.time)]
+    if ns.freeze:
+        delayed.append("sb.Dev.Delayed %g sb.Ocean.Freeze 1" % (ns.warmup - 0.95))
     exec_cmds = ",".join(cmds + delayed)
     if ns.packaged:
         args = [PACKAGED]
     else:
         args = [EDITOR, PROJECT, "/Game/Saltbound/Maps/L_VisualTest", "-game"]
-    args += ["-windowed", "-resx=%s" % rx, "-resy=%s" % ry, "-nosplash", "-log", '-ExecCmds=%s' % exec_cmds]
+    # Pinned at the top-left corner, no log console (it would cover the frame); the log file is still written.
+    args += ["-windowed", "-resx=%s" % rx, "-resy=%s" % ry, "-WinX=0", "-WinY=0", "-nosplash", '-ExecCmds=%s' % exec_cmds]
     proc = subprocess.Popen(args)
     try:
         hwnd = int(find_window_handle([proc.pid]))
@@ -107,6 +129,59 @@ def main():
             proc.wait(20)
         except subprocess.TimeoutExpired:
             proc.kill()
+
+
+def shot_commands(ns):
+    shot = {n: (loc, rot) for n, loc, rot in capture_shots.SHOTS["visualtest"]}[ns.shot]
+    (x, y, z), (pitch, yaw, _roll) = shot
+    if ns.float_height == 0:
+        ns.float_height = z
+    return ["sb.Lighting %s" % ns.preset] + list(ns.exec) + [
+        ("sb.Dev.Camera %g %g %g %g %g %g" % (x, y, z, pitch, yaw, ns.fov)) if ns.float_height is None else
+        ("sb.Dev.Camera %g %g %g %g %g %g 1" % (x, y, ns.float_height, pitch, yaw, ns.fov))]
+
+
+def record_dump(ns):
+    """Fixed-time-step render capture: the game advances exactly 1/fps per frame, the renderer writes each
+    frame as a PNG (MovieFrame*), ffmpeg assembles them. Deterministic and independent of the desktop."""
+    import glob
+    shots_dir = os.path.join(ROOT, "Saltbound", "Saved", "Screenshots")
+    for f in glob.glob(os.path.join(shots_dir, "**", "MovieFrame*"), recursive=True):
+        os.remove(f)
+    rx, ry = ns.res.split("x")
+    frames = max(1, int(round(ns.seconds * ns.fps)))
+    w = ns.warmup
+    delayed = ["sb.Dev.Delayed %g sb.Ocean.Time %g" % (w - 1.0, ns.time)]
+    if ns.freeze:
+        delayed.append("sb.Dev.Delayed %g sb.Ocean.Freeze 1" % (w - 0.95))
+    delayed += ["sb.Dev.Delayed %g sb.Dev.DumpFrames %d" % (w, frames),
+                "sb.Dev.Delayed %g quit" % (w + ns.seconds + 0.5)]
+    exec_cmds = ",".join(["r.VSync 0"] + shot_commands(ns) + delayed)
+    args = ([PACKAGED] if ns.packaged else [EDITOR, PROJECT, "/Game/Saltbound/Maps/L_VisualTest", "-game"]) + [
+        "-windowed", "-resx=%s" % rx, "-resy=%s" % ry, "-WinX=0", "-WinY=0", "-nosplash",
+        "-UseFixedTimeStep", "-FPS=%d" % ns.fps, "-ExecCmds=%s" % exec_cmds]
+    proc = subprocess.Popen(args)
+    try:
+        proc.wait(timeout=900)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        raise SystemExit("game did not quit")
+    files = sorted(glob.glob(os.path.join(shots_dir, "**", "MovieFrame*.png"), recursive=True))
+    if not files:
+        raise SystemExit("no frames dumped")
+    tmp = os.path.join(os.path.dirname(os.path.abspath(ns.out)), "_frames_%d" % os.getpid())
+    os.makedirs(tmp, exist_ok=True)
+    for i, f in enumerate(files):
+        shutil.move(f, os.path.join(tmp, "%05d.png" % i))
+    subprocess.run([shutil.which("ffmpeg"), "-y", "-loglevel", "error", "-framerate", str(ns.fps), "-i",
+                    os.path.join(tmp, "%05d.png"), "-c:v", "libx264", "-preset", "veryfast", "-crf", "16",
+                    "-pix_fmt", "yuv420p", ns.out], check=True)
+    if ns.keep_frames:
+        os.makedirs(ns.keep_frames, exist_ok=True)
+        for f in sorted(os.listdir(tmp)):
+            shutil.move(os.path.join(tmp, f), os.path.join(ns.keep_frames, f))
+    shutil.rmtree(tmp, ignore_errors=True)
+    print("SB_CLIP", ns.out, "frames", len(files))
 
 
 if __name__ == "__main__":

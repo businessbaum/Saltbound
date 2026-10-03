@@ -1,13 +1,18 @@
 """Creates the ocean rendering assets (script-owned; safe to re-run):
 
-  /Game/Saltbound/Water/MPC_Ocean   wave parameters written by ASaltOcean every frame, and the water look
-                                    (Look*) written by ASaltLightingRig (region + sea state, D25)
-  /Game/Saltbound/Water/M_Ocean     Single Layer Water master: CDLOD morph + Gerstner WPO (vertex, with
-                                    previous-frame phases for motion vectors), analytic normals, ripples,
-                                    specular anti-aliasing, foam with history and crest light (pixel);
+  /Game/Saltbound/Water/MPC_Ocean   swell parameters written by ASaltOcean every frame, FFT cascade frames
+                                    (Cascade0-2), and the water look (Look*) written by ASaltLightingRig
+                                    (region + sea state, D25)
+  /Game/Saltbound/Water/FFT/RT_Ocean{Disp,DispPrev,Deriv,Aux}{0,1,2}
+                                    FFT ocean outputs (SaltOceanFFT, written every frame by compute shaders)
+  /Game/Saltbound/Water/M_Ocean     Single Layer Water master: CDLOD morph + Gerstner swells + FFT wind sea
+                                    (vertex, with previous-frame data for motion vectors); exact normals of the
+                                    displaced surface, slope-variance roughness, specular anti-aliasing,
+                                    and light through thin crests (pixel); no foam (removed, D27);
                                     HLSL from Saltbound/Shaders/SaltOcean.ush
-  /Game/Saltbound/Water/MI_Ocean    instance (all tuning parameters, see Docs/Decisions.md D23-D26)
+  /Game/Saltbound/Water/MI_Ocean    instance (all tuning parameters, see Docs/Decisions.md D23-D27)
 """
+import math
 import os
 import sys
 
@@ -19,28 +24,43 @@ import sb_ue  # noqa: E402
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 USH = os.path.join(REPO_ROOT, "Saltbound", "Shaders", "SaltOcean.ush")
 DIR = "/Game/Saltbound/Water"
+FFT_DIR = DIR + "/FFT"
 mel = sb_ue.mel
+
+FFT_SIZE = 256
+# Must match SaltOceanFFT::GetCascade (SaltOceanSpectrum.cpp): patch size (cm), rotation (deg).
+CASCADES = [(25000.0, 0.0), (3700.0, 23.4), (600.0, 51.7)]
 
 WAVE_PARAMS = ["W%d" % i for i in range(12)]
 PHASE_PARAMS = ["Phase0123", "Phase4567", "Phase891011"]
 PREV_PARAMS = ["PrevPhase0123", "PrevPhase4567", "PrevPhase891011"]
-FIELD_PARAMS = PHASE_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals"]
-LOOK_PARAMS = ["LookAbsorption", "LookScattering", "LookCrest", "LookFoam", "LookSea"]
-PS_EXTRA = ["RippleOffsets", "LookCrest", "LookFoam", "LookSea"]
+CASCADE_PARAMS = ["Cascade0", "Cascade1", "Cascade2"]
+FIELD_PARAMS = PHASE_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals"] + CASCADE_PARAMS
+LOOK_PARAMS = ["LookAbsorption", "LookScattering", "LookCrest"]
+PS_EXTRA = ["RippleOffsets", "LookCrest"]
+
+
+def cascade_default(i):
+    size, rot = CASCADES[i]
+    r = math.radians(rot)
+    return (1.0 / size, math.cos(r), math.sin(r), float(FFT_SIZE))
+
 
 # MPC defaults = Shores of Plenty, Rough (the rig overwrites them at runtime and in the editor).
 MPC_DEFAULTS = {
     "Calm0": (1.0e9, 1.0e9, 0, 1), "Calm1": (1.0e9, 1.0e9, 0, 1), "Calm2": (1.0e9, 1.0e9, 0, 1), "Calm3": (1.0e9, 1.0e9, 0, 1),
     "CalmMin": (1, 1, 1, 1), "Chop": (1, 0, 3, 250),
-    "LookAbsorption": (1.3, 0.3, 0.22, 1), "LookScattering": (0.008, 0.05, 0.07, 1),
-    "LookCrest": (0.15, 0.95, 0.85, 1), "LookFoam": (0.85, 0.92, 0.92, 1), "LookSea": (0.6, 2.2, 1.0, 0.6),
+    "Cascade0": cascade_default(0), "Cascade1": cascade_default(1), "Cascade2": cascade_default(2),
+    "LookAbsorption": (1.35, 0.26, 0.15, 1), "LookScattering": (0.01, 0.065, 0.1, 1),
+    "LookCrest": (0.1, 0.95, 0.9, 1),
 }
 
 
-# --- MPC -----------------------------------------------------------------------------------
+# --- MPC and render targets -------------------------------------------------------------------
 def make_mpc():
     mpc = sb_ue.get_or_create_asset("MPC_Ocean", DIR, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
-    names = WAVE_PARAMS + PHASE_PARAMS + PREV_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals", "RippleOffsets"] + LOOK_PARAMS
+    names = (WAVE_PARAMS + PHASE_PARAMS + PREV_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals", "RippleOffsets"]
+             + CASCADE_PARAMS + LOOK_PARAMS)
     params = []
     for name in names:
         p = unreal.CollectionVectorParameter()
@@ -50,6 +70,28 @@ def make_mpc():
     mpc.set_editor_property("vector_parameters", params)
     sb_ue.eal.save_loaded_asset(mpc)
     return mpc
+
+
+def make_targets():
+    """FFT outputs: 256^2 RGBA16F with a full mip chain, wrap addressing and UAV access (compute writes)."""
+    rts = {}
+    for kind in ("Disp", "DispPrev", "Deriv", "Aux"):
+        for c in range(3):
+            name = "RT_Ocean%s%d" % (kind, c)
+            rt = sb_ue.get_or_create_asset(name, FFT_DIR, unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew())
+            rt.set_editor_property("size_x", FFT_SIZE)
+            rt.set_editor_property("size_y", FFT_SIZE)
+            rt.set_editor_property("render_target_format", unreal.TextureRenderTargetFormat.RTF_RGBA16F)
+            rt.set_editor_property("clear_color", unreal.LinearColor(0, 0, 0, 0))
+            rt.set_editor_property("address_x", unreal.TextureAddress.TA_WRAP)
+            rt.set_editor_property("address_y", unreal.TextureAddress.TA_WRAP)
+            rt.set_editor_property("auto_generate_mips", True)
+            rt.set_editor_property("mips_address_u", unreal.TextureAddress.TA_WRAP)
+            rt.set_editor_property("mips_address_v", unreal.TextureAddress.TA_WRAP)
+            rt.set_editor_property("supports_uav", True)
+            sb_ue.eal.save_loaded_asset(rt)
+            rts[name] = rt
+    return rts
 
 
 # --- material helpers -----------------------------------------------------------------------
@@ -99,8 +141,35 @@ float MorphK = saturate((Dist - MorphStart) / max(MorphEnd - MorphStart, 1.0));
 // Robust parity of the integer grid coordinate (odd vertices collapse onto the lower even neighbour).
 float2 Odd = LocalPos.xy - 2.0 * floor((LocalPos.xy + 0.5) * 0.5);
 float2 XY = WorldPos.xy - Odd * (MorphK * CellSize);
-// Waves shorter than ~4 grid cells cannot be represented by the mesh: leave them to the pixel normals.
+// Swells (Gerstner).
 float3 D = O.Displacement(XY, max(Dist * FadeScale, CellSize * 4.0));
+// Wind sea: FFT cascades 0 (waves >= 6 m) and 1 (0.9-6 m) shape the geometry; cascade 2 (ripples) is
+// shading only. The mip level follows the vertex spacing, so waves the grid cannot carry are filtered
+// out instead of aliasing. The velocity pass (IsPrev = 1) reads last frame's textures.
+float F = O.Attenuation(XY) * O.ChopFactor(XY);
+float2 UV0 = O.TileUV(XY, Cascade0);
+float2 UV1 = O.TileUV(XY, Cascade1);
+float Mip0 = max(log2(CellSize * Cascade0.x * Cascade0.w) + VSMipBias, 0.0);
+float Mip1 = max(log2(CellSize * Cascade1.x * Cascade1.w) + VSMipBias, 0.0);
+float4 S0;
+float4 S1;
+if (IsPrev > 0.5)
+{
+    S0 = Texture2DSampleLevel(DispPrev0, DispPrev0Sampler, UV0, Mip0);
+    S1 = Texture2DSampleLevel(DispPrev1, DispPrev1Sampler, UV1, Mip1);
+}
+else
+{
+    S0 = Texture2DSampleLevel(Disp0, Disp0Sampler, UV0, Mip0);
+    S1 = Texture2DSampleLevel(Disp1, Disp1Sampler, UV1, Mip1);
+}
+D += float3(O.ToWorld(S0.xy, Cascade0), S0.z) * F;
+// Medium waves follow the short-wave mask (same as the pixel shader: geometry and normals agree).
+float2 WDir = normalize(O.WA[0].xy + float2(1e-6, 0.0));
+float2 QuietUV = float2(dot(XY, WDir), dot(XY, float2(-WDir.y, WDir.x))) / QuietTile + float2(0.13, 0.71) - float2(RippleOffsets.w * 0.5, 0.0);
+float Quiet = Texture2DSampleLevel(QuietTex, QuietTexSampler, QuietUV, 0.0).b;
+float Mask = O.ShortWaveMask(D.z / max(O.Chop.w, 1.0), Quiet, TroughCalm, QuietAmount);
+D += float3(O.ToWorld(S1.xy, Cascade1), S1.z) * (F * WindSeaVS1 * Mask);
 P0 = float3(XY, D.z);
 return float3(XY - WorldPos.xy, 0.0) + D;
 """
@@ -108,146 +177,130 @@ return float3(XY - WorldPos.xy, 0.0) + D;
 PS_CODE = INIT + """
 float Dist = distance(CamPos, WorldPos);
 float Height = P0.z;
-float2 XY = P0.xy;                                   // Lagrangian coordinate: textures ride with the water
+float2 XY = P0.xy;                                   // Lagrangian coordinate: all detail rides with the water
 float FadeK = Dist * FadeScale;
-// Shading normal: waves shorter than PSMinWavelength are left out (Fade() removes lambda < FadeK fully,
-// keeps lambda > 2 FadeK). Their straight, infinitely long crests otherwise draw long parallel reflection
-// streaks; the ripple texture supplies that scale with more varied directions. Silhouette waves are unaffected.
-float NormalFadeK = max(FadeK, PSMinWavelength * 0.5);
-float3 GN; float J;
-O.NormalAndJacobian(XY, NormalFadeK, GN, J);         // wave (geometric) normal and horizontal compression
+float F = O.Attenuation(XY) * O.ChopFactor(XY);
 
-float SwellH = max(O.Chop.w, 1.0);                   // summed swell amplitude (cm) for this sea state
-float CrestH = saturate((Height / SwellH - CrestStart) / max(CrestRange, 0.01));
-float ChopF = O.ChopFactor(XY);
+// --- Surface tangents dP/dx0, dP/dy0 of the displaced surface: swells (analytic) + FFT cascades. The
+// shading normal is their cross product, so it is the normal of the moving geometry at every scale and
+// small waves ride on the large ones; the textures are mip-filtered with distance.
+float3 Tx = float3(1, 0, 0);
+float3 Ty = float3(0, 1, 0);
+O.SwellTangents(XY, FadeK, Tx, Ty);
+float2 UV0 = O.TileUV(XY, Cascade0);
+float2 UV1 = O.TileUV(XY, Cascade1);
+float2 UV2 = O.TileUV(XY, Cascade2);
+float4 A0 = Texture2DSample(Disp0, Disp0Sampler, UV0);
+float4 G0 = Texture2DSample(Deriv0, Deriv0Sampler, UV0);
+float4 X0 = Texture2DSample(Aux0, Aux0Sampler, UV0);
+float4 A1 = Texture2DSample(Disp1, Disp1Sampler, UV1);
+float4 G1 = Texture2DSample(Deriv1, Deriv1Sampler, UV1);
+float4 X1 = Texture2DSample(Aux1, Aux1Sampler, UV1);
+float4 A2 = Texture2DSample(Disp2, Disp2Sampler, UV2);
+float4 G2 = Texture2DSample(Deriv2, Deriv2Sampler, UV2);
+float4 X2 = Texture2DSample(Aux2, Aux2Sampler, UV2);
+float SlopeVar = 0.0;
+// Short-wave mask: medium waves and ripples gather on high water and calm down in troughs and in broad
+// quiet patches (same formula as the vertex shader, so the medium waves' normals match their geometry).
 float2 WDir = normalize(O.WA[0].xy + float2(1e-6, 0.0));
 float2 WPerp = float2(-WDir.y, WDir.x);
+float2 QuietUV = float2(dot(XY, WDir), dot(XY, WPerp)) / QuietTile + float2(0.13, 0.71) - float2(RippleOffsets.w * 0.5, 0.0);
+float Quiet = Texture2DSampleLevel(QuietTex, QuietTexSampler, QuietUV, 0.0).b;
+float Mask = O.ShortWaveMask(Height / max(O.Chop.w, 1.0), Quiet, TroughCalm, QuietAmount);
+// Slopes, displacement tensor and sub-pixel slope variance (mip moments: E[s^2] - E[s]^2) per cascade.
+{
+    float2 H0 = O.ToWorld(G0.xy, Cascade0) * F;
+    float3 M0 = O.TensorToWorld(float3(G0.z, G0.w, A0.w), Cascade0) * F;
+    Tx += float3(M0.x, M0.z, H0.x);  Ty += float3(M0.z, M0.y, H0.y);
+    SlopeVar += max(X0.y + X0.z - dot(G0.xy, G0.xy), 0.0) * F * F * O.MinifyWeight(UV0, Cascade0);
+    float F1 = F * Mask;
+    float2 H1 = O.ToWorld(G1.xy, Cascade1) * F1;
+    float3 M1 = O.TensorToWorld(float3(G1.z, G1.w, A1.w), Cascade1) * F1;
+    Tx += float3(M1.x, M1.z, H1.x);  Ty += float3(M1.z, M1.y, H1.y);
+    SlopeVar += max(X1.y + X1.z - dot(G1.xy, G1.xy), 0.0) * F1 * F1 * O.MinifyWeight(UV1, Cascade1);
+}
+float3 Nm = normalize(cross(Tx, Ty));                // wave-scale normal (swells + cascades 0, 1)
+float J = Tx.x * Ty.y - Tx.y * Ty.x;                 // horizontal Jacobian (< 1 on compressed crests)
+{
+    // Ripples keep a floor in troughs and quiet patches: they barely show in the sky reflection, but break
+    // the sun reflection into glints instead of a smooth glare.
+    float F2 = F * lerp(RippleFloor, 1.0, Mask) * saturate(1.0 - Dist / max(RippleFadeDistance, 1.0));
+    float2 H2 = O.ToWorld(G2.xy, Cascade2) * F2;
+    float3 M2 = O.TensorToWorld(float3(G2.z, G2.w, A2.w), Cascade2) * F2;
+    Tx += float3(M2.x, M2.z, H2.x);  Ty += float3(M2.z, M2.y, H2.y);
+    SlopeVar += max(X2.y + X2.z - dot(G2.xy, G2.xy), 0.0) * F2 * F2 * O.MinifyWeight(UV2, Cascade2);
+}
+float3 N = normalize(cross(Tx, Ty));
+N = normalize(float3(N.xy, max(N.z, 0.08)));         // folded crest tips: keep the normal facing up
 
-// --- Ripples: three wind-driven layers of one flowing normal map, each in its own rotated frame (the
-// tiling never lines up) and travelling across the swell (ocean clock, RippleOffsets). Layer 1 (9 m) and
-// 3 (1.5 m) are near/mid detail, layer 2 (38 m) carries far shading. Weaker in calm patches and troughs.
-float RippleFade = saturate(1.0 - Dist / max(RippleFadeDistance, 1.0));
-float MidFade = saturate(1.0 - Dist / max(RippleFadeDistance * 0.35, 1.0));
-float NearFade = saturate(1.0 - Dist / max(RippleFadeDistance * 0.12, 1.0));
-float2 A1 = WDir;
-float2 A2 = float2(0.766 * WDir.x - 0.643 * WDir.y, 0.643 * WDir.x + 0.766 * WDir.y);
-float2 A3 = float2(0.906 * WDir.x + 0.423 * WDir.y, -0.423 * WDir.x + 0.906 * WDir.y);
-float2 B1 = float2(-A1.y, A1.x);
-float2 B2 = float2(-A2.y, A2.x);
-float2 B3 = float2(-A3.y, A3.x);
-float2 S1 = Texture2DSample(RippleTex, RippleTexSampler, float2(dot(XY, A1), dot(XY, B1)) / RippleTile1 - float2(RippleOffsets.x, 0.0)).xy * 2.0 - 1.0;
-float2 S2 = Texture2DSample(RippleTex, RippleTexSampler, float2(dot(XY, A2), dot(XY, B2)) / RippleTile2 + 0.37 - float2(RippleOffsets.y, 0.0)).xy * 2.0 - 1.0;
-float2 S3 = Texture2DSample(RippleTex, RippleTexSampler, float2(dot(XY, A3), dot(XY, B3)) / RippleTile3 + 0.61 - float2(RippleOffsets.z, 0.0)).xy * 2.0 - 1.0;
-float2 RippleSlope = (S1.x * A1 + S1.y * B1) * (Ripple1Weight * MidFade)
-                   + (S2.x * A2 + S2.y * B2) * (Ripple2Weight * RippleFade)
-                   + (S3.x * A3 + S3.y * B3) * (Ripple3Weight * NearFade);
-RippleSlope *= RippleStrength * LookSea.z * lerp(0.55, 1.0, ChopF) * lerp(0.65, 1.1, saturate(Height / SwellH + 0.5));
-// Quieter patches (tens of metres, drifting with the wind) between rippled areas: the water colour and
-// wave faces stay readable there. Low-frequency channel of the foam texture (B), one extra sample.
-float QuietN = Texture2DSample(FoamTex, FoamTexSampler, float2(dot(XY, WDir), dot(XY, WPerp)) / QuietTile + float2(0.13, 0.71) - float2(RippleOffsets.w * 0.5, 0.0)).b;
-RippleSlope *= lerp(1.0 - QuietAmount, 1.0, smoothstep(0.3, 0.7, QuietN));
-// Slopes add in height-field form, so ripples keep their strength on steep wave faces and the shading
-// normal stays consistent with the displaced surface (GN is the exact normal of the displacement).
-float3 N = normalize(float3(GN.xy / max(GN.z, 0.15) + RippleSlope, 1.0));
-
-// --- Roughness with specular anti-aliasing: normal variation inside a pixel widens the highlight
-// (Kaplanyan / Tokuyoshi). Sub-pixel ripples then read as a soft sheen instead of grainy, flickering
-// sparkle; broken glints stay where the normal is coherent across pixels.
+// --- Roughness: sub-pixel slope variance from the mip moments widens the highlight with distance (sun
+// glitter turns into a sheen instead of aliasing), plus specular anti-aliasing for the remaining
+// pixel-to-pixel normal change (Kaplanyan / Tokuyoshi).
 float3 dNx = ddx(N);
 float3 dNy = ddy(N);
 float Variance = SpecAAVariance * (dot(dNx, dNx) + dot(dNy, dNy));
 float BaseRough = lerp(WaterRoughness, FarRoughness, saturate(Dist / max(FarRoughnessDistance, 1.0)));
-float Alpha2 = BaseRough * BaseRough * BaseRough * BaseRough + min(Variance, SpecAAMax);
-float Rough = sqrt(sqrt(Alpha2));
+float Alpha2 = BaseRough * BaseRough * BaseRough * BaseRough + min(Variance, SpecAAMax) + SlopeVar * SlopeVarScale;
+float Rough = sqrt(sqrt(min(Alpha2, MaxAlpha2)));
 
-// --- Reflection horizon occlusion (D26). Where the shading normal tilts away from the viewer, the reflected
-// ray points at or below the horizon: on a real sea it hits the next wave and reflects dark water. The
-// ocean is not in the ray-tracing scene, so those rays miss and return the bright horizon band or the
-// sky atmosphere's ground: the silver-grey / brownish streaks. Reduce the reflectance there (Specular
-// scales F0 and, through F90 = saturate(50 F0), the grazing Fresnel too). Angle-dependent Fresnel stays
-// intact everywhere the reflection sees the sky.
+// --- Reflection horizon occlusion (D26): where the reflected ray points at or below the horizon it would
+// hit the next wave; the ocean is not in the ray-tracing scene, so dim the reflectance there.
 float3 V = normalize(CamPos - WorldPos);
 float3 Rv = reflect(-V, N);
 float HorizonT = saturate((HorizonOccTop - Rv.z) / max(HorizonOccTop - HorizonOccBottom, 1e-3));
 float HorizonOcc = HorizonT * HorizonT * (3.0 - 2.0 * HorizonT) * HorizonOcclusion;
 SpecularOut = Specular * lerp(1.0, HorizonOccFloor, HorizonOcc);
 
-// --- Foam. Lace texture along the wind, drifting slowly with it.
-//   R graded lace, G bubble holes, B patchiness. Coverage erodes the lace: thin coverage leaves fragments.
-float2 FXY = float2(dot(XY, WDir), dot(XY, WPerp));
-float2 Distort = RippleSlope * 0.5;
-float3 FA = Texture2DSample(FoamTex, FoamTexSampler, FXY / FoamTile - float2(RippleOffsets.w, 0.0) + Distort).rgb;
-float3 FB = Texture2DSample(FoamTex, FoamTexSampler, FXY / (FoamTile * 2.9) + float2(0.37, 0.61) + Distort * 0.5).rgb;
-float Lace = max(FA.r, FB.r * 0.85);
-// Whitecaps with history: the same water (Lagrangian XY) is checked now and FoamAge1/2 seconds ago. Foam
-// forms where a crest breaks (strong compression) and stays with the water while the crest runs on, so
-// it trails down the back of the wave, thins out and fades. Sea state sets the breaking threshold.
-float WStart = LookSea.x;
-float Break0 = saturate((WStart - J) / max(FoamJRange, 1e-3)) * saturate(CrestH * 2.5 + 0.1);
-float Break1 = saturate((WStart - O.JacobianAt(XY, FadeK, -FoamAge1)) / max(FoamJRange, 1e-3));
-float Break2 = saturate((WStart - O.JacobianAt(XY, FadeK, -FoamAge2)) / max(FoamJRange, 1e-3));
-float Caps = max(Break0, max(Break1 * FoamDecay1, Break2 * FoamDecay2));
-// Only some crests break: a slow patch mask keeps much of the sea clear.
-float Breaking = saturate(FB.b * LookSea.y - (LookSea.y - 1.0) * 0.45);
-Caps *= Breaking * LookFoam.a;
-// Shore: soft contact foam plus bands that lap outwards from the contact line.
-float Depth = max(WaterDepth, 0.0);
-float Shore = saturate(1.0 - Depth / max(ShoreFoamDepth * (0.45 + 1.1 * FB.b), 1.0));
-float Bands = 0.5 + 0.5 * sin(Depth / max(ShoreBandSpacing, 1.0) * 6.2831853 - Globals.z * ShoreBandSpeed + FB.b * 3.0);
-float ShoreCover = pow(Shore, 1.5) * 0.5 + Shore * Bands * 0.3;
-float Cover = saturate(max(Caps, ShoreCover));
-float Main = smoothstep(1.0 - Cover, 1.0 - Cover + FoamSoftness, Lace);
-Main *= 1.0 - FA.g * saturate(Cover * 1.5 - 0.3) * 0.6;
-Main *= lerp(0.45, 0.92, Cover);
-// A few faint marbled streaks on the open sea, only where waves have been breaking (sea state).
-float MarbleFade = saturate(1.0 - Dist / max(MarbleFadeDistance, 1.0));
-float MarbleCover = saturate(FB.b * 1.4 - 0.4) * MarbleAmount * MarbleFade * LookFoam.a;
-float Marble = smoothstep(1.0 - MarbleCover, 1.0 - MarbleCover + FoamSoftness, FB.r) * MarbleOpacity;
-float Foam = saturate(max(Main, Marble));
-FoamOut = Foam;
-FoamColorOut = LookFoam.rgb;
-RoughOut = lerp(Rough, 0.7, Foam);
+RoughOut = Rough;
 
-// --- Light through thin wave tops: only where the wave is high and steep (thin), strongest when the sun
-// is behind the wave and we look into its face; by the sun's brightness, not its colour (the light comes
-// out filtered by the water). Never a flat tint on every high point; far crests only hint at it.
+// --- Light through thin water: wave tops that are high and steep (thin), lit from behind (the sun shines
+// through the crest towards the viewer) or by the sky, scaled by the sun's brightness after the
+// atmosphere. Never a flat tint on every high point; troughs and faces keep the deep body colour.
 float3 L = normalize(SunDir);
-float Thin = saturate(CrestH * CrestH * saturate(1.0 - GN.z) * ThinScale);
+float SeaH = max(O.Chop.w, 1.0);
+float CrestH = saturate((Height / SeaH - CrestStart) / max(CrestRange, 0.01));
+float Thin = saturate(CrestH * saturate(1.0 - Nm.z) * ThinScale) * saturate(1.5 - J);
 float Forward = pow(saturate(dot(-V, L) * 0.6 + 0.4), SSSBacklitPower);
-float Facing = saturate(dot(GN, V) * 1.5);
+float Facing = saturate(dot(Nm, V) * 1.5);
 float Glow = Thin * Forward * (0.35 + 0.65 * Facing) + SSSAmbient * CrestH * CrestH * Facing;
 Glow *= lerp(1.0, 0.3, saturate(Dist / max(SSSFarDistance, 1.0)));
 float SunLum = dot(SunIllum, float3(0.2126, 0.7152, 0.0722));
-EmissiveOut = LookCrest.rgb * SunLum * (Glow * SSSStrength * LookCrest.a * (1.0 - Foam));
-// Diagnostics: DebugView 1 = magenta where reflections are occluded (reflected ray at/below the horizon).
-EmissiveOut = lerp(EmissiveOut, float3(20000.0, 0.0, 20000.0) * HorizonT, saturate(DebugView));
+EmissiveOut = LookCrest.rgb * SunLum * (Glow * SSSStrength * LookCrest.a);
+// Diagnostics: DebugView 1 = magenta where reflections are occluded; 3 = slope variance.
+float Dbg = saturate(DebugView);
+EmissiveOut = lerp(EmissiveOut, float3(20000.0, 0.0, 20000.0) * HorizonT, Dbg);
+EmissiveOut = lerp(EmissiveOut, float3(20000.0, 20000.0, 0.0) * saturate(SlopeVar * 50.0), saturate(DebugView - 2.0));
 return N;
 """
 
 SCALARS = {
-    # ripples
-    "RippleTile1": (900.0, "Ripples"), "RippleTile2": (3800.0, "Ripples"), "RippleTile3": (150.0, "Ripples"),
-    "Ripple1Weight": (0.85, "Ripples"), "Ripple2Weight": (0.5, "Ripples"), "Ripple3Weight": (0.35, "Ripples"),
-    "RippleStrength": (0.2, "Ripples"), "RippleFadeDistance": (25000.0, "Ripples"),
+    # geometry
+    "VSMipBias": (0.5, "Waves"), "WindSeaVS1": (1.0, "Waves"), "RippleFadeDistance": (8000.0, "Waves"),
+    # short-wave mask: TroughCalm = medium waves / ripples left in troughs, QuietAmount = calmer patches
+    "TroughCalm": (0.2, "Waves"), "QuietAmount": (0.55, "Waves"), "QuietTile": (7000.0, "Waves"),
+    "RippleFloor": (0.5, "Waves"),
     # surface
-    "WaterRoughness": (0.03, "Surface"), "FarRoughness": (0.1, "Surface"), "FarRoughnessDistance": (30000.0, "Surface"),
-    "SpecAAVariance": (0.03, "Surface"), "SpecAAMax": (0.015, "Surface"), "PSMinWavelength": (500.0, "Waves"),
-    "QuietAmount": (0.25, "Ripples"), "QuietTile": (4500.0, "Ripples"),
-    "Specular": (0.3, "Surface"), "HorizonOcclusion": (1.0, "Surface"), "HorizonOccTop": (0.08, "Surface"),
+    "WaterRoughness": (0.025, "Surface"), "FarRoughness": (0.06, "Surface"), "FarRoughnessDistance": (30000.0, "Surface"),
+    "SpecAAVariance": (0.03, "Surface"), "SpecAAMax": (0.001, "Surface"), "SlopeVarScale": (0.25, "Surface"),
+    "MaxAlpha2": (0.004, "Surface"),
+    "Specular": (0.24, "Surface"), "HorizonOcclusion": (1.0, "Surface"), "HorizonOccTop": (0.08, "Surface"),
     "HorizonOccBottom": (0.0, "Surface"), "HorizonOccFloor": (0.2, "Surface"), "DebugView": (0.0, "Diagnostics"),
-    # foam
-    "FoamTile": (900.0, "Foam"), "FoamJRange": (0.3, "Foam"), "FoamSoftness": (0.12, "Foam"),
-    "FoamAge1": (0.9, "Foam"), "FoamAge2": (2.2, "Foam"), "FoamDecay1": (0.75, "Foam"), "FoamDecay2": (0.45, "Foam"),
-    "ShoreFoamDepth": (90.0, "Foam"), "ShoreBandSpacing": (22.0, "Foam"), "ShoreBandSpeed": (1.6, "Foam"),
-    "MarbleAmount": (0.16, "Foam"), "MarbleOpacity": (0.35, "Foam"), "MarbleFadeDistance": (7000.0, "Foam"),
-    # crest light (CrestStart / CrestRange are fractions of the swell height)
-    "SSSStrength": (0.11, "Crest light"), "CrestStart": (0.2, "Crest light"), "CrestRange": (0.55, "Crest light"),
+    # crest light (CrestStart / CrestRange are fractions of the sea height)
+    "SSSStrength": (0.22, "Crest light"), "CrestStart": (0.15, "Crest light"), "CrestRange": (0.55, "Crest light"),
     "SSSBacklitPower": (2.5, "Crest light"), "SSSAmbient": (0.02, "Crest light"), "ThinScale": (6.0, "Crest light"),
     "SSSFarDistance": (12000.0, "Crest light"),
 }
 
+VS_TEXTURES = ["Disp0", "Disp1", "DispPrev0", "DispPrev1"]
+PS_TEXTURES = ["Disp0", "Disp1", "Disp2", "Deriv0", "Deriv1", "Deriv2", "Aux0", "Aux1", "Aux2"]
 
-def make_material(mpc, ush):
+
+def rt_name(param):
+    kind, c = param[:-1], param[-1]
+    return "RT_Ocean%s%s" % (kind, c)
+
+
+def make_material(mpc, ush, rts):
     m = sb_ue.reset_material("M_Ocean", DIR)
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
@@ -258,14 +311,29 @@ def make_material(mpc, ush):
     nodes = {n: mpc_param(m, mpc, n, -2400, -1600 + i * 60) for i, n in enumerate(names)}
     cam = sb_ue.expr(m, unreal.MaterialExpressionCameraPositionWS, -2400, 0)
 
+    # FFT textures: one parameter node each, shared by the vertex and pixel code (shared wrap sampler,
+    # so the sampler count stays low).
+    tex = {}
+    for i, p in enumerate(sorted(set(VS_TEXTURES + PS_TEXTURES))):
+        tex[p] = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -2000, -1600 + i * 90, parameter_name=p,
+                            texture=rts[rt_name(p)], sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR,
+                            sampler_source=unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS, group="FFT")
+
     # --- vertex: morph + displacement
     wp_vs = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -2000, 200,
                        world_position_shader_offset=unreal.WorldPositionIncludedOffsets.WPT_EXCLUDE_ALL_SHADER_OFFSETS)
     lp = sb_ue.expr(m, unreal.MaterialExpressionLocalPosition, -2000, 300)
     cd = [sb_ue.expr(m, unreal.MaterialExpressionPerInstanceCustomData, -2000, 400 + i * 80, data_index=i) for i in range(3)]
     fade_vs = sb_ue.scalar_param(m, "WaveFadeVS", 0.03, -2000, 650, "Waves")
-    vs_inputs = ["WorldPos", "LocalPos", "CamPos", "CellSize", "MorphStart", "MorphEnd", "FadeScale"] + WAVE_PARAMS + FIELD_PARAMS
-    vs = custom(m, -1500, 300, "SaltOcean VS (morph + Gerstner)", ush + "\n" + VS_CODE, vs_inputs, F3, [("P0", F3)])
+    vs_only = ["VSMipBias", "WindSeaVS1"]
+    vs_scalars = vs_only + ["TroughCalm", "QuietAmount", "QuietTile"]
+    vs_inputs = (["WorldPos", "LocalPos", "CamPos", "CellSize", "MorphStart", "MorphEnd", "FadeScale", "IsPrev", "QuietTex", "RippleOffsets"]
+                 + vs_scalars + VS_TEXTURES + WAVE_PARAMS + FIELD_PARAMS)
+    # Low-frequency noise (blue channel of the old foam pattern) for the drifting quiet patches.
+    quiet_tex = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -1200, 1050, parameter_name="QuietTex",
+                           texture=unreal.load_asset(DIR + "/Textures/T_OceanFoam_M"),
+                           sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, group="Waves")
+    vs = custom(m, -1500, 300, "SaltOcean VS (morph + swells + FFT wind sea)", ush + "\n" + VS_CODE, vs_inputs, F3, [("P0", F3)])
     link(wp_vs, "", vs, "WorldPos")
     link(lp, "", vs, "LocalPos")
     link(cam, "", vs, "CamPos")
@@ -273,9 +341,13 @@ def make_material(mpc, ush):
     link(cd[1], "", vs, "MorphStart")
     link(cd[2], "", vs, "MorphEnd")
     link(fade_vs, "", vs, "FadeScale")
-    # Last frame's displacement for the velocity pass: PreviousFrameSwitch picks PrevPhase*. Without it
-    # the previous position is evaluated with this frame's phases, the waves get zero motion vectors and
-    # TSR reprojects history onto moving water (D23). UsePrevFramePhases = 0 restores the old behaviour.
+    link(quiet_tex, "", vs, "QuietTex")
+    link(nodes["RippleOffsets"], "", vs, "RippleOffsets")
+    for p in VS_TEXTURES:
+        link(tex[p], "", vs, p)
+    # Last frame's displacement for the velocity pass: PreviousFrameSwitch picks PrevPhase* for the swells
+    # and IsPrev = 1 (last frame's FFT textures). Without it the waves get zero motion vectors and TSR
+    # reprojects history onto moving water (D23). UsePrevFramePhases = 0 restores that for A/B tests.
     use_prev = sb_ue.scalar_param(m, "UsePrevFramePhases", 1.0, -2400, 1500, "Diagnostics")
     prev_nodes = {n: mpc_param(m, mpc, n, -2400, 1600 + i * 60) for i, n in enumerate(PREV_PARAMS)}
     for i, n in enumerate(PHASE_PARAMS):
@@ -287,53 +359,50 @@ def make_material(mpc, ush):
         link(nodes[n], "", sw, "Current Frame")
         link(lerp_node, "", sw, "Previous Frame")
         link(sw, "", vs, n)
+    zero = sb_ue.expr(m, unreal.MaterialExpressionConstant, -2150, 2000, r=0.0)
+    is_prev = sb_ue.expr(m, unreal.MaterialExpressionPreviousFrameSwitch, -1950, 2000)
+    link(zero, "", is_prev, "Current Frame")
+    link(use_prev, "", is_prev, "Previous Frame")
+    link(is_prev, "", vs, "IsPrev")
     for n in WAVE_PARAMS + FIELD_PARAMS:
         if n not in PHASE_PARAMS:
             link(nodes[n], "", vs, n)
+    sp = {n: sb_ue.scalar_param(m, n, v, -1200, 1200 + i * 60, g) for i, (n, (v, g)) in enumerate(SCALARS.items())}
+    for n in vs_scalars:
+        link(sp[n], "", vs, n)
     sb_ue.to_prop(vs, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
     interp = sb_ue.expr(m, unreal.MaterialExpressionVertexInterpolator, -1200, 500)
     link(vs, "P0", interp, "")
 
-    # --- pixel: normals, ripples, specular AA, foam, crest light
+    # --- pixel: normals, roughness, crest light
     wp_ps = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -1200, 700)
     fade_ps = sb_ue.scalar_param(m, "WaveFadePS", 0.002, -1200, 800, "Waves")
-    ripple_tex = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -1200, 900, parameter_name="RippleTex",
-                            # Soft (near-isotropic) ripples since D26; T_OceanRipples_N (elongated) is kept for comparison.
-                            texture=unreal.load_asset(DIR + "/Textures/T_OceanRipplesSoft_N"),
-                            sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, group="Ripples")
-    foam_tex = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -1200, 1050, parameter_name="FoamTex",
-                          texture=unreal.load_asset(DIR + "/Textures/T_OceanFoam_M"),
-                          sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, group="Foam")
-    sp = {n: sb_ue.scalar_param(m, n, v, -1200, 1200 + i * 60, g) for i, (n, (v, g)) in enumerate(SCALARS.items())}
-    scene_depth = sb_ue.expr(m, unreal.MaterialExpressionSceneDepthWithoutWater, -1500, 1800)
-    pixel_depth = sb_ue.expr(m, unreal.MaterialExpressionPixelDepth, -1500, 1900)
-    depth = sb_ue.expr(m, unreal.MaterialExpressionSubtract, -1300, 1850)
-    link(scene_depth, "", depth, "A")
-    link(pixel_depth, "", depth, "B")
     sun_dir = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightDirection, -1500, 2000)
     sun_illum = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightIlluminance, -1500, 2100)
 
-    ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "RippleTex", "FoamTex", "WaterDepth", "SunDir", "SunIllum"]
-                 + list(SCALARS) + WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA)
-    ps = custom(m, -700, 900, "SaltOcean PS (normal, ripples, specular AA, foam, crest light)", ush + "\n" + PS_CODE, ps_inputs, F3,
-                [("FoamOut", F1), ("FoamColorOut", F3), ("RoughOut", F1), ("EmissiveOut", F3), ("SpecularOut", F1)])
+    ps_scalars = [n for n in SCALARS if n not in vs_only]
+    ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "QuietTex", "SunDir", "SunIllum"]
+                 + PS_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA)
+    ps = custom(m, -700, 900, "SaltOcean PS (surface normal, roughness, crest light)", ush + "\n" + PS_CODE, ps_inputs, F3,
+                [("RoughOut", F1), ("EmissiveOut", F3), ("SpecularOut", F1)])
     link(sun_dir, "", ps, "SunDir")
     link(sun_illum, "", ps, "SunIllum")
     link(interp, "", ps, "P0")
     link(wp_ps, "", ps, "WorldPos")
     link(cam, "", ps, "CamPos")
     link(fade_ps, "", ps, "FadeScale")
-    link(ripple_tex, "", ps, "RippleTex")
-    link(foam_tex, "", ps, "FoamTex")
-    link(depth, "", ps, "WaterDepth")
-    for n in SCALARS:
+    link(quiet_tex, "", ps, "QuietTex")
+    for p in PS_TEXTURES:
+        link(tex[p], "", ps, p)
+    for n in ps_scalars:
         link(sp[n], "", ps, n)
     for n in WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA:
         link(nodes[n], "", ps, n)
 
     sb_ue.to_prop(ps, "", unreal.MaterialProperty.MP_NORMAL)
-    sb_ue.to_prop(ps, "FoamOut", unreal.MaterialProperty.MP_OPACITY)
-    sb_ue.to_prop(ps, "FoamColorOut", unreal.MaterialProperty.MP_BASE_COLOR)
+    # No surface layer on the water (opacity 0 = pure Single Layer Water).
+    zero_opacity = sb_ue.expr(m, unreal.MaterialExpressionConstant, -300, 1100, r=0.0)
+    sb_ue.to_prop(zero_opacity, "", unreal.MaterialProperty.MP_OPACITY)
     sb_ue.to_prop(ps, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
     sb_ue.to_prop(ps, "EmissiveOut", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     sb_ue.to_prop(ps, "SpecularOut", unreal.MaterialProperty.MP_SPECULAR)
@@ -363,7 +432,8 @@ def main():
     with open(USH, encoding="utf-8") as f:
         ush = f.read()
     mpc = make_mpc()
-    m = make_material(mpc, ush)
+    rts = make_targets()
+    m = make_material(mpc, ush, rts)
     mi = sb_ue.make_mi("MI_Ocean", DIR, m)
     # Instance overrides from earlier experiments would mask the master defaults: start clean.
     mel.clear_all_material_instance_parameters(mi)

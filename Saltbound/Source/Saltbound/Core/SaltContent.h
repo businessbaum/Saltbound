@@ -19,8 +19,22 @@ namespace SaltContent
 	inline const TCHAR* OceanQuarterTile = TEXT("/Game/Saltbound/Water/SM_OceanTile16.SM_OceanTile16");
 	inline const TCHAR* LanternMesh = TEXT("/Game/Saltbound/Props/SM_Lantern.SM_Lantern");
 	inline const TCHAR* CloudMaterial = TEXT("/Game/Saltbound/Environment/Sky/MI_Clouds_Stylized.MI_Clouds_Stylized");
+	/** FFT ocean render targets (setup_ocean.py): /Game/Saltbound/Water/FFT/RT_Ocean<Kind><Cascade>. */
+	inline FString OceanFFTTarget(const TCHAR* Kind, int32 Cascade)
+	{
+		return FString::Printf(TEXT("/Game/Saltbound/Water/FFT/RT_Ocean%s%d.RT_Ocean%s%d"), Kind, Cascade, Kind, Cascade);
+	}
 
 	/** Loads Path into Slot if Slot is empty. */
+	template <typename T, typename PtrType>
+	void ResolveDefault(PtrType& Slot, const FString& Path)
+	{
+		if (!Slot)
+		{
+			Slot = LoadObject<T>(nullptr, *Path);
+		}
+	}
+
 	template <typename T, typename PtrType>
 	void ResolveDefault(PtrType& Slot, const TCHAR* Path)
 	{

@@ -37,6 +37,11 @@ def main():
     ap.add_argument("--ocean", nargs="*", default=[], help="ocean actor properties, e.g. ripple_scroll=0,0,0,0")
     ap.add_argument("--mitex", nargs="*", default=[], help="MI_Ocean texture parameters, e.g. RippleTex=/Game/.../T_X")
     ap.add_argument("--preset", default="Day")
+    ap.add_argument("--hold", action="store_true",
+                    help="leave the ocean frozen afterwards (next capture sees exactly the same sea and foam)")
+    ap.add_argument("--warm", type=float, default=0.0,
+                    help="run the sea for this many seconds before --time, then freeze there (simulated foam develops "
+                         "with the current settings; while frozen, old foam never fades)")
     ap.add_argument("--out", default=os.path.join(os.environ.get("TEMP", "."), "saltbound_diag"))
     ns = ap.parse_args()
     os.makedirs(ns.out, exist_ok=True)
@@ -72,17 +77,27 @@ def main():
         "        old['ocean'] = {}\n"
         "        for k, v in %r.items():\n"
         "            cur = a.get_editor_property(k)\n"
-        "            old['ocean'][k] = [cur.x, cur.y, cur.z, cur.w] if hasattr(cur, 'w') else [float(cur)]\n"
-        "            a.set_editor_property(k, unreal.Vector4(*v) if len(v) == 4 else v[0])\n"
+        "            old['ocean'][k] = ([cur.x, cur.y, cur.z, cur.w] if hasattr(cur, 'w') else\n"
+        "                               [cur.x, cur.y, cur.z] if hasattr(cur, 'z') else [float(cur)])\n"
+        "            a.set_editor_property(k, unreal.Vector4(*v) if len(v) == 4 else unreal.Vector(*v) if len(v) == 3 else v[0])\n"
         "        a.set_editor_property('freeze_time', %s)\n"
         "        a.set_ocean_time(%f)\n"
-        "print('SB_DIAG_OLD', json.dumps(old))\n" % (MI, cvars, mis, mitex, ocean, "True" if ns.freeze else "False", ns.time))
+        "print('SB_DIAG_OLD', json.dumps(old))\n" % (MI, cvars, mis, mitex, ocean, "True" if ns.freeze and ns.warm <= 0 else "False",
+                                                     ns.time - max(ns.warm, 0.0)))
     out = run(setup)
     text = "".join(o["output"] for o in out.get("output", []))
     if not out.get("success"):
         raise SystemExit("setup failed: %s %s" % (text, out.get("result")))
     old_line = [l for l in text.splitlines() if "SB_DIAG_OLD" in l]
     path = os.path.join(ns.out, "%s.png" % ns.label)
+    if ns.warm > 0:
+        # Let the viewport tick the sea, then jump to the exact time and freeze (if requested).
+        ue_mcp.capture(os.path.join(ns.out, "_warm.png"), (*shot[0], *shot[1]), settle=ns.warm)
+        run("import unreal\n"
+            "for a in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors():\n"
+            "    if a.get_class().get_name() == 'SaltOcean':\n"
+            "        a.set_editor_property('freeze_time', %s)\n"
+            "        a.set_ocean_time(%f)\n" % ("True" if ns.freeze else "False", ns.time))
     try:
         ue_mcp.capture(path, (*shot[0], *shot[1]), settle=ns.settle)
         print("SB_DIAG_SHOT", path)
@@ -103,8 +118,9 @@ def main():
             "for a in eas.get_all_level_actors():\n"
             "    if a.get_class().get_name() == 'SaltOcean':\n"
             "        for k, v in old.get('ocean', {}).items():\n"
-            "            a.set_editor_property(k, unreal.Vector4(*v) if len(v) == 4 else v[0])\n"
-            "        a.set_editor_property('freeze_time', False)\n" % (MI, old_line[0].split("SB_DIAG_OLD", 1)[1].strip() if old_line else "{\"cvar\": {}, \"mi\": {}}"))
+            "            a.set_editor_property(k, unreal.Vector4(*v) if len(v) == 4 else unreal.Vector(*v) if len(v) == 3 else v[0])\n"
+            "        a.set_editor_property('freeze_time', %s)\n" % (MI, old_line[0].split("SB_DIAG_OLD", 1)[1].strip() if old_line else "{\"cvar\": {}, \"mi\": {}}",
+                                                              "True" if ns.hold else "False"))
         run(restore)
 
 

@@ -1,0 +1,84 @@
+// Saltbound - wind-sea spectrum for the FFT ocean (shader side).
+//
+// MUST stay in sync with Source/SaltboundRender/Private/SaltOceanSpectrum.cpp (CPU side), which evaluates
+// the long-wave part of cascade 0 for gameplay queries. Both compute, for every lattice wave vector K of a
+// cascade (tile frame, rad/cm):
+//   psi(k)  = Scale * (k/kp)^-3 * exp(-1.25 (kp/k)^2) * Gamma^r * exp(-(k/kDamp)^2)     (JONSWAP-like, in k)
+//   D(dth)  = Q(s) * cos(dth/2)^(2s),  s = SpreadPeak * (k/kp)^(2.5 | -1.25), s >= SpreadMin   (Mitsuyasu)
+//   A(K)    = sqrt(psi * D / k * dk^2 / 2) * Gain                              (amplitude per lattice cell)
+//   h0(K)   = A(K) * (g1 + i g2) / sqrt(2),  g from a hash of (cascade, n, m)  (complex Gaussian)
+//   h(K,t)  = h0(K) e^(-i w t) + conj(h0(-K)) e^(i w t),  w = sqrt(g k) quantised to the loop period
+//   field(X) = sum_K F(K) e^(i K.X)   (no 1/N: amplitudes are per wave)
+// Units: centimetres, seconds, radians.
+
+#define SALT_PI 3.14159265
+#define SALT_GRAVITY 980.665
+
+uint SaltPcg(uint V)
+{
+	uint State = V * 747796405u + 2891336453u;
+	uint Word = ((State >> ((State >> 28u) + 4u)) ^ State) * 277803737u;
+	return (Word >> 22u) ^ Word;
+}
+
+// Standard complex Gaussian pair for lattice point (N, M) of a cascade (Box-Muller).
+float2 SaltGauss(int N, int M, uint Cascade, uint Seed)
+{
+	const uint Key = ((uint(N) & 0xFFFFu) << 16u) | (uint(M) & 0xFFFFu);
+	const uint H1 = SaltPcg(Key ^ SaltPcg(Cascade + Seed * 16u));
+	const uint H2 = SaltPcg(H1);
+	const float U1 = (float(H1 >> 8u) + 1.0) / 16777217.0;
+	const float U2 = float(H2 >> 8u) / 16777216.0;
+	const float R = sqrt(-2.0 * log(U1));
+	return R * float2(cos(2.0 * SALT_PI * U2), sin(2.0 * SALT_PI * U2));
+}
+
+// log Gamma(x), x > 0 (shifted Stirling series).
+float SaltLgamma(float X)
+{
+	const float P = X * (X + 1.0) * (X + 2.0) * (X + 3.0) * (X + 4.0) * (X + 5.0);
+	const float Z = X + 6.0;
+	const float Lg = (Z - 0.5) * log(Z) - Z + 0.918938533 + 1.0 / (12.0 * Z) - 1.0 / (360.0 * Z * Z * Z);
+	return Lg - log(P);
+}
+
+// Spec0: xy wind direction (tile frame, unit), z peak wavenumber kp, w scale
+// Spec1: x gamma, y spread at the peak, z minimum spread, w damping wavenumber (0 = none)
+// Band:  x kMin, y kMax, z gain, w unused
+float SaltSpectrumAmplitude(float2 K, float Dk, float4 Spec0, float4 Spec1, float4 Band)
+{
+	const float Kl = length(K);
+	if (Kl < max(Band.x, 1e-7) || Kl >= Band.y || Spec0.w <= 0.0)
+	{
+		return 0.0;
+	}
+	const float Kr = Kl / Spec0.z;
+	const float Sigma = Kr <= 1.0 ? 0.07 : 0.09;
+	const float Sq = sqrt(Kr) - 1.0;
+	const float R = exp(-Sq * Sq / (2.0 * Sigma * Sigma));
+	float Psi = Spec0.w / (Kr * Kr * Kr) * exp(-1.25 / (Kr * Kr)) * pow(Spec1.x, R);
+	if (Spec1.w > 0.0)
+	{
+		const float Kd = Kl / Spec1.w;
+		Psi *= exp(-Kd * Kd);
+	}
+	const float S = max(Spec1.y * (Kr < 1.0 ? pow(Kr, 2.5) : pow(Kr, -1.25)), Spec1.z);
+	const float HalfCos = sqrt(saturate(0.5 + 0.5 * dot(K / Kl, Spec0.xy)));
+	const float Q = exp(SaltLgamma(S + 1.0) - SaltLgamma(S + 0.5)) / (2.0 * sqrt(SALT_PI));
+	const float D = Q * pow(max(HalfCos, 1e-6), 2.0 * S);
+	return sqrt(max(Psi * D / Kl, 0.0) * Dk * Dk * 0.5) * Band.z;
+}
+
+// Angular frequency quantised so the whole field repeats exactly after LoopSeconds; returns the phase
+// w t for a time given as a fraction of the loop (keeps float precision for any session length).
+float SaltWavePhase(float Kl, float TimeFrac, float LoopSeconds)
+{
+	const float W = sqrt(SALT_GRAVITY * Kl);
+	const float Q = round(W * LoopSeconds / (2.0 * SALT_PI));
+	return 2.0 * SALT_PI * frac(Q * TimeFrac);
+}
+
+float2 SaltCMul(float2 A, float2 B)
+{
+	return float2(A.x * B.x - A.y * B.y, A.x * B.y + A.y * B.x);
+}

@@ -48,8 +48,18 @@ void FSaltWaveField::Build(const TArray<FSaltWaveSpec>& Specs, float AmplitudeSc
 	}
 }
 
+void FSaltWaveField::SetSpectrum(const SaltOceanFFT::FSpectrum& Spectrum, bool bEnable)
+{
+	bUseFFT = bEnable;
+	if (bEnable)
+	{
+		LowBand.SetSpectrum(Spectrum);
+	}
+}
+
 void FSaltWaveField::SetTime(double TimeSeconds)
 {
+	Time = TimeSeconds;
 	for (FWave& W : Waves)
 	{
 		W.Phase = (float)FMath::Fmod(W.Omega * TimeSeconds + W.PhaseOffset, 2.0 * UE_DOUBLE_PI);
@@ -107,6 +117,13 @@ FVector FSaltWaveField::Displacement(const FVector2D& P0) const
 		Disp.Y += W.Dir.Y * (W.Horizontal * F * C);
 		Disp.Z += W.Amplitude * F * S;
 	}
+	if (bUseFFT && LowBand.HasWaves())
+	{
+		LowBand.Update(Time);
+		const SaltOceanFFT::FLowBand::FSample S = LowBand.Sample(P0);
+		const float F = Att * Chop;
+		Disp += FVector(S.Dx, S.Dy, S.H) * F;
+	}
 	return Disp;
 }
 
@@ -130,6 +147,14 @@ void FSaltWaveField::NormalAndJacobian(const FVector2D& P0, FVector& OutNormal, 
 		Dy.X += W.Dir.X * (-H * S * W.K.Y);
 		Dy.Y += W.Dir.Y * (-H * S * W.K.Y);
 		Dy.Z += A * C * W.K.Y;
+	}
+	if (bUseFFT && LowBand.HasWaves())
+	{
+		LowBand.Update(Time);
+		const SaltOceanFFT::FLowBand::FSample S = LowBand.Sample(P0);
+		const float F = Att * Chop;
+		Dx += FVector(S.Dxx, S.Dxy, S.Hx) * F;
+		Dy += FVector(S.Dxy, S.Dyy, S.Hy) * F;
 	}
 	OutNormal = FVector::CrossProduct(Dx, Dy).GetSafeNormal();
 	OutJacobian = (float)(Dx.X * Dy.Y - Dx.Y * Dy.X);

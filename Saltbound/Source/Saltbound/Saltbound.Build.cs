@@ -18,7 +18,7 @@ public class Saltbound : ModuleRules
 			"Slate"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "SlateCore", "RHI", "RenderCore" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "SlateCore", "RHI", "RenderCore", "SaltboundRender" });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"Saltbound"

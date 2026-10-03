@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-03 (session 2, ocean revision 5: smearing, environment layers, reflection breakup).
+Last updated: 2026-10-04 (session 3, ocean revision 6: FFT ocean; foam removed).
 
 ## Milestone status
 
@@ -164,6 +164,24 @@ for a higher screen percentage (for example 75 %) and more content.
   - `Tools/ocean_diag.py` (controlled A/B captures), `Tools/water_metrics.py`,
     `Tools/record_clip.py --float`, `Tools/tune_env.py`.
 
+### Ocean revision 6 (session 3, FFT ocean, D27)
+- **Wind sea:**
+  - Tessendorf FFT on the GPU (three cascades, 250 m / 37 m / 6 m) on top of three analytic Gerstner
+    swells. The CPU mirrors the long waves (≥ ~12 m) for buoyancy.
+  - New module `SaltboundRender` with compute shaders `Shaders/SaltOceanFFT.usf` and
+    `SaltOceanSpectrum.ush`.
+- **Shapes (owner feedback):**
+  - Distinct major ridges (peaky spectrum, sharper crests); medium waves and ripples subordinate.
+  - Smooth areas in troughs and drifting quiet patches; shading normals equal to the displaced surface.
+- **Sea states:** Flat (new windless biome), Calm (own low-wind balance with a sun glitter path),
+  Moderate, Rough, Storm.
+- **Look:** blue body with turquoise only in thin backlit crests; less reflection (Specular 0.24);
+  roughness from sub-pixel slope variance (grid artefact fixed).
+- **Removed at the owner's request:** all foam (whitecaps and shore foam) and the spray particles. A
+  detailed foam rework was tried and dropped.
+- **Evidence:** `Docs/Evidence/Ocean_rev6/` (references compared with before and after, Rough / Calm /
+  Flat, low and elevated views).
+
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
 |---|---|---|
@@ -178,7 +196,9 @@ Developer console (`~`, non-shipping builds):
 - `sb.Lighting Day|Evening|Dusk`
 - `sb.Region ShoresOfPlenty|AncientIsles|Wilds|DevilsRoar [blend s]`, `sb.Weather Clear|Cloudy|Overcast|Storm [blend s]`,
   `sb.SeaState Calm|Moderate|Rough|Storm [blend s]`, `sb.Env` (print the composed state)
+- `sb.SeaState Flat|Calm|Moderate|Rough|Storm [blend s]` (Flat = windless biome)
 - `sb.Ocean.Freeze 0|1`, `sb.Ocean.Time <s>`, `sb.Dev.Camera X Y Z Pitch Yaw [FOV] [Float]` (`sb.Dev.Camera off` returns to the player)
+- `sb.Dev.DumpFrames <n>`: the renderer writes the next n frames to `Saved/Screenshots` (with `-UseFixedTimeStep -FPS=<n>`, see `Tools/record_clip.py --dump`)
 - `sb.Dev.RunMovementTests [motion speed turn]`, `sb.Dev.Platform <motion> [speed turn]`
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`
@@ -195,8 +215,11 @@ Developer console (`~`, non-shipping builds):
     second (previous-frame) wave evaluation in the vertex shader. Overall the build is faster than
     revision 3. It was not profiled pass by pass; one known saving is that Lumen screen traces are off.
 - The Jacobian foam trail samples the dominant wave direction only.
+- **Ocean (D27):**
+  - No foam and no spray (removed at the owner's request; a foam system needs a new attempt).
+  - The CPU mirrors only the wind sea's long waves (≥ ~12 m): small floating objects ignore shorter waves.
+  - The FFT tiles repeat every 250 m (hidden by the swells and the chop patches; visible only from far above).
 - **Ocean (D26):**
-  - Gerstner crests are straight, so some parallel banding remains on long swell faces.
   - The ocean does not reflect itself: it is not in the ray-tracing scene, and horizon occlusion only
     approximates this.
   - No spray yet (`SprayAmount` is unused). No underwater rendering.

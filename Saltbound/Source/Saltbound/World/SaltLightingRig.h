@@ -78,12 +78,13 @@ struct FSaltRegionPreset
 
 	/** Single Layer Water volume (1/m): absorption sets the deep colour, scattering the body colour and
 	 *  how bright shallows become over light ground. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor WaterAbsorption = FLinearColor(1.3f, 0.3f, 0.22f);
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor WaterScattering = FLinearColor(0.008f, 0.05f, 0.07f);
+	// Defaults = Shores of Plenty (D27): blue body and deep blue troughs, turquoise only where light passes
+	// through thin water.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor WaterAbsorption = FLinearColor(1.35f, 0.26f, 0.15f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor WaterScattering = FLinearColor(0.01f, 0.065f, 0.1f);
 	/** Light passing through thin, backlit crests. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor CrestLightColor = FLinearColor(0.15f, 0.95f, 0.85f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor CrestLightColor = FLinearColor(0.1f, 0.95f, 0.9f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") float CrestLightStrength = 1.f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor FoamColor = FLinearColor(0.85f, 0.92f, 0.92f);
 
 	/** Rayleigh scattering colour (absolute; hue of the clear sky) and scale/haze multipliers. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sky") FLinearColor RayleighColor = FLinearColor(0.175287f, 0.409607f, 1.f);
@@ -129,26 +130,34 @@ struct FSaltWeatherPreset
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weather") float ContrastMul = 1.f;
 };
 
-/** Sea state: wave height and character, whitecaps, ripples and spray. */
+/** Sea state: swell, wind sea (FFT spectrum) and the balance of medium waves and ripples. Each state has its own wave
+ *  balance (D27): low wind is not the rough sea scaled down. */
 USTRUCT(BlueprintType)
 struct FSaltSeaStatePreset
 {
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") FName Name = TEXT("Rough");
-	/** Ocean AmplitudeScale / SteepnessScale. */
+	/** Swell (Gerstner): ocean AmplitudeScale / SteepnessScale. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") float WaveHeight = 1.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") float WaveSteepness = 1.f;
+	/** Wind sea (FFT): significant height and dominant wavelength (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea", meta = (Units = "cm")) float WindSeaHeight = 150.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea", meta = (Units = "cm")) float WindSeaWavelength = 2600.f;
+	/** Peak enhancement: higher = one dominant wave size, more distinctive major ridges. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea") float WindSeaGamma = 5.f;
+	/** Directional spreading at the peak and its floor (lower = shorter, more interrupted crests). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea") float WindSeaSpread = 5.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea") float WindSeaSpreadMin = 1.5f;
+	/** Crest sharpness of the wind sea (scales the ocean's CascadeChop). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea") float Choppiness = 1.f;
+	/** Waves shorter than this are damped (0 = none): smooth areas between ripples in low wind. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind Sea", meta = (Units = "cm")) float ShortWaveLength = 0.f;
 	/** Ocean ChopVariation: how much calmer the quiet patches are. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") float ChopVariation = 0.6f;
-	/** Crests break where the surface Jacobian drops below this (higher = more whitecaps). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") float WhitecapStart = 0.6f;
-	/** Whitecap coverage scale (0 = none). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") float WhitecapAmount = 1.f;
-	/** Higher values leave more breaking-capable crests unbroken (patchier whitecaps). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") float BreakPatchiness = 2.2f;
+	/** Medium waves (0.9-6 m) and ripples (< 0.9 m) relative to the default balance. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") float MediumWaveScale = 1.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") float RippleScale = 1.f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") float SprayAmount = 0.5f;
 };
 
 /**

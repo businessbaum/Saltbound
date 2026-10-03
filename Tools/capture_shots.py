@@ -34,6 +34,12 @@ SHOTS = {
         ("15_ref_low", (22000, -6000, 160), (-7, 95, 0)),
         # Second reflection-check view (owner screenshot, 2026-10-03): low, towards the landmark.
         ("16_ref_landmark", (22000, -6000, 250), (-9, 46, 0)),
+        # FFT ocean brief (owner references): rough sea seen from about 3.5 m (ship deck) towards the
+        # high sun, calm water from about 1.5 m with the sun upper left, and an elevated overview.
+        # Z is the height above the water when recorded with record_clip.py --float.
+        ("17_ref_rough", (22000, -6000, 350), (-11, 145, 0)),
+        ("18_ref_calm", (22000, -6000, 150), (10, 152, 0)),
+        ("19_elevated", (22000, -6000, 1800), (-26, 60, 0)),
     ],
 }
 

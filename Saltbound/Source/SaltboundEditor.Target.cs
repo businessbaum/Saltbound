@@ -10,6 +10,6 @@ public class SaltboundEditorTarget : TargetRules
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
-		ExtraModuleNames.Add("Saltbound");
+		ExtraModuleNames.AddRange(new string[] { "SaltboundRender", "Saltbound" });
 	}
 }

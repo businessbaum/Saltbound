@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "SaltOceanFFT.h"
 #include "SaltWaveTypes.generated.h"
 
 /** One Gerstner wave component as authored in the editor. */
@@ -72,6 +73,9 @@ struct FSaltWaterSample
 /**
  * Evaluates the wave field. Mirrors Saltbound/Shaders/SaltOcean.ush exactly; keep both in sync.
  * Units: centimetres, seconds, radians. Deep-water dispersion: omega = sqrt(g * k).
+ * Gerstner waves are the long swells; the wind sea comes from the FFT spectrum (SaltOceanFFT), of which
+ * the CPU evaluates the long waves (cascade 0, >= ~12 m). Both are scaled by the calm zones; the FFT
+ * sea also by the chop patches (calmer and choppier areas).
  */
 struct SALTBOUND_API FSaltWaveField
 {
@@ -95,15 +99,21 @@ struct SALTBOUND_API FSaltWaveField
 	float CalmMin[MaxCalmZones];
 	double WaterLevel = 0.0;
 
-	/** Waves [0, SwellCount) are swell; the rest (medium waves and chop) vary in patches (ChopFactor). */
+	/** Waves [0, SwellCount) are swell; later Gerstner waves and the FFT sea vary in patches (ChopFactor). */
 	int32 SwellCount = 3;
 	/** Chop factor in the calmest patches (1 = no variation). */
 	float ChopMin = 1.f;
 	/** 2 pi / patch size (rad/cm). */
 	float ChopFreq = 0.f;
 
+	/** FFT wind sea (long waves only; see SaltOceanFFT::FLowBand). Evaluated lazily per time. */
+	bool bUseFFT = false;
+	mutable SaltOceanFFT::FLowBand LowBand;
+	double Time = 0.0;
+
 	FSaltWaveField();
 
+	void SetSpectrum(const SaltOceanFFT::FSpectrum& Spectrum, bool bEnable);
 	void Build(const TArray<FSaltWaveSpec>& Specs, float AmplitudeScale, float SteepnessScale, const TArray<FSaltCalmZone>& Zones, double InWaterLevel);
 	void SetTime(double TimeSeconds);
 

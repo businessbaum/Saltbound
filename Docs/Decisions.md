@@ -359,3 +359,66 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - Gerstner crests are straight, so on a long swell face some parallel banding remains.
   - Horizon occlusion is an approximation; the ocean does not reflect itself.
   - Clouds drift on wall-clock time, so cloud reflections differ between captures taken minutes apart.
+
+### D27 · FFT ocean: Tessendorf wind sea on Gerstner swells (Adopted; supersedes the ripple layers of D19/D26)
+- **Owner brief (2026-10-03/04):** match two Sea of Thieves references (rough sea; calm water beside a ship),
+  including their wave shapes. Medium waves must be carried by the swells, crests irregular and
+  interrupted, faces partly steep and partly gentle. Low wind gets its own balance, and a separate
+  windless preset. Owner hint: "Sea of Thieves uses FFT ocean simulation with vertex displacement".
+- **Decision: GPU FFT ocean** (new module `SaltboundRender`, loading phase PostConfigInit for global shaders).
+  - Three cascades with their own tile size and rotation split the spectrum by wavelength:
+    - 250 m tile (waves ≥ 6 m).
+    - 37 m tile (0.9–6 m).
+    - 6 m tile (ripples, shading only).
+  - Spectrum: JONSWAP in wavenumber space, cos^2s spreading (Mitsuyasu), a Gaussian hash per lattice
+    point, frequencies quantised to a 1000 s loop. It is scaled to a significant height (`WindSeaHeight`).
+  - Per frame, compute shaders (`Shaders/SaltOceanFFT.usf`) run the spectrum, a 256-point FFT along rows
+    and columns, and a resolve pass.
+  - Output per cascade (256² RGBA16F render targets with mips, `/Game/Saltbound/Water/FFT`):
+    - Displacement (Dx, Dy, h, Dxy).
+    - Derivatives (hx, hy, Dxx, Dyy).
+    - Slope moments.
+    - Last frame's displacement (motion vectors, D23).
+  - The three long Gerstner swells stay analytic and are not periodic, which hides the tile repetition.
+- **CPU mirror:** `SaltOceanFFT::FLowBand` evaluates the same spectrum's waves ≥ ~12 m (cascade 0,
+  |n|,|m| ≤ 21) with a 64² FFT. Buoyancy and the floating camera follow the visible long waves. Shorter
+  waves exist only on the GPU.
+- **Material (`setup_ocean.py`):**
+  - Vertex shader: swells, plus cascades 0–1 sampled at a mip chosen from the vertex spacing (no
+    geometric aliasing).
+  - Pixel shader: exact tangents of the displaced surface (swell tensor + rotated cascade tensors), so
+    the shading normal is the normal of the moving geometry.
+  - Short-wave mask: medium waves and ripples gather on high water and calm down in troughs and in broad
+    drifting quiet patches. This leaves smooth areas between the ridges (owner feedback).
+- **Findings (one variable at a time, frozen sea, identical cameras):**
+  - The large white sun smear came from the sub-pixel slope-variance roughness (LEAN). Bloom was not the
+    cause; with near-mirror roughness the smear disappeared. That term is now capped (`SlopeVarScale`
+    0.25, `MaxAlpha2` 0.004) and only counts once a texture is minified (`MinifyWeight`). Under
+    magnification, bilinear filtering alone made the variance peak between texel centres, a plaid grid
+    in the roughness.
+  - Long, gentle swells barely read from above. The visible SoT character comes from steep wind waves of
+    15–35 m with a peaky spectrum (gamma 5) and sharper major crests.
+  - From owner feedback, the major ridges are distinct while medium waves and ripples stay subordinate:
+    cascade gains 1 / 0.5 / 0.14, Specular 0.24 ("a bit more smoothing, a bit less reflection").
+  - Colour (Shores of Plenty): blue body and deep troughs (absorption 1.35/0.26/0.15, scattering
+    0.01/0.065/0.1). Turquoise only in thin, backlit crests (crest light 0.22, starting at 15 % of the
+    sea height).
+- **Sea states (rig, each with its own balance):**
+  - Flat (windless biome, new): no swell, 1.5 cm breath.
+  - Calm (low wind): 0.6 swell, Hs 55 cm at 5 m, gentle chop; a glitter path under the sun.
+  - Moderate.
+  - Rough: 0.7 swell, Hs 2.8 m at 26 m, gamma 5, chop 1.2.
+  - Storm.
+- **Removed at the owner's request:**
+  - Spray particles (instanced billboards).
+  - All foam: whitecaps, foam simulation, shore foam. A foam rework following a detailed brief
+    (crest-segment breaking chance, accumulation, authored patch texture, fresh/residual debug view) was
+    implemented and then dropped. The owner: "we abandon the foam for now … remove the foam completely".
+- **Tools:**
+  - `record_clip.py --dump`: render-side frames at a fixed time step (`sb.Dev.DumpFrames`), reproducible
+    and immune to other windows.
+  - `ocean_diag.py`: `--warm` (simulate before freezing) and `--hold` (stay frozen for paired captures);
+    `--ocean` accepts 3-component vectors.
+  - Shots `17_ref_rough`, `18_ref_calm`, `19_elevated`.
+- **Cost:** pixel shader 1359 instructions (was 1540; 36 analytic wave evaluations replaced by 9 texture
+  samples). The FFT runs 3 × 256² every frame.

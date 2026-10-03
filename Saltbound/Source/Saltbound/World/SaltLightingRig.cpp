@@ -69,7 +69,7 @@ namespace
 
 	FAutoConsoleCommandWithWorldAndArgs CmdSeaState(
 		TEXT("sb.SeaState"),
-		TEXT("Sea state: sb.SeaState Calm | Moderate | Rough | Storm [BlendSeconds]"),
+		TEXT("Sea state: sb.SeaState Flat | Calm | Moderate | Rough | Storm [BlendSeconds] (Flat = windless, no swell)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			if (Args.Num() > 0) { ForEachRig(World, [&](ASaltLightingRig& R) { R.SetSeaState(FName(*Args[0]), BlendArg(Args)); }); }
@@ -89,8 +89,6 @@ namespace
 	const FName PAbsorption(TEXT("LookAbsorption"));
 	const FName PScattering(TEXT("LookScattering"));
 	const FName PCrest(TEXT("LookCrest"));
-	const FName PFoam(TEXT("LookFoam"));
-	const FName PSea(TEXT("LookSea"));
 }
 
 ASaltLightingRig::ASaltLightingRig()
@@ -184,7 +182,6 @@ ASaltLightingRig::ASaltLightingRig()
 	Ancient.WaterAbsorption = FLinearColor(1.45f, 0.24f, 0.17f);
 	Ancient.WaterScattering = FLinearColor(0.007f, 0.058f, 0.068f);
 	Ancient.CrestLightColor = FLinearColor(0.1f, 0.92f, 0.68f);
-	Ancient.FoamColor = FLinearColor(0.86f, 0.92f, 0.88f);
 	Ancient.MieScaleMul = 1.8f;
 	Ancient.FogDensityMul = 1.5f;
 	Ancient.FogTint = FLinearColor(0.88f, 1.05f, 0.95f);
@@ -202,7 +199,6 @@ ASaltLightingRig::ASaltLightingRig()
 	Wilds.WaterScattering = FLinearColor(0.022f, 0.036f, 0.028f);
 	Wilds.CrestLightColor = FLinearColor(0.35f, 0.62f, 0.42f);
 	Wilds.CrestLightStrength = 0.45f;
-	Wilds.FoamColor = FLinearColor(0.78f, 0.8f, 0.75f);
 	Wilds.RayleighScaleMul = 0.7f;
 	Wilds.MieScaleMul = 2.6f;
 	Wilds.SkyLuminance = FLinearColor(0.86f, 0.9f, 0.86f);
@@ -225,7 +221,6 @@ ASaltLightingRig::ASaltLightingRig()
 	Roar.WaterScattering = FLinearColor(0.01f, 0.02f, 0.027f);
 	Roar.CrestLightColor = FLinearColor(0.25f, 0.55f, 0.55f);
 	Roar.CrestLightStrength = 0.45f;
-	Roar.FoamColor = FLinearColor(0.7f, 0.68f, 0.65f);
 	Roar.RayleighScaleMul = 0.5f;
 	Roar.MieScaleMul = 4.f;
 	Roar.MieAbsorptionScale = 0.004f;
@@ -274,19 +269,30 @@ ASaltLightingRig::ASaltLightingRig()
 	Storm.SaturationMul = 0.72f;
 	Weathers.Add(Storm);
 
-	// --- Sea states (Rough matches the owner's reference image).
-	auto Sea = [this](const TCHAR* Name, float H, float St, float Chop, float WStart, float WAmt, float Patch, float Rip, float Spray)
+	// --- Sea states (D27; owner references: Sea of Thieves rough sea and calm water beside a ship).
+	// Swell: H height scale, St steepness, chop-patch variation. Wind sea: Hs (cm), peak wavelength (cm),
+	// gamma, spreading at the peak and its floor, choppiness, short-wave damping (cm). Med / Rip: medium-wave
+	// and ripple balance.
+	auto Sea = [this](const TCHAR* Name, float H, float St, float Chop, float Hs, float Lp, float Gamma, float Spread, float SpreadMin,
+		float Choppy, float ShortWave, float Med, float Rip)
 	{
 		FSaltSeaStatePreset S;
-		S.Name = Name; S.WaveHeight = H; S.WaveSteepness = St; S.ChopVariation = Chop; S.WhitecapStart = WStart;
-		S.WhitecapAmount = WAmt; S.BreakPatchiness = Patch; S.RippleScale = Rip; S.SprayAmount = Spray;
+		S.Name = Name; S.WaveHeight = H; S.WaveSteepness = St; S.ChopVariation = Chop;
+		S.WindSeaHeight = Hs; S.WindSeaWavelength = Lp; S.WindSeaGamma = Gamma; S.WindSeaSpread = Spread; S.WindSeaSpreadMin = SpreadMin;
+		S.Choppiness = Choppy; S.ShortWaveLength = ShortWave; S.MediumWaveScale = Med; S.RippleScale = Rip;
 		SeaStates.Add(S);
 	};
-	Sea(TEXT("Calm"), 0.3f, 0.55f, 0.4f, 0.15f, 0.f, 3.f, 0.6f, 0.f);
-	Sea(TEXT("Moderate"), 0.65f, 0.85f, 0.55f, 0.45f, 0.6f, 2.6f, 0.85f, 0.2f);
-	Sea(TEXT("Rough"), 1.3f, 1.f, 0.6f, 0.6f, 1.f, 2.2f, 1.f, 0.6f);
-	Sea(TEXT("Storm"), 1.55f, 1.05f, 0.5f, 0.72f, 1.f, 1.5f, 1.25f, 1.f);
-}
+	//        name         swell H steep  chop   Hs     peak    gamma spread min  choppy short med   rip
+	// Windless biome: glassy water, no swell; only a faint breath on the surface.
+	Sea(TEXT("Flat"),     0.f,   0.f,   0.f,   1.5f,  150.f,  3.3f, 2.f, 1.f,  0.2f,  0.f, 1.f,  1.f);
+	// Low wind (owner's calm reference): low rounded swell, soft overlapping wind waves of a few metres that
+	// break the sun into a glitter path, smooth areas between them.
+	Sea(TEXT("Calm"),     0.6f,  0.4f,  0.5f,  55.f,  500.f,  3.3f, 3.f, 1.5f, 0.55f, 0.f, 1.4f, 2.5f);
+	Sea(TEXT("Moderate"), 0.6f,  0.8f,  0.55f, 130.f, 1800.f, 4.f,  6.f, 2.5f, 1.f,   0.f, 1.1f, 1.3f);
+	// Rough (owner's rough reference): substantial swell carrying steep, short-crested wind waves with
+	// distinctive major ridges (peaky spectrum, sharp crests) rather than uniformly tall waves.
+	Sea(TEXT("Rough"),    0.7f,  1.f,   0.5f,  280.f, 2600.f, 5.f,  8.f, 2.5f, 1.2f,  0.f, 1.f,  1.f);
+	Sea(TEXT("Storm"),    1.1f,  1.05f, 0.4f,  420.f, 4500.f, 5.f,  6.f, 2.f,  1.3f,  0.f, 1.f,  1.2f);}
 
 // --- Layers ---------------------------------------------------------------------------------------
 
@@ -299,7 +305,6 @@ FSaltRegionPreset ASaltLightingRig::LerpRegion(const FSaltRegionPreset& A, const
 	R.WaterScattering = C(A.WaterScattering, B.WaterScattering);
 	R.CrestLightColor = C(A.CrestLightColor, B.CrestLightColor);
 	R.CrestLightStrength = L(A.CrestLightStrength, B.CrestLightStrength);
-	R.FoamColor = C(A.FoamColor, B.FoamColor);
 	R.RayleighColor = C(A.RayleighColor, B.RayleighColor);
 	R.RayleighScaleMul = L(A.RayleighScaleMul, B.RayleighScaleMul);
 	R.MieScaleMul = L(A.MieScaleMul, B.MieScaleMul);
@@ -340,11 +345,15 @@ FSaltSeaStatePreset ASaltLightingRig::LerpSeaState(const FSaltSeaStatePreset& A,
 	R.WaveHeight = FMath::Lerp(A.WaveHeight, B.WaveHeight, T);
 	R.WaveSteepness = FMath::Lerp(A.WaveSteepness, B.WaveSteepness, T);
 	R.ChopVariation = FMath::Lerp(A.ChopVariation, B.ChopVariation, T);
-	R.WhitecapStart = FMath::Lerp(A.WhitecapStart, B.WhitecapStart, T);
-	R.WhitecapAmount = FMath::Lerp(A.WhitecapAmount, B.WhitecapAmount, T);
-	R.BreakPatchiness = FMath::Lerp(A.BreakPatchiness, B.BreakPatchiness, T);
+	R.MediumWaveScale = FMath::Lerp(A.MediumWaveScale, B.MediumWaveScale, T);
 	R.RippleScale = FMath::Lerp(A.RippleScale, B.RippleScale, T);
-	R.SprayAmount = FMath::Lerp(A.SprayAmount, B.SprayAmount, T);
+	R.WindSeaHeight = FMath::Lerp(A.WindSeaHeight, B.WindSeaHeight, T);
+	R.WindSeaWavelength = FMath::Lerp(A.WindSeaWavelength, B.WindSeaWavelength, T);
+	R.WindSeaGamma = FMath::Lerp(A.WindSeaGamma, B.WindSeaGamma, T);
+	R.WindSeaSpread = FMath::Lerp(A.WindSeaSpread, B.WindSeaSpread, T);
+	R.WindSeaSpreadMin = FMath::Lerp(A.WindSeaSpreadMin, B.WindSeaSpreadMin, T);
+	R.Choppiness = FMath::Lerp(A.Choppiness, B.Choppiness, T);
+	R.ShortWaveLength = FMath::Lerp(A.ShortWaveLength, B.ShortWaveLength, T);
 	return R;
 }
 
@@ -692,6 +701,17 @@ void ASaltLightingRig::PushEnvironment(const FSaltLightingPreset& P, const FSalt
 			LastAppliedSea = S;
 			bHaveAppliedSea = true;
 		}
+		// Wind sea: read by the ocean every frame (no rebuild needed).
+		Ocean->bWindSea = S.WindSeaHeight > 0.f;
+		Ocean->WindSeaHeight = S.WindSeaHeight;
+		Ocean->WindSeaPeakWavelength = FMath::Max(S.WindSeaWavelength, 100.f);
+		Ocean->WindSeaGamma = FMath::Max(S.WindSeaGamma, 1.f);
+		Ocean->WindSeaSpread = S.WindSeaSpread;
+		Ocean->WindSeaSpreadMin = S.WindSeaSpreadMin;
+		Ocean->ShortWaveLength = S.ShortWaveLength;
+		// Major ridges sharper than the medium waves; ripples subordinate (owner feedback, D27).
+		Ocean->CascadeChop = FVector(1.12, 1.0, 0.5) * S.Choppiness;
+		Ocean->CascadeGain = FVector(1.0, 0.5 * S.MediumWaveScale, 0.14 * S.RippleScale);
 		UWorld* World = GetWorld();
 		if (World && Ocean->ParameterCollection)
 		{
@@ -702,8 +722,6 @@ void ASaltLightingRig::PushEnvironment(const FSaltLightingPreset& P, const FSalt
 				Inst->SetVectorParameterValue(PAbsorption, FLinearColor(Ab.R, Ab.G, Ab.B, 1.f));
 				Inst->SetVectorParameterValue(PScattering, FLinearColor(Sc.R, Sc.G, Sc.B, 1.f));
 				Inst->SetVectorParameterValue(PCrest, FLinearColor(R.CrestLightColor.R, R.CrestLightColor.G, R.CrestLightColor.B, R.CrestLightStrength));
-				Inst->SetVectorParameterValue(PFoam, FLinearColor(R.FoamColor.R, R.FoamColor.G, R.FoamColor.B, S.WhitecapAmount));
-				Inst->SetVectorParameterValue(PSea, FLinearColor(S.WhitecapStart, S.BreakPatchiness, S.RippleScale, S.SprayAmount));
 			}
 		}
 	}

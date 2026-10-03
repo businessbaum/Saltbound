@@ -1,0 +1,130 @@
+// Saltbound - FFT ocean compute passes (Tessendorf). Dispatched every frame by SaltboundRender
+// (SaltOceanFFT.cpp). Three cascades of SALT_FFT_N^2 lattice waves, each in its own rotated tile:
+//   SpectrumCS  h(K,t) and the spectra of 8 real fields, packed as 4 complex fields (two per float4):
+//               slice 2c   = (h + i Dx,  Dy + i hx)       slice 2c+1 = (hy + i Dxx, Dyy + i Dxy)
+//   FFTCS       inverse FFT along rows, then columns (in place, one thread group per line)
+//   ResolveCS   writes the displacement / derivative / slope-moment textures the ocean material samples
+// Displacement convention (matches the Gerstner swells): X = X0 + D(X0), D = sum i K/|K| h  -> crests
+// sharpen (horizontal Jacobian J = (1 + Dxx)(1 + Dyy) - Dxy^2 < 1 on crests).
+
+#include "/Engine/Public/Platform.ush"
+#include "/Saltbound/SaltOceanSpectrum.ush"
+
+#ifndef SALT_FFT_N
+#define SALT_FFT_N 256
+#endif
+#ifndef SALT_FFT_LOG2N
+#define SALT_FFT_LOG2N 8
+#endif
+
+// --- Spectrum ---------------------------------------------------------------------------------------
+float4 CascadeA[3];   // x: patch size (cm), y: cos(rotation), z: sin(rotation), w: choppiness
+float4 CascadeB[3];   // x: kMin, y: kMax, z: gain, w: unused
+float4 Spec0;         // xy: wind direction (world), z: kp, w: scale
+float4 Spec1;         // x: gamma, y: spread at peak, z: min spread, w: damping wavenumber
+float TimeFrac;
+float LoopSeconds;
+uint Seed;
+RWTexture2DArray<float4> OutSpectrum;
+
+[numthreads(8, 8, 1)]
+void SpectrumCS(uint3 Id : SV_DispatchThreadID)
+{
+	const uint C = Id.z;
+	const int Half = SALT_FFT_N / 2;
+	const int N = Id.x < (uint)Half ? (int)Id.x : (int)Id.x - SALT_FFT_N;
+	const int M = Id.y < (uint)Half ? (int)Id.y : (int)Id.y - SALT_FFT_N;
+	float4 Z12 = 0;
+	float4 Z34 = 0;
+	if (N != -Half && M != -Half && (N != 0 || M != 0))
+	{
+		const float Dk = 2.0 * SALT_PI / CascadeA[C].x;
+		const float2 K = float2(N, M) * Dk;
+		const float Kl = length(K);
+		// Wind direction in the tile frame: tile coordinates are the world rotated by the cascade angle.
+		const float Co = CascadeA[C].y;
+		const float Si = CascadeA[C].z;
+		const float4 S0 = float4(Co * Spec0.x - Si * Spec0.y, Si * Spec0.x + Co * Spec0.y, Spec0.zw);
+		const float A = SaltSpectrumAmplitude(K, Dk, S0, Spec1, CascadeB[C]);
+		const float Am = SaltSpectrumAmplitude(-K, Dk, S0, Spec1, CascadeB[C]);
+		const float2 H0 = SaltGauss(N, M, C, Seed) * (A * 0.70710678);
+		const float2 H0m = SaltGauss(-N, -M, C, Seed) * (Am * 0.70710678);
+		const float Ph = SaltWavePhase(Kl, TimeFrac, LoopSeconds);
+		const float2 E = float2(cos(Ph), sin(Ph));
+		// h0(K) e^(-i w t): with the e^(+i K.x) transform the wave travels along +K (downwind).
+		const float2 H = SaltCMul(H0, float2(E.x, -E.y)) + SaltCMul(float2(H0m.x, -H0m.y), E);
+		const float Chop = CascadeA[C].w;
+		const float2 IH = float2(-H.y, H.x);            // i h
+		const float Ux = K.x / Kl;
+		const float Uy = K.y / Kl;
+		// Z1 = h + i Dx,  Dx^ = i Ux Chop h  ->  i Dx^ = -Ux Chop h
+		const float2 Z1 = H - Ux * Chop * H;
+		// Z2 = Dy + i hx,  Dy^ = i Uy Chop h,  hx^ = i Kx h  ->  i hx^ = -Kx h
+		const float2 Z2 = Uy * Chop * IH - K.x * H;
+		// Z3 = hy + i Dxx,  hy^ = i Ky h,  Dxx^ = -Kx Ux Chop h  ->  i Dxx^ = -Kx Ux Chop (i h)
+		const float2 Z3 = K.y * IH - K.x * Ux * Chop * IH;
+		// Z4 = Dyy + i Dxy,  Dyy^ = -Ky Uy Chop h,  Dxy^ = -Kx Uy Chop h
+		const float2 Z4 = -K.y * Uy * Chop * H - K.x * Uy * Chop * IH;
+		Z12 = float4(Z1, Z2);
+		Z34 = float4(Z3, Z4);
+	}
+	OutSpectrum[uint3(Id.xy, C * 2)] = Z12;
+	OutSpectrum[uint3(Id.xy, C * 2 + 1)] = Z34;
+}
+
+// --- Inverse FFT along one axis (radix 2, decimation in time, in groupshared memory) -----------------
+uint Vertical;
+RWTexture2DArray<float4> FFTData;
+groupshared float4 Line[SALT_FFT_N];
+
+[numthreads(SALT_FFT_N / 2, 1, 1)]
+void FFTCS(uint3 Gid : SV_GroupID, uint3 Tid : SV_GroupThreadID)
+{
+	const uint L = Gid.x;
+	const uint Slice = Gid.y;
+	const uint T = Tid.x;
+	[unroll] for (uint I = 0; I < 2; I++)
+	{
+		const uint E = T + I * (SALT_FFT_N / 2);
+		const uint2 P = Vertical != 0 ? uint2(L, E) : uint2(E, L);
+		Line[reversebits(E) >> (32 - SALT_FFT_LOG2N)] = FFTData[uint3(P, Slice)];
+	}
+	GroupMemoryBarrierWithGroupSync();
+	[unroll] for (uint S = 1; S <= SALT_FFT_LOG2N; S++)
+	{
+		const uint HalfM = 1u << (S - 1);
+		const uint J = T & (HalfM - 1);
+		const uint K = (T >> (S - 1)) << S;
+		const float Ang = SALT_PI * float(J) / float(HalfM);   // +2 pi j / m: inverse transform
+		const float2 W = float2(cos(Ang), sin(Ang));
+		const float4 A = Line[K + J];
+		const float4 B = Line[K + J + HalfM];
+		const float4 WB = float4(SaltCMul(W, B.xy), SaltCMul(W, B.zw));
+		Line[K + J] = A + WB;
+		Line[K + J + HalfM] = A - WB;
+		GroupMemoryBarrierWithGroupSync();
+	}
+	[unroll] for (uint I2 = 0; I2 < 2; I2++)
+	{
+		const uint E2 = T + I2 * (SALT_FFT_N / 2);
+		const uint2 P = Vertical != 0 ? uint2(L, E2) : uint2(E2, L);
+		FFTData[uint3(P, Slice)] = Line[E2];
+	}
+}
+
+// --- Resolve ------------------------------------------------------------------------------------------
+Texture2DArray<float4> FFTResult;
+uint Cascade;
+RWTexture2D<float4> OutDisp;    // Dx, Dy, h, Dxy
+RWTexture2D<float4> OutDeriv;   // hx, hy, Dxx, Dyy
+RWTexture2D<float4> OutAux;     // unused, hx^2, hy^2, hx*hy (slope moments: mips give the slope variance)
+
+[numthreads(8, 8, 1)]
+void ResolveCS(uint3 Id : SV_DispatchThreadID)
+{
+	const float4 A = FFTResult[uint3(Id.xy, Cascade * 2)];       // h, Dx, Dy, hx
+	const float4 B = FFTResult[uint3(Id.xy, Cascade * 2 + 1)];   // hy, Dxx, Dyy, Dxy
+	OutDisp[Id.xy] = float4(A.y, A.z, A.x, B.w);
+	OutDeriv[Id.xy] = float4(A.w, B.x, B.y, B.z);
+	OutAux[Id.xy] = float4(0.0, A.w * A.w, B.x * B.x, A.w * B.x);
+}
