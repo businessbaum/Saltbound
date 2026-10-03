@@ -190,6 +190,10 @@ Developer console (`~`, non-shipping builds):
   - Revision 3, same setup: Day 82.5 fps (GPU 11.4 ms, p95 13.0), Evening 81.3 fps (GPU 11.6 ms),
     Dusk 72.4 fps (GPU 13.1 ms). This meets D8. Fewer cloud pixels and the Nanite boat section offset the
     bigger swell.
+  - Ocean revision 5 (D23–D26), same setup: Day 92.2 fps (GPU 10.1 ms, frame p95 11.5 ms), Evening 84.2 fps
+    (GPU 11.2 ms), Dusk 84.3 fps (GPU 11.2 ms). The water shader grew to 1540 instructions with the
+    second (previous-frame) wave evaluation in the vertex shader. Overall the build is faster than
+    revision 3. It was not profiled pass by pass; one known saving is that Lumen screen traces are off.
 - The Jacobian foam trail samples the dominant wave direction only.
 - **Ocean (D26):**
   - Gerstner crests are straight, so some parallel banding remains on long swell faces.

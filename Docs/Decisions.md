@@ -351,7 +351,8 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     analysed at 960×540. Flicker is the mean absolute difference between each frame and the average of
     its two neighbours, over the water region (luma 0–255). Smooth wave motion scores low; shimmer and
     popping glints score high.
-  - Pixel shader: 1540 instructions.
+  - Pixel shader: 1540 instructions. Standalone at 2560×1440 native with the editor closed: Day 92 fps,
+    Evening and Dusk 84 fps (GPU 10.1–11.2 ms).
 - **Evidence:** `Docs/Evidence/Ocean_rev5/` (`reflection_steps_*` shows each step on its own, starting with
   the magenta horizon debug view).
 - **Limitations:**
