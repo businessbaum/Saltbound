@@ -1,63 +1,90 @@
 # Progress
 
-Last updated: 2026-10-03.
+Last updated: 2026-10-03 (end of session 1).
 
 ## Milestone status
 
 | Milestone | Status |
 |---|---|
-| M1 Infrastructure & foundation | **Done** (verified 2026-10-03) |
-| M2 First-person player & moving-platform tests | **Done** (verified 2026-10-03) |
-| M3 Visual test scene | Next: water spike, then the scene and the feedback checkpoint |
-| M4 Starting boat & navigable water | Planned |
+| M1 Infrastructure & foundation | **Done** (verified) |
+| M2 First-person player & moving-platform tests | **Done** (verified in PIE and standalone) |
+| M3 Visual test scene | **Built; waiting for owner feedback** (see "Decisions needed") |
+| M4 Starting boat & navigable water | Next (technical parts can start without the decisions) |
 | M5 Starting harbor & complete loop | Planned |
 
-## M1 – Infrastructure (done)
-Implemented:
-- Git repository with LFS (`.gitattributes`) and ignore rules; the template baseline is the first commit.
-- Template clean-up (Horror/Shooter variants removed); automation enabled (Python remote execution, MCP).
-- Blender pipeline (`sb_blender.py`, headless build script) and Interchange importer (`import_assets.py`, manifest).
-- Test map `L_DevTest`; packaging script; launch/build scripts.
+## Decisions needed from the owner (visual checkpoint)
+Recommendation is listed first. Evidence images: `Docs/Evidence/M3/` (Day / Evening / Dusk × 10 shots,
+plus `Standalone_Dusk_PlayerStart.jpg`).
+1. **Overall look** (chunky readable shapes, soft bevels, restrained surface detail, warm boat vs. cool sea):
+   (a) keep and refine · (b) more painterly / hand-painted · (c) more realistic materials.
+2. **Living space aboard:**
+   - (a) A raised deckhouse with standing headroom and the floor above the waterline. It is technically
+     safe and gets windows and a lantern-lit interior.
+   - (b) A low classic cabin trunk with the saloon below deck. Nicer silhouette, but the ocean would render
+     inside the hull, so it needs water masking and carries more risk.
+   - (c) A mostly open deck with a small cuddy. Simplest, but less of a home.
+3. **Hull colour:** (a) oxblood red with a cream sheer stripe (current) · (b) dark green · (c) natural varnished wood.
+4. **Default sea state:** (a) the current rolling swell (calmer inside the harbour) · (b) calmer by default,
+   with big seas reserved for weather.
 
-Verified:
-- `SM_Crate_Small` imports at 61.2 × 41.2 × 40.2 cm (expected from the geometry), with correct +X/+Y axis
-  markers, both slot materials assigned by name, and one convex collision hull. A line trace hits the UCX
-  surface at exactly −20.0 cm.
-- The standalone Development build packages successfully (5 min 40 s for the first full cook), launches
-  fullscreen at 2560×1440, and loads `L_DevTest`. On that near-empty map: 158 fps, frame 6.3 ms,
-  GPU 5.9 ms at the default 60.6 % TSR screen percentage. This is not representative yet.
+Owner feedback received so far (2026-10-03): "The water is okay, waves are missing, needs a bit more
+realism – the water from Sea of Thieves hits the spot." The waves were revised in response (see M3).
+
+## M1 – Infrastructure (done)
+- Git + LFS repository at `Saltbound_all/` (template baseline is the first commit), clean template.
+- Automation: Python remote execution (`Tools/ue_exec.py`), MCP (`Tools/ue_mcp.py`), headless Blender,
+  build/launch/package/run scripts.
+- Blender → Unreal pipeline verified on `SM_Crate_Small`: 1 m = 100 uu, axes, slot materials, UCX collision.
+- The standalone build packages and runs.
 
 ## M2 – Player & moving platform (done)
+- First-person character (176 cm capsule, 165 cm eye height, walk/sprint/jump, no head bob or camera roll).
+- Interaction volumes with a subtle HUD, and control stations (helm) you step into and out of.
+- Walking, standing, jumping and helm use on a kinematic heaving, rolling, turning deck.
+- Automated suite `sb.Dev.RunMovementTests`: 30/30 checks pass at three motion levels; 10/10 pass in the
+  standalone build. Details in git history and Decisions D7.
+
+## M3 – Visual test scene (built)
+Map: `/Game/Saltbound/Maps/L_VisualTest` (game and editor default map). Regenerate with
+`python Tools/ue_exec.py Tools/ue_scripts/create_visual_test_map.py`.
+
 Implemented:
-- `ASaltPlayerCharacter`: 176 cm capsule, eye at 165 cm, walk 2.5 m/s, sprint 4.2 m/s, low jump. No head
-  bob, and the camera never rolls.
-- Interaction: focus volumes on a dedicated trace channel, a 5 cm sphere probe out to 2.2 m, and an
-  occlusion check. HUD shows a subtle dot that brightens on focus, plus a fading `[E] <action>` prompt.
-- Control stations: step in with a 0.45 s blend in station space; look limits relative to the station;
-  WASD routed to the station's owner; E to leave (with a fallback exit point if the exit is blocked).
-- Moving decks: CharacterMovement based movement on a kinematic deck that moves before the character
-  each frame. Rotational base velocity for kinematic decks via `ISaltKinematicBase`; `bStayBasedInAir`
-  keeps jumps in the deck's frame.
-- Dev tools: `ASaltDevMovingPlatform` and the automated suite `sb.Dev.RunMovementTests` (runner:
-  `python Tools/run_pie_test.py "sb.Dev.RunMovementTests <motion> <speed> <turn>"`).
+- **Ocean (custom, D6):**
+  - 12 shared Gerstner waves (42 m to 0.8 m), calm zones, and CDLOD instanced tiles (25 cm cells near the viewer).
+  - Single Layer Water shading, analytic normals, two ripple layers out to about 250 m.
+  - Jacobian crest foam and depth-based shore foam.
+  - Translucent crest light, scaled by the sun after the atmosphere (fades in the evening and at dusk).
+  - Distance-based roughness against specular sparkle.
+  - CPU queries via `USaltOceanSubsystem`. CPU/GPU agreement checked visually with probe spheres (`L_OceanTest`).
+- **Materials:**
+  - Procedural tileable textures (`Tools/textures/gen_textures.py`).
+  - `M_SB_Surface`: tint, per-part variation, macro noise, edge wear on bevel faces, grime and wetness from vertex colours.
+  - `M_SB_Rock`: triplanar rock with lichen and a wet band. `M_SB_Glow` for emissive parts.
+  - About 20 material instances following the palette (Docs/ArtDirection.md).
+- **Assets (Blender scripts):**
+  - The 4 m test deck section of the boat at 3.4 m beam: teak deck, bulwark, oxblood hull, cream deckhouse,
+    portholes, hatch, cleat and rope.
+  - Lantern, pier section, three coastal rocks, and a landmark sea stack with a ruined tower.
+- **Lighting:** `ASaltLightingRig` with Day, Evening and Dusk presets (`sb.Lighting <name>`), using a
+  physically based sun (90 klx) and preset exposure ranges.
+- **Lantern:** `ASaltLantern` (28 cd, 2100 K, flicker; interact to light or douse it).
+- **Floating test boat:** `ASaltDevFloater` makes the deck section ride the waves; it is walkable.
+- **Tools:** `Tools/capture_shots.py visualtest` captures each named shot per preset and builds a contact
+  sheet. `sb.Dev.Benchmark` and `sb.Dev.Perf` measure performance; `sb.Dev.Delayed <s> <cmd>` runs a command later.
 
-Verified (PIE, about 120 fps). All 10 checks pass in each of three conditions:
+Performance, measured in the standalone Development build at 2560×1440 fullscreen with vsync off,
+**editor closed**, TSR at the default 60.6 % (internal 1552×873), Lumen hardware ray tracing and Virtual
+Shadow Maps, from the player start on the pier:
 
-| Condition | Standing drift (12 s) | Eye jitter RMS / max | Jump landing offset | Slide after stop |
-|---|---|---|---|---|
-| Motion 1× (heave 25 cm, pitch 2.5°, roll 4°), 3 m/s, 8°/s | 0.25 cm | 0.009 / 0.25 cm | 1.0 cm | 0.0 cm |
-| Motion 2.5×, 5 m/s, 15°/s | 0.27 cm | 0.031 / 0.26 cm | 4.4 cm | 0.25 cm |
-| Motion 4× (≈1 m heave, 16° roll), 6 m/s, 25°/s | 1.0 cm | 0.058 / 0.27 cm | 8.7 cm | 1.3 cm |
+| Preset | fps avg | frame avg / p95 | GPU avg |
+|---|---|---|---|
+| Day | 126.3 | 7.92 / 8.76 ms | 7.24 ms |
+| Evening | 120.0 | 8.33 / 9.11 ms | 7.68 ms |
+| Dusk | 120.5 | 8.30 / 9.03 ms | 7.65 ms |
 
-Standalone Development build (fullscreen 2560×1440, `-ExecCmds` run of the suite at 1×/3 m/s/8°/s): all 10
-checks pass, with eye jitter RMS 0.010 cm, jump offset 1.8 cm, about 149 fps.
-
-Further checks: walking speed relative to the deck matches input. Focus on the helm, entering (stand error
-0.000 cm), steering, and leaving (exit error < 1 cm, back on the deck) all work.
-
-Finding: before `bStayBasedInAir`, a jump on a turning deck landed 24 cm (moderate) or 66 cm (rough) from
-the take-off point. The suite caught it; it is now fixed. Also found: the side lane next to a 200 cm wide
-deckhouse was narrower than the player capsule. The rule is now walkways ≥ 70 cm.
+GPU frame breakdown (ProfileGPU): volumetric clouds about 1.5–1.8 ms, TSR about 1.3 ms, lighting and
+Lumen reflections about 0.9 ms, shadows about 0.9 ms, water about 0.4–0.8 ms. There is plenty of headroom
+for a higher screen percentage (for example 75 %) and more content.
 
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
@@ -67,25 +94,39 @@ deckhouse was narrower than the player capsule. The rule is now walkways ≥ 70 
 | Sprint | Left Shift (hold) | Left stick click |
 | Jump | Space | A / Cross |
 | Interact / leave station | E | X / Square |
-| At a station | W/S and A/D are routed to the station (e.g. speed / steer) | Left stick |
+| At a station | W/S and A/D are routed to the station | Left stick |
 
-Developer console (`~`, non-shipping builds): `sb.Dev.RunMovementTests [motion speed turn]`,
-`sb.Dev.Platform <motion> [speed turn]`, `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`,
-`sb.Dev.ShowInteractionVolumes 1`.
+Developer console (`~`, non-shipping builds):
+- `sb.Lighting Day|Evening|Dusk`
+- `sb.Dev.RunMovementTests [motion speed turn]`, `sb.Dev.Platform <motion> [speed turn]`
+- `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
+- `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`
 
 ## Known issues and limitations
-- About 0.25 cm vertical camera pops on heaving decks. This comes from CharacterMovement's floor-distance
-  correction; it is below the visible threshold in tests so far. A small camera-height smoothing can
-  remove it if it ever shows.
-- Mouse sensitivity is a first guess (0.07°/count × 1.0) and has not been tested by a human. Adjust with
-  `sb.MouseSensitivity`.
-- No player body or hands; there are no footstep or interaction sounds yet.
-- The key label in the prompt is fixed to "E" and does not reflect the gamepad mapping.
-- `L_DevTest` uses grid placeholder materials; `BoardingRamp` is not aligned to the deck yet.
+- **Vsync frame pacing:** with vsync on, the standalone build runs at about 55–60 fps even though the GPU
+  needs only about 7.5 ms. Default display settings (vsync off or a frame cap, later a settings menu) are needed.
+- **Benchmarking:** always close the editor first. A running editor renders in the background (throttling
+  is disabled for automated tests) and halves standalone performance.
+- **Ocean:** crest foam forms round blobs (needs a lacier, streakier pattern). Golden sun-glint streaks
+  appear towards the sun. Very shallow water at the rocks looks like a bright pool with a hard white foam outline.
+- **Water inside hulls:** the ocean is not masked inside hulls yet. This matters if the cabin floor goes
+  below the waterline (decision 2).
+- **Test deck section:** it is a slice of the boat with flat end caps (not a full hull), and its deckhouse
+  is a shed-like 95 cm box.
+- **Floater:** `ASaltDevFloater` is a simple spring-fitted floater, not the M4 boat model.
+- About 0.25 cm vertical camera pops on heaving decks (CharacterMovement floor correction), below the visible threshold.
+- Mouse sensitivity has not been tested by a human (`sb.MouseSensitivity`). The prompt key label is fixed to "E".
+- No audio yet. No player body or hands.
+- `BoardingRamp` in `L_DevTest` is not aligned. Template `LevelPrototyping` content is still in use for greyboxing.
 
 ## Next steps
-1. **M3 water spike:** compare the engine Water plugin (rendering + CPU wave query) with a custom shared
-   Gerstner ocean on accuracy (boat sits on the visible surface), look, and cost. Then decide D6.
-2. **M3 visual test scene:** deck section with railing, lantern, dock, rock/coast and water. Day and
-   evening lighting; first master materials and palette. Request feedback at this checkpoint.
-3. Keep validating the standalone build after each milestone.
+1. Apply the owner's checkpoint decisions (style, cabin concept, hull colour, sea state).
+2. **M4 technical, independent of the decisions:**
+   - Boat motion model: buoyancy from multi-point samples of the shared wave field, heave/pitch/roll response.
+   - Simplified sailing: wind direction and strength, no-go zone, sail trim/raise, keel lateral resistance,
+     rudder, heel.
+   - Helm station driving the boat; collision sweeps against the pier and rocks; reset/recovery utility.
+   - Water masking inside the hull if needed.
+3. M4 art after the decisions: full starter boat in Blender (about 10 m double-ender, 3.4 m beam), interior, sail.
+4. Water polish: foam pattern, sun-glint streaks, shallow-water colour, a bow wave and wake.
+5. Display settings: vsync/frame cap, screen percentage. Re-measure in standalone with the editor closed.

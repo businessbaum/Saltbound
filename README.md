@@ -52,6 +52,11 @@ All scripts are PowerShell (`powershell -ExecutionPolicy Bypass -File Tools\<scr
 | Standalone Windows build → `Builds\Development\Windows\Saltbound.exe` | `Tools\Package-Game.ps1` |
 | Build a Blender asset headless | `Tools\Build-BlenderAsset.ps1 <script_name>` |
 | Import Blender exports into Unreal (editor running) | `python Tools\ue_exec.py Tools\ue_scripts\import_assets.py [Asset ...]` |
+| Save, quit, rebuild and relaunch the editor (after C++ changes) | `Tools\Rebuild-Editor.ps1` |
+| Run the packaged build (optional screenshot / console commands) | `Tools\Run-Build.ps1 -Seconds 60 -ExecCmds "sb.Dev.Benchmark 10" -Fullscreen` |
+| Automated movement tests in PIE | `python Tools\run_pie_test.py "sb.Dev.RunMovementTests 1 300 8"` |
+| Capture the visual test shots (Day/Evening/Dusk) | `python Tools\capture_shots.py visualtest --presets Day Evening Dusk` |
+| Regenerate procedural textures | `python Tools\textures\gen_textures.py` (then `import_textures.py`) |
 
 Editor automation: the project enables Python remote execution (`Tools/ue_exec.py` runs Python inside the
 running editor) and the engine MCP server at `http://127.0.0.1:8000/mcp` (`Tools/ue_mcp.py`, used for
@@ -67,4 +72,5 @@ Controls are documented per milestone in [Docs/Progress.md](Docs/Progress.md#con
 - [Docs/Decisions.md](Docs/Decisions.md) – significant technical and visual decisions with rationale
 - [Docs/Progress.md](Docs/Progress.md) – milestone status, verification results, known issues, next steps
 - [Docs/Ideas.md](Docs/Ideas.md) – future ideas with benefits and prerequisites
+- [Docs/ArtDirection.md](Docs/ArtDirection.md) – visual principles, palette, lighting presets, boat proportions
 - [Docs/ThirdParty.md](Docs/ThirdParty.md) – external content, sources and licenses
