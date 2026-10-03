@@ -14,10 +14,12 @@
 namespace SaltOceanParams
 {
 	static const FName Wave[FSaltWaveField::MaxWaves] = {
-		TEXT("W0"), TEXT("W1"), TEXT("W2"), TEXT("W3"), TEXT("W4"), TEXT("W5"), TEXT("W6"), TEXT("W7") };
+		TEXT("W0"), TEXT("W1"), TEXT("W2"), TEXT("W3"), TEXT("W4"), TEXT("W5"),
+		TEXT("W6"), TEXT("W7"), TEXT("W8"), TEXT("W9"), TEXT("W10"), TEXT("W11") };
 	static const FName Calm[FSaltWaveField::MaxCalmZones] = { TEXT("Calm0"), TEXT("Calm1"), TEXT("Calm2"), TEXT("Calm3") };
 	static const FName Phase0123(TEXT("Phase0123"));
 	static const FName Phase4567(TEXT("Phase4567"));
+	static const FName Phase891011(TEXT("Phase891011"));
 	static const FName CalmMin(TEXT("CalmMin"));
 	static const FName Globals(TEXT("Globals"));
 	static const FName Ripples(TEXT("RippleOffsets"));
@@ -59,7 +61,9 @@ ASaltOcean::ASaltOcean()
 	TileMesh = Tile.Object;
 	QuarterTileMesh = Quarter.Object;
 
-	// A moderate swell from the west-south-west plus wind chop. Sum of steepness = 0.9.
+	// Rolling swell from the west-south-west with wind sea on top: 12 components spread +-55 deg around
+	// the wind (20 deg), wavelengths 42 m .. 0.8 m. Peaks reach ~1.3 m where components align.
+	// Sum of steepness = 0.9 (keeps the surface free of loops).
 	auto Add = [this](float Dir, float Lambda, float Amp, float Steep, float Phase)
 	{
 		FSaltWaveSpec S;
@@ -70,14 +74,18 @@ ASaltOcean::ASaltOcean()
 		S.PhaseOffset = Phase;
 		Waves.Add(S);
 	};
-	Add(20.f, 6000.f, 45.f, 0.10f, 0.0f);
-	Add(35.f, 3100.f, 22.f, 0.14f, 1.3f);
-	Add(5.f, 1700.f, 12.f, 0.16f, 2.1f);
-	Add(55.f, 1100.f, 7.f, 0.14f, 4.0f);
-	Add(-15.f, 650.f, 4.f, 0.12f, 0.7f);
-	Add(30.f, 420.f, 2.5f, 0.10f, 5.2f);
-	Add(70.f, 260.f, 1.5f, 0.08f, 3.3f);
-	Add(-40.f, 170.f, 0.9f, 0.06f, 1.9f);
+	Add(20.f, 4200.f, 50.f, 0.10f, 0.0f);
+	Add(50.f, 3000.f, 36.f, 0.11f, 1.3f);
+	Add(-5.f, 2100.f, 24.f, 0.12f, 2.1f);
+	Add(35.f, 1400.f, 15.f, 0.12f, 4.0f);
+	Add(75.f, 950.f, 9.f, 0.10f, 0.7f);
+	Add(0.f, 650.f, 6.f, 0.09f, 5.2f);
+	Add(-35.f, 450.f, 4.f, 0.08f, 3.3f);
+	Add(60.f, 320.f, 2.6f, 0.07f, 1.9f);
+	Add(15.f, 220.f, 1.6f, 0.05f, 2.8f);
+	Add(-60.f, 160.f, 1.0f, 0.03f, 0.4f);
+	Add(95.f, 110.f, 0.6f, 0.02f, 4.6f);
+	Add(40.f, 80.f, 0.4f, 0.01f, 3.7f);
 }
 
 void ASaltOcean::OnConstruction(const FTransform& Transform)
@@ -160,6 +168,7 @@ void ASaltOcean::PushParameters()
 	}
 	Inst->SetVectorParameterValue(SaltOceanParams::Phase0123, FLinearColor(Phases[0], Phases[1], Phases[2], Phases[3]));
 	Inst->SetVectorParameterValue(SaltOceanParams::Phase4567, FLinearColor(Phases[4], Phases[5], Phases[6], Phases[7]));
+	Inst->SetVectorParameterValue(SaltOceanParams::Phase891011, FLinearColor(Phases[8], Phases[9], Phases[10], Phases[11]));
 	for (int32 j = 0; j < FSaltWaveField::MaxCalmZones; ++j)
 	{
 		const FVector4f& Z = Field.Calm[j];

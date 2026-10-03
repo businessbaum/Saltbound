@@ -18,8 +18,8 @@ USH = os.path.join(REPO_ROOT, "Saltbound", "Shaders", "SaltOcean.ush")
 DIR = "/Game/Saltbound/Water"
 mel = sb_ue.mel
 
-WAVE_PARAMS = ["W%d" % i for i in range(8)]
-OTHER_PARAMS = ["Phase0123", "Phase4567", "Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Globals", "RippleOffsets"]
+WAVE_PARAMS = ["W%d" % i for i in range(12)]
+OTHER_PARAMS = ["Phase0123", "Phase4567", "Phase891011", "Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Globals", "RippleOffsets"]
 
 
 # --- MPC -----------------------------------------------------------------------------------
@@ -78,7 +78,10 @@ F1 = unreal.CustomMaterialOutputType.CMOT_FLOAT1
 F2 = unreal.CustomMaterialOutputType.CMOT_FLOAT2
 F3 = unreal.CustomMaterialOutputType.CMOT_FLOAT3
 
-INIT = "FSaltOcean O;\nO.Init(W0, W1, W2, W3, W4, W5, W6, W7, Phase0123, Phase4567, Calm0, Calm1, Calm2, Calm3, CalmMin, Globals.x);\n"
+INIT = """FSaltOcean O;
+O.Init(W0, W1, W2, W3, W4, W5, W6, W7, W8, W9, W10, W11, Phase0123, Phase4567, Phase891011,
+       Calm0, Calm1, Calm2, Calm3, CalmMin, Globals.x);
+"""
 
 VS_CODE = INIT + """
 float Dist = distance(CamPos, WorldPos);
@@ -86,36 +89,50 @@ float MorphK = saturate((Dist - MorphStart) / max(MorphEnd - MorphStart, 1.0));
 // Robust parity of the integer grid coordinate (odd vertices collapse onto the lower even neighbour).
 float2 Odd = LocalPos.xy - 2.0 * floor((LocalPos.xy + 0.5) * 0.5);
 float2 XY = WorldPos.xy - Odd * (MorphK * CellSize);
-float3 D = O.Displacement(XY, Dist * FadeScale);
-P0 = XY;
+// Waves shorter than ~4 grid cells cannot be represented by the mesh: leave them to the pixel normals.
+float3 D = O.Displacement(XY, max(Dist * FadeScale, CellSize * 4.0));
+P0 = float3(XY, D.z);
 return float3(XY - WorldPos.xy, 0.0) + D;
 """
 
 PS_CODE = INIT + """
 float Dist = distance(CamPos, WorldPos);
+float Height = P0.z;
+float2 XY = P0.xy;
 float3 N; float J;
-O.NormalAndJacobian(P0, Dist * FadeScale, N, J);
+O.NormalAndJacobian(XY, Dist * FadeScale, N, J);
 
 // Detail ripples: two scrolling layers of one tiling normal map, fading out with distance.
 float RippleFade = saturate(1.0 - Dist / max(RippleFadeDistance, 1.0));
-float2 R1 = Texture2DSample(RippleTex, RippleTexSampler, P0 / RippleTile1 + RippleOffsets.xy).xy * 2.0 - 1.0;
-float2 R2 = Texture2DSample(RippleTex, RippleTexSampler, P0 / RippleTile2 + RippleOffsets.zw).xy * 2.0 - 1.0;
+float2 R1 = Texture2DSample(RippleTex, RippleTexSampler, XY / RippleTile1 + RippleOffsets.xy).xy * 2.0 - 1.0;
+float2 R2 = Texture2DSample(RippleTex, RippleTexSampler, XY / RippleTile2 + RippleOffsets.zw).xy * 2.0 - 1.0;
 N = normalize(N + float3((R1 + R2) * (RippleStrength * RippleFade), 0.0));
 
 // Foam: compressed crests (low Jacobian) and shallow water near geometry, broken up by a cell texture.
-float3 FT = Texture2DSample(FoamTex, FoamTexSampler, P0 / FoamTile + RippleOffsets.xy * 0.5).rgb;
+float3 FT = Texture2DSample(FoamTex, FoamTexSampler, XY / FoamTile + RippleOffsets.xy * 0.5).rgb;
 float Crest = saturate((FoamJStart - J) / max(FoamJRange, 1e-3));
 float Shore = saturate(1.0 - max(WaterDepth, 0.0) / max(ShoreFoamDepth, 1.0));
 float Amount = max(Crest, Shore * 0.85);
 float Foam = saturate((Amount * 1.4 - (1.0 - FT.r)) * 2.5) * lerp(0.55, 1.0, FT.g);
 FoamOut = Foam;
-RoughOut = lerp(WaterRoughness, 0.65, Foam);
+// Rougher with distance: sub-pixel waves spread the sun highlight instead of sparkling.
+float BaseRough = lerp(WaterRoughness, FarRoughness, saturate(Dist / max(FarRoughnessDistance, 1.0)));
+RoughOut = lerp(BaseRough, 0.65, Foam);
+
+// Light through thin wave crests: brighter on high, steep crests and when looking towards the sun.
+// Scaled by the sun's illuminance after the atmosphere, so it fades naturally in the evening and at dusk.
+float3 V = normalize(CamPos - WorldPos);
+float CrestH = saturate((Height - SSSCrestStart) / max(SSSCrestRange, 1.0));
+float Back = pow(saturate(dot(-V, normalize(SunDir))), SSSBacklitPower);
+float Steep = saturate(1.0 - N.z) * 4.0;
+float Glow = CrestH * (SSSAmbient + Back) * (0.4 + Steep);
+EmissiveOut = SSSColor * SunIllum * (Glow * SSSStrength * (1.0 - Foam));
 return N;
 """
 
 
 def make_material(mpc, ush):
-    m = sb_ue.recreate_asset("M_Ocean", DIR, unreal.Material, unreal.MaterialFactoryNew())
+    m = sb_ue.reset_material("M_Ocean", DIR)
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
     m.set_editor_property("tangent_space_normal", False)
@@ -132,7 +149,7 @@ def make_material(mpc, ush):
     cd = [sb_ue.expr(m, unreal.MaterialExpressionPerInstanceCustomData, -2000, 400 + i * 80, data_index=i) for i in range(3)]
     fade_vs = sb_ue.scalar_param(m, "WaveFadeVS", 0.03, -2000, 650, "Waves")
     vs_inputs = ["WorldPos", "LocalPos", "CamPos", "CellSize", "MorphStart", "MorphEnd", "FadeScale"] + WAVE_PARAMS + OTHER_PARAMS[:-1]
-    vs = custom(m, -1500, 300, "SaltOcean VS (morph + Gerstner)", ush + "\n" + VS_CODE, vs_inputs, F3, [("P0", F2)])
+    vs = custom(m, -1500, 300, "SaltOcean VS (morph + Gerstner)", ush + "\n" + VS_CODE, vs_inputs, F3, [("P0", F3)])
     link(wp_vs, "", vs, "WorldPos")
     link(lp, "", vs, "LocalPos")
     link(cam, "", vs, "CamPos")
@@ -156,9 +173,11 @@ def make_material(mpc, ush):
                           texture=unreal.load_asset(DIR + "/Textures/T_OceanFoam_M"),
                           sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, group="Foam")
     scalars = {
-        "RippleTile1": (900.0, "Ripples"), "RippleTile2": (2300.0, "Ripples"), "RippleStrength": (0.18, "Ripples"),
-        "RippleFadeDistance": (6000.0, "Ripples"), "FoamTile": (700.0, "Foam"), "FoamJStart": (0.72, "Foam"),
-        "FoamJRange": (0.35, "Foam"), "ShoreFoamDepth": (45.0, "Foam"), "WaterRoughness": (0.035, "Surface"),
+        "RippleTile1": (900.0, "Ripples"), "RippleTile2": (4200.0, "Ripples"), "RippleStrength": (0.15, "Ripples"),
+        "RippleFadeDistance": (25000.0, "Ripples"), "FoamTile": (700.0, "Foam"), "FoamJStart": (0.72, "Foam"),
+        "FoamJRange": (0.35, "Foam"), "ShoreFoamDepth": (45.0, "Foam"), "WaterRoughness": (0.04, "Surface"), "FarRoughness": (0.11, "Surface"), "FarRoughnessDistance": (30000.0, "Surface"),
+        "SSSStrength": (0.035, "Crest light"), "SSSCrestStart": (0.0, "Crest light"), "SSSCrestRange": (120.0, "Crest light"),
+        "SSSBacklitPower": (3.0, "Crest light"), "SSSAmbient": (0.45, "Crest light"),
     }
     sp = {n: sb_ue.scalar_param(m, n, v, -1200, 1200 + i * 60, g) for i, (n, (v, g)) in enumerate(scalars.items())}
     scene_depth = sb_ue.expr(m, unreal.MaterialExpressionSceneDepthWithoutWater, -1500, 1800)
@@ -167,9 +186,16 @@ def make_material(mpc, ush):
     link(scene_depth, "", depth, "A")
     link(pixel_depth, "", depth, "B")
 
-    ps_inputs = ["P0", "WorldPos", "CamPos", "FadeScale", "RippleTex", "FoamTex", "WaterDepth"] + list(scalars) + WAVE_PARAMS + OTHER_PARAMS
-    ps = custom(m, -700, 900, "SaltOcean PS (normal, ripples, foam)", ush + "\n" + PS_CODE, ps_inputs, F3,
-                [("FoamOut", F1), ("RoughOut", F1)])
+    sun_dir = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightDirection, -1500, 2000)
+    sun_illum = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightIlluminance, -1500, 2100)
+    sss_color = sb_ue.vector_param(m, "SSSColor", (0.1, 0.75, 0.62, 1), -1500, 2200, "Crest light")
+    ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "RippleTex", "FoamTex", "WaterDepth", "SunDir", "SunIllum", "SSSColor"]
+                 + list(scalars) + WAVE_PARAMS + OTHER_PARAMS)
+    ps = custom(m, -700, 900, "SaltOcean PS (normal, ripples, foam, crest light)", ush + "\n" + PS_CODE, ps_inputs, F3,
+                [("FoamOut", F1), ("RoughOut", F1), ("EmissiveOut", F3)])
+    link(sun_dir, "", ps, "SunDir")
+    link(sun_illum, "", ps, "SunIllum")
+    link(sss_color, "", ps, "SSSColor")
     link(interp, "", ps, "P0")
     link(wp_ps, "", ps, "WorldPos")
     link(cam, "", ps, "CamPos")
@@ -185,6 +211,7 @@ def make_material(mpc, ush):
     sb_ue.to_prop(ps, "", unreal.MaterialProperty.MP_NORMAL)
     sb_ue.to_prop(ps, "FoamOut", unreal.MaterialProperty.MP_OPACITY)
     sb_ue.to_prop(ps, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
+    sb_ue.to_prop(ps, "EmissiveOut", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     foam_color = sb_ue.vector_param(m, "FoamColor", (0.82, 0.86, 0.86, 1), -400, 600, "Foam")
     sb_ue.to_prop(foam_color, "", unreal.MaterialProperty.MP_BASE_COLOR)
     spec = sb_ue.scalar_param(m, "Specular", 0.3, -400, 700, "Surface")

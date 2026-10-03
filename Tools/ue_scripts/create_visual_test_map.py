@@ -64,10 +64,11 @@ rig = spawn(unreal.SaltLightingRig, (0, 0, 300), label="LightingRig")
 ocean = spawn(unreal.SaltOcean, (0, 0, 0), label="Ocean")
 zone = unreal.SaltCalmZone()
 zone.set_editor_property("center", unreal.Vector2D(500, 300))
-zone.set_editor_property("inner_radius", 4000.0)
-zone.set_editor_property("outer_radius", 22000.0)
-zone.set_editor_property("min_factor", 0.3)
+zone.set_editor_property("inner_radius", 2500.0)
+zone.set_editor_property("outer_radius", 15000.0)
+zone.set_editor_property("min_factor", 0.5)
 ocean.set_editor_property("calm_zones", [zone])
+ocean.set_editor_property("amplitude_scale", 1.5)
 
 # --- seabed --------------------------------------------------------------------------------------------
 CUBE = "/Engine/BasicShapes/Cube"

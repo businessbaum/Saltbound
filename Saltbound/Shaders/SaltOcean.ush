@@ -15,21 +15,24 @@
 
 struct FSaltOcean
 {
-	float4 WA[8];    // Kx, Ky, Amplitude, Horizontal amplitude
-	float  Ph[8];    // phases
+	float4 WA[12];   // Kx, Ky, Amplitude, Horizontal amplitude
+	float  Ph[12];   // phases
 	float4 Calm[4];  // centre X, centre Y, inner radius, outer radius
 	float4 CalmMin;  // amplitude factor at each zone centre
 	int    Count;
 
 	void Init(float4 W0, float4 W1, float4 W2, float4 W3, float4 W4, float4 W5, float4 W6, float4 W7,
-		float4 P0123, float4 P4567, float4 C0, float4 C1, float4 C2, float4 C3, float4 CMin, float WaveCount)
+		float4 W8, float4 W9, float4 W10, float4 W11, float4 P0123, float4 P4567, float4 P891011,
+		float4 C0, float4 C1, float4 C2, float4 C3, float4 CMin, float WaveCount)
 	{
-		WA[0] = W0; WA[1] = W1; WA[2] = W2; WA[3] = W3; WA[4] = W4; WA[5] = W5; WA[6] = W6; WA[7] = W7;
+		WA[0] = W0; WA[1] = W1; WA[2] = W2; WA[3] = W3; WA[4] = W4; WA[5] = W5;
+		WA[6] = W6; WA[7] = W7; WA[8] = W8; WA[9] = W9; WA[10] = W10; WA[11] = W11;
 		Ph[0] = P0123.x; Ph[1] = P0123.y; Ph[2] = P0123.z; Ph[3] = P0123.w;
 		Ph[4] = P4567.x; Ph[5] = P4567.y; Ph[6] = P4567.z; Ph[7] = P4567.w;
+		Ph[8] = P891011.x; Ph[9] = P891011.y; Ph[10] = P891011.z; Ph[11] = P891011.w;
 		Calm[0] = C0; Calm[1] = C1; Calm[2] = C2; Calm[3] = C3;
 		CalmMin = CMin;
-		Count = (int)clamp(WaveCount, 0.0, 8.0);
+		Count = (int)clamp(WaveCount, 0.0, 12.0);
 	}
 
 	float Attenuation(float2 P)

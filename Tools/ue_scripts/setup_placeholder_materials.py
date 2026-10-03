@@ -14,7 +14,7 @@ import sb_ue  # noqa: E402
 MASTER_DIR = "/Game/Saltbound/Materials/Master"
 MI_DIR = "/Game/Saltbound/Materials/Instances"
 
-m = sb_ue.recreate_asset("M_SB_Placeholder", MASTER_DIR, unreal.Material, unreal.MaterialFactoryNew())
+m = sb_ue.reset_material("M_SB_Placeholder", MASTER_DIR)
 base = sb_ue.vector_param(m, "BaseColor", (0.5, 0.5, 0.5, 1), -500, -100)
 rough = sb_ue.scalar_param(m, "Roughness", 0.6, -500, 100)
 metal = sb_ue.scalar_param(m, "Metallic", 0.0, -500, 250)

@@ -81,7 +81,7 @@ return Base;
 
 
 def build_surface():
-    m = sb_ue.recreate_asset("M_SB_Surface", MASTER, unreal.Material, unreal.MaterialFactoryNew())
+    m = sb_ue.reset_material("M_SB_Surface", MASTER)
     uv0 = sb_ue.expr(m, unreal.MaterialExpressionTextureCoordinate, -2200, 0)
     uv_scale = sb_ue.scalar_param(m, "UVScale", 1.0, -2200, 100, "Textures")
     uv = sb_ue.expr(m, unreal.MaterialExpressionMultiply, -2000, 50)
@@ -198,7 +198,7 @@ return Base;
 
 
 def build_rock():
-    m = sb_ue.recreate_asset("M_SB_Rock", MASTER, unreal.Material, unreal.MaterialFactoryNew())
+    m = sb_ue.reset_material("M_SB_Rock", MASTER)
     m.set_editor_property("tangent_space_normal", False)
     wp = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -1800, 0)
     wn = sb_ue.expr(m, unreal.MaterialExpressionVertexNormalWS, -1800, 100)
@@ -243,7 +243,7 @@ def build_rock():
 
 # --- M_SB_Glow -------------------------------------------------------------------------------------
 def build_glow():
-    m = sb_ue.recreate_asset("M_SB_Glow", MASTER, unreal.Material, unreal.MaterialFactoryNew())
+    m = sb_ue.reset_material("M_SB_Glow", MASTER)
     base = sb_ue.vector_param(m, "BaseColor", (0.3, 0.22, 0.12, 1), -800, 0, "Color")
     glow = sb_ue.vector_param(m, "GlowColor", (1.0, 0.5, 0.18, 1), -800, 150, "Glow")
     inten = sb_ue.scalar_param(m, "GlowIntensity", 20.0, -800, 250, "Glow")

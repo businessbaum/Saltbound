@@ -20,6 +20,24 @@ def recreate_asset(name, folder, cls, factory):
     return asset_tools.create_asset(name, folder, cls, factory)
 
 
+def reset_material(name, folder):
+    """Script-owned master material: reuse the asset if it exists and clear its graph (keeps references
+    from instances and placed meshes intact; deleting a referenced material fails while it is loaded)."""
+    path = "%s/%s" % (folder, name)
+    if eal.does_asset_exist(path):
+        m = unreal.load_asset(path)
+        # delete_all_material_expressions removes only part of the graph per call (5.8); repeat until empty.
+        for _ in range(16):
+            if mel.get_num_material_expressions(m) == 0:
+                break
+            mel.delete_all_material_expressions(m)
+        if mel.get_num_material_expressions(m) != 0:
+            raise RuntimeError("Could not clear material graph of " + path)
+        return m
+    ensure_folder(folder)
+    return asset_tools.create_asset(name, folder, unreal.Material, unreal.MaterialFactoryNew())
+
+
 def get_or_create_asset(name, folder, cls, factory):
     path = "%s/%s" % (folder, name)
     if eal.does_asset_exist(path):

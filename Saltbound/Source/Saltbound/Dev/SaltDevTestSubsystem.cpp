@@ -14,6 +14,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Saltbound.h"
+#include "TimerManager.h"
 #include "World/SaltLightingRig.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
@@ -76,6 +77,33 @@ namespace
 			{
 				T->RunBenchmark(ArgOr(Args, 0, 10.f));
 			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdDelayed(
+		TEXT("sb.Dev.Delayed"),
+		TEXT("Run a console command after a delay: sb.Dev.Delayed <Seconds> <Command ...>"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (!World || Args.Num() < 2)
+			{
+				return;
+			}
+			const float Delay = FCString::Atof(*Args[0]);
+			FString Cmd;
+			for (int32 i = 1; i < Args.Num(); ++i)
+			{
+				Cmd += (i > 1 ? TEXT(" ") : TEXT("")) + Args[i];
+			}
+			FTimerHandle Handle;
+			TWeakObjectPtr<UWorld> WeakWorld(World);
+			World->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateLambda([WeakWorld, Cmd]()
+			{
+				if (UWorld* W = WeakWorld.Get())
+				{
+					UE_LOG(LogSaltbound, Display, TEXT("SB_DELAYED %s"), *Cmd);
+					GEngine->Exec(W, *Cmd);
+				}
+			}), FMath::Max(Delay, 0.01f), false);
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdResetPlayer(

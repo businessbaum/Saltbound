@@ -92,14 +92,14 @@ public:
 
 	/** Size of the finest quadtree node. */
 	UPROPERTY(EditAnywhere, Category = "Rendering", meta = (Units = "cm"))
-	float Lod0NodeSize = 1600.f;
+	float Lod0NodeSize = 800.f;
 
 	UPROPERTY(EditAnywhere, Category = "Rendering", meta = (ClampMin = "1", ClampMax = "14"))
-	int32 LodCount = 11;
+	int32 LodCount = 12;
 
 	/** View distance covered by LOD 0; doubles per level. Should be >= ~2x Lod0NodeSize. */
 	UPROPERTY(EditAnywhere, Category = "Rendering", meta = (Units = "cm"))
-	float Lod0Range = 4000.f;
+	float Lod0Range = 2200.f;
 
 	/** Fraction of each LOD range used to morph into the next level. */
 	UPROPERTY(EditAnywhere, Category = "Rendering", meta = (ClampMin = "0.05", ClampMax = "0.95"))
