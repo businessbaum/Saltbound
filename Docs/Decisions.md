@@ -129,3 +129,55 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   part of the graph per call in 5.8.
 - **Decision:** `sb_ue.reset_material()` repeats the clear until the graph is empty, then rebuilds it. All
   references from instances and placed meshes stay intact.
+
+### D16 · Art direction: stylised and crisp, detail lives in hand-painted materials (Adopted, M3 revision 2)
+- **Owner feedback (2026-10-03):** "The water doesn't look like good quality; the objects are missing
+  detail, NOT realism." Then: "Maybe detail was the wrong word. The carvings in the stones look horrible.
+  I mean the material detail, with no blur and visibly readable material." References: Sea of Thieves
+  rocks, deck and sea.
+- **Decision:**
+  - Shapes stay simple and chunky, with flat facets and soft bevels.
+  - Surface quality comes from crisp, hand-painted tiling textures at high texel density (2048 px per
+    1–2.5 m tile, about 0.5–1.2 mm per texel). These have flat tone patches with hard edges, painted
+    cracks and chips, and straight grain with knots. They are not soft noise, and the detail is not carved
+    into the geometry.
+  - The renderer runs at native resolution with light sharpening (D18).
+- **Tried and rejected:**
+  - Carved rocks (Voronoi plates, crack grooves, strata ledges): read as busy and artificial.
+  - Chiselled facet normal maps: polygon mosaic.
+  - Soft painted noise: blurry, "fur".
+  - Contour-line ("cathedral") wood grain: looked like a map.
+- **Consequences:**
+  - `sb_rock.py` keeps the carving options, but they are off by default.
+  - Textures stay procedural (`gen_textures.py`, D12), but are designed as painted shapes.
+
+### D17 · Native classes resolve /Game content lazily (Adopted)
+- **Finding:** `ConstructorHelpers` in `ASaltOcean`/`ASaltLantern` loaded `MI_Ocean`, `M_Ocean` and the surface
+  materials while class default objects were built at engine start-up. Objects loaded before the
+  disregard-for-GC pool closes are added to the root set. `setup_ocean.py` then crashed the editor when it
+  deleted a rooted expression.
+- **Decision:**
+  - Constructors only create components.
+  - Default assets are resolved in `OnConstruction`/`BeginPlay` (`Core/SaltContent.h`), and the placed
+    instance stores the reference, so the cooker sees it.
+  - `/Game/Saltbound/Water` and `/Game/Saltbound/Props` are additionally always cooked.
+
+### D18 · Native screen percentage (Adopted, re-measure pending)
+- **Finding:** With the display-based default, the game rendered at ~61 % of 1440p and upscaled with TSR. That
+  softened the painted detail the owner asked for.
+- **Decision:** `r.ScreenPercentage.Default.Desktop.Mode=0` and `r.ScreenPercentage.Default=100`, plus
+  `r.Tonemapper.Sharpen=0.6`. Motion blur is off by default.
+- **Cost:** about 2.7× the shaded pixels. The last measured GPU time was 7.2–7.7 ms at 61 %, so this is
+  expected to stay within D8. It must be re-measured in a standalone build with the editor closed.
+
+### D19 · Ocean look v3: Sea of Thieves palette and lace foam (Adopted)
+- **Body:** deep blue (scattering 0.008/0.04/0.1, absorption 1.4/0.36/0.15). Turquoise appears only as crest light,
+  from backlit thin crests.
+- **Foam:** one lace texture (graded filaments), with coverage eroding the lace:
+  - Whitecaps from the Jacobian, plus a trail sampled down-wave.
+  - Faint marbled streaks on the open sea.
+  - Shore foam with lapping bands of varying width.
+  - Foam stays translucent (40–88 %).
+- **Surface:** three ripple layers (a fine near layer stops calm water turning into a mirror), crisper ripple
+  normals and roughness 0.028 near the viewer, for the sun glitter of the reference.
+- **Cost:** pixel shader 1458 instructions (three Jacobian evaluations). Measure with D18.

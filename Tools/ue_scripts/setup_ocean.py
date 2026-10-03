@@ -210,9 +210,9 @@ def make_material(mpc, ush):
         "FoamSoftness": (0.12, "Foam"), "FoamTrailLength": (450.0, "Foam"), "FoamTrailStrength": (0.75, "Foam"),
         "ShoreFoamDepth": (90.0, "Foam"), "ShoreBandSpacing": (22.0, "Foam"), "ShoreBandSpeed": (1.6, "Foam"),
         "MarbleAmount": (0.36, "Foam"), "MarbleOpacity": (0.45, "Foam"), "MarbleFadeDistance": (9000.0, "Foam"),
-        "WaterRoughness": (0.05, "Surface"), "FarRoughness": (0.12, "Surface"), "FarRoughnessDistance": (30000.0, "Surface"),
-        "SSSStrength": (0.08, "Crest light"), "SSSCrestStart": (-20.0, "Crest light"), "SSSCrestRange": (130.0, "Crest light"),
-        "SSSBacklitPower": (3.0, "Crest light"), "SSSAmbient": (0.55, "Crest light"),
+        "WaterRoughness": (0.028, "Surface"), "FarRoughness": (0.12, "Surface"), "FarRoughnessDistance": (30000.0, "Surface"),
+        "SSSStrength": (0.07, "Crest light"), "SSSCrestStart": (-20.0, "Crest light"), "SSSCrestRange": (130.0, "Crest light"),
+        "SSSBacklitPower": (3.0, "Crest light"), "SSSAmbient": (0.35, "Crest light"),
     }
     sp = {n: sb_ue.scalar_param(m, n, v, -1200, 1200 + i * 60, g) for i, (n, (v, g)) in enumerate(scalars.items())}
     scene_depth = sb_ue.expr(m, unreal.MaterialExpressionSceneDepthWithoutWater, -1500, 1800)
@@ -249,7 +249,7 @@ def make_material(mpc, ush):
     sb_ue.to_prop(ps, "FoamOut", unreal.MaterialProperty.MP_OPACITY)
     sb_ue.to_prop(ps, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
     sb_ue.to_prop(ps, "EmissiveOut", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    foam_color = sb_ue.vector_param(m, "FoamColor", (0.78, 0.9, 0.88, 1), -400, 600, "Foam")
+    foam_color = sb_ue.vector_param(m, "FoamColor", (0.7, 0.9, 0.97, 1), -400, 600, "Foam")
     sb_ue.to_prop(foam_color, "", unreal.MaterialProperty.MP_BASE_COLOR)
     spec = sb_ue.scalar_param(m, "Specular", 0.3, -400, 700, "Surface")
     sb_ue.to_prop(spec, "", unreal.MaterialProperty.MP_SPECULAR)

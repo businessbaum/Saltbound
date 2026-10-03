@@ -55,6 +55,9 @@ def finish(parts, name, seed, waterline=None, wet=0.4, ucx=(), wear=1.0, jitter=
                                                        "handrail", "coaming", "hatch", "hinge", "cleat_base", "joist",
                                                        "stringer", "brace", "ladder", "glass", "porthole_glass")):
             sb.world_box_uv(p, 1.0)
+    rng = random.Random(seed * 101)
+    for p in parts:
+        sb.offset_uv(p, rng.uniform(0, 1), rng.uniform(0, 1))
     obj = sb.join(parts, name)
     if jitter:
         sb.jitter_vertices(obj, jitter, seed)
@@ -328,21 +331,50 @@ def rocks():
 
 
 def landmark():
+    """Sea stack (soft-faceted rock) crowned by a ruined round tower built from bevelled stone blocks:
+    courses offset by half a block, a jagged broken crown, one window opening and the ancient glow band."""
+    import sb_rock
     sb.reset_scene()
     mats()
-    stack = make_rock("SM_Landmark_Spire", (14.0, 11.0, 30.0), 5, 21, target_faces=3000, bottom=-6.0)
+    stack = sb_rock.stylised_rock("SM_Landmark_Spire", (14.0, 11.0, 30.0), 21, chunks=5, cuts=14, bottom=-6.0,
+                                  target_faces=40000, material=M["MI_Rock_Coast"])
     rng = random.Random(22)
-    parts = [stack]
-    top = max(v.co.z for v in stack.data.vertices)
-    tower = sb.add_cylinder("tower", 2.3, 7.0, (0.4, 0.2, top + 2.5), "Z", 18, M["MI_Stone_Ruin"], radius_top=2.0)
-    for v in tower.data.vertices:
-        if v.co.z > top + 4.0:
-            v.co.z -= rng.uniform(0.0, 2.6) * (0.5 + 0.5 * math.sin(math.atan2(v.co.y, v.co.x) * 3))
-    parts.append(tower)
-    parts.append(sb.add_torus("ancient_band", 2.36, 0.12, (0.4, 0.2, top + 3.4), (0, 0, 0), 48, 6, M["MI_AncientGlow"]))
-    obj = sb.join(parts, "SM_Landmark_Spire")
-    sb.world_box_uv(obj, 4.0)
-    sb.bake_vertex_masks(obj, wear=0.5, waterline=0.0, wet_height=1.0, seed=22, mode="convexity")
+    cx, cy, radius = 0.4, 0.2, 2.2
+    near = [v.co.z for v in stack.data.vertices if math.hypot(v.co.x - cx, v.co.y - cy) < radius + 0.4]
+    base = (max(near) if near else max(v.co.z for v in stack.data.vertices)) - 0.9
+    course_h, depth, per_ring, rings = 0.5, 0.45, 16, 13
+    blocks = []
+    for k in range(rings):
+        z = base + k * course_h + course_h / 2
+        offset = (0.5 if k % 2 else 0.0) * 2 * math.pi / per_ring
+        for j in range(per_ring):
+            a = offset + j * 2 * math.pi / per_ring
+            # Broken crown: each column survives up to a jagged height.
+            crown = 7.5 + 3.5 * (0.5 + 0.5 * math.sin(3 * a + 1.0)) + rng.uniform(-1.2, 1.2)
+            if k > crown:
+                continue
+            if 3 <= k <= 5 and abs(math.atan2(math.sin(a - 0.6), math.cos(a - 0.6))) < 0.3:
+                continue  # window opening, facing the cove
+            arc = 2 * math.pi * radius / per_ring - 0.03
+            r = radius + rng.uniform(-0.03, 0.03)
+            b = sb.add_box("block", (depth, arc, course_h - 0.03), (r, 0, 0), M["MI_Stone_Ruin"])
+            sb.transform_obj(b, (rng.uniform(-0.02, 0.02), rng.uniform(-0.02, 0.02), a + rng.uniform(-0.015, 0.015)))
+            for v in b.data.vertices:
+                v.co.x += cx
+                v.co.y += cy
+                v.co.z += z
+            sb.soften(b, 0.035, 2)
+            blocks.append(b)
+    # Inner core closes the shell (seen through the window as a dark recess).
+    core = sb.add_cylinder("core", radius - depth / 2 - 0.05, 5 * course_h, (cx, cy, base + 2.5 * course_h), "Z", 24, M["MI_Stone_Ruin"])
+    blocks.append(core)
+    blocks.append(sb.add_torus("ancient_band", radius + 0.27, 0.09, (cx, cy, base + 2 * course_h), (0, 0, 0), 64, 6, M["MI_AncientGlow"]))
+    for b in blocks:
+        sb.world_box_uv(b, 1.0)
+    tower = sb.join(blocks, "tower")
+    sb.bake_vertex_masks(tower, wear=1.0, seed=23, bevel_max=0.06)
+    obj = sb.join([stack, tower], "SM_Landmark_Spire")
+    print("SB_LANDMARK faces", len(obj.data.polygons))
     sb.save_blend("SM_Landmark_Spire")
     sb.export_fbx([obj], os.path.join("VisualTest", "SM_Landmark_Spire.fbx"))
 

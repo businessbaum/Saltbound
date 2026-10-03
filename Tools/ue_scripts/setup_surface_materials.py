@@ -317,7 +317,7 @@ def main():
     lib = {
         # Boat: warm, cared for
         "MI_Wood_Teak": dict(vectors={"Tint": (0.26, 0.135, 0.065, 1), "WearColor": (0.42, 0.24, 0.11, 1), "GrimeColor": (0.55, 0.45, 0.38, 1)},
-                             scalars={"RoughScale": 0.95, "WearStrength": 0.9, "GrimeAmount": 0.8}, textures=wood_textures()),
+                             scalars={"RoughScale": 0.95, "WearStrength": 0.9, "GrimeAmount": 0.8, "VarAmount": 0.2}, textures=wood_textures()),
         "MI_Wood_Varnish": dict(vectors={"Tint": (0.12, 0.05, 0.022, 1), "WearColor": (0.3, 0.14, 0.05, 1)},
                                 scalars={"RoughScale": 0.45, "RoughOffset": -0.05, "NormalStrength": 0.6, "WearStrength": 0.8, "WearRoughness": 0.55}, textures=wood_textures()),
         "MI_Paint_Cream": dict(vectors={"Tint": (0.74, 0.64, 0.45, 1), "WearColor": (0.3, 0.17, 0.08, 1), "VarTint": (1.0, 0.97, 0.92, 1)},
@@ -343,7 +343,7 @@ def main():
         "MI_Canvas": dict(vectors={"Tint": (0.62, 0.58, 0.5, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.8, "RoughScale": 1.6, "WearStrength": 0.0, "UVScale": 2.0}, textures=canvas_textures()),
         # Harbour: weathered, cooler
         "MI_Wood_DockWeathered": dict(vectors={"Tint": (0.15, 0.14, 0.125, 1), "WearColor": (0.3, 0.29, 0.27, 1), "GrimeColor": (0.18, 0.24, 0.12, 1), "VarTint": (0.9, 0.95, 1.0, 1)},
-                                      scalars={"RoughScale": 1.3, "NormalStrength": 1.4, "VarAmount": 0.18, "VarHue": 0.6, "GrimeAmount": 1.2, "GrimeRoughness": 0.45}, textures=wood_textures()),
+                                      scalars={"RoughScale": 1.3, "NormalStrength": 1.4, "VarAmount": 0.26, "VarHue": 0.7, "GrimeAmount": 1.2, "GrimeRoughness": 0.45}, textures=wood_textures()),
         "MI_Wood_Piling": dict(vectors={"Tint": (0.06, 0.05, 0.04, 1), "WearColor": (0.18, 0.15, 0.12, 1), "GrimeColor": (0.6, 1.1, 0.5, 1)},
                                scalars={"RoughScale": 1.1, "NormalStrength": 1.6, "GrimeAmount": 1.3, "GrimeRoughness": 0.3}, textures=wood_textures()),
         "MI_Wood_Planks": dict(vectors={"Tint": (0.3, 0.2, 0.12, 1), "WearColor": (0.4, 0.32, 0.22, 1)}, scalars={"RoughScale": 1.2}, textures=wood_textures()),

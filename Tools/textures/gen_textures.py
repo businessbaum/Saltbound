@@ -151,30 +151,53 @@ def n01(a):
     return (a - a.min()) / (a.max() - a.min() + 1e-9)
 
 
-def wood_grain():
-    """Neutral warm wood grain (tinted per material). Grain runs along U (image X).
-
-    Irregular band spacing (phase driven by noise that varies across the grain), soft late-wood lines of
-    varying strength, long fibre streaks and broad tonal drift. Deliberately low contrast.
-    """
-    size = 1024
+def wood_field(size, seed=0):
+    """Shared straight-grain field (1 tile = 1 m, grain along U), Sea of Thieves deck reference:
+    long, mostly straight grain lines of varying spacing and strength that wobble gently, only rarely a
+    stretched arch, soft early/late wood bands, long fibre streaks, a few small knots.
+    Returns latewood lines, knot cores, band value, fibre streaks and broad tone (all periodic)."""
     y, x = np.mgrid[0:size, 0:size] / size
-    across = spectral_noise(size, 1, 4, -2.0, seed=35, aniso=(40.0, 1.0))   # varies with y only
-    warp = (spectral_noise(size, 1, 5, -2.0, seed=31, aniso=(6.0, 1.0)) * 0.03 +
-            spectral_noise(size, 3, 16, -1.6, seed=32, aniso=(4.0, 1.0)) * 0.006)
-    phase = (y + warp) * 18.0 + across * 2.5                   # ~18 bands per tile, uneven spacing
-    line = (0.5 + 0.5 * np.cos(2 * np.pi * phase)) ** 2.2
-    strength = 0.55 + 0.45 * n01(spectral_noise(size, 1, 6, -1.8, seed=36, aniso=(3.0, 1.0)))
-    rings = line * strength
-    fibers = spectral_noise(size, 40, 320, -1.0, seed=33, aniso=(12.0, 1.0))
-    broad = spectral_noise(size, 1, 6, -2.0, seed=34)
-    albedo = 0.60 - 0.12 * rings - 0.045 * np.abs(fibers) + 0.07 * broad
-    rgb = np.stack([albedo * 1.00, albedo * 0.93, albedo * 0.84], -1)
-    height = -rings * 0.6 + fibers * 0.2
+    rng = np.random.default_rng(38 + seed)
+    across = spectral_noise(size, 1, 6, -2.0, seed=31 + seed, aniso=(40.0, 1.0))          # varies with y only
+    wobble = (spectral_noise(size, 1, 4, -2.0, seed=32 + seed, aniso=(1.0, 3.0)) * 0.012 +
+              spectral_noise(size, 3, 12, -1.6, seed=33 + seed, aniso=(1.0, 4.0)) * 0.002)
+    # Occasional long arch: a very deep pith, so the rings meet the surface as stretched curves.
+    pith_y = 0.5 + spectral_noise(size, 1, 3, -2.0, seed=37 + seed, aniso=(1.0, 40.0)) * 0.1
+    dy = ((y - pith_y + 0.5) % 1.0) - 0.5
+    depth = 0.15 + 0.2 * n01(spectral_noise(size, 1, 3, -2.0, seed=39 + seed, aniso=(1.0, 40.0)))
+    arch = np.sqrt(dy * dy + depth * depth) - depth
+    knot_dark = np.zeros_like(x)
+    knot_bend = np.zeros_like(x)
+    for _ in range(2):
+        kx, ky, kr = rng.uniform(0, 1), rng.uniform(0, 1), rng.uniform(0.006, 0.011)
+        ddx = ((x - kx + 0.5) % 1.0) - 0.5
+        ddy = ((y - ky + 0.5) % 1.0) - 0.5
+        d = np.sqrt((ddx * 0.3) ** 2 + ddy ** 2)
+        knot_bend += kr * 1.4 * np.exp(-(d / (kr * 3.5)) ** 2) * np.sign(ddy + 1e-9)
+        knot_dark = np.maximum(knot_dark, np.clip(1.0 - d / kr, 0, 1) ** 0.6)
+    pos = y + wobble + across * 0.02 + arch * 0.6 + knot_bend
+    phase = pos * 90.0                                           # ~1.1 cm between grain lines
+    frac = phase - np.floor(phase)
+    strength = 0.35 + 0.65 * n01(spectral_noise(size, 2, 20, -1.5, seed=36 + seed, aniso=(4.0, 1.0)))
+    latewood = np.clip(1.0 - np.abs(frac - 0.85) / 0.07, 0, 1) * strength          # thin crisp lines
+    band = 0.5 + 0.5 * np.sin(2 * np.pi * pos * 22.0)                              # soft wide bands
+    fibers = spectral_noise(size, 40, 500, -0.9, seed=34 + seed, aniso=(20.0, 1.0))
+    broad = spectral_noise(size, 1, 6, -2.0, seed=35 + seed)
+    return latewood, knot_dark, band, fibers, broad
+
+
+def wood_grain():
+    """Hand-painted straight-grain wood (tinted per material), 1 tile = 1 m at 2048 px, grain along U."""
+    size = 2048
+    latewood, knot_dark, band, fibers, broad = wood_field(size)
+    albedo = (0.6 + 0.06 * broad + 0.035 * (band - 0.5) - 0.14 * latewood - 0.05 * np.abs(fibers)
+              + 0.02 * fibers - 0.3 * knot_dark)
+    rgb = np.stack([albedo * 1.00, albedo * 0.92, albedo * 0.82], -1)
+    height = -latewood * 0.45 + fibers * 0.35 - knot_dark * 0.4 + band * 0.05
     save_rgb(os.path.join(OUT, "Wood", "T_WoodGrain_D.png"), rgb)
-    save_normal(os.path.join(OUT, "Wood", "T_WoodGrain_N.png"), height_to_normal(height, 2.0))
-    ao = 1.0 - 0.12 * rings
-    rough = np.clip(0.62 + 0.12 * rings - 0.06 * broad, 0, 1)
+    save_normal(os.path.join(OUT, "Wood", "T_WoodGrain_N.png"), height_to_normal(height, 3.0))
+    ao = 1.0 - 0.12 * latewood - 0.2 * knot_dark
+    rough = np.clip(0.62 + 0.12 * latewood - 0.05 * broad + 0.04 * np.abs(fibers), 0, 1)
     save_rgb(os.path.join(OUT, "Wood", "T_WoodGrain_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
 
 
@@ -263,38 +286,50 @@ def facet_normals(size, cells, seed, tilt, warp=None, bevel=0.06):
     return sx * (1.0 - 0.6 * edge), sy * (1.0 - 0.6 * edge), edge
 
 
-def rock():
-    """Hand-painted stone for world-aligned (triplanar) use, tile ~2.5 m at 2048 px (about 1.2 mm per
-    texel, so it stays crisp up close).
+def crisp(x, edge, width=0.004):
+    """Anti-aliased hard threshold (painted shapes keep crisp edges at full resolution)."""
+    return np.clip((x - edge) / width + 0.5, 0, 1)
 
-    Albedo: painted tonal blocks (soft noise, partly posterised so it reads as brush work), warm/cool hue
-    shifts, directional strokes at two angles, crisp light chips and dark pits, faint grain.
-    Normal: soft bumps plus faint stroke relief.
-    ORM: AO darkens pits; roughness matte with painted variation."""
+
+def rock():
+    """Hand-painted stone, crisp (Sea of Thieves reference) for triplanar use: tile ~2.5 m at 2048 px.
+
+    Flat tone patches with hard edges (posterised noise), a sparse network of painted cracks (dark groove
+    line with a light lower lip), angular chips (Voronoi cells, lighter inside, lit upper edge and shaded
+    lower edge), a few crisp specks and very little fine grain. Smooth areas stay calm in between, so
+    the eye reads defined shapes instead of soft noise."""
     size = 2048
-    broad = spectral_noise(size, 1, 6, -2.0, seed=71)
-    blocks = np.round(n01(broad) * 5.0) / 5.0                 # posterised tone blocks
-    tone = 0.55 * n01(broad) + 0.45 * blocks
-    hue = spectral_noise(size, 2, 8, -1.8, seed=72)
-    strokes = (spectral_noise_dir(size, 6, 60, -1.3, 73, 25.0, 4.0) * 0.6 +
-               spectral_noise_dir(size, 6, 60, -1.3, 74, -40.0, 4.0) * 0.4)
-    warp = (spectral_noise(size, 1, 5, -1.8, seed=76) * 0.02, spectral_noise(size, 1, 5, -1.8, seed=77) * 0.02)
-    # Irregular light flecks and small dark pits (thresholded noise, crisp edges, sparse).
-    fleck_field = n01(spectral_noise(size, 50, 160, -1.1, seed=78)) + 0.25 * n01(broad)
-    chips = np.clip((fleck_field - 0.86) / 0.02, 0, 1)
-    pits = np.clip((n01(spectral_noise(size, 80, 260, -1.0, seed=81)) - 0.9) / 0.02, 0, 1)
-    grain = spectral_noise(size, 120, 500, -0.8, seed=83)
-    # Relief: soft bumps and faint brush relief only. Facet normals (facet_normals) read as a polygon
-    # mosaic on large rocks, unlike the smooth painted reference.
-    bumps = spectral_noise(size, 2, 16, -1.8, seed=86) + 0.12 * spectral_noise(size, 16, 60, -1.4, seed=87)
-    height = bumps * 0.8 + strokes * 0.1 - pits * 0.03 + chips * 0.01
-    n = height_to_normal(height, 22.0)
-    v = (0.52 + 0.13 * (tone - 0.5) + 0.045 * strokes + 0.06 * chips - 0.1 * pits + 0.015 * grain)
-    rgb = np.stack([v * (1.0 + 0.05 * hue), v * (1.0 + 0.01 * hue), v * (1.0 - 0.05 * hue)], -1)
+    y, x = np.mgrid[0:size, 0:size] / size
+    warp = (spectral_noise(size, 1, 6, -1.8, seed=76) * 0.03, spectral_noise(size, 1, 6, -1.8, seed=77) * 0.03)
+    # 1. Tone patches: 4 crisp levels plus a warm/cool patch layer.
+    tone_src = n01(spectral_noise(size, 2, 10, -1.9, seed=71))
+    levels = sum(crisp(tone_src, t, 0.006) for t in (0.3, 0.5, 0.7)) / 3.0
+    hue_src = n01(spectral_noise(size, 2, 8, -1.8, seed=72))
+    warm = crisp(hue_src, 0.62, 0.006)
+    # 2. Cracks: thin segments of a warped Voronoi border network, partly hidden.
+    f1, f2 = worley_grid(size, 3, 4, seed=73, warp=warp)
+    e = f2 - f1
+    show = crisp(n01(spectral_noise(size, 2, 9, -1.7, seed=74)), 0.6, 0.01)
+    crack = crisp(0.018 - e, 0.0, 0.006) * show
+    crack_lip = np.clip(np.roll(crack, 3, axis=0) - crack, 0, 1)       # light edge just below the groove
+    # 3. Chips: a few angular cells, recessed with a lit top edge and a shaded bottom edge.
+    f1c, f2c, cid = worley_cells(size, 26, seed=79, warp=warp)
+    pick = (np.random.default_rng(80).random(26 * 26) < 0.04)[cid]
+    chip = pick * crisp(f2c - f1c, 0.05, 0.02)
+    chip_top = np.clip(chip - np.roll(chip, 4, axis=0), 0, 1)
+    chip_bottom = np.clip(chip - np.roll(chip, -4, axis=0), 0, 1)
+    # 4. Specks and grain.
+    specks_l = crisp(n01(spectral_noise(size, 90, 300, -1.0, seed=81)), 0.9, 0.01)
+    specks_d = crisp(n01(spectral_noise(size, 90, 300, -1.0, seed=82)), 0.91, 0.01)
+    grain = spectral_noise(size, 200, 600, -0.8, seed=83)
+    v = (0.5 + 0.07 * (levels - 0.5) - 0.03 * chip + 0.07 * chip_top - 0.06 * chip_bottom
+         - 0.2 * crack + 0.06 * crack_lip + 0.035 * specks_l - 0.06 * specks_d + 0.008 * grain)
+    rgb = np.stack([v * (1.0 + 0.04 * warm), v * (1.0 + 0.01 * warm), v * (1.0 - 0.04 * warm)], -1)
     save_rgb(os.path.join(OUT, "Rock", "T_Rock_D.png"), rgb)
-    save_normal(os.path.join(OUT, "Rock", "T_Rock_N.png"), n)
-    ao = 1.0 - 0.3 * pits
-    rough = np.clip(0.8 + 0.08 * strokes - 0.1 * chips, 0, 1)
+    height = -crack * 1.0 - chip * 0.7 + spectral_noise(size, 2, 12, -1.8, seed=86) * 0.25
+    save_normal(os.path.join(OUT, "Rock", "T_Rock_N.png"), height_to_normal(height, 6.0))
+    ao = 1.0 - 0.45 * crack - 0.15 * chip_bottom
+    rough = np.clip(0.82 - 0.06 * chip + 0.04 * (levels - 0.5), 0, 1)
     save_rgb(os.path.join(OUT, "Rock", "T_Rock_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
 
 
@@ -318,32 +353,43 @@ def rock_detail():
 
 
 def paint_surface():
-    """Painted wood: near-flat colour, soft brush strokes along U, faint grain telegraphing through."""
-    size = 1024
-    brush = spectral_noise(size, 4, 120, -1.3, seed=91, aniso=(6.0, 1.0))
+    """Painted wood (tinted per material), 1 tile = 1 m at 2048 px: visible brush strokes along U,
+    the board grain telegraphing through the paint, soft blotches. Crisp but calm."""
+    size = 2048
+    latewood, knot_dark, _, fibers, broad = wood_field(size, seed=7)
+    brush = (spectral_noise_dir(size, 10, 160, -1.25, 91, 0.0, 7.0) * 0.7 +
+             spectral_noise_dir(size, 30, 300, -1.1, 94, 4.0, 10.0) * 0.3)
     blotch = spectral_noise(size, 1, 8, -2.0, seed=92)
-    y, x = np.mgrid[0:size, 0:size] / size
-    grain = (0.5 + 0.5 * np.cos(2 * np.pi * ((y + spectral_noise(size, 1, 5, -2.0, seed=93, aniso=(6.0, 1.0)) * 0.03) * 18))) ** 2.2
-    albedo = 0.62 + 0.02 * brush + 0.025 * blotch - 0.015 * grain
+    albedo = 0.62 + 0.05 * brush + 0.025 * blotch - 0.035 * latewood - 0.05 * knot_dark
     save_rgb(os.path.join(OUT, "Paint", "T_PaintSurface_D.png"), np.stack([albedo, albedo, albedo], -1))
-    height = brush * 0.25 - grain * 0.12 + blotch * 0.05
-    save_normal(os.path.join(OUT, "Paint", "T_PaintSurface_N.png"), height_to_normal(height, 1.2))
-    rough = np.clip(0.5 + 0.06 * brush + 0.05 * blotch, 0, 1)
+    height = brush * 0.6 - latewood * 0.3 - knot_dark * 0.2 + blotch * 0.05
+    save_normal(os.path.join(OUT, "Paint", "T_PaintSurface_N.png"), height_to_normal(height, 2.2))
+    rough = np.clip(0.5 + 0.07 * brush + 0.05 * blotch + 0.06 * latewood, 0, 1)
     save_rgb(os.path.join(OUT, "Paint", "T_PaintSurface_ORM.png"), np.stack([np.ones_like(rough), rough, np.zeros_like(rough)], -1))
 
 
 def canvas():
-    """Tarred/painted canvas weave for roofs, covers and sails (64 threads per tile)."""
-    size = 1024
+    """Painted canvas for roofs, covers and later sails (1 tile = 0.5 m at UVScale 2, 2048 px): a visible
+    plain weave (64 threads per tile), a sewn seam with stitches across U, soft creases and weathering."""
+    size = 2048
     y, x = np.mgrid[0:size, 0:size] / size
-    n = 64
+    n = 96
     warp = np.sin(2 * np.pi * x * n) * np.sign(np.sin(np.pi * y * n))
     weft = np.sin(2 * np.pi * y * n) * -np.sign(np.sin(np.pi * x * n))
     weave = 0.5 + 0.25 * (warp + weft)
-    slub = spectral_noise(size, 2, 30, -1.6, seed=95)
-    albedo = 0.6 + 0.05 * (weave - 0.5) + 0.04 * slub
+    slub = spectral_noise(size, 2, 40, -1.5, seed=95)
+    creases = spectral_noise_dir(size, 2, 20, -1.6, 96, 80.0, 5.0)
+    # Seam: a double fold line at v = 0.5 with a row of stitches beside it.
+    sv = np.abs(y - 0.5)
+    seam = np.clip(1.0 - sv / 0.012, 0, 1)
+    fold = np.clip(1.0 - np.abs(sv - 0.016) / 0.004, 0, 1)
+    stitches = np.clip(1.0 - np.abs(sv - 0.03) / 0.0035, 0, 1) * (np.sin(2 * np.pi * x * 80) > 0.2)
+    grime = n01(spectral_noise(size, 1, 10, -1.8, seed=97))
+    albedo = (0.6 + 0.06 * (weave - 0.5) + 0.04 * slub + 0.03 * creases - 0.08 * fold - 0.1 * stitches
+              + 0.03 * seam - 0.06 * grime)
     save_rgb(os.path.join(OUT, "Fabric", "T_Canvas_D.png"), np.stack([albedo, albedo * 0.98, albedo * 0.93], -1))
-    save_normal(os.path.join(OUT, "Fabric", "T_Canvas_N.png"), height_to_normal(weave + slub * 0.2, 1.4))
+    height = weave * 0.6 + slub * 0.2 + creases * 1.2 + seam * 0.8 - fold * 0.6 + stitches * 0.4
+    save_normal(os.path.join(OUT, "Fabric", "T_Canvas_N.png"), height_to_normal(height, 1.6))
 
 
 def macro_noise():

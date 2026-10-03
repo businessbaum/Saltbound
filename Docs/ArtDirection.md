@@ -1,14 +1,21 @@
-# Art direction (working draft, pending owner feedback at the M3 checkpoint)
+# Art direction (revision 2, owner feedback applied; see Decisions D16)
 
-Reference for cohesion and ocean presentation: Sea of Thieves. Saltbound aims for a calmer, original look with
-less exaggerated shapes. The owner confirmed the Sea of Thieves water as the target for the sea.
+Reference: Sea of Thieves for the sea, rocks and wood (owner-supplied reference images, 2026-10-03).
+Saltbound aims for a calmer, original look with less exaggerated shapes. **Stylised, not realistic.**
+Quality means crisp, readable, hand-painted material detail without blur, on simple chunky shapes.
 
 ## Principles
 - **Shapes:** chunky and readable, with believable proportions. Planks 3–4 cm thick, rails about 8 cm.
   Soft bevels of 3–8 mm on every hard edge (`sb.soften`). Slight irregularity: plank length/height jitter,
   ±0.5–1° rotations, sub-mm vertex jitter.
-- **Surface detail:** restrained. Low-contrast tiling textures, generated procedurally, carry the material
-  identity. Variation comes from vertex masks rather than unique high-resolution textures:
+- **Surface detail:** hand-painted and crisp. Procedural tiling textures at 2048 px per 1–2.5 m tile are
+  designed as painted shapes:
+  - Stone: flat tone patches with hard edges, sparse painted cracks with a highlight lip, chips.
+  - Wood: straight grain lines with knots.
+  - Paint: brush strokes over the grain.
+
+  Avoid soft noise (it reads as blur) and carved geometric detail (cracks, plates). Variation also comes
+  from vertex masks:
   - R: edge wear on bevel faces
   - G: grime and wetness near the waterline
   - B: per-part tone variation
@@ -30,8 +37,8 @@ less exaggerated shapes. The owner confirmed the Sea of Thieves water as the tar
 | Canvas | MI_Canvas | 0.62, 0.58, 0.5 | roofs, covers, later sails |
 | Pier planks | MI_Wood_DockWeathered | 0.15, 0.14, 0.125 | silver-grey weathered, algae at the waterline |
 | Pilings | MI_Wood_Piling | 0.06, 0.05, 0.04 | tarred, green algae band |
-| Rock | MI_Rock_Coast | 0.2, 0.21, 0.21 | cool grey, ochre lichen on top faces, dark wet band |
-| Sea | MI_Ocean | absorption 0.6/0.18/0.09, scattering 0.004/0.013/0.022 | deep blue offshore; teal crest light 0.1/0.75/0.62 |
+| Rock | MI_Rock_Coast | 0.29, 0.275, 0.25 | warm grey painted stone, ochre lichen on top faces, algae and barnacle tide zone, dark wet band |
+| Sea | MI_Ocean | absorption 1.4/0.36/0.15, scattering 0.008/0.04/0.1 | deep cobalt body; turquoise crest light 0.12/0.9/0.78; foam 0.7/0.9/0.97, translucent |
 | Lantern | MI_LanternGlass / ASaltLantern | 2100 K, 28 cd | warm accent light |
 
 ## Lighting presets (`ASaltLightingRig`)

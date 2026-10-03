@@ -133,6 +133,16 @@ def world_box_uv(obj, metres_per_uv=1.0, layer="UVMap"):
     return obj
 
 
+def offset_uv(obj, du, dv, layer="UVMap"):
+    """Shifts all UVs of an object (tiling materials): gives each part its own slice of the texture."""
+    uv = obj.data.uv_layers.get(layer) or (obj.data.uv_layers[0] if obj.data.uv_layers else None)
+    if uv is None:
+        return obj
+    for d in uv.data:
+        d.uv = (d.uv[0] + du, d.uv[1] + dv)
+    return obj
+
+
 def add_cylinder(name, radius, depth, center=(0, 0, 0), axis="Z", segments=16, material=None, radius_top=None, collection=None):
     """Capped cylinder (optionally tapered) along an axis, centred at center."""
     bm = bmesh.new()

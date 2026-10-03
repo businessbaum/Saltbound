@@ -183,7 +183,12 @@ def stylised_rock(name, size, seed, chunks=5, cuts=9, voxel=None, plate_cell=Non
     for v in rock.data.vertices:
         if v.co.z < 0:
             v.co.z = v.co.z * 0.3 + bottom * 0.7
-    _remesh(rock, s / 45.0)
+    _remesh(rock, s / 30.0)
+    # Fill the concave pockets where chunks meet (a facet cut through one leaves a dark pit).
+    m = rock.modifiers.new("FillPockets", "SMOOTH")
+    m.factor = 1.0
+    m.iterations = 8
+    sb.apply_modifiers(rock)
     _planar_cuts(rock, cuts, rng)
     _remesh(rock, voxel)
 

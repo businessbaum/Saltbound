@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-03 (end of session 1).
+Last updated: 2026-10-03 (session 2, visual revision 2 after owner feedback).
 
 ## Milestone status
 
@@ -8,15 +8,15 @@ Last updated: 2026-10-03 (end of session 1).
 |---|---|
 | M1 Infrastructure & foundation | **Done** (verified) |
 | M2 First-person player & moving-platform tests | **Done** (verified in PIE and standalone) |
-| M3 Visual test scene | **Built; waiting for owner feedback** (see "Decisions needed") |
+| M3 Visual test scene | **Revision 2 in review** (owner feedback on water, rocks, wood applied; see below) |
 | M4 Starting boat & navigable water | Next (technical parts can start without the decisions) |
 | M5 Starting harbor & complete loop | Planned |
 
 ## Decisions needed from the owner (visual checkpoint)
 Recommendation is listed first. Evidence images: `Docs/Evidence/M3/` (Day / Evening / Dusk × 10 shots,
 plus `Standalone_Dusk_PlayerStart.jpg`).
-1. **Overall look** (chunky readable shapes, soft bevels, restrained surface detail, warm boat vs. cool sea):
-   (a) keep and refine · (b) more painterly / hand-painted · (c) more realistic materials.
+1. **Overall look:** answered (D16): stylised like Sea of Thieves (not realistic), with crisp hand-painted
+   material detail on simple chunky shapes.
 2. **Living space aboard:**
    - (a) A raised deckhouse with standing headroom and the floor above the waterline. It is technically
      safe and gets windows and a lantern-lit interior.
@@ -27,8 +27,13 @@ plus `Standalone_Dusk_PlayerStart.jpg`).
 4. **Default sea state:** (a) the current rolling swell (calmer inside the harbour) · (b) calmer by default,
    with big seas reserved for weather.
 
-Owner feedback received so far (2026-10-03): "The water is okay, waves are missing, needs a bit more
-realism – the water from Sea of Thieves hits the spot." The waves were revised in response (see M3).
+Owner feedback received so far (2026-10-03):
+- Session 1: "The water is okay, waves are missing, needs a bit more realism – the water from Sea of
+  Thieves hits the spot." The waves were revised (D14).
+- Session 2: "The water doesn't look like good quality; the objects are missing detail, NOT realism."
+  Then: "The carvings in the stones look horrible – I mean material detail, no blur, visibly readable
+  material", with Sea of Thieves reference images for rocks, deck wood and sea. Applied in revision 2
+  (D16–D19). Rock shapes were confirmed as better; material and wood were iterated after that.
 
 ## M1 – Infrastructure (done)
 - Git + LFS repository at `Saltbound_all/` (template baseline is the first commit), clean template.
@@ -86,6 +91,32 @@ GPU frame breakdown (ProfileGPU): volumetric clouds about 1.5–1.8 ms, TSR abou
 Lumen reflections about 0.9 ms, shadows about 0.9 ms, water about 0.4–0.8 ms. There is plenty of headroom
 for a higher screen percentage (for example 75 %) and more content.
 
+### M3 revision 2 (session 2, after owner feedback)
+- **Water (D19):**
+  - Deep-blue body with turquoise light in backlit crests.
+  - Lace foam: whitecaps with trails, marbled open-sea streaks, softer shore foam with lapping bands,
+    translucent overall.
+  - A third ripple layer and lower near-field roughness give crisp sun glitter.
+- **Rocks (D16):**
+  - `Art/Blender/Scripts/sb_rock.py` builds chunky blobs with planar facet cuts, filled pockets and soft
+    bevels. Carving options exist but are off.
+  - Two new scatter rocks sit along the shoreline.
+  - Stone texture (2048, 2.5 m tile): crisp tone patches, sparse painted cracks with a highlight lip,
+    recessed chips, specks.
+  - `M_SB_Rock`: sharp triplanar blend, vertex masks (edge light, cavity dark, plate tone), painted top
+    light, lichen, and an algae/barnacle tide zone.
+- **Wood:**
+  - Straight-grain painted wood (2048 per m): wobbling grain lines, rare long arches, small knots, fibre
+    streaks.
+  - Each built part gets a random UV offset, and planks vary more in tone.
+- **Paint:** brush strokes along the boards, with the grain telegraphing through.
+- **Canvas:** visible weave, a sewn seam with stitches, creases.
+- **Landmark:** soft-faceted sea stack, with a ruined round tower of bevelled stone blocks (broken crown,
+  window, glow band).
+- **Image:** native screen percentage, sharpening 0.6, no motion blur (D18).
+- **Fix:** editor crash when rebuilding materials (D17). Content defaults no longer load in constructors.
+- **Evidence:** latest captures in `Docs/Evidence/M3_rev2/`.
+
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
 |---|---|---|
@@ -103,12 +134,15 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`
 
 ## Known issues and limitations
+- **Performance after revision 2 is not re-measured.** Native resolution (D18) and the heavier ocean pixel
+  shader (1458 instructions) need a standalone benchmark with the editor closed.
+- **Sun glitter towards a low sun looks golden.** The sun's colour through the atmosphere is warm. The
+  reference shows white glitter.
+- The Jacobian foam trail samples the dominant wave direction only.
 - **Vsync frame pacing:** with vsync on, the standalone build runs at about 55–60 fps even though the GPU
   needs only about 7.5 ms. Default display settings (vsync off or a frame cap, later a settings menu) are needed.
 - **Benchmarking:** always close the editor first. A running editor renders in the background (throttling
   is disabled for automated tests) and halves standalone performance.
-- **Ocean:** crest foam forms round blobs (needs a lacier, streakier pattern). Golden sun-glint streaks
-  appear towards the sun. Very shallow water at the rocks looks like a bright pool with a hard white foam outline.
 - **Water inside hulls:** the ocean is not masked inside hulls yet. This matters if the cabin floor goes
   below the waterline (decision 2).
 - **Test deck section:** it is a slice of the boat with flat end caps (not a full hull), and its deckhouse
@@ -120,13 +154,15 @@ Developer console (`~`, non-shipping builds):
 - `BoardingRamp` in `L_DevTest` is not aligned. Template `LevelPrototyping` content is still in use for greyboxing.
 
 ## Next steps
-1. Apply the owner's checkpoint decisions (style, cabin concept, hull colour, sea state).
-2. **M4 technical, independent of the decisions:**
+1. Owner review of M3 revision 2 (`Docs/Evidence/M3_rev2/`). Remaining checkpoint decisions: cabin
+   concept, hull colour, sea state.
+2. Benchmark revision 2 in a standalone build with the editor closed (D18, D19).
+3. **M4 technical, independent of the decisions:**
    - Boat motion model: buoyancy from multi-point samples of the shared wave field, heave/pitch/roll response.
    - Simplified sailing: wind direction and strength, no-go zone, sail trim/raise, keel lateral resistance,
      rudder, heel.
    - Helm station driving the boat; collision sweeps against the pier and rocks; reset/recovery utility.
    - Water masking inside the hull if needed.
-3. M4 art after the decisions: full starter boat in Blender (about 10 m double-ender, 3.4 m beam), interior, sail.
-4. Water polish: foam pattern, sun-glint streaks, shallow-water colour, a bow wave and wake.
-5. Display settings: vsync/frame cap, screen percentage. Re-measure in standalone with the editor closed.
+4. M4 art after the decisions: full starter boat in Blender (about 10 m double-ender, 3.4 m beam), interior, sail.
+5. Water polish: white sun glitter towards a low sun, bow wave and wake, spray at crests.
+6. Display settings menu: vsync/frame cap, screen percentage.
