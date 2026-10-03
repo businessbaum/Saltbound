@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-03 (session 2, visual revision 3: stylised realism).
+Last updated: 2026-10-03 (session 2, ocean revision 5: smearing, environment layers, reflection breakup).
 
 ## Milestone status
 
@@ -140,6 +140,30 @@ for a higher screen percentage (for example 75 %) and more content.
 - **Captures:** first-person and low-sea shots were added (`11_dock_fp` … `14_sea_low_cross`). Evidence is
   in `Docs/Evidence/M3_rev3/`.
 
+### Ocean revision 5 (session 2, ocean brief and reflection-breakup brief)
+- **Smearing (D23):**
+  - Cause: the displaced water wrote no motion vectors, so TSR smeared stale history.
+  - Fix: previous-frame wave phases give real motion vectors; the water writes temporal responsiveness
+    0.3; Lumen screen-traced reflections are off.
+- **Wave hierarchy (D24):** three long swells, subordinate medium waves in calmer/choppier patches
+  (CPU = GPU), foam trails from a time-shifted Jacobian, and tile bounds that cover the full displacement.
+- **Environment layers (D25):**
+  - Independent, blendable time of day, region (Shores of Plenty, Ancient Isles, Wilds, Devil's Roar),
+    weather and sea state.
+  - Region zones blend by position. The rig owns the clouds.
+- **Reflection breakup (D26):**
+  - Causes: below-horizon reflection rays on short straight crests drew the silver/brown streaks; the
+    1.5 m ripple layer drew the crumpled glints.
+  - Fixes: horizon occlusion of specular, macro normal without waves under 5 m, softer ripple texture,
+    rebalanced layers, quiet patches, specular AA cap.
+  - Results: fine near-field detail roughly halved; shimmer in moving clips down by 47–55 %.
+  - Evidence: `Docs/Evidence/Ocean_rev5/`. It holds the step-by-step chain with the horizon debug view, a
+    four-view before/after, motion frames, and two side-by-side clips (left before, right after).
+- **Tools:**
+  - `sb.Ocean.Freeze`/`sb.Ocean.Time`, `sb.Dev.Camera … [Float]`.
+  - `Tools/ocean_diag.py` (controlled A/B captures), `Tools/water_metrics.py`,
+    `Tools/record_clip.py --float`, `Tools/tune_env.py`.
+
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
 |---|---|---|
@@ -152,6 +176,9 @@ for a higher screen percentage (for example 75 %) and more content.
 
 Developer console (`~`, non-shipping builds):
 - `sb.Lighting Day|Evening|Dusk`
+- `sb.Region ShoresOfPlenty|AncientIsles|Wilds|DevilsRoar [blend s]`, `sb.Weather Clear|Cloudy|Overcast|Storm [blend s]`,
+  `sb.SeaState Calm|Moderate|Rough|Storm [blend s]`, `sb.Env` (print the composed state)
+- `sb.Ocean.Freeze 0|1`, `sb.Ocean.Time <s>`, `sb.Dev.Camera X Y Z Pitch Yaw [FOV] [Float]` (`sb.Dev.Camera off` returns to the player)
 - `sb.Dev.RunMovementTests [motion speed turn]`, `sb.Dev.Platform <motion> [speed turn]`
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`
@@ -164,6 +191,12 @@ Developer console (`~`, non-shipping builds):
     Dusk 72.4 fps (GPU 13.1 ms). This meets D8. Fewer cloud pixels and the Nanite boat section offset the
     bigger swell.
 - The Jacobian foam trail samples the dominant wave direction only.
+- **Ocean (D26):**
+  - Gerstner crests are straight, so some parallel banding remains on long swell faces.
+  - The ocean does not reflect itself: it is not in the ray-tracing scene, and horizon occlusion only
+    approximates this.
+  - No spray yet (`SprayAmount` is unused). No underwater rendering.
+  - Cloud positions follow wall-clock time, so captures minutes apart reflect different clouds.
 - **Vsync frame pacing:** with vsync on, the standalone build runs at about 55–60 fps even though the GPU
   needs only about 7.5 ms. Default display settings (vsync off or a frame cap, later a settings menu) are needed.
 - **Benchmarking:** always close the editor first. A running editor renders in the background (throttling
@@ -189,5 +222,6 @@ Developer console (`~`, non-shipping builds):
    - Helm station driving the boat; collision sweeps against the pier and rocks; reset/recovery utility.
    - Water masking inside the hull if needed.
 4. M4 art after the decisions: full starter boat in Blender (about 10 m double-ender, 3.4 m beam), interior, sail.
-5. Water polish: white sun glitter towards a low sun, bow wave and wake, spray at crests.
+5. Water polish: bow wave and wake, spray at crests (`SprayAmount`), verification captures of all
+   region × weather × time-of-day combinations, curved (non-Gerstner) crests against the remaining banding.
 6. Display settings menu: vsync/frame cap, screen percentage.

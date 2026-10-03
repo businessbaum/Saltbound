@@ -35,6 +35,7 @@ def main():
     ap.add_argument("--cvar", nargs="*", default=[])
     ap.add_argument("--mi", nargs="*", default=[])
     ap.add_argument("--ocean", nargs="*", default=[], help="ocean actor properties, e.g. ripple_scroll=0,0,0,0")
+    ap.add_argument("--mitex", nargs="*", default=[], help="MI_Ocean texture parameters, e.g. RippleTex=/Game/.../T_X")
     ap.add_argument("--preset", default="Day")
     ap.add_argument("--out", default=os.path.join(os.environ.get("TEMP", "."), "saltbound_diag"))
     ns = ap.parse_args()
@@ -43,6 +44,7 @@ def main():
     cvars = dict(c.split("=", 1) for c in ns.cvar)
     mis = {k: float(v) for k, v in (m.split("=", 1) for m in ns.mi)}
     ocean = {k: [float(x) for x in v.split(",")] for k, v in (o.split("=", 1) for o in ns.ocean)}
+    mitex = dict(t.split("=", 1) for t in ns.mitex)
     run("import unreal\n"
         "unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_set_game_view(True)\n")
     capture_shots.apply_preset(ns.preset)
@@ -58,6 +60,11 @@ def main():
         "for k, v in %r.items():\n"
         "    old['mi'][k] = mel.get_material_instance_scalar_parameter_value(mi, k)\n"
         "    mel.set_material_instance_scalar_parameter_value(mi, k, v)\n"
+        "old['mitex'] = {}\n"
+        "for k, v in %r.items():\n"
+        "    cur = mel.get_material_instance_texture_parameter_value(mi, k)\n"
+        "    old['mitex'][k] = cur.get_path_name() if cur else ''\n"
+        "    mel.set_material_instance_texture_parameter_value(mi, k, unreal.load_asset(v))\n"
         "mel.update_material_instance(mi)\n"
         "eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)\n"
         "for a in eas.get_all_level_actors():\n"
@@ -69,7 +76,7 @@ def main():
         "            a.set_editor_property(k, unreal.Vector4(*v) if len(v) == 4 else v[0])\n"
         "        a.set_editor_property('freeze_time', %s)\n"
         "        a.set_ocean_time(%f)\n"
-        "print('SB_DIAG_OLD', json.dumps(old))\n" % (MI, cvars, mis, ocean, "True" if ns.freeze else "False", ns.time))
+        "print('SB_DIAG_OLD', json.dumps(old))\n" % (MI, cvars, mis, mitex, ocean, "True" if ns.freeze else "False", ns.time))
     out = run(setup)
     text = "".join(o["output"] for o in out.get("output", []))
     if not out.get("success"):
@@ -89,6 +96,8 @@ def main():
             "    unreal.SystemLibrary.execute_console_command(None, '%%s %%g' %% (k, v))\n"
             "for k, v in old['mi'].items():\n"
             "    mel.set_material_instance_scalar_parameter_value(mi, k, v)\n"
+            "for k, v in old.get('mitex', {}).items():\n"
+            "    mel.set_material_instance_texture_parameter_value(mi, k, unreal.load_asset(v) if v else None)\n"
             "mel.update_material_instance(mi)\n"
             "eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)\n"
             "for a in eas.get_all_level_actors():\n"

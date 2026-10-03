@@ -34,6 +34,8 @@ public:
 	void StartPerf(float Seconds);
 	void RunBenchmark(float SecondsPerPreset);
 	bool IsRunning() const { return Steps.IsValidIndex(StepIndex); }
+	/** sb.Dev.Camera Float mode: keep Camera at HeightAboveWater above the (smoothed) water surface. */
+	void SetFloatingCamera(class ACameraActor* Camera, bool bFloat, float HeightAboveWater);
 
 private:
 	struct FStep
@@ -83,6 +85,11 @@ private:
 	FVector LandLocal = FVector::ZeroVector;
 	bool bWasAirborne = false;
 	bool bLanded = false;
+
+	TWeakObjectPtr<class ACameraActor> FloatCamera;
+	float FloatHeight = 0.f;
+	float FloatWater = 0.f;
+	bool bFloatInitialised = false;
 
 	float PerfRemaining = 0.f;
 	float PerfDuration = 0.f;

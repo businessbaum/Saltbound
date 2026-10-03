@@ -236,3 +236,125 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   hidden from ray tracing and distance fields.
 - **Lesson:** isolate such colours by switching inputs off one at a time (specular, then sun, then
   geometry) instead of guessing.
+
+### D23 · Ocean smearing: motion vectors for wave displacement (Adopted)
+- **Owner brief:** the moving sea smeared. Diagnose with controlled experiments before changing settings.
+- **Experiments** (`Tools/ocean_diag.py`, fixed camera and ocean clock; `sb.Ocean.Freeze`, `sb.Ocean.Time`):
+  - Waves frozen: the temporal smear disappeared. Some ribbon-like streaks stayed on steep wave faces, so
+    part of the artefact was not temporal. That part turned out to be reflections (D26).
+  - Motion blur was already off (D18), so it was not involved.
+  - The velocity visualiser showed zero motion vectors on the water. The vertex shader displaces the
+    tiles with world-position offset, and nothing told TSR where each pixel had been in the previous frame.
+    TSR therefore reprojected stale history onto moving water: smeared ripples and reflections.
+  - Lumen screen-traced reflections traced against the water's own depth at grazing angles. This produced
+    stair-stepped blocks in the reflections that moved with the waves.
+- **Decision:**
+  - The material evaluates the wave field twice through `PreviousFrameSwitch`, with the previous frame's
+    phases (`MPC_Ocean` PrevPhase*, written by `ASaltOcean::PushParameters`). TSR now gets correct
+    motion vectors. `UsePrevFramePhases = 0` restores the old behaviour for A/B tests.
+  - The water writes TSR temporal responsiveness 0.3 (`r.Velocity.TemporalResponsiveness.Supported=1`).
+    TSR then rejects history on the water more readily, without affecting the rest of the image.
+  - Lumen reflection screen traces are off in the rig's post-process; hardware ray tracing alone gives
+    clean reflections.
+- **Tools:**
+  - `sb.Dev.Camera X Y Z Pitch Yaw [FOV] [Float]` gives a fixed or water-following camera without the HUD.
+  - `Tools/record_clip.py` records the uncooked game with ffmpeg ddagrab.
+
+### D24 · Ocean wave hierarchy: three swells, patchy chop, foam history (Adopted)
+- **Waves (C++ defaults of `ASaltOcean`):**
+  - Three long swells (74/53/39 m) carry most of the height and of the horizontal displacement.
+  - Medium waves (21–6 m) are visible but subordinate.
+  - Short waves (under 4 m) are mostly shading detail.
+  - The steepness sum is 0.995, so the surface does not loop.
+- **Chop patches:**
+  - Waves above `SwellCount` (3) are scaled by a slow three-sine field (`ChopVariation` 0.6,
+    `ChopPatchSize` 260 m). Wave faces are calmer in some areas and choppier in others instead of
+    uniformly crumpled.
+  - The field is identical on the CPU (`FSaltWaveField::ChopFactor`) and the GPU (`SaltOcean.ush`), so
+    buoyancy matches the picture.
+- **Foam:**
+  - Whitecaps come from the Jacobian.
+  - Two time-shifted Jacobian samples (`JacobianAt`, 0.9 s and 2.2 s back) leave decaying trails behind
+    breaking crests.
+  - Breaking is patchy (`BreakPatchiness`), so calm water shows no whitecaps (Calm sea state:
+    `WhitecapAmount` 0).
+- **Bounds:** ocean tile bounds now cover the largest displacement (`bounds_extension` [26, 26, 600]). The
+  old bounds let tiles at the screen edge be culled while their displaced waves were still visible.
+
+### D25 · Environment layers: time of day, region, weather, sea state (Adopted)
+- **Owner brief:** regional looks after the Sea of Thieves regions (Shores of Plenty, Ancient Isles, the
+  Wilds, the Devil's Roar), with region, depth, weather, time of day and sea state adjustable separately,
+  and smooth transitions.
+- **Decision (`ASaltLightingRig`):** four independent layers.
+  - Time of day (`sb.Lighting`).
+  - Region (`sb.Region`). Water absorption, scattering, crest light and foam colour are absolute values;
+    sky, fog, light and grading multiply the time-of-day preset, so every region works at every time of
+    day.
+  - Weather (`sb.Weather`: Clear, Cloudy, Overcast, Storm).
+  - Sea state (`sb.SeaState`: Calm, Moderate, Rough, Storm). It drives wave height and steepness, chop,
+    whitecap threshold and amount, break patchiness and ripple strength.
+  - Every layer blends over time (`BlendSeconds`). `ASaltRegionZone` actors blend regions spatially by the
+    viewer's position. `sb.Env` prints the composed state.
+- **Implementation:**
+  - The rig owns the volumetric clouds as a transient component with a dynamic material instance, so
+    weather can change coverage without editing assets.
+  - The water look goes to `MPC_Ocean` (LookAbsorption, LookScattering, LookCrest, LookFoam, LookSea).
+  - Depth colour comes from Single Layer Water absorption over the real seabed.
+- **Not yet implemented:** spray (`SprayAmount` is stored but unused).
+
+### D26 · Ocean reflection breakup: causes and corrections (Adopted)
+- **Owner brief:** excessive reflection breakup, long parallel silver streaks, tightly crumpled
+  highlights. Diagnose first, change one variable at a time, keep wave geometry, colour, foam, layout and
+  lighting unchanged, no blur/sharpen/noise.
+- **Method:** frozen ocean (`--time 100 --freeze 1`), identical camera and light; views `15_ref_low`
+  (low, towards the sun) and `16_ref_landmark` (low, across the light), plus `13_sea_low` and
+  `11_dock_fp`. Each candidate was tested alone, then the fixes were applied cumulatively.
+  `Tools/water_metrics.py` measures the water region:
+  - `silver`: share of pale, unsaturated pixels.
+  - `fine`: Laplacian density, i.e. crumpled detail.
+  - `streak`/`horiz`: structure-tensor coherence and the share of near-horizontal edges.
+- **Findings:**
+  - Reflections carry almost all of the contrast. With Specular 0, the luma std fell from 39 to 11.
+  - The silver/brown parallel streaks remained with all ripples off, so they came from the macro normals.
+    A debug view of the reflected ray (`DebugView` 1, magenta where the ray points at or below the horizon)
+    lined up with the streaks. Where short, straight-crested Gerstner waves tilt the normal away from the
+    viewer, the ray reflects below the horizon. The ocean is not in the ray-tracing scene, so these rays
+    hit the sky atmosphere's ground or the bright horizon band.
+  - The 1.5 m ripple layer alone produced the crumpled glints (fine_near 8.1 with only that layer).
+  - The 38 m ripple layer produced large smooth blotches and bands.
+  - The elongated ridged ripple texture added streaks of its own.
+- **Corrections (`Tools/ue_scripts/setup_ocean.py` defaults; every one is an `MI_Ocean` parameter):**
+  1. Horizon occlusion: `Specular` fades to 20 % (`HorizonOccFloor`) as the reflected ray drops from 0.08
+     to 0.0 (`HorizonOccTop`/`Bottom`). This is the reflection a real wave face would get from the water
+     beside it. `HorizonOcclusion 0` turns it off.
+  2. `PSMinWavelength` 500: the pixel-shader normal leaves out Gerstner waves shorter than 5 m. Their
+     straight crests drew the parallel lines; the vertex displacement still uses them.
+  3. Soft ripple texture `T_OceanRipplesSoft_N` (near-isotropic, `gen_textures.py ocean_ripples_soft`). The
+     old `T_OceanRipples_N` is kept.
+  4. Ripple layer weights 0.85 / 0.5 / 0.35 (were 1.0 / 0.8 / 1.0).
+  5. Quiet patches (`QuietAmount` 0.25, `QuietTile` 45 m): ripple strength drops by up to 25 % in broad
+     patches. 0.55 made the water read as a mirror.
+  6. Specular anti-aliasing cap `SpecAAMax` 0.015 (was 0.01).
+- **Results:**
+
+  | View | silver | fine near | fine far | moving clip flicker |
+  |---|---|---|---|---|
+  | 15_ref_low | 17.4 % → 18.5 % | 6.97 → 3.25 | 13.5 → 7.1 | 5.28 → 2.82 |
+  | 16_ref_landmark | 5.3 % → 2.9 % | 3.22 → 1.58 | 10.1 → 5.2 | 2.07 → 0.94 |
+
+  - In view 15 the silver share stays because that view looks into the bright sky reflection; the brown
+    and silver streaks are gone.
+  - Coherence (`streak`, `horiz`) rose from 0.73 to 0.85, because the fine isotropic noise is gone and
+    the swell's own bands dominate. The metric cannot tell wave bands from reflection streaks, so the
+    streak verdict comes from the captures.
+  - Moving clips: 8 s at 60 fps with the floating camera (`record_clip.py --float`); seconds 1–5 were
+    analysed at 960×540. Flicker is the mean absolute difference between each frame and the average of
+    its two neighbours, over the water region (luma 0–255). Smooth wave motion scores low; shimmer and
+    popping glints score high.
+  - Pixel shader: 1540 instructions.
+- **Evidence:** `Docs/Evidence/Ocean_rev5/` (`reflection_steps_*` shows each step on its own, starting with
+  the magenta horizon debug view).
+- **Limitations:**
+  - Gerstner crests are straight, so on a long swell face some parallel banding remains.
+  - Horizon occlusion is an approximation; the ocean does not reflect itself.
+  - Clouds drift on wall-clock time, so cloud reflections differ between captures taken minutes apart.

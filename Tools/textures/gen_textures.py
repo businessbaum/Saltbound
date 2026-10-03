@@ -93,6 +93,34 @@ def ocean_ripples():
     save_normal(os.path.join(OUT, "Water", "T_OceanRipples_N.png"), height_to_normal(h, 12.0))
 
 
+def ocean_ripples_soft():
+    """Ripple normals v2 (D26): the same flowing, domain-warped construction as ocean_ripples, but with
+    near-isotropic features (anisotropy 1.25 / 1.1 instead of 2.6 / 2.0) and rounder ridges (power 2
+    instead of 3). Long aligned ridges drew parallel reflection streaks at grazing angles; this keeps the
+    flowing shapes with more varied directions and no extra noise."""
+    size = 1024
+    wx = spectral_noise(size, 1, 6, -1.8, seed=14) * 0.04
+    wy = spectral_noise(size, 1, 6, -1.8, seed=15) * 0.04
+    iy, ix = np.mgrid[0:size, 0:size].astype(float)
+
+    def warped(field):
+        fy, fx = iy + wy * size, ix + wx * size
+        y0, x0 = np.floor(fy).astype(int), np.floor(fx).astype(int)
+        ty, tx = fy - y0, fx - x0
+        y0 %= size; x0 %= size
+        y1, x1 = (y0 + 1) % size, (x0 + 1) % size
+        return (field[y0, x0] * (1 - tx) * (1 - ty) + field[y0, x1] * tx * (1 - ty)
+                + field[y1, x0] * (1 - tx) * ty + field[y1, x1] * tx * ty)
+
+    n1 = warped(spectral_noise(size, 6, 28, -1.6, seed=11, aniso=(1.0, 1.25)))
+    n2 = warped(spectral_noise(size, 14, 48, -1.4, seed=12, aniso=(1.0, 1.1)))
+    ridge1 = (1.0 - np.abs(n1)) ** 2
+    ridge2 = (1.0 - np.abs(n2)) ** 2
+    swell = spectral_noise(size, 2, 10, -1.8, seed=13, aniso=(1.0, 1.2))
+    h = ridge1 * 0.6 + ridge2 * 0.25 + swell * 0.35
+    save_normal(os.path.join(OUT, "Water", "T_OceanRipplesSoft_N.png"), height_to_normal(h, 12.0))
+
+
 def worley_grid(size, cells_x, cells_y=None, seed=0, warp=None):
     """Periodic Worley F1/F2 on a jittered grid (3x3 neighbourhood, O(9 N)). Distances in cell units.
 
@@ -442,6 +470,7 @@ def macro_noise():
 
 GENERATORS = {
     "ocean_ripples": ocean_ripples,
+    "ocean_ripples_soft": ocean_ripples_soft,
     "ocean_foam": ocean_foam,
     "wood_grain": wood_grain,
     "wood_weathered": wood_weathered,

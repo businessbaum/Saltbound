@@ -13,6 +13,7 @@
 #include "GameFramework/PlayerStart.h"
 #include "HAL/IConsoleManager.h"
 #include "Interaction/SaltStationComponent.h"
+#include "Ocean/SaltOceanSubsystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
@@ -111,7 +112,8 @@ namespace
 
 	FAutoConsoleCommandWithWorldAndArgs CmdCamera(
 		TEXT("sb.Dev.Camera"),
-		TEXT("View from a fixed camera: sb.Dev.Camera <X> <Y> <Z> <Pitch> <Yaw> [FOV=80]. sb.Dev.Camera off returns to the player."),
+		TEXT("View from a fixed camera: sb.Dev.Camera <X> <Y> <Z> <Pitch> <Yaw> [FOV=80] [Float=0]. With Float=1, Z is a height above ")
+		TEXT("the water and the camera rides the waves (smoothed, like a small boat). sb.Dev.Camera off returns to the player."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			APlayerController* PC = World ? UGameplayStatics::GetPlayerController(World, 0) : nullptr;
@@ -146,6 +148,10 @@ namespace
 				FRotator(ArgOr(Args, 3, 0.f), ArgOr(Args, 4, 0.f), 0.f));
 			Cam->GetCameraComponent()->SetFieldOfView(ArgOr(Args, 5, 80.f));
 			PC->SetViewTarget(Cam);
+			if (USaltDevTestSubsystem* T = GetTests(World))
+			{
+				T->SetFloatingCamera(Cam, ArgOr(Args, 6, 0.f) != 0.f, ArgOr(Args, 2, 0.f));
+			}
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdResetPlayer(
@@ -500,9 +506,29 @@ void USaltDevTestSubsystem::RunMovementSuite(float MotionScale, float Speed, flo
 	bStepStarted = false;
 }
 
+void USaltDevTestSubsystem::SetFloatingCamera(ACameraActor* Camera, bool bFloat, float HeightAboveWater)
+{
+	FloatCamera = bFloat ? Camera : nullptr;
+	FloatHeight = HeightAboveWater;
+	bFloatInitialised = false;
+}
+
 void USaltDevTestSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	if (ACameraActor* Cam = FloatCamera.Get())
+	{
+		// Rides the water like a small boat: follows the surface height at the camera, low-pass filtered
+		// (~0.6 s) so short waves do not shake the view.
+		if (const USaltOceanSubsystem* Ocean = GetWorld()->GetSubsystem<USaltOceanSubsystem>())
+		{
+			const FVector L = Cam->GetActorLocation();
+			const float Water = (float)Ocean->SampleWater(FVector2D(L.X, L.Y)).Location.Z;
+			FloatWater = bFloatInitialised ? FMath::FInterpTo(FloatWater, Water, DeltaTime, 1.6f) : Water;
+			bFloatInitialised = true;
+			Cam->SetActorLocation(FVector(L.X, L.Y, FloatWater + FloatHeight));
+		}
+	}
 	if (PerfRemaining > 0.f)
 	{
 		PerfFrame.Add(DeltaTime * 1000.f);

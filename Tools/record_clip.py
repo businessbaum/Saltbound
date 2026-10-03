@@ -65,6 +65,8 @@ def main():
     ap.add_argument("--res", default="1920x1080")
     ap.add_argument("--fps", type=int, default=60)
     ap.add_argument("--warmup", type=float, default=14.0, help="seconds after launch before recording")
+    ap.add_argument("--float", dest="float_height", type=float, default=None,
+                    help="ride the waves at this height (cm) above the water instead of the shot's fixed Z")
     ns = ap.parse_args()
     shot = {n: (loc, rot) for n, loc, rot in capture_shots.SHOTS["visualtest"]}[ns.shot]
     (x, y, z), (pitch, yaw, _roll) = shot
@@ -72,7 +74,8 @@ def main():
     # Commands run in order after the world is up; the ocean clock is set last, so every clip starts at
     # the same sea state regardless of loading time.
     cmds = ["r.VSync 0", "t.MaxFPS %d" % ns.fps, "sb.Lighting %s" % ns.preset] + list(ns.exec) + [
-        "sb.Dev.Camera %g %g %g %g %g 80" % (x, y, z, pitch, yaw),
+        ("sb.Dev.Camera %g %g %g %g %g 80" % (x, y, z, pitch, yaw)) if ns.float_height is None else
+        ("sb.Dev.Camera %g %g %g %g %g 80 1" % (x, y, ns.float_height, pitch, yaw)),
     ]
     delayed = ["sb.Dev.Delayed %g sb.Ocean.Time %g" % (ns.warmup - 1.0, ns.time)]
     exec_cmds = ",".join(cmds + delayed)

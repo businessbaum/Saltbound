@@ -110,8 +110,12 @@ float Dist = distance(CamPos, WorldPos);
 float Height = P0.z;
 float2 XY = P0.xy;                                   // Lagrangian coordinate: textures ride with the water
 float FadeK = Dist * FadeScale;
+// Shading normal: waves shorter than PSMinWavelength are left out (Fade() removes lambda < FadeK fully,
+// keeps lambda > 2 FadeK). Their straight, infinitely long crests otherwise draw long parallel reflection
+// streaks; the ripple texture supplies that scale with more varied directions. Silhouette waves are unaffected.
+float NormalFadeK = max(FadeK, PSMinWavelength * 0.5);
 float3 GN; float J;
-O.NormalAndJacobian(XY, FadeK, GN, J);               // wave (geometric) normal and horizontal compression
+O.NormalAndJacobian(XY, NormalFadeK, GN, J);         // wave (geometric) normal and horizontal compression
 
 float SwellH = max(O.Chop.w, 1.0);                   // summed swell amplitude (cm) for this sea state
 float CrestH = saturate((Height / SwellH - CrestStart) / max(CrestRange, 0.01));
@@ -138,6 +142,10 @@ float2 RippleSlope = (S1.x * A1 + S1.y * B1) * (Ripple1Weight * MidFade)
                    + (S2.x * A2 + S2.y * B2) * (Ripple2Weight * RippleFade)
                    + (S3.x * A3 + S3.y * B3) * (Ripple3Weight * NearFade);
 RippleSlope *= RippleStrength * LookSea.z * lerp(0.55, 1.0, ChopF) * lerp(0.65, 1.1, saturate(Height / SwellH + 0.5));
+// Quieter patches (tens of metres, drifting with the wind) between rippled areas: the water colour and
+// wave faces stay readable there. Low-frequency channel of the foam texture (B), one extra sample.
+float QuietN = Texture2DSample(FoamTex, FoamTexSampler, float2(dot(XY, WDir), dot(XY, WPerp)) / QuietTile + float2(0.13, 0.71) - float2(RippleOffsets.w * 0.5, 0.0)).b;
+RippleSlope *= lerp(1.0 - QuietAmount, 1.0, smoothstep(0.3, 0.7, QuietN));
 // Slopes add in height-field form, so ripples keep their strength on steep wave faces and the shading
 // normal stays consistent with the displaced surface (GN is the exact normal of the displacement).
 float3 N = normalize(float3(GN.xy / max(GN.z, 0.15) + RippleSlope, 1.0));
@@ -151,6 +159,18 @@ float Variance = SpecAAVariance * (dot(dNx, dNx) + dot(dNy, dNy));
 float BaseRough = lerp(WaterRoughness, FarRoughness, saturate(Dist / max(FarRoughnessDistance, 1.0)));
 float Alpha2 = BaseRough * BaseRough * BaseRough * BaseRough + min(Variance, SpecAAMax);
 float Rough = sqrt(sqrt(Alpha2));
+
+// --- Reflection horizon occlusion (D26). Where the shading normal tilts away from the viewer, the reflected
+// ray points at or below the horizon: on a real sea it hits the next wave and reflects dark water. The
+// ocean is not in the ray-tracing scene, so those rays miss and return the bright horizon band or the
+// sky atmosphere's ground: the silver-grey / brownish streaks. Reduce the reflectance there (Specular
+// scales F0 and, through F90 = saturate(50 F0), the grazing Fresnel too). Angle-dependent Fresnel stays
+// intact everywhere the reflection sees the sky.
+float3 V = normalize(CamPos - WorldPos);
+float3 Rv = reflect(-V, N);
+float HorizonT = saturate((HorizonOccTop - Rv.z) / max(HorizonOccTop - HorizonOccBottom, 1e-3));
+float HorizonOcc = HorizonT * HorizonT * (3.0 - 2.0 * HorizonT) * HorizonOcclusion;
+SpecularOut = Specular * lerp(1.0, HorizonOccFloor, HorizonOcc);
 
 // --- Foam. Lace texture along the wind, drifting slowly with it.
 //   R graded lace, G bubble holes, B patchiness. Coverage erodes the lace: thin coverage leaves fragments.
@@ -191,7 +211,6 @@ RoughOut = lerp(Rough, 0.7, Foam);
 // --- Light through thin wave tops: only where the wave is high and steep (thin), strongest when the sun
 // is behind the wave and we look into its face; by the sun's brightness, not its colour (the light comes
 // out filtered by the water). Never a flat tint on every high point; far crests only hint at it.
-float3 V = normalize(CamPos - WorldPos);
 float3 L = normalize(SunDir);
 float Thin = saturate(CrestH * CrestH * saturate(1.0 - GN.z) * ThinScale);
 float Forward = pow(saturate(dot(-V, L) * 0.6 + 0.4), SSSBacklitPower);
@@ -200,17 +219,22 @@ float Glow = Thin * Forward * (0.35 + 0.65 * Facing) + SSSAmbient * CrestH * Cre
 Glow *= lerp(1.0, 0.3, saturate(Dist / max(SSSFarDistance, 1.0)));
 float SunLum = dot(SunIllum, float3(0.2126, 0.7152, 0.0722));
 EmissiveOut = LookCrest.rgb * SunLum * (Glow * SSSStrength * LookCrest.a * (1.0 - Foam));
+// Diagnostics: DebugView 1 = magenta where reflections are occluded (reflected ray at/below the horizon).
+EmissiveOut = lerp(EmissiveOut, float3(20000.0, 0.0, 20000.0) * HorizonT, saturate(DebugView));
 return N;
 """
 
 SCALARS = {
     # ripples
     "RippleTile1": (900.0, "Ripples"), "RippleTile2": (3800.0, "Ripples"), "RippleTile3": (150.0, "Ripples"),
-    "Ripple1Weight": (1.0, "Ripples"), "Ripple2Weight": (0.8, "Ripples"), "Ripple3Weight": (1.0, "Ripples"),
+    "Ripple1Weight": (0.85, "Ripples"), "Ripple2Weight": (0.5, "Ripples"), "Ripple3Weight": (0.35, "Ripples"),
     "RippleStrength": (0.2, "Ripples"), "RippleFadeDistance": (25000.0, "Ripples"),
     # surface
     "WaterRoughness": (0.03, "Surface"), "FarRoughness": (0.1, "Surface"), "FarRoughnessDistance": (30000.0, "Surface"),
-    "SpecAAVariance": (0.03, "Surface"), "SpecAAMax": (0.01, "Surface"),
+    "SpecAAVariance": (0.03, "Surface"), "SpecAAMax": (0.015, "Surface"), "PSMinWavelength": (500.0, "Waves"),
+    "QuietAmount": (0.25, "Ripples"), "QuietTile": (4500.0, "Ripples"),
+    "Specular": (0.3, "Surface"), "HorizonOcclusion": (1.0, "Surface"), "HorizonOccTop": (0.08, "Surface"),
+    "HorizonOccBottom": (0.0, "Surface"), "HorizonOccFloor": (0.2, "Surface"), "DebugView": (0.0, "Diagnostics"),
     # foam
     "FoamTile": (900.0, "Foam"), "FoamJRange": (0.3, "Foam"), "FoamSoftness": (0.12, "Foam"),
     "FoamAge1": (0.9, "Foam"), "FoamAge2": (2.2, "Foam"), "FoamDecay1": (0.75, "Foam"), "FoamDecay2": (0.45, "Foam"),
@@ -274,7 +298,8 @@ def make_material(mpc, ush):
     wp_ps = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -1200, 700)
     fade_ps = sb_ue.scalar_param(m, "WaveFadePS", 0.002, -1200, 800, "Waves")
     ripple_tex = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -1200, 900, parameter_name="RippleTex",
-                            texture=unreal.load_asset(DIR + "/Textures/T_OceanRipples_N"),
+                            # Soft (near-isotropic) ripples since D26; T_OceanRipples_N (elongated) is kept for comparison.
+                            texture=unreal.load_asset(DIR + "/Textures/T_OceanRipplesSoft_N"),
                             sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL, group="Ripples")
     foam_tex = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -1200, 1050, parameter_name="FoamTex",
                           texture=unreal.load_asset(DIR + "/Textures/T_OceanFoam_M"),
@@ -291,7 +316,7 @@ def make_material(mpc, ush):
     ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "RippleTex", "FoamTex", "WaterDepth", "SunDir", "SunIllum"]
                  + list(SCALARS) + WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA)
     ps = custom(m, -700, 900, "SaltOcean PS (normal, ripples, specular AA, foam, crest light)", ush + "\n" + PS_CODE, ps_inputs, F3,
-                [("FoamOut", F1), ("FoamColorOut", F3), ("RoughOut", F1), ("EmissiveOut", F3)])
+                [("FoamOut", F1), ("FoamColorOut", F3), ("RoughOut", F1), ("EmissiveOut", F3), ("SpecularOut", F1)])
     link(sun_dir, "", ps, "SunDir")
     link(sun_illum, "", ps, "SunIllum")
     link(interp, "", ps, "P0")
@@ -311,8 +336,7 @@ def make_material(mpc, ush):
     sb_ue.to_prop(ps, "FoamColorOut", unreal.MaterialProperty.MP_BASE_COLOR)
     sb_ue.to_prop(ps, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
     sb_ue.to_prop(ps, "EmissiveOut", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    spec = sb_ue.scalar_param(m, "Specular", 0.3, -400, 700, "Surface")
-    sb_ue.to_prop(spec, "", unreal.MaterialProperty.MP_SPECULAR)
+    sb_ue.to_prop(ps, "SpecularOut", unreal.MaterialProperty.MP_SPECULAR)
 
     # --- water volume (Single Layer Water output): absorption and scattering per region (MPC Look*).
     slw = sb_ue.expr(m, unreal.MaterialExpressionSingleLayerWaterMaterialOutput, 0, 1200)

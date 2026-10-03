@@ -32,6 +32,8 @@ SHOTS = {
         # Reference-like low view (owner's Sea of Thieves screenshot): 1.6 m above the water, looking
         # along the swell with the sun ahead-right.
         ("15_ref_low", (22000, -6000, 160), (-7, 95, 0)),
+        # Second reflection-check view (owner screenshot, 2026-10-03): low, towards the landmark.
+        ("16_ref_landmark", (22000, -6000, 250), (-9, 46, 0)),
     ],
 }
 
