@@ -160,7 +160,9 @@ Developer console (`~`, non-shipping builds):
 - **Performance:** revision 2 measured in standalone, 2560×1440 native, editor closed:
   - Day 75.7 fps (GPU 12.5 ms), Evening 69.6 fps (GPU 13.6 ms), Dusk 72.1 fps (GPU 13.1 ms).
   - This is within D8 (60 fps), but the headroom shrank from about 2× to 1.2×.
-  - Revision 3 (big swell, 215k-triangle Nanite boat section, denser clouds) has not been measured yet.
+  - Revision 3, same setup: Day 82.5 fps (GPU 11.4 ms, p95 13.0), Evening 81.3 fps (GPU 11.6 ms),
+    Dusk 72.4 fps (GPU 13.1 ms). This meets D8. Fewer cloud pixels and the Nanite boat section offset the
+    bigger swell.
 - The Jacobian foam trail samples the dominant wave direction only.
 - **Vsync frame pacing:** with vsync on, the standalone build runs at about 55–60 fps even though the GPU
   needs only about 7.5 ms. Default display settings (vsync off or a frame cap, later a settings menu) are needed.
@@ -179,7 +181,7 @@ Developer console (`~`, non-shipping builds):
 ## Next steps
 1. Owner review of M3 revision 2 (`Docs/Evidence/M3_rev2/`). Remaining checkpoint decisions: cabin
    concept, hull colour, sea state.
-2. Benchmark revision 2 in a standalone build with the editor closed (D18, D19).
+2. Owner feedback on revision 3 (`Docs/Evidence/M3_rev3/`); then M4 sailing (wind subsystem is in place).
 3. **M4 technical, independent of the decisions:**
    - Boat motion model: buoyancy from multi-point samples of the shared wave field, heave/pitch/roll response.
    - Simplified sailing: wind direction and strength, no-go zone, sail trim/raise, keel lateral resistance,
