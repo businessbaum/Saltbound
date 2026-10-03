@@ -215,96 +215,73 @@ def lantern():
 
 
 def dock_section():
+    """8 m harbour pier section: weathered, hand-made timber (D20). Same footprint and deck height as
+    before; every board, beam and post is an individual sb_timber piece with its own seed."""
+    import sb_timber as tb
     rng = random.Random(9)
     parts = []
-    L, W, top = 8.0, 2.4, 1.10
+    L, W, top, T = 8.0, 2.4, 1.10, 0.065
+    wood, pile = M["MI_Wood_DockWeathered"], M["MI_Wood_Piling"]
     piles_x = (-3.6, -1.2, 1.2, 3.6)
+    post_y = 1.3                                   # posts stand just outside the deck edge
+    seed = 100
+    half_pi = math.pi / 2
     for x in piles_x:
-        for y in (-1.05, 1.05):
-            p = sb.add_cylinder("piling", 0.145, 3.85, (x, y, -0.625), "Z", 22, M["MI_Wood_Piling"], radius_top=0.13)
-            sb.transform_obj(p, (rng.uniform(-0.025, 0.025), rng.uniform(-0.025, 0.025), rng.uniform(0, 6.28)), (x, y, -2.5))
-            sb.soften(p, 0.01, 2)
-            parts.append(p)
-        plank(parts, "joist", (0.12, W + 0.3, 0.20), (x, 0, top - 0.24 - 0.10), "MI_Wood_DockWeathered", bevel=0.01)
-    for y in (-1.05, 0.0, 1.05):
-        plank(parts, "stringer", (L, 0.12, 0.20), (0, y, top - 0.04 - 0.10), "MI_Wood_DockWeathered", bevel=0.01)
-    pw, gap = 0.18, 0.016
-    n = int(L / (pw + gap))
-    xs = -(n * (pw + gap)) / 2 + pw / 2
-    for i in range(n):
-        x = xs + i * (pw + gap)
-        ln = W + rng.uniform(-0.05, 0.08)
-        off = rng.uniform(-0.03, 0.03)
-        plank(parts, "deck", (pw - rng.uniform(0, 0.012), ln, 0.04), (x, off, top - 0.02 + rng.uniform(-0.004, 0.003)), "MI_Wood_DockWeathered",
-              rot=(0, rng.uniform(-0.006, 0.006), rng.uniform(-0.01, 0.01)), bevel=0.006)
-    # X-bracing on both long sides between pilings.
-    for y in (-1.2, 1.2):
+        for y in (-post_y, post_y):
+            seed += 1
+            parts.append(tb.rough_post("post", 0.15, 3.85, (x + rng.uniform(-0.02, 0.02), y, top + 0.27 - 3.85),
+                                       taper=0.88, material=pile, seed=seed))
+        seed += 1
+        # Joist across the dock, carried by the two posts.
+        parts.append(tb.rough_plank("beam", W + 0.75, 0.22, 0.14, (x, 0, top - T - 0.2 - 0.11),
+                                    (half_pi, 0, half_pi), wood, seed, wear=0.6, split_chance=0.1))
+    for y in (-1.0, 0.0, 1.0):
+        seed += 1
+        parts.append(tb.rough_plank("beam", L, 0.2, 0.14, (0, y, top - T - 0.1), (half_pi, 0, 0), wood, seed,
+                                    wear=0.6, split_chance=0.1))
+    # Deck boards: chunky, varied width, length and placement; grain along each board.
+    x = -L / 2
+    while True:
+        w = rng.uniform(0.2, 0.27)
+        if x + w > L / 2 + 0.01:
+            break
+        seed += 1
+        ln = W + rng.uniform(-0.1, 0.14)
+        parts.append(tb.rough_plank("board", ln, w, T, (x + w / 2, rng.uniform(-0.05, 0.05), top - T / 2 + rng.uniform(-0.004, 0.002)),
+                                    (math.radians(rng.uniform(-0.6, 0.6)), math.radians(rng.uniform(-0.4, 0.4)),
+                                     half_pi + math.radians(rng.uniform(-1.2, 1.2))), wood, seed))
+        x += w + rng.uniform(0.012, 0.026)
+    # X-bracing on both long sides between the posts (boards on edge).
+    for y in (-post_y - 0.12, post_y + 0.12):
         for a, b in zip(piles_x[:-1], piles_x[1:]):
-            mid = ((a + b) / 2, y, -0.1)
             span = math.hypot(b - a, 1.2)
+            ang = math.atan2(1.2, b - a)
             for sgn in (-1, 1):
-                plank(parts, "brace", (span, 0.04, 0.14), mid, "MI_Wood_DockWeathered", rot=(0, sgn * math.atan2(1.2, b - a), 0), bevel=0.006)
+                seed += 1
+                parts.append(tb.rough_plank("beam", span, 0.15, 0.05, ((a + b) / 2, y + sgn * 0.03, -0.1),
+                                            (half_pi, sgn * ang, 0), wood, seed, wear=0.7, split_chance=0.15))
     # Ladder on the +Y side.
     lx = -2.4
     for dx in (-0.22, 0.22):
-        plank(parts, "ladder_rail", (0.06, 0.06, 2.2), (lx + dx, 1.28, 0.05), "MI_Wood_DockWeathered", bevel=0.008)
+        seed += 1
+        parts.append(tb.rough_plank("beam", 2.2, 0.07, 0.07, (lx + dx, post_y + 0.08, 0.05), (0, -half_pi, 0), wood, seed, wear=0.5))
     for k in range(6):
-        plank(parts, "ladder_rung", (0.44, 0.05, 0.04), (lx, 1.28, -0.8 + k * 0.32), "MI_Wood_DockWeathered", bevel=0.006)
+        seed += 1
+        parts.append(tb.rough_plank("beam", 0.5, 0.06, 0.045, (lx, post_y + 0.08, -0.8 + k * 0.32), (half_pi, 0, 0), wood, seed, wear=0.4))
     # Iron bollard near the end.
     parts.append(sb.add_cylinder("bollard", 0.1, 0.30, (3.4, 0.0, top + 0.15), "Z", 16, M["MI_Metal_Iron"]))
     parts.append(sb.add_cylinder("bollard_cap", 0.14, 0.06, (3.4, 0.0, top + 0.32), "Z", 16, M["MI_Metal_Iron"], radius_top=0.12))
+    for p in parts[-2:]:
+        sb.world_box_uv(p, 1.0)
     ucx = [((L + 0.1, W + 0.1, 0.12), (0, 0, top - 0.06)),
            ((0.4, 0.4, 0.4), (3.4, 0.0, top + 0.2))]
     for x in piles_x:
-        for y in (-1.05, 1.05):
-            ucx.append(((0.3, 0.3, 3.7), (x, y, -0.6)))
-    obj, cols = finish(parts, "SM_DockSection", 9, waterline=0.0, wet=0.55, ucx=ucx, wear=1.2, jitter=0.0012)
+        for y in (-post_y, post_y):
+            ucx.append(((0.34, 0.34, 3.8), (x, y, top + 0.27 - 1.9)))
+    obj, cols = finish(parts, "SM_DockSection", 9, waterline=0.0, wet=0.55, ucx=ucx, wear=0.6, jitter=0.0)
+    print("SB_DOCK faces", len(obj.data.polygons), "parts", len(parts))
     sb.save_blend("SM_DockSection")
     export("SM_DockSection", obj, cols)
-
-
-def make_rock(name, size, chunks, seed, target_faces=1800, bottom=-3.0):
-    rng = random.Random(seed)
-    objs = []
-    for c in range(chunks):
-        bm = bmesh.new()
-        cx = rng.uniform(-0.28, 0.28) * size[0]
-        cy = rng.uniform(-0.28, 0.28) * size[1]
-        cz = rng.uniform(0.05, 0.35) * size[2] if c else 0.25 * size[2]
-        sx, sy, sz = (size[0] * rng.uniform(0.35, 0.55), size[1] * rng.uniform(0.35, 0.55), size[2] * rng.uniform(0.35, 0.6))
-        if c == 0:
-            sx, sy, sz = size[0] * 0.5, size[1] * 0.5, size[2] * 0.55
-        for _ in range(26):
-            v = Vector((rng.gauss(0, 1), rng.gauss(0, 1), rng.gauss(0, 1))).normalized() * (rng.uniform(0.75, 1.0))
-            bm.verts.new((cx + v.x * sx, cy + v.y * sy, cz + v.z * sz))
-        bmesh.ops.convex_hull(bm, input=bm.verts)
-        me = bpy.data.meshes.new(name + "_chunk")
-        bm.to_mesh(me)
-        bm.free()
-        objs.append(sb.new_object(name + "_chunk%d" % c, me))
-    rock = sb.join(objs, name)
-    # Extend the base below the water so rocks never float.
-    for v in rock.data.vertices:
-        if v.co.z < 0.15 * size[2]:
-            v.co.z = min(v.co.z, v.co.z * 0.3 + bottom * 0.7) if v.co.z < 0 else v.co.z
-    rm = rock.modifiers.new("Remesh", "REMESH")
-    rm.mode = "VOXEL"
-    rm.voxel_size = max(size) / 60.0
-    dec = rock.modifiers.new("Decimate", "DECIMATE")
-    dec.decimate_type = "COLLAPSE"
-    sb.apply_modifiers(rock)
-    faces = len(rock.data.polygons)
-    if faces > target_faces:
-        dec = rock.modifiers.new("Decimate", "DECIMATE")
-        dec.ratio = target_faces / faces
-        sb.apply_modifiers(rock)
-    for p in rock.data.polygons:
-        p.use_smooth = True
-    rock.data.materials.clear()
-    rock.data.materials.append(M["MI_Rock_Coast"])
-    sb.world_box_uv(rock, 4.0)
-    sb.bake_vertex_masks(rock, wear=0.6, waterline=0.0, wet_height=0.8, seed=seed, mode="convexity")
-    return rock
 
 
 ROCKS = (

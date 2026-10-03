@@ -62,7 +62,7 @@ float3 Base = Tint * Albedo * TexNormalize;
 Base *= lerp(1.0 - VarAmount, 1.0 + VarAmount, VC.b);
 Base = lerp(Base, Base * VarTint.rgb, VC.b * VarHue);
 Base *= lerp(1.0 - MacroAmount, 1.0 + MacroAmount, Macro.r);
-float Rough = saturate(ORM.g * RoughScale + RoughOffset);
+float Rough = saturate(ORM.g * RoughScale + RoughOffset + (VC.b - 0.5) * VarRough);
 float Metal = Metallic;
 // Edge wear: convex edges (vertex colour R) broken up by the wear mask.
 float Wear = saturate((VC.r * WearStrength - (1.0 - WearTex.r)) * 3.0);
@@ -115,6 +115,7 @@ def build_surface():
         "MacroAmount": ("s", 0.08, "Variation"),
         "RoughScale": ("s", 1.0, "Surface"),
         "RoughOffset": ("s", 0.0, "Surface"),
+        "VarRough": ("s", 0.0, "Variation"),
         "Metallic": ("s", 0.0, "Surface"),
         "AOStrength": ("s", 1.0, "Surface"),
         "WearStrength": ("s", 1.2, "Wear"),
@@ -303,6 +304,11 @@ def canvas_textures():
             "ORMTexture": TEX + "/Paint/T_PaintSurface_ORM"}
 
 
+def weathered_textures():
+    return {"BaseTexture": TEX + "/Wood/T_WoodWeathered_D", "NormalTexture": TEX + "/Wood/T_WoodWeathered_N",
+            "ORMTexture": TEX + "/Wood/T_WoodWeathered_ORM"}
+
+
 def wood_textures():
     return {"BaseTexture": TEX + "/Wood/T_WoodGrain_D", "NormalTexture": TEX + "/Wood/T_WoodGrain_N",
             "ORMTexture": TEX + "/Wood/T_WoodGrain_ORM"}
@@ -342,10 +348,17 @@ def main():
                               textures={"BaseTexture": "/Engine/EngineResources/WhiteSquareTexture"}),
         "MI_Canvas": dict(vectors={"Tint": (0.62, 0.58, 0.5, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.8, "RoughScale": 1.6, "WearStrength": 0.0, "UVScale": 2.0}, textures=canvas_textures()),
         # Harbour: weathered, cooler
-        "MI_Wood_DockWeathered": dict(vectors={"Tint": (0.15, 0.14, 0.125, 1), "WearColor": (0.3, 0.29, 0.27, 1), "GrimeColor": (0.18, 0.24, 0.12, 1), "VarTint": (0.9, 0.95, 1.0, 1)},
-                                      scalars={"RoughScale": 1.3, "NormalStrength": 1.4, "VarAmount": 0.26, "VarHue": 0.7, "GrimeAmount": 1.2, "GrimeRoughness": 0.45}, textures=wood_textures()),
-        "MI_Wood_Piling": dict(vectors={"Tint": (0.06, 0.05, 0.04, 1), "WearColor": (0.18, 0.15, 0.12, 1), "GrimeColor": (0.6, 1.1, 0.5, 1)},
-                               scalars={"RoughScale": 1.1, "NormalStrength": 1.6, "GrimeAmount": 1.3, "GrimeRoughness": 0.3}, textures=wood_textures()),
+        # Weathered dock timber (D20): desaturated grey-brown, olive-brown board variation, matte, broad grain;
+        # edge accents only where the wear mask breaks through (no continuous pale outlines).
+        "MI_Wood_DockWeathered": dict(vectors={"Tint": (0.074, 0.068, 0.056, 1), "WearColor": (0.19, 0.18, 0.155, 1),
+                                               "GrimeColor": (0.55, 0.62, 0.42, 1), "VarTint": (0.9, 1.0, 0.74, 1)},
+                                      scalars={"RoughScale": 1.0, "NormalStrength": 0.7, "VarAmount": 0.17, "VarHue": 0.9, "VarRough": 0.12,
+                                               "WearStrength": 0.55, "WearRoughness": 0.9, "GrimeAmount": 1.0, "GrimeRoughness": 0.45,
+                                               "MacroAmount": 0.06}, textures=weathered_textures()),
+        "MI_Wood_Piling": dict(vectors={"Tint": (0.055, 0.048, 0.04, 1), "WearColor": (0.12, 0.105, 0.09, 1), "GrimeColor": (0.6, 0.95, 0.45, 1),
+                                        "VarTint": (0.92, 1.0, 0.8, 1)},
+                               scalars={"RoughScale": 1.0, "NormalStrength": 1.2, "VarAmount": 0.12, "VarHue": 0.6, "VarRough": 0.1,
+                                        "WearStrength": 0.5, "GrimeAmount": 1.2, "GrimeRoughness": 0.35}, textures=weathered_textures()),
         "MI_Wood_Planks": dict(vectors={"Tint": (0.3, 0.2, 0.12, 1), "WearColor": (0.4, 0.32, 0.22, 1)}, scalars={"RoughScale": 1.2}, textures=wood_textures()),
     }
     for name, kw in lib.items():

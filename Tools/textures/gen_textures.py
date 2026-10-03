@@ -68,13 +68,29 @@ def save_normal(path, n):
 # --- textures --------------------------------------------------------------------------
 
 def ocean_ripples():
-    """Wind ripples, slightly stretched across the wind. Strong high frequencies give the crisp sun
-    glitter of the reference (many small facets catching the sun)."""
+    """Flowing wind ripples (U = along the wind): ridged, domain-warped noise at mid frequencies only.
+    Crests are sharp and run across the wind; there is no fine noise, so the sun breaks into glints that
+    follow the ripple shapes instead of a grainy glitter (owner reference, 2026-10-03)."""
     size = 1024
-    h = (spectral_noise(size, 6, 48, -1.6, seed=11, aniso=(1.0, 1.35)) * 0.55 +
-         spectral_noise(size, 24, 140, -1.1, seed=12) * 0.3 +
-         spectral_noise(size, 80, 300, -0.9, seed=13) * 0.15)
-    save_normal(os.path.join(OUT, "Water", "T_OceanRipples_N.png"), height_to_normal(h, 9.0))
+    wx = spectral_noise(size, 1, 6, -1.8, seed=14) * 0.04
+    wy = spectral_noise(size, 1, 6, -1.8, seed=15) * 0.04
+    iy, ix = np.mgrid[0:size, 0:size].astype(float)
+    def warped(field):
+        # Bilinear, periodic lookup (integer offsets leave hatching along the ridges).
+        fy, fx = iy + wy * size, ix + wx * size
+        y0, x0 = np.floor(fy).astype(int), np.floor(fx).astype(int)
+        ty, tx = fy - y0, fx - x0
+        y0 %= size; x0 %= size
+        y1, x1 = (y0 + 1) % size, (x0 + 1) % size
+        return (field[y0, x0] * (1 - tx) * (1 - ty) + field[y0, x1] * tx * (1 - ty)
+                + field[y1, x0] * (1 - tx) * ty + field[y1, x1] * tx * ty)
+    n1 = warped(spectral_noise(size, 6, 28, -1.6, seed=11, aniso=(1.0, 2.6)))
+    n2 = warped(spectral_noise(size, 14, 48, -1.4, seed=12, aniso=(1.0, 2.0)))
+    ridge1 = (1.0 - np.abs(n1)) ** 3
+    ridge2 = (1.0 - np.abs(n2)) ** 3
+    swell = spectral_noise(size, 2, 10, -1.8, seed=13, aniso=(1.0, 1.6))
+    h = ridge1 * 0.6 + ridge2 * 0.25 + swell * 0.35
+    save_normal(os.path.join(OUT, "Water", "T_OceanRipples_N.png"), height_to_normal(h, 12.0))
 
 
 def worley_grid(size, cells_x, cells_y=None, seed=0, warp=None):
@@ -151,7 +167,7 @@ def n01(a):
     return (a - a.min()) / (a.max() - a.min() + 1e-9)
 
 
-def wood_field(size, seed=0):
+def wood_field(size, seed=0, rings=90.0, line_w=0.07):
     """Shared straight-grain field (1 tile = 1 m, grain along U), Sea of Thieves deck reference:
     long, mostly straight grain lines of varying spacing and strength that wobble gently, only rarely a
     stretched arch, soft early/late wood bands, long fibre streaks, a few small knots.
@@ -176,10 +192,10 @@ def wood_field(size, seed=0):
         knot_bend += kr * 1.4 * np.exp(-(d / (kr * 3.5)) ** 2) * np.sign(ddy + 1e-9)
         knot_dark = np.maximum(knot_dark, np.clip(1.0 - d / kr, 0, 1) ** 0.6)
     pos = y + wobble + across * 0.02 + arch * 0.6 + knot_bend
-    phase = pos * 90.0                                           # ~1.1 cm between grain lines
+    phase = pos * rings                                          # 90: ~1.1 cm between grain lines
     frac = phase - np.floor(phase)
     strength = 0.35 + 0.65 * n01(spectral_noise(size, 2, 20, -1.5, seed=36 + seed, aniso=(4.0, 1.0)))
-    latewood = np.clip(1.0 - np.abs(frac - 0.85) / 0.07, 0, 1) * strength          # thin crisp lines
+    latewood = np.clip(1.0 - np.abs(frac - 0.85) / line_w, 0, 1) * strength       # thin crisp lines
     band = 0.5 + 0.5 * np.sin(2 * np.pi * pos * 22.0)                              # soft wide bands
     fibers = spectral_noise(size, 40, 500, -0.9, seed=34 + seed, aniso=(20.0, 1.0))
     broad = spectral_noise(size, 1, 6, -2.0, seed=35 + seed)
@@ -199,6 +215,25 @@ def wood_grain():
     ao = 1.0 - 0.12 * latewood - 0.2 * knot_dark
     rough = np.clip(0.62 + 0.12 * latewood - 0.05 * broad + 0.04 * np.abs(fibers), 0, 1)
     save_rgb(os.path.join(OUT, "Wood", "T_WoodGrain_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
+
+
+def wood_weathered():
+    """Weathered dock timber (tinted per material, 1 tile = 1 m, 2048 px, grain along U), D20:
+    broad simplified grain (wide soft bands ~3 cm apart, low contrast), long weathering streaks and
+    sculpted grooves in the normal map, almost no fine grain, matte."""
+    size = 2048
+    latewood, knot_dark, band, fibers, broad = wood_field(size, seed=11, rings=32.0, line_w=0.17)
+    streaks = spectral_noise_dir(size, 3, 30, -1.6, 120, 0.0, 12.0)
+    blotch = spectral_noise(size, 1, 6, -2.0, seed=121)
+    albedo = (0.6 + 0.05 * blotch + 0.035 * streaks - 0.06 * latewood + 0.015 * (band - 0.5)
+              - 0.01 * np.abs(fibers) - 0.16 * knot_dark)
+    rgb = np.stack([albedo, albedo * 0.96, albedo * 0.9], -1)
+    save_rgb(os.path.join(OUT, "Wood", "T_WoodWeathered_D.png"), rgb)
+    height = -latewood * 1.0 + streaks * 0.6 + band * 0.15 - knot_dark * 0.5 + fibers * 0.04
+    save_normal(os.path.join(OUT, "Wood", "T_WoodWeathered_N.png"), height_to_normal(height, 4.0))
+    ao = 1.0 - 0.1 * latewood - 0.15 * knot_dark
+    rough = np.clip(0.86 + 0.04 * latewood + 0.03 * streaks, 0, 1)
+    save_rgb(os.path.join(OUT, "Wood", "T_WoodWeathered_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
 
 
 def paint_wear():
@@ -405,6 +440,7 @@ GENERATORS = {
     "ocean_ripples": ocean_ripples,
     "ocean_foam": ocean_foam,
     "wood_grain": wood_grain,
+    "wood_weathered": wood_weathered,
     "paint_wear": paint_wear,
     "metal": metal,
     "rope": rope,

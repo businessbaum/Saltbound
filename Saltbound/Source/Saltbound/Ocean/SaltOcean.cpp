@@ -54,9 +54,11 @@ ASaltOcean::ASaltOcean()
 
 	// Content defaults (MPC, material, tile meshes) are resolved in OnConstruction; see SaltContent.h.
 
-	// Rolling swell from the west-south-west with wind sea on top: 12 components spread +-55 deg around
-	// the wind (20 deg), wavelengths 42 m .. 0.8 m. Peaks reach ~1.3 m where components align.
-	// Sum of steepness = 0.9 (keeps the surface free of loops).
+	// Open-sea default (owner reference: Sea of Thieves, 2026-10-03): three long swells from neighbouring
+	// directions interfere into irregular groups (no evenly spaced crests); most of the horizontal
+	// (Gerstner) displacement sits in them, which gives narrow crests and broad troughs. Wind waves and
+	// short waves ride on top in a clear hierarchy of scale. Peaks reach ~2-3 m where swells align.
+	// Sum of steepness = 0.975 (just below 1: compressed crests foam, but the surface never loops).
 	auto Add = [this](float Dir, float Lambda, float Amp, float Steep, float Phase)
 	{
 		FSaltWaveSpec S;
@@ -67,18 +69,18 @@ ASaltOcean::ASaltOcean()
 		S.PhaseOffset = Phase;
 		Waves.Add(S);
 	};
-	Add(20.f, 4200.f, 50.f, 0.10f, 0.0f);
-	Add(50.f, 3000.f, 36.f, 0.11f, 1.3f);
-	Add(-5.f, 2100.f, 24.f, 0.12f, 2.1f);
-	Add(35.f, 1400.f, 15.f, 0.12f, 4.0f);
-	Add(75.f, 950.f, 9.f, 0.10f, 0.7f);
-	Add(0.f, 650.f, 6.f, 0.09f, 5.2f);
-	Add(-35.f, 450.f, 4.f, 0.08f, 3.3f);
-	Add(60.f, 320.f, 2.6f, 0.07f, 1.9f);
-	Add(15.f, 220.f, 1.6f, 0.05f, 2.8f);
-	Add(-60.f, 160.f, 1.0f, 0.03f, 0.4f);
-	Add(95.f, 110.f, 0.6f, 0.02f, 4.6f);
-	Add(40.f, 80.f, 0.4f, 0.01f, 3.7f);
+	Add(20.f, 6800.f, 95.f, 0.24f, 0.0f);
+	Add(42.f, 4700.f, 75.f, 0.20f, 1.3f);
+	Add(2.f, 3300.f, 52.f, 0.16f, 2.1f);
+	Add(58.f, 2200.f, 32.f, 0.11f, 4.0f);
+	Add(-15.f, 1500.f, 20.f, 0.08f, 0.7f);
+	Add(32.f, 1000.f, 12.f, 0.06f, 5.2f);
+	Add(75.f, 680.f, 7.5f, 0.04f, 3.3f);
+	Add(-35.f, 470.f, 4.5f, 0.03f, 1.9f);
+	Add(12.f, 330.f, 3.f, 0.025f, 2.8f);
+	Add(50.f, 230.f, 1.8f, 0.015f, 0.4f);
+	Add(-60.f, 160.f, 1.1f, 0.01f, 4.6f);
+	Add(95.f, 110.f, 0.7f, 0.005f, 3.7f);
 }
 
 void ASaltOcean::OnConstruction(const FTransform& Transform)

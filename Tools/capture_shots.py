@@ -24,6 +24,11 @@ SHOTS = {
         ("08_dock_end", (1250, -150, 275), (-18, 120, 0)),
         ("09_open_sea", (22000, -6000, 260), (-3, 35, 0)),
         ("10_open_sea_sun", (22000, -6000, 260), (-3, 120, 0)),
+        # Owner reference comparisons (session 2): first person on the pier, low over the open sea.
+        ("11_dock_fp", (-160, 45, 285), (-16, 6, 0)),
+        ("12_dock_fp_boat", (650, -60, 285), (-14, 40, 0)),
+        ("13_sea_low", (22000, -6000, 330), (-6, 30, 0)),
+        ("14_sea_low_cross", (22000, -6000, 330), (-6, 105, 0)),
     ],
 }
 

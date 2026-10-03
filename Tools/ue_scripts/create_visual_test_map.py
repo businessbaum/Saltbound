@@ -66,9 +66,9 @@ zone = unreal.SaltCalmZone()
 zone.set_editor_property("center", unreal.Vector2D(500, 300))
 zone.set_editor_property("inner_radius", 2500.0)
 zone.set_editor_property("outer_radius", 15000.0)
-zone.set_editor_property("min_factor", 0.5)
+zone.set_editor_property("min_factor", 0.15)  # sheltered cove; the open sea keeps the full swell
 ocean.set_editor_property("calm_zones", [zone])
-ocean.set_editor_property("amplitude_scale", 1.5)
+ocean.set_editor_property("amplitude_scale", 1.6)   # powerful open-sea swell (owner reference)
 
 # --- seabed --------------------------------------------------------------------------------------------
 CUBE = "/Engine/BasicShapes/Cube"
