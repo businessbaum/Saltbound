@@ -95,12 +95,22 @@ struct SALTBOUND_API FSaltWaveField
 	float CalmMin[MaxCalmZones];
 	double WaterLevel = 0.0;
 
+	/** Waves [0, SwellCount) are swell; the rest (medium waves and chop) vary in patches (ChopFactor). */
+	int32 SwellCount = 3;
+	/** Chop factor in the calmest patches (1 = no variation). */
+	float ChopMin = 1.f;
+	/** 2 pi / patch size (rad/cm). */
+	float ChopFreq = 0.f;
+
 	FSaltWaveField();
 
 	void Build(const TArray<FSaltWaveSpec>& Specs, float AmplitudeScale, float SteepnessScale, const TArray<FSaltCalmZone>& Zones, double InWaterLevel);
 	void SetTime(double TimeSeconds);
 
 	float Attenuation(const FVector2D& P) const;
+	/** Smooth, static patches of calmer and choppier water (0..1 noise mapped to [ChopMin, 1]). */
+	float ChopFactor(const FVector2D& P) const;
+	void SetChop(int32 InSwellCount, float Variation, float PatchSize);
 	FVector Displacement(const FVector2D& P0) const;
 	void NormalAndJacobian(const FVector2D& P0, FVector& OutNormal, float& OutJacobian) const;
 

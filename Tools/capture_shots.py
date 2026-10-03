@@ -29,6 +29,9 @@ SHOTS = {
         ("12_dock_fp_boat", (650, -60, 285), (-14, 40, 0)),
         ("13_sea_low", (22000, -6000, 330), (-6, 30, 0)),
         ("14_sea_low_cross", (22000, -6000, 330), (-6, 105, 0)),
+        # Reference-like low view (owner's Sea of Thieves screenshot): 1.6 m above the water, looking
+        # along the swell with the sun ahead-right.
+        ("15_ref_low", (22000, -6000, 160), (-7, 95, 0)),
     ],
 }
 

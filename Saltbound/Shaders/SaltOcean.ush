@@ -2,13 +2,14 @@
 //
 // MUST stay in sync with Source/Saltbound/Ocean/SaltWaveTypes.cpp (CPU side). Both evaluate:
 //   theta_i  = dot(K_i, P0) - Phase_i
-//   Disp.xy  = sum D_i * H_i * att * cos(theta_i)       (D_i = K_i / |K_i|)
-//   Disp.z   = sum A_i * att * sin(theta_i)
-//   att      = calm-zone attenuation at P0 (min over zones, smoothstep falloff)
+//   F_i      = att * (i < SwellCount ? 1 : chop)        att: calm zones, chop: calmer/choppier patches
+//   Disp.xy  = sum D_i * H_i * F_i * cos(theta_i)       (D_i = K_i / |K_i|)
+//   Disp.z   = sum A_i * F_i * sin(theta_i)
 // Units: centimetres, radians. Phases are wrapped to [0, 2pi) on the CPU in double precision.
 // Rendering-only addition: waves shorter than the sampling footprint fade out with view distance
 // (FadeK = distance * fade scale; wavelength factor = saturate(lambda / FadeK - 1)). CPU queries use
 // FadeK = 0 (no fade), which matches the rendered surface near the viewer where gameplay happens.
+// Calm-zone and chop factors vary over hundreds of metres; their derivatives are ignored in the normals.
 //
 // This file is embedded into Custom material expressions by Tools/ue_scripts/setup_ocean.py
 // (the struct trick lets a single Custom node define helper functions).
@@ -19,11 +20,12 @@ struct FSaltOcean
 	float  Ph[12];   // phases
 	float4 Calm[4];  // centre X, centre Y, inner radius, outer radius
 	float4 CalmMin;  // amplitude factor at each zone centre
+	float4 Chop;     // x: factor in calm patches, y: 2pi / patch size, z: swell count, w: swell height (cm)
 	int    Count;
 
 	void Init(float4 W0, float4 W1, float4 W2, float4 W3, float4 W4, float4 W5, float4 W6, float4 W7,
 		float4 W8, float4 W9, float4 W10, float4 W11, float4 P0123, float4 P4567, float4 P891011,
-		float4 C0, float4 C1, float4 C2, float4 C3, float4 CMin, float WaveCount)
+		float4 C0, float4 C1, float4 C2, float4 C3, float4 CMin, float4 InChop, float WaveCount)
 	{
 		WA[0] = W0; WA[1] = W1; WA[2] = W2; WA[3] = W3; WA[4] = W4; WA[5] = W5;
 		WA[6] = W6; WA[7] = W7; WA[8] = W8; WA[9] = W9; WA[10] = W10; WA[11] = W11;
@@ -32,6 +34,7 @@ struct FSaltOcean
 		Ph[8] = P891011.x; Ph[9] = P891011.y; Ph[10] = P891011.z; Ph[11] = P891011.w;
 		Calm[0] = C0; Calm[1] = C1; Calm[2] = C2; Calm[3] = C3;
 		CalmMin = CMin;
+		Chop = InChop;
 		Count = (int)clamp(WaveCount, 0.0, 12.0);
 	}
 
@@ -48,21 +51,42 @@ struct FSaltOcean
 		return Att;
 	}
 
+	float ChopFactor(float2 P)
+	{
+		if (Chop.x >= 1.0 || Chop.y <= 0.0)
+		{
+			return 1.0;
+		}
+		const float X = P.x * Chop.y, Y = P.y * Chop.y;
+		const float A = sin(X * 0.83 + Y * 0.31 + 1.3);
+		const float B = sin(-X * 0.27 + Y * 0.91 + 4.1);
+		const float C = sin(X * 0.58 - Y * 0.66 + 2.6);
+		const float N = saturate(0.5 + 0.28 * (A + B) + 0.18 * C);
+		const float T = saturate((N - 0.25) / 0.5);
+		return lerp(Chop.x, 1.0, T * T * (3.0 - 2.0 * T));
+	}
+
 	float Fade(float2 K, float FadeK)
 	{
 		const float Lambda = 6.2831853 / max(length(K), 1e-6);
 		return saturate(Lambda / max(FadeK, 1e-3) - 1.0);
 	}
 
+	float WaveFactor(int i, float Att, float ChopF)
+	{
+		return Att * (i < (int)Chop.z ? 1.0 : ChopF);
+	}
+
 	float3 Displacement(float2 P0, float FadeK)
 	{
 		const float Att = Attenuation(P0);
+		const float ChopF = ChopFactor(P0);
 		float3 Disp = 0;
 		for (int i = 0; i < Count; i++)
 		{
 			const float2 K = WA[i].xy;
 			const float2 D = K / max(length(K), 1e-6);
-			const float F = Att * Fade(K, FadeK);
+			const float F = WaveFactor(i, Att, ChopF) * Fade(K, FadeK);
 			float S, C;
 			sincos(dot(K, P0) - Ph[i], S, C);
 			Disp.xy += D * (WA[i].w * F * C);
@@ -75,13 +99,14 @@ struct FSaltOcean
 	void NormalAndJacobian(float2 P0, float FadeK, out float3 Normal, out float Jacobian)
 	{
 		const float Att = Attenuation(P0);
+		const float ChopF = ChopFactor(P0);
 		float3 Dx = float3(1, 0, 0);
 		float3 Dy = float3(0, 1, 0);
 		for (int i = 0; i < Count; i++)
 		{
 			const float2 K = WA[i].xy;
 			const float2 D = K / max(length(K), 1e-6);
-			const float F = Att * Fade(K, FadeK);
+			const float F = WaveFactor(i, Att, ChopF) * Fade(K, FadeK);
 			const float A = WA[i].z * F;
 			const float H = WA[i].w * F;
 			float S, C;
@@ -93,5 +118,26 @@ struct FSaltOcean
 		}
 		Normal = normalize(cross(Dx, Dy));
 		Jacobian = Dx.x * Dy.y - Dx.y * Dy.x;
+	}
+
+	// Horizontal Jacobian of the same water (Lagrangian P0) DeltaT seconds ago: phases run back by
+	// omega * DeltaT (deep water: omega = sqrt(g k)). Used for foam that stays behind breaking crests.
+	float JacobianAt(float2 P0, float FadeK, float DeltaT)
+	{
+		const float Att = Attenuation(P0);
+		const float ChopF = ChopFactor(P0);
+		float2 Dx = float2(1, 0);
+		float2 Dy = float2(0, 1);
+		for (int i = 0; i < Count; i++)
+		{
+			const float2 K = WA[i].xy;
+			const float Kl = max(length(K), 1e-6);
+			const float2 D = K / Kl;
+			const float H = WA[i].w * WaveFactor(i, Att, ChopF) * Fade(K, FadeK);
+			const float S = sin(dot(K, P0) - Ph[i] + sqrt(980.665 * Kl) * DeltaT);
+			Dx += D * (-H * S * K.x);
+			Dy += D * (-H * S * K.y);
+		}
+		return Dx.x * Dy.y - Dx.y * Dy.x;
 	}
 };

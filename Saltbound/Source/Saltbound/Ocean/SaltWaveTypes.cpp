@@ -69,17 +69,43 @@ float FSaltWaveField::Attenuation(const FVector2D& P) const
 	return Att;
 }
 
+void FSaltWaveField::SetChop(int32 InSwellCount, float Variation, float PatchSize)
+{
+	SwellCount = FMath::Max(0, InSwellCount);
+	ChopMin = 1.f - FMath::Clamp(Variation, 0.f, 1.f);
+	ChopFreq = PatchSize > 1.f ? (float)(2.0 * UE_DOUBLE_PI / PatchSize) : 0.f;
+}
+
+float FSaltWaveField::ChopFactor(const FVector2D& P) const
+{
+	if (ChopMin >= 1.f || ChopFreq <= 0.f)
+	{
+		return 1.f;
+	}
+	// Three skewed plane waves at incommensurate frequencies: irregular patches, no visible grid.
+	const float X = (float)P.X * ChopFreq, Y = (float)P.Y * ChopFreq;
+	const float A = FMath::Sin(X * 0.83f + Y * 0.31f + 1.3f);
+	const float B = FMath::Sin(-X * 0.27f + Y * 0.91f + 4.1f);
+	const float C = FMath::Sin(X * 0.58f - Y * 0.66f + 2.6f);
+	const float N = FMath::Clamp(0.5f + 0.28f * (A + B) + 0.18f * C, 0.f, 1.f);
+	const float T = FMath::Clamp((N - 0.25f) / 0.5f, 0.f, 1.f);
+	return FMath::Lerp(ChopMin, 1.f, T * T * (3.f - 2.f * T));
+}
+
 FVector FSaltWaveField::Displacement(const FVector2D& P0) const
 {
 	const float Att = Attenuation(P0);
+	const float Chop = ChopFactor(P0);
 	FVector Disp = FVector::ZeroVector;
-	for (const FWave& W : Waves)
+	for (int32 i = 0; i < Waves.Num(); ++i)
 	{
+		const FWave& W = Waves[i];
+		const float F = Att * (i < SwellCount ? 1.f : Chop);
 		float S, C;
 		FMath::SinCos(&S, &C, (float)FVector2D::DotProduct(W.K, P0) - W.Phase);
-		Disp.X += W.Dir.X * (W.Horizontal * Att * C);
-		Disp.Y += W.Dir.Y * (W.Horizontal * Att * C);
-		Disp.Z += W.Amplitude * Att * S;
+		Disp.X += W.Dir.X * (W.Horizontal * F * C);
+		Disp.Y += W.Dir.Y * (W.Horizontal * F * C);
+		Disp.Z += W.Amplitude * F * S;
 	}
 	return Disp;
 }
@@ -87,12 +113,15 @@ FVector FSaltWaveField::Displacement(const FVector2D& P0) const
 void FSaltWaveField::NormalAndJacobian(const FVector2D& P0, FVector& OutNormal, float& OutJacobian) const
 {
 	const float Att = Attenuation(P0);
+	const float Chop = ChopFactor(P0);
 	FVector Dx(1.f, 0.f, 0.f);
 	FVector Dy(0.f, 1.f, 0.f);
-	for (const FWave& W : Waves)
+	for (int32 i = 0; i < Waves.Num(); ++i)
 	{
-		const float A = W.Amplitude * Att;
-		const float H = W.Horizontal * Att;
+		const FWave& W = Waves[i];
+		const float F = Att * (i < SwellCount ? 1.f : Chop);
+		const float A = W.Amplitude * F;
+		const float H = W.Horizontal * F;
 		float S, C;
 		FMath::SinCos(&S, &C, (float)FVector2D::DotProduct(W.K, P0) - W.Phase);
 		Dx.X += W.Dir.X * (-H * S * W.K.X);

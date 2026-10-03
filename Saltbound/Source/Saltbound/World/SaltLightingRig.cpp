@@ -1,43 +1,105 @@
-// Saltbound - lighting presets (day / evening ...) applied to the scene's sun, sky, fog and exposure.
+// Saltbound - environment rig: time of day, region, weather and sea state, applied to sun, sky, fog, clouds,
+// post-processing and the ocean.
 
 #include "World/SaltLightingRig.h"
 
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "Components/VolumetricCloudComponent.h"
+#include "Core/SaltContent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/SkyLight.h"
+#include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialParameterCollection.h"
+#include "Materials/MaterialParameterCollectionInstance.h"
+#include "Ocean/SaltOcean.h"
 #include "Props/SaltLantern.h"
 #include "Saltbound.h"
 
 namespace
 {
-	FAutoConsoleCommandWithWorldAndArgs CmdLighting(
-		TEXT("sb.Lighting"),
-		TEXT("Apply a lighting preset: sb.Lighting Day | Evening"),
-		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	template <typename Fn>
+	void ForEachRig(UWorld* World, Fn&& F)
+	{
+		if (World)
 		{
-			if (!World || Args.Num() == 0)
-			{
-				return;
-			}
 			for (TActorIterator<ASaltLightingRig> It(World); It; ++It)
 			{
-				It->ApplyPreset(FName(*Args[0]));
+				F(**It);
 			}
+		}
+	}
+
+	float BlendArg(const TArray<FString>& Args)
+	{
+		return Args.Num() > 1 ? FCString::Atof(*Args[1]) : 0.f;
+	}
+
+	FAutoConsoleCommandWithWorldAndArgs CmdLighting(
+		TEXT("sb.Lighting"),
+		TEXT("Time of day: sb.Lighting Day | Evening | Dusk"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (Args.Num() > 0) { ForEachRig(World, [&](ASaltLightingRig& R) { R.ApplyPreset(FName(*Args[0])); }); }
 		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdRegion(
+		TEXT("sb.Region"),
+		TEXT("Sea region: sb.Region ShoresOfPlenty | AncientIsles | Wilds | DevilsRoar [BlendSeconds]"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (Args.Num() > 0) { ForEachRig(World, [&](ASaltLightingRig& R) { R.SetRegion(FName(*Args[0]), BlendArg(Args)); }); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdWeather(
+		TEXT("sb.Weather"),
+		TEXT("Weather: sb.Weather Clear | Cloudy | Overcast | Storm [BlendSeconds]"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (Args.Num() > 0) { ForEachRig(World, [&](ASaltLightingRig& R) { R.SetWeather(FName(*Args[0]), BlendArg(Args)); }); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdSeaState(
+		TEXT("sb.SeaState"),
+		TEXT("Sea state: sb.SeaState Calm | Moderate | Rough | Storm [BlendSeconds]"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (Args.Num() > 0) { ForEachRig(World, [&](ASaltLightingRig& R) { R.SetSeaState(FName(*Args[0]), BlendArg(Args)); }); }
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdEnv(
+		TEXT("sb.Env"),
+		TEXT("Print the environment layers (time of day, region, weather, sea state)."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ForEachRig(World, [&](ASaltLightingRig& R) { UE_LOG(LogSaltbound, Display, TEXT("SB_ENV %s"), *R.DescribeEnvironment()); });
+		}));
+
+	FLinearColor Mul(const FLinearColor& A, const FLinearColor& B) { return FLinearColor(A.R * B.R, A.G * B.G, A.B * B.B, A.A); }
+	float Smooth(float T) { T = FMath::Clamp(T, 0.f, 1.f); return T * T * (3.f - 2.f * T); }
+
+	const FName PAbsorption(TEXT("LookAbsorption"));
+	const FName PScattering(TEXT("LookScattering"));
+	const FName PCrest(TEXT("LookCrest"));
+	const FName PFoam(TEXT("LookFoam"));
+	const FName PSea(TEXT("LookSea"));
 }
 
 ASaltLightingRig::ASaltLightingRig()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
 
+	// --- Time of day.
 	// Stylised realism (owner reference: Sea of Thieves): golden sun with a large disc (big soft sun
 	// reflection on the sea), cool sky fill so shadows read blue, a deep blue sky with little white haze,
 	// blue distance haze that fades far islands into the sky, rich but controlled colour (saturation and
@@ -110,14 +172,374 @@ ASaltLightingRig::ASaltLightingRig()
 	Dusk.Gain = FLinearColor(0.96f, 0.98f, 1.06f);
 	Dusk.bLanternsLit = true;
 	Presets.Add(Dusk);
+
+	// --- Regions (D25). Reference directions from the Sea of Thieves regions; water values are absolute,
+	// atmosphere / light / grading multiply the time-of-day preset.
+	FSaltRegionPreset Shores;          // bright tropical blues, turquoise shallows, clear sunny reflections
+	Shores.Name = TEXT("ShoresOfPlenty");
+	Regions.Add(Shores);
+
+	FSaltRegionPreset Ancient;         // richer blue and teal water, lush humid tropical atmosphere
+	Ancient.Name = TEXT("AncientIsles");
+	Ancient.WaterAbsorption = FLinearColor(1.45f, 0.24f, 0.17f);
+	Ancient.WaterScattering = FLinearColor(0.007f, 0.058f, 0.068f);
+	Ancient.CrestLightColor = FLinearColor(0.1f, 0.92f, 0.68f);
+	Ancient.FoamColor = FLinearColor(0.86f, 0.92f, 0.88f);
+	Ancient.MieScaleMul = 1.8f;
+	Ancient.FogDensityMul = 1.5f;
+	Ancient.FogTint = FLinearColor(0.88f, 1.05f, 0.95f);
+	Ancient.FogDirectionalTint = FLinearColor(1.12f, 1.0f, 0.82f);
+	Ancient.SunTint = FLinearColor(1.f, 0.96f, 0.88f);
+	Ancient.SkyLightTint = FLinearColor(0.95f, 1.03f, 0.95f);
+	Ancient.CloudCoverage = -0.22f;
+	Ancient.SaturationMul = 1.08f;
+	Ancient.GainMul = FLinearColor(1.f, 1.02f, 0.98f);
+	Regions.Add(Ancient);
+
+	FSaltRegionPreset Wilds;           // muted, murkier green-grey water, cloudier light, clear surface shading
+	Wilds.Name = TEXT("Wilds");
+	Wilds.WaterAbsorption = FLinearColor(0.85f, 0.3f, 0.42f);
+	Wilds.WaterScattering = FLinearColor(0.022f, 0.036f, 0.028f);
+	Wilds.CrestLightColor = FLinearColor(0.35f, 0.62f, 0.42f);
+	Wilds.CrestLightStrength = 0.45f;
+	Wilds.FoamColor = FLinearColor(0.78f, 0.8f, 0.75f);
+	Wilds.RayleighScaleMul = 0.7f;
+	Wilds.MieScaleMul = 2.6f;
+	Wilds.SkyLuminance = FLinearColor(0.86f, 0.9f, 0.86f);
+	Wilds.FogDensityMul = 2.6f;
+	Wilds.FogTint = FLinearColor(0.72f, 0.8f, 0.72f);
+	Wilds.FogDirectionalTint = FLinearColor(0.6f, 0.62f, 0.55f);
+	Wilds.SunTint = FLinearColor(0.95f, 0.97f, 1.f);
+	Wilds.SunIntensityMul = 0.55f;
+	Wilds.SkyLightTint = FLinearColor(0.95f, 1.f, 0.95f);
+	Wilds.CloudCoverage = -0.02f;
+	Wilds.CloudAlbedo = FLinearColor(0.8f, 0.82f, 0.82f);
+	Wilds.SaturationMul = 0.78f;
+	Wilds.ContrastMul = 0.98f;
+	Wilds.ShadowGainMul = FLinearColor(0.96f, 1.f, 0.96f);
+	Regions.Add(Wilds);
+
+	FSaltRegionPreset Roar;            // dark volcanic atmosphere: ash sky, warm glow; the water stays water
+	Roar.Name = TEXT("DevilsRoar");
+	Roar.WaterAbsorption = FLinearColor(1.1f, 0.42f, 0.32f);
+	Roar.WaterScattering = FLinearColor(0.01f, 0.02f, 0.027f);
+	Roar.CrestLightColor = FLinearColor(0.25f, 0.55f, 0.55f);
+	Roar.CrestLightStrength = 0.45f;
+	Roar.FoamColor = FLinearColor(0.7f, 0.68f, 0.65f);
+	Roar.RayleighScaleMul = 0.5f;
+	Roar.MieScaleMul = 4.f;
+	Roar.MieAbsorptionScale = 0.004f;
+	Roar.SkyLuminance = FLinearColor(0.55f, 0.42f, 0.36f);
+	Roar.FogDensityMul = 3.f;
+	Roar.FogTint = FLinearColor(0.45f, 0.32f, 0.28f);
+	Roar.FogDirectionalTint = FLinearColor(1.4f, 0.55f, 0.25f);
+	Roar.SunTint = FLinearColor(1.f, 0.72f, 0.52f);
+	Roar.SunIntensityMul = 0.45f;
+	Roar.SkyLightTint = FLinearColor(0.9f, 0.75f, 0.68f);
+	Roar.SkyLightMul = 0.8f;
+	Roar.CloudCoverage = 0.05f;
+	Roar.CloudAlbedo = FLinearColor(0.42f, 0.38f, 0.36f);
+	Roar.SaturationMul = 0.92f;
+	Roar.ContrastMul = 1.08f;
+	Roar.GainMul = FLinearColor(1.03f, 0.98f, 0.94f);
+	Roar.ShadowGainMul = FLinearColor(0.9f, 0.88f, 0.9f);
+	Regions.Add(Roar);
+
+	// --- Weather.
+	FSaltWeatherPreset Clear;
+	Clear.Name = TEXT("Clear");
+	Weathers.Add(Clear);
+	FSaltWeatherPreset Cloudy;
+	Cloudy.Name = TEXT("Cloudy");
+	Cloudy.CloudCoverageOffset = 0.12f;
+	Cloudy.SunIntensityMul = 0.85f;
+	Weathers.Add(Cloudy);
+	FSaltWeatherPreset Overcast;
+	Overcast.Name = TEXT("Overcast");
+	Overcast.CloudCoverageOffset = 0.4f;
+	Overcast.CloudAlbedoMul = 0.85f;
+	Overcast.SunIntensityMul = 0.3f;
+	Overcast.SkyLightMul = 0.85f;
+	Overcast.FogDensityMul = 1.5f;
+	Overcast.SaturationMul = 0.85f;
+	Overcast.ContrastMul = 0.95f;
+	Weathers.Add(Overcast);
+	FSaltWeatherPreset Storm;
+	Storm.Name = TEXT("Storm");
+	Storm.CloudCoverageOffset = 0.55f;
+	Storm.CloudAlbedoMul = 0.5f;
+	Storm.SunIntensityMul = 0.12f;
+	Storm.SkyLightMul = 0.55f;
+	Storm.FogDensityMul = 2.2f;
+	Storm.SaturationMul = 0.72f;
+	Weathers.Add(Storm);
+
+	// --- Sea states (Rough matches the owner's reference image).
+	auto Sea = [this](const TCHAR* Name, float H, float St, float Chop, float WStart, float WAmt, float Patch, float Rip, float Spray)
+	{
+		FSaltSeaStatePreset S;
+		S.Name = Name; S.WaveHeight = H; S.WaveSteepness = St; S.ChopVariation = Chop; S.WhitecapStart = WStart;
+		S.WhitecapAmount = WAmt; S.BreakPatchiness = Patch; S.RippleScale = Rip; S.SprayAmount = Spray;
+		SeaStates.Add(S);
+	};
+	Sea(TEXT("Calm"), 0.3f, 0.55f, 0.4f, 0.15f, 0.f, 3.f, 0.6f, 0.f);
+	Sea(TEXT("Moderate"), 0.65f, 0.85f, 0.55f, 0.45f, 0.6f, 2.6f, 0.85f, 0.2f);
+	Sea(TEXT("Rough"), 1.3f, 1.f, 0.6f, 0.6f, 1.f, 2.2f, 1.f, 0.6f);
+	Sea(TEXT("Storm"), 1.55f, 1.05f, 0.5f, 0.72f, 1.f, 1.5f, 1.25f, 1.f);
+}
+
+// --- Layers ---------------------------------------------------------------------------------------
+
+FSaltRegionPreset ASaltLightingRig::LerpRegion(const FSaltRegionPreset& A, const FSaltRegionPreset& B, float T)
+{
+	FSaltRegionPreset R = T < 0.5f ? A : B;
+	auto L = [T](float X, float Y) { return FMath::Lerp(X, Y, T); };
+	auto C = [T](const FLinearColor& X, const FLinearColor& Y) { return X + (Y - X) * T; };
+	R.WaterAbsorption = C(A.WaterAbsorption, B.WaterAbsorption);
+	R.WaterScattering = C(A.WaterScattering, B.WaterScattering);
+	R.CrestLightColor = C(A.CrestLightColor, B.CrestLightColor);
+	R.CrestLightStrength = L(A.CrestLightStrength, B.CrestLightStrength);
+	R.FoamColor = C(A.FoamColor, B.FoamColor);
+	R.RayleighColor = C(A.RayleighColor, B.RayleighColor);
+	R.RayleighScaleMul = L(A.RayleighScaleMul, B.RayleighScaleMul);
+	R.MieScaleMul = L(A.MieScaleMul, B.MieScaleMul);
+	R.MieAbsorptionScale = L(A.MieAbsorptionScale, B.MieAbsorptionScale);
+	R.SkyLuminance = C(A.SkyLuminance, B.SkyLuminance);
+	R.FogDensityMul = L(A.FogDensityMul, B.FogDensityMul);
+	R.FogTint = C(A.FogTint, B.FogTint);
+	R.FogDirectionalTint = C(A.FogDirectionalTint, B.FogDirectionalTint);
+	R.SunTint = C(A.SunTint, B.SunTint);
+	R.SunIntensityMul = L(A.SunIntensityMul, B.SunIntensityMul);
+	R.SkyLightTint = C(A.SkyLightTint, B.SkyLightTint);
+	R.SkyLightMul = L(A.SkyLightMul, B.SkyLightMul);
+	R.CloudCoverage = L(A.CloudCoverage, B.CloudCoverage);
+	R.CloudAlbedo = C(A.CloudAlbedo, B.CloudAlbedo);
+	R.SaturationMul = L(A.SaturationMul, B.SaturationMul);
+	R.ContrastMul = L(A.ContrastMul, B.ContrastMul);
+	R.GainMul = C(A.GainMul, B.GainMul);
+	R.ShadowGainMul = C(A.ShadowGainMul, B.ShadowGainMul);
+	return R;
+}
+
+FSaltWeatherPreset ASaltLightingRig::LerpWeather(const FSaltWeatherPreset& A, const FSaltWeatherPreset& B, float T)
+{
+	FSaltWeatherPreset R = T < 0.5f ? A : B;
+	R.CloudCoverageOffset = FMath::Lerp(A.CloudCoverageOffset, B.CloudCoverageOffset, T);
+	R.CloudAlbedoMul = FMath::Lerp(A.CloudAlbedoMul, B.CloudAlbedoMul, T);
+	R.SunIntensityMul = FMath::Lerp(A.SunIntensityMul, B.SunIntensityMul, T);
+	R.SkyLightMul = FMath::Lerp(A.SkyLightMul, B.SkyLightMul, T);
+	R.FogDensityMul = FMath::Lerp(A.FogDensityMul, B.FogDensityMul, T);
+	R.SaturationMul = FMath::Lerp(A.SaturationMul, B.SaturationMul, T);
+	R.ContrastMul = FMath::Lerp(A.ContrastMul, B.ContrastMul, T);
+	return R;
+}
+
+FSaltSeaStatePreset ASaltLightingRig::LerpSeaState(const FSaltSeaStatePreset& A, const FSaltSeaStatePreset& B, float T)
+{
+	FSaltSeaStatePreset R = T < 0.5f ? A : B;
+	R.WaveHeight = FMath::Lerp(A.WaveHeight, B.WaveHeight, T);
+	R.WaveSteepness = FMath::Lerp(A.WaveSteepness, B.WaveSteepness, T);
+	R.ChopVariation = FMath::Lerp(A.ChopVariation, B.ChopVariation, T);
+	R.WhitecapStart = FMath::Lerp(A.WhitecapStart, B.WhitecapStart, T);
+	R.WhitecapAmount = FMath::Lerp(A.WhitecapAmount, B.WhitecapAmount, T);
+	R.BreakPatchiness = FMath::Lerp(A.BreakPatchiness, B.BreakPatchiness, T);
+	R.RippleScale = FMath::Lerp(A.RippleScale, B.RippleScale, T);
+	R.SprayAmount = FMath::Lerp(A.SprayAmount, B.SprayAmount, T);
+	return R;
+}
+
+namespace
+{
+	template <typename T>
+	T FindPresetOr(const TArray<T>& Array, FName Name)
+	{
+		for (const T& X : Array)
+		{
+			if (X.Name == Name)
+			{
+				return X;
+			}
+		}
+		return Array.Num() > 0 ? Array[0] : T();
+	}
+}
+
+void ASaltLightingRig::InitLayersIfNeeded()
+{
+	if (bLayersInitialised)
+	{
+		return;
+	}
+	bLayersInitialised = true;
+	RegionLayer.From = RegionLayer.To = FindPresetOr(Regions, StartRegion);
+	WeatherLayer.From = WeatherLayer.To = FindPresetOr(Weathers, StartWeather);
+	SeaLayer.From = SeaLayer.To = FindPresetOr(SeaStates, StartSeaState);
+	CurrentRegion = RegionLayer.To.Name;
+	CurrentWeather = WeatherLayer.To.Name;
+	CurrentSeaState = SeaLayer.To.Name;
+}
+
+bool ASaltLightingRig::SetRegion(FName RegionName, float BlendSeconds)
+{
+	InitLayersIfNeeded();
+	const FSaltRegionPreset* P = Regions.FindByPredicate([RegionName](const FSaltRegionPreset& X) { return X.Name == RegionName; });
+	if (!P)
+	{
+		UE_LOG(LogSaltbound, Warning, TEXT("Region '%s' not found"), *RegionName.ToString());
+		return false;
+	}
+	RegionLayer.From = LerpRegion(RegionLayer.From, RegionLayer.To, Smooth(RegionLayer.Alpha));
+	RegionLayer.To = *P;
+	RegionLayer.Duration = FMath::Max(0.f, BlendSeconds);
+	RegionLayer.Alpha = RegionLayer.Duration > 0.f ? 0.f : 1.f;
+	CurrentRegion = RegionName;
+	ApplyEnvironment();
+	return true;
+}
+
+bool ASaltLightingRig::SetWeather(FName WeatherName, float BlendSeconds)
+{
+	InitLayersIfNeeded();
+	const FSaltWeatherPreset* P = Weathers.FindByPredicate([WeatherName](const FSaltWeatherPreset& X) { return X.Name == WeatherName; });
+	if (!P)
+	{
+		UE_LOG(LogSaltbound, Warning, TEXT("Weather '%s' not found"), *WeatherName.ToString());
+		return false;
+	}
+	WeatherLayer.From = LerpWeather(WeatherLayer.From, WeatherLayer.To, Smooth(WeatherLayer.Alpha));
+	WeatherLayer.To = *P;
+	WeatherLayer.Duration = FMath::Max(0.f, BlendSeconds);
+	WeatherLayer.Alpha = WeatherLayer.Duration > 0.f ? 0.f : 1.f;
+	CurrentWeather = WeatherName;
+	ApplyEnvironment();
+	return true;
+}
+
+bool ASaltLightingRig::SetSeaState(FName SeaStateName, float BlendSeconds)
+{
+	InitLayersIfNeeded();
+	const FSaltSeaStatePreset* P = SeaStates.FindByPredicate([SeaStateName](const FSaltSeaStatePreset& X) { return X.Name == SeaStateName; });
+	if (!P)
+	{
+		UE_LOG(LogSaltbound, Warning, TEXT("Sea state '%s' not found"), *SeaStateName.ToString());
+		return false;
+	}
+	SeaLayer.From = LerpSeaState(SeaLayer.From, SeaLayer.To, Smooth(SeaLayer.Alpha));
+	SeaLayer.To = *P;
+	SeaLayer.Duration = FMath::Max(0.f, BlendSeconds);
+	SeaLayer.Alpha = SeaLayer.Duration > 0.f ? 0.f : 1.f;
+	CurrentSeaState = SeaStateName;
+	ApplyEnvironment();
+	return true;
+}
+
+FString ASaltLightingRig::DescribeEnvironment() const
+{
+	return FString::Printf(TEXT("time=%s region=%s (%.0f%%) weather=%s (%.0f%%) sea=%s (%.0f%%) zones=%.2f"),
+		*CurrentPreset.ToString(), *CurrentRegion.ToString(), RegionLayer.Alpha * 100.f, *CurrentWeather.ToString(),
+		WeatherLayer.Alpha * 100.f, *CurrentSeaState.ToString(), SeaLayer.Alpha * 100.f, FMath::Max(LastZoneWeightSum, 0.f));
+}
+
+FSaltRegionPreset ASaltLightingRig::ComposeRegion(float* OutZoneWeightSum) const
+{
+	FSaltRegionPreset R = LerpRegion(RegionLayer.From, RegionLayer.To, Smooth(RegionLayer.Alpha));
+	float WeightSum = 0.f;
+	const UWorld* World = GetWorld();
+	if (World && World->ViewLocationsRenderedLastFrame.Num() > 0)
+	{
+		const FVector View = World->ViewLocationsRenderedLastFrame[0];
+		for (TActorIterator<ASaltRegionZone> It(World); It; ++It)
+		{
+			const float W = It->WeightAt(View);
+			if (W <= 0.f)
+			{
+				continue;
+			}
+			const FName ZoneRegion = It->Region;
+			if (const FSaltRegionPreset* Z = Regions.FindByPredicate([ZoneRegion](const FSaltRegionPreset& X) { return X.Name == ZoneRegion; }))
+			{
+				R = LerpRegion(R, *Z, W);
+				WeightSum += W;
+			}
+		}
+	}
+	if (OutZoneWeightSum)
+	{
+		*OutZoneWeightSum = WeightSum;
+	}
+	return R;
+}
+
+// --- Lifecycle ------------------------------------------------------------------------------------
+
+void ASaltLightingRig::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	EnsureClouds();
 }
 
 void ASaltLightingRig::BeginPlay()
 {
 	Super::BeginPlay();
+	EnsureClouds();
+	InitLayersIfNeeded();
 	if (!StartPreset.IsNone())
 	{
 		ApplyPreset(StartPreset);
+	}
+}
+
+void ASaltLightingRig::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+}
+
+void ASaltLightingRig::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	bool bChanged = false;
+	auto Advance = [&](auto& Layer)
+	{
+		if (Layer.IsBlending())
+		{
+			Layer.Alpha = Layer.Duration > 0.f ? FMath::Min(1.f, Layer.Alpha + DeltaSeconds / Layer.Duration) : 1.f;
+			bChanged = true;
+		}
+	};
+	Advance(RegionLayer);
+	Advance(WeatherLayer);
+	Advance(SeaLayer);
+	float ZoneSum = 0.f;
+	ComposeRegion(&ZoneSum);
+	if (FMath::Abs(ZoneSum - LastZoneWeightSum) > 0.002f)
+	{
+		bChanged = true;
+	}
+	if (bChanged)
+	{
+		ApplyEnvironment();
+	}
+}
+
+void ASaltLightingRig::EnsureClouds()
+{
+	if (!CloudMaterial)
+	{
+		CloudMaterial = LoadObject<UMaterialInterface>(nullptr, SaltContent::CloudMaterial);
+	}
+	if (!Clouds || !Clouds->IsRegistered())
+	{
+		// Transient: never saved with the level, so the dynamic material never ends up in an asset.
+		Clouds = NewObject<UVolumetricCloudComponent>(this, NAME_None, RF_Transient);
+		Clouds->SetupAttachment(GetRootComponent());
+		Clouds->RegisterComponent();
+		CloudMID = nullptr;
+	}
+	if (!CloudMID && CloudMaterial)
+	{
+		CloudMID = UMaterialInstanceDynamic::Create(CloudMaterial, this);
+		CloudMID->SetFlags(RF_Transient);
+		Clouds->SetMaterial(CloudMID);
 	}
 }
 
@@ -132,6 +554,7 @@ void ASaltLightingRig::ResolveSceneActors()
 	if (!SkyLight) { for (TActorIterator<ASkyLight> It(World); It; ++It) { SkyLight = *It; break; } }
 	if (!Fog) { for (TActorIterator<AExponentialHeightFog> It(World); It; ++It) { Fog = *It; break; } }
 	if (!Atmosphere) { for (TActorIterator<ASkyAtmosphere> It(World); It; ++It) { Atmosphere = *It; break; } }
+	if (!Ocean) { for (TActorIterator<ASaltOcean> It(World); It; ++It) { Ocean = *It; break; } }
 	if (!PostProcess)
 	{
 		for (TActorIterator<APostProcessVolume> It(World); It; ++It)
@@ -149,66 +572,158 @@ bool ASaltLightingRig::ApplyPreset(FName PresetName)
 		UE_LOG(LogSaltbound, Warning, TEXT("Lighting preset '%s' not found"), *PresetName.ToString());
 		return false;
 	}
+	CurrentPreset = PresetName;
+	ApplyEnvironment();
+	UE_LOG(LogSaltbound, Log, TEXT("Applied lighting preset %s"), *PresetName.ToString());
+	return true;
+}
+
+void ASaltLightingRig::ApplyEnvironment()
+{
+	InitLayersIfNeeded();
+	const FName Tod = CurrentPreset.IsNone() ? StartPreset : CurrentPreset;
+	const FSaltLightingPreset* P = Presets.FindByPredicate([Tod](const FSaltLightingPreset& X) { return X.Name == Tod; });
+	if (!P && Presets.Num() > 0)
+	{
+		P = &Presets[0];
+	}
+	if (!P)
+	{
+		return;
+	}
+	CurrentPreset = P->Name;
 	ResolveSceneActors();
+	EnsureClouds();
+	float ZoneSum = 0.f;
+	const FSaltRegionPreset R = ComposeRegion(&ZoneSum);
+	LastZoneWeightSum = ZoneSum;
+	PushEnvironment(*P, R, LerpWeather(WeatherLayer.From, WeatherLayer.To, Smooth(WeatherLayer.Alpha)),
+		LerpSeaState(SeaLayer.From, SeaLayer.To, Smooth(SeaLayer.Alpha)));
+}
+
+void ASaltLightingRig::PushEnvironment(const FSaltLightingPreset& P, const FSaltRegionPreset& R, const FSaltWeatherPreset& W, const FSaltSeaStatePreset& S)
+{
 	if (Sun)
 	{
 		// Directional light points along its forward vector: pitch = -elevation.
-		Sun->SetActorRotation(FRotator(-P->SunElevation, P->SunYaw, 0.f));
+		Sun->SetActorRotation(FRotator(-P.SunElevation, P.SunYaw, 0.f));
 		if (UDirectionalLightComponent* C = Cast<UDirectionalLightComponent>(Sun->GetLightComponent()))
 		{
-			C->SetIntensity(P->SunIlluminance);
+			C->SetIntensity(P.SunIlluminance * R.SunIntensityMul * W.SunIntensityMul);
 			C->SetUseTemperature(true);
-			C->SetTemperature(P->SunTemperature);
-			C->SetLightSourceAngle(P->SunSourceAngle);
+			C->SetTemperature(P.SunTemperature);
+			C->SetLightColor(R.SunTint, false);
+			C->SetLightSourceAngle(P.SunSourceAngle);
 		}
 	}
 	if (SkyLight && SkyLight->GetLightComponent())
 	{
-		SkyLight->GetLightComponent()->SetIntensity(P->SkyLightIntensity);
-		SkyLight->GetLightComponent()->SetLightColor(P->SkyLightTint);
+		USkyLightComponent* C = SkyLight->GetLightComponent();
+		C->SetIntensity(P.SkyLightIntensity * R.SkyLightMul * W.SkyLightMul);
+		C->SetLightColor(Mul(P.SkyLightTint, R.SkyLightTint));
 	}
 	if (Atmosphere)
 	{
 		if (USkyAtmosphereComponent* A = Atmosphere->FindComponentByClass<USkyAtmosphereComponent>())
 		{
-			A->SetRayleighScatteringScale(P->RayleighScale);
-			A->SetMieScatteringScale(P->MieScale);
+			A->SetRayleighScattering(R.RayleighColor);
+			A->SetRayleighScatteringScale(P.RayleighScale * R.RayleighScaleMul);
+			A->SetMieScatteringScale(P.MieScale * R.MieScaleMul);
+			A->SetMieAbsorptionScale(R.MieAbsorptionScale);
+			A->SetSkyLuminanceFactor(R.SkyLuminance);
 		}
 	}
 	if (Fog && Fog->GetComponent())
 	{
 		UExponentialHeightFogComponent* F = Fog->GetComponent();
-		F->SetFogDensity(P->FogDensity);
-		F->SetFogHeightFalloff(P->FogHeightFalloff);
-		F->SetFogInscatteringColor(P->FogInscattering);
-		F->SetDirectionalInscatteringColor(P->FogDirectionalInscattering);
-		F->SetStartDistance(P->FogStartDistance);
+		F->SetFogDensity(P.FogDensity * R.FogDensityMul * W.FogDensityMul);
+		F->SetFogHeightFalloff(P.FogHeightFalloff);
+		F->SetFogInscatteringColor(Mul(P.FogInscattering, R.FogTint));
+		F->SetDirectionalInscatteringColor(Mul(P.FogDirectionalInscattering, R.FogDirectionalTint));
+		F->SetStartDistance(P.FogStartDistance);
+	}
+	if (CloudMID)
+	{
+		CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), FMath::Clamp(R.CloudCoverage + W.CloudCoverageOffset, -1.f, 1.f));
+		const FLinearColor Albedo = R.CloudAlbedo * W.CloudAlbedoMul;
+		CloudMID->SetVectorParameterValue(TEXT("Cloud_AlbedoColor"), FLinearColor(Albedo.R, Albedo.G, Albedo.B, 0.5f));
 	}
 	if (PostProcess)
 	{
-		FPostProcessSettings& S = PostProcess->Settings;
-		S.bOverride_AutoExposureMinBrightness = true;
-		S.bOverride_AutoExposureMaxBrightness = true;
-		S.bOverride_AutoExposureBias = true;
-		S.AutoExposureMinBrightness = P->ExposureMinEV;
-		S.AutoExposureMaxBrightness = P->ExposureMaxEV;
-		S.AutoExposureBias = P->ExposureBias;
-		S.bOverride_ColorSaturation = true;
-		S.ColorSaturation = FVector4(P->Saturation, P->Saturation, P->Saturation, 1.f);
-		S.bOverride_ColorGain = true;
-		S.ColorGain = FVector4(P->Gain.R, P->Gain.G, P->Gain.B, 1.f);
-		S.bOverride_ColorContrast = true;
-		S.ColorContrast = FVector4(P->Contrast, P->Contrast, P->Contrast, 1.f);
-		S.bOverride_ColorGainShadows = true;
-		S.ColorGainShadows = FVector4(P->ShadowGain.R, P->ShadowGain.G, P->ShadowGain.B, 1.f);
-		S.bOverride_ColorGainHighlights = true;
-		S.ColorGainHighlights = FVector4(P->HighlightGain.R, P->HighlightGain.G, P->HighlightGain.B, 1.f);
+		FPostProcessSettings& PS = PostProcess->Settings;
+		PS.bOverride_AutoExposureMinBrightness = true;
+		PS.bOverride_AutoExposureMaxBrightness = true;
+		PS.bOverride_AutoExposureBias = true;
+		PS.AutoExposureMinBrightness = P.ExposureMinEV;
+		PS.AutoExposureMaxBrightness = P.ExposureMaxEV;
+		PS.AutoExposureBias = P.ExposureBias;
+		const float Sat = P.Saturation * R.SaturationMul * W.SaturationMul;
+		const float Con = P.Contrast * R.ContrastMul * W.ContrastMul;
+		const FLinearColor Gain = Mul(P.Gain, R.GainMul);
+		const FLinearColor ShadowGain = Mul(P.ShadowGain, R.ShadowGainMul);
+		PS.bOverride_ColorSaturation = true;
+		PS.ColorSaturation = FVector4(Sat, Sat, Sat, 1.f);
+		PS.bOverride_ColorGain = true;
+		PS.ColorGain = FVector4(Gain.R, Gain.G, Gain.B, 1.f);
+		PS.bOverride_ColorContrast = true;
+		PS.ColorContrast = FVector4(Con, Con, Con, 1.f);
+		PS.bOverride_ColorGainShadows = true;
+		PS.ColorGainShadows = FVector4(ShadowGain.R, ShadowGain.G, ShadowGain.B, 1.f);
+		PS.bOverride_ColorGainHighlights = true;
+		PS.ColorGainHighlights = FVector4(P.HighlightGain.R, P.HighlightGain.G, P.HighlightGain.B, 1.f);
+		// Lumen screen traces hit the water's own depth at grazing angles and paint stair-stepped
+		// reflection blocks onto the waves (D23). Hardware ray tracing alone gives clean reflections.
+		PS.bOverride_LumenReflectionsScreenTraces = true;
+		PS.LumenReflectionsScreenTraces = 0;
+	}
+	// Water look and sea state.
+	if (Ocean)
+	{
+		const bool bSeaChanged = !bHaveAppliedSea || !FMath::IsNearlyEqual(S.WaveHeight, LastAppliedSea.WaveHeight)
+			|| !FMath::IsNearlyEqual(S.WaveSteepness, LastAppliedSea.WaveSteepness)
+			|| !FMath::IsNearlyEqual(S.ChopVariation, LastAppliedSea.ChopVariation)
+			|| !FMath::IsNearlyEqual(Ocean->AmplitudeScale, S.WaveHeight);
+		if (bSeaChanged)
+		{
+			Ocean->AmplitudeScale = S.WaveHeight;
+			Ocean->SteepnessScale = S.WaveSteepness;
+			Ocean->ChopVariation = S.ChopVariation;
+			Ocean->RebuildWaveField();
+			LastAppliedSea = S;
+			bHaveAppliedSea = true;
+		}
+		UWorld* World = GetWorld();
+		if (World && Ocean->ParameterCollection)
+		{
+			if (UMaterialParameterCollectionInstance* Inst = World->GetParameterCollectionInstance(Ocean->ParameterCollection))
+			{
+				const FLinearColor& Ab = R.WaterAbsorption;
+				const FLinearColor& Sc = R.WaterScattering;
+				Inst->SetVectorParameterValue(PAbsorption, FLinearColor(Ab.R, Ab.G, Ab.B, 1.f));
+				Inst->SetVectorParameterValue(PScattering, FLinearColor(Sc.R, Sc.G, Sc.B, 1.f));
+				Inst->SetVectorParameterValue(PCrest, FLinearColor(R.CrestLightColor.R, R.CrestLightColor.G, R.CrestLightColor.B, R.CrestLightStrength));
+				Inst->SetVectorParameterValue(PFoam, FLinearColor(R.FoamColor.R, R.FoamColor.G, R.FoamColor.B, S.WhitecapAmount));
+				Inst->SetVectorParameterValue(PSea, FLinearColor(S.WhitecapStart, S.BreakPatchiness, S.RippleScale, S.SprayAmount));
+			}
+		}
 	}
 	for (TActorIterator<ASaltLantern> It(GetWorld()); It; ++It)
 	{
-		It->SetLit(P->bLanternsLit);
+		It->SetLit(P.bLanternsLit);
 	}
-	CurrentPreset = PresetName;
-	UE_LOG(LogSaltbound, Log, TEXT("Applied lighting preset %s"), *PresetName.ToString());
-	return true;
+}
+
+// --- Region zone ----------------------------------------------------------------------------------
+
+ASaltRegionZone::ASaltRegionZone()
+{
+	PrimaryActorTick.bCanEverTick = false;
+	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
+}
+
+float ASaltRegionZone::WeightAt(const FVector& WorldLocation) const
+{
+	const float D = (float)FVector2D::Distance(FVector2D(WorldLocation), FVector2D(GetActorLocation()));
+	const float T = FMath::Clamp((D - InnerRadius) / FMath::Max(OuterRadius - InnerRadius, 1.f), 0.f, 1.f);
+	return 1.f - T * T * (3.f - 2.f * T);
 }

@@ -23,6 +23,14 @@ USaltInputConfig* ASaltPlayerController::GetInputConfig()
 	return InputConfig;
 }
 
+void ASaltPlayerController::SetHUDVisible(bool bVisible)
+{
+	if (HUDWidget)
+	{
+		HUDWidget->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+}
+
 void ASaltPlayerController::BeginPlay()
 {
 	Super::BeginPlay();

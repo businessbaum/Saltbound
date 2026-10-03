@@ -64,13 +64,38 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves", meta = (ClampMin = "0"))
 	float TimeScale = 1.f;
 
+	/** Stops ocean time (waves, ripples and foam travel together). For diagnostics and comparisons;
+	 *  console: sb.Ocean.Freeze 0|1, sb.Ocean.Time <seconds>. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves")
+	bool bFreezeTime = false;
+
+	/** Jumps to an ocean time (seconds). The previous-frame phases are reset, so no false motion vectors. */
+	UFUNCTION(BlueprintCallable, Category = "Ocean")
+	void SetOceanTime(double NewTime);
+
+	/** The first SwellCount waves are swell: they keep their full height everywhere. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves", meta = (ClampMin = "0", ClampMax = "12"))
+	int32 SwellCount = 3;
+
+	/** Medium waves and chop calm down in patches by up to this fraction (0 = uniform sea). Leaves
+	 *  quieter wave faces between choppier areas instead of a uniformly crumpled surface. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves", meta = (ClampMin = "0", ClampMax = "1"))
+	float ChopVariation = 0.6f;
+
+	/** Typical size of the calmer / choppier patches. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves", meta = (Units = "cm"))
+	float ChopPatchSize = 26000.f;
+
 	/** Up to 4 sheltered areas with reduced waves. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves")
 	TArray<FSaltCalmZone> CalmZones;
 
-	/** Scroll speeds (UV per second) of the two detail ripple layers. */
+	/** Travel rates of the detail layers in tiles per second (tile sizes live in the material):
+	 *  X, Y, Z = ripple layers 1-3 (along their rotated wind frames), W = foam drift.
+	 *  Offsets are wrapped in double precision on the CPU, so ripples stop with bFreezeTime and never lose
+	 *  precision in long sessions. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves")
-	FVector4 RippleScroll = FVector4(0.012, 0.004, -0.006, 0.010);
+	FVector4 RippleScroll = FVector4(0.1, 0.042, 0.3, 0.039);
 
 	// Rendering ----------------------------------------------------------------
 	UPROPERTY(EditAnywhere, Category = "Rendering")
@@ -142,5 +167,9 @@ private:
 
 	FSaltWaveField Field;
 	double OceanTime = 0.0;
+	/** Wave phases of the previous frame: the material evaluates last frame's displacement with them
+	 *  (PreviousFrameSwitch), so the velocity buffer contains the wave motion and TSR can reproject. */
+	float PrevPhases[FSaltWaveField::MaxWaves] = {};
+	bool bHavePrevPhases = false;
 	FVector LastSelectionView = FVector(1.0e12);
 };

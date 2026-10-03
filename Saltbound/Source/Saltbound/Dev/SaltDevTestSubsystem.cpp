@@ -2,17 +2,20 @@
 
 #include "Dev/SaltDevTestSubsystem.h"
 
+#include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Dev/SaltDevMovingPlatform.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "HAL/IConsoleManager.h"
 #include "Interaction/SaltStationComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/SaltPlayerCharacter.h"
+#include "Player/SaltPlayerController.h"
 #include "Saltbound.h"
 #include "TimerManager.h"
 #include "World/SaltLightingRig.h"
@@ -104,6 +107,45 @@ namespace
 					GEngine->Exec(W, *Cmd);
 				}
 			}), FMath::Max(Delay, 0.01f), false);
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdCamera(
+		TEXT("sb.Dev.Camera"),
+		TEXT("View from a fixed camera: sb.Dev.Camera <X> <Y> <Z> <Pitch> <Yaw> [FOV=80]. sb.Dev.Camera off returns to the player."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			APlayerController* PC = World ? UGameplayStatics::GetPlayerController(World, 0) : nullptr;
+			if (!PC)
+			{
+				return;
+			}
+			ACameraActor* Cam = nullptr;
+			for (TActorIterator<ACameraActor> It(World); It; ++It)
+			{
+				if (It->Tags.Contains(TEXT("SB_DevCamera"))) { Cam = *It; break; }
+			}
+			ASaltPlayerController* SaltPC = Cast<ASaltPlayerController>(PC);
+			if (Args.Num() >= 1 && Args[0].Equals(TEXT("off"), ESearchCase::IgnoreCase))
+			{
+				PC->SetViewTarget(PC->GetPawn());
+				if (SaltPC) { SaltPC->SetHUDVisible(true); }
+				return;
+			}
+			if (SaltPC) { SaltPC->SetHUDVisible(false); }
+			if (Args.Num() < 5)
+			{
+				return;
+			}
+			if (!Cam)
+			{
+				Cam = World->SpawnActor<ACameraActor>();
+				Cam->Tags.Add(TEXT("SB_DevCamera"));
+				Cam->GetCameraComponent()->bConstrainAspectRatio = false;
+			}
+			Cam->SetActorLocationAndRotation(FVector(ArgOr(Args, 0, 0.f), ArgOr(Args, 1, 0.f), ArgOr(Args, 2, 0.f)),
+				FRotator(ArgOr(Args, 3, 0.f), ArgOr(Args, 4, 0.f), 0.f));
+			Cam->GetCameraComponent()->SetFieldOfView(ArgOr(Args, 5, 80.f));
+			PC->SetViewTarget(Cam);
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdResetPlayer(

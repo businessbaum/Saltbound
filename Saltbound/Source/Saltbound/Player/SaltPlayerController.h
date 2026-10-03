@@ -20,6 +20,9 @@ public:
 	/** Input actions and mappings (created on first use). */
 	USaltInputConfig* GetInputConfig();
 
+	/** Shows or hides the in-game HUD (development captures and recordings). */
+	void SetHUDVisible(bool bVisible);
+
 protected:
 	virtual void BeginPlay() override;
 

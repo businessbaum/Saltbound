@@ -55,9 +55,7 @@ skc = sky.get_component_by_class(unreal.SkyLightComponent)
 skc.set_mobility(unreal.ComponentMobility.MOVABLE)
 skc.set_editor_property("real_time_capture", True)
 spawn(unreal.ExponentialHeightFog, (0, 0, -200), label="HeightFog")
-clouds = spawn(unreal.VolumetricCloud, label="Clouds")
-clouds.get_component_by_class(unreal.VolumetricCloudComponent).set_editor_property(
-    "material", unreal.load_asset("/Game/Saltbound/Environment/Sky/MI_Clouds_Stylized"))
+# Volumetric clouds belong to the environment rig (transient component, weather/region driven; D25).
 pp = spawn(unreal.PostProcessVolume, label="GlobalPostProcess")
 pp.set_editor_property("unbound", True)
 rig = spawn(unreal.SaltLightingRig, (0, 0, 300), label="LightingRig")
@@ -70,7 +68,7 @@ zone.set_editor_property("inner_radius", 2500.0)
 zone.set_editor_property("outer_radius", 15000.0)
 zone.set_editor_property("min_factor", 0.15)  # sheltered cove; the open sea keeps the full swell
 ocean.set_editor_property("calm_zones", [zone])
-ocean.set_editor_property("amplitude_scale", 1.6)   # powerful open-sea swell (owner reference)
+# Wave height comes from the rig's sea state (StartSeaState below), not from the ocean actor.
 
 # --- seabed --------------------------------------------------------------------------------------------
 CUBE = "/Engine/BasicShapes/Cube"
@@ -80,6 +78,14 @@ seabed = mesh("Seabed", CUBE, (0, 0, -1800), scale=(1200, 1200, 1), mat="/Game/S
 seabed.static_mesh_component.set_editor_property("visible_in_ray_tracing", False)
 seabed.static_mesh_component.set_editor_property("affect_distance_field_lighting", False)
 mesh("ShoreSlope", CUBE, (-200, 0, -700), (-10.0, 0, 0), scale=(40, 50, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
+# Shallow sandbank (1.5-4 m deep) east of the pier: shows how each region's water reads over light ground.
+sandbank = mesh("Sandbank", CUBE, (3200, 1800, -260), (0, 25, 2.5), scale=(22, 14, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
+sandbank.static_mesh_component.set_editor_property("visible_in_ray_tracing", False)
+# A distant region zone (2 km east): sailing there blends into the Ancient Isles palette.
+region_zone = spawn(unreal.SaltRegionZone, (200000, 0, 0), label="RegionZone_AncientIsles")
+region_zone.set_editor_property("region", "AncientIsles")
+region_zone.set_editor_property("inner_radius", 30000.0)
+region_zone.set_editor_property("outer_radius", 90000.0)
 
 # --- coast -------------------------------------------------------------------------------------------
 R = "/Game/Saltbound/Environment/Rocks/"
@@ -151,6 +157,9 @@ mesh("Crate_Dock", "/Game/Saltbound/Props/SM_Crate_Small", (1180, -60, 110), (0,
 mesh("Crate_Dock2", "/Game/Saltbound/Props/SM_Crate_Small", (1185, -62, 150.5), (0, 12, 0), 0.85)
 
 spawn(unreal.PlayerStart, (380, -10, 110 + 92), (0, 0, 0), "PlayerStart")
+rig.set_editor_property("start_region", "ShoresOfPlenty")
+rig.set_editor_property("start_weather", "Clear")
+rig.set_editor_property("start_sea_state", "Rough")
 rig.apply_preset("Day")
 les.save_current_level()
 print("SB_MAP_OK", MAP)
