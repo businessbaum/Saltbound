@@ -279,9 +279,10 @@ def build_rock():
     return m
 
 
-# Caustics (D28): two drifting patterns of T_Caustics_M, their minimum is a crisp moving web of light. Only
-# below the water level and on upward-facing surfaces; the pattern is projected along the sun, so it falls
-# where the light entered the surface. Emissive: sunlight focused by the waves, scaled like diffuse light.
+# Caustics (D28, D29): two drifting patterns of T_Caustics_M, their minimum is a moving web of light. Only below
+# the water level. Projected three ways (top along the sun, two sides) and blended by the surface normal, so the
+# pattern keeps its size on slopes instead of stretching (owner feedback); a mip bias softens it. Emissive:
+# sunlight focused by the waves, scaled like diffuse light.
 CAUSTIC_CODE = """
 float Depth = WaterLevel - P.z;
 float Under = saturate(Depth / 30.0);
@@ -290,13 +291,21 @@ if (Under <= 0.0 || CausticStrength <= 0.0)
     return 0;
 }
 float3 L = normalize(SunDir);
-float2 UV = (P.xy + L.xy / max(L.z, 0.25) * Depth) / CausticScale;
 float T = Time * CausticSpeed;
-float A = Texture2DSample(CausticTex, CausticTexSampler, UV + T * float2(0.71, 0.34)).r;
-float B = Texture2DSample(CausticTex, CausticTexSampler, UV * 1.17 + float2(0.37, 0.61) - T * float2(0.28, 0.66)).g;
-float C = min(A, B) * 2.0;
-float Facing = saturate(N.z * 1.25 - 0.15);
-return Base * SunIllum * (saturate(L.z) * 0.3183 * C * CausticStrength * Under * Facing * exp(-max(Depth, 0.0) / CausticDepthFade));
+float3 W = pow(abs(N), 4.0);
+W /= max(W.x + W.y + W.z, 1e-4);
+float2 Proj[3] = { (P.xy + L.xy / max(L.z, 0.25) * Depth) / CausticScale, P.xz / CausticScale, P.yz / CausticScale };
+float Weights[3] = { W.z, W.y, W.x };
+float C = 0.0;
+[unroll] for (int i = 0; i < 3; i++)
+{
+    float A = Texture2DSampleBias(CausticTex, CausticTexSampler, Proj[i] + T * float2(0.71, 0.34), CausticBlur).r;
+    float B = Texture2DSampleBias(CausticTex, CausticTexSampler, Proj[i] * 1.17 + float2(0.37, 0.61) - T * float2(0.28, 0.66), CausticBlur).g;
+    C += min(A, B) * Weights[i];
+}
+// Light reaches upward faces fully, steep faces partly.
+float Facing = saturate(N.z * 0.8 + 0.2);
+return Base * SunIllum * (saturate(L.z) * 0.3183 * 2.0 * C * CausticStrength * Under * Facing * exp(-max(Depth, 0.0) / CausticDepthFade));
 """
 
 
@@ -305,7 +314,8 @@ def add_caustics(m, base_node, wp, wn, water_level, x, y):
     ctex = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, x - 500, y, parameter_name="CausticTex",
                       texture=tex(TEX + "/Common/T_Caustics_M"), sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR,
                       group="Caustics")
-    params = {"CausticStrength": 1.0, "CausticScale": 350.0, "CausticSpeed": 0.03, "CausticDepthFade": 1500.0}
+    params = {"CausticStrength": 0.6, "CausticScale": 350.0, "CausticSpeed": 0.03, "CausticDepthFade": 1500.0,
+              "CausticBlur": 1.5}
     pn = {n: sb_ue.scalar_param(m, n, v, x - 500, y + 120 + i * 60, "Caustics") for i, (n, v) in enumerate(params.items())}
     time = sb_ue.expr(m, unreal.MaterialExpressionTime, x - 500, y + 400)
     # Sun illuminance sampled above the water (points below the planet's ground are in the planet's shadow).
@@ -482,8 +492,10 @@ def main():
     sb_ue.make_mi("MI_Stone_Ruin", MI, rock, vectors={"Tint": (0.42, 0.4, 0.36, 1), "LichenColor": (0.4, 0.46, 0.28, 1)},
                   scalars={"Scale": 250.0, "LichenCoverage": 0.35, "NormalStrength": 0.6, "StrataScale": 1.0e6})
     # Engine primitives carry no vertex colours (they read as white): switch the masks off.
+    # Sand has its own painted texture set (ripple bands, grains; D29).
     sb_ue.make_mi("MI_Sand", MI, rock, vectors={"Tint": (0.62, 0.55, 0.42, 1), "LichenColor": (0.5, 0.48, 0.36, 1)},
-                  scalars={"Scale": 900.0, "LichenCoverage": 0.0, "NormalStrength": 0.25, "MacroAmount": 0.25, "WetDarken": 0.7,
+                  textures={"AlbedoTex": TEX + "/Sand/T_Sand_D", "NormalTex": TEX + "/Sand/T_Sand_N", "ORMTex": TEX + "/Sand/T_Sand_ORM"},
+                  scalars={"Scale": 400.0, "LichenCoverage": 0.0, "NormalStrength": 0.8, "MacroAmount": 0.25, "WetDarken": 0.7,
                            "VertexMaskAmount": 0.0, "AlgaeAmount": 0.0, "BarnacleAmount": 0.0, "StrataScale": 1.0e6})
     sb_ue.make_mi("MI_SeaGrass", MI, grass)
     sb_ue.make_mi("MI_LanternGlass", MI, glow, vectors={"BaseColor": (0.35, 0.25, 0.14, 1), "GlowColor": (1.0, 0.52, 0.2, 1)}, scalars={"GlowIntensity": 80.0, "Roughness": 0.1})

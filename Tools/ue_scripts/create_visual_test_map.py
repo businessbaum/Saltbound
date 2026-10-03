@@ -74,7 +74,8 @@ ocean.set_editor_property("calm_zones", [zone])
 # --- seabed --------------------------------------------------------------------------------------------
 CUBE = "/Engine/BasicShapes/Cube"
 UW = "/Game/Saltbound/Environment/Underwater/"
-seabed = mesh("Seabed", CUBE, (0, 0, -1800), scale=(1200, 1200, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
+# Far floor 60 m down: with the clearer water (D29) a shallower floor would tint the open sea.
+seabed = mesh("Seabed", CUBE, (0, 0, -6000), scale=(1200, 1200, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
 # Sculpted cove floor (build_seabed.py): beach behind the rocks, about 2.3 m under the pier, a drop-off to the
 # 17.5 m floor, and the shallow sandbank east of the pier (light ground: how each region's water reads).
 cove_floor = mesh("Seabed_Cove", UW + "SM_Seabed", (0, 0, 0))

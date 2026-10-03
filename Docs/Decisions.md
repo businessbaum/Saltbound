@@ -499,3 +499,34 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Cost:**
   - Underside material 532 instructions; post-process 754 (only near or below the surface).
   - The ocean vertex work doubles while the camera is within 5 m of the surface.
+
+### D29 · Underwater review: sand texture, softer caustics, clear shallows, detailed stone, smaller player (Adopted)
+- **Owner review of D28 (2026-10-04):**
+  1. The sand needs more texture: "too plain, but remember, it's not about realism".
+  2. Reflections (caustics) on the sea floor should be a bit weaker and blurrier.
+  3. "If the terrain is not even, the reflection should not stretch."
+  4. "I can't look through the water surface."
+  5. Stones: "some quality is missing. Not sharp but detailed."
+  6. The character is too tall.
+- **Changes:**
+  1. **Sand:** its own painted texture set, `T_Sand_D/N/ORM` (`gen_textures.py sand`), used by `MI_Sand`
+     (scale 4 m, normal 0.8):
+     - Wavy ripple bands (lit crest, shaded trough, soft edges) that fade in and out in patches.
+     - Soft tone patches, light and dark grains, a few pale shell flecks.
+  2. **Caustics:** strength 0.6 (was 1.0), mip bias 1.5 (`CausticBlur`).
+  3. **Stretching:** caustics are projected three ways (top along the sun, two sides) and blended by the
+     surface normal, so the pattern keeps its size on slopes. Steep faces get partial light.
+  4. **Clarity:**
+     - Single Layer Water reads its coefficients per centimetre. The region values (written as 1/m) made
+       the sea opaque within centimetres. This was proven with a near-zero volume (the sand showed) after
+       ruling out the underside tiles and the underwater pass.
+     - `M_Ocean` scales absorption and scattering by `VolumeScale` 0.005. The scattering albedo is
+       unchanged, so deep water keeps the approved colour while the shallows turn clear turquoise and show
+       sand, grass and caustics.
+     - The flat far floor moved from 17.5 m to 60 m, so it no longer tints the open sea.
+  5. **Stone (`T_Rock_*`):**
+     - Tone patches at three scales: broad crisp, medium soft, faint mottling.
+     - Small soft pits (a darker inside with a hint of a lit rim), specks and grain.
+     - Soft bumps in the normal map at the same scales.
+     - Still no lines.
+  6. **Player:** capsule 176 → 160 cm, eye height 165 → 150 cm. `Tools/swim_test.py` still passes 5/5.

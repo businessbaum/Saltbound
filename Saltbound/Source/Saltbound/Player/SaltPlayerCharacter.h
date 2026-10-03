@@ -83,9 +83,9 @@ public:
 	/** True while swimming in the sea (surface or under water). */
 	bool IsSwimming() const;
 
-	/** Camera height above the feet (capsule height is 176 cm). */
+	/** Camera height above the feet (capsule height is 160 cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "100", ClampMax = "180", Units = "cm"))
-	float EyeHeight = 165.f;
+	float EyeHeight = 150.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "60", ClampMax = "110"))
 	float FieldOfView = 80.f;

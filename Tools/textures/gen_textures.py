@@ -356,37 +356,82 @@ def crisp(x, edge, width=0.004):
 
 
 def rock():
-    """Hand-painted stone, crisp (Sea of Thieves reference) for triplanar use: tile ~2.5 m at 2048 px.
+    """Hand-painted stone for triplanar use: tile ~2.5 m at 2048 px. Detailed but soft (owner feedback, D28/D29):
 
-    Flat tone patches with hard edges (posterised noise), a few faint angular tone patches (Voronoi cells), a
-    few crisp specks and very little fine grain. Smooth areas stay calm in between, so the eye reads defined
-    shapes instead of soft noise. No lines (owner feedback, D28): neither the painted crack network nor the
-    lit / shaded outlines of the chips; the stone shape comes from the geometry."""
+    tone patches at three scales (broad crisp levels, softer medium patches, faint small mottling), a
+    warm/cool patch layer, small soft pits (darker dents with a hint of a lit rim, no hard outlines), a few
+    faint angular tone patches, crisp specks and fine grain. No lines (no cracks, no chip outlines); the
+    normal map carries soft bumps at the same scales, so light reads the surface without sharp detail."""
     size = 2048
-    y, x = np.mgrid[0:size, 0:size] / size
     warp = (spectral_noise(size, 1, 6, -1.8, seed=76) * 0.03, spectral_noise(size, 1, 6, -1.8, seed=77) * 0.03)
-    # 1. Tone patches: 4 crisp levels plus a warm/cool patch layer.
+    # 1. Tone patches: broad crisp levels, medium soft patches, small mottling; warm/cool patches.
     tone_src = n01(spectral_noise(size, 2, 10, -1.9, seed=71))
     levels = sum(crisp(tone_src, t, 0.006) for t in (0.3, 0.5, 0.7)) / 3.0
+    mid_src = n01(spectral_noise(size, 10, 32, -1.6, seed=74))
+    mid = sum(crisp(mid_src, t, 0.04) for t in (0.38, 0.6)) / 2.0
+    mottle = spectral_noise(size, 32, 110, -1.2, seed=75)
     hue_src = n01(spectral_noise(size, 2, 8, -1.8, seed=72))
     warm = crisp(hue_src, 0.62, 0.006)
-    # 2. Chips: a few angular cells, only a faint tone change (no outlines, no relief).
-    f1c, f2c, cid = worley_cells(size, 26, seed=79, warp=warp)
+    # 2. Soft pits: small round dents (about 1-3 cm), a darker inside fading out, light catching the upper rim.
+    rng = np.random.default_rng(78)
+    f1p, _f2p, cidp = worley_cells(size, 70, seed=79, warp=warp)
+    radius = rng.uniform(0.12, 0.3, 70 * 70)[cidp]
+    use = (rng.random(70 * 70) < 0.22)[cidp] * crisp(n01(spectral_noise(size, 2, 8, -1.8, seed=73)), 0.35, 0.2)
+    pit = use * np.clip(1.0 - f1p / radius, 0.0, 1.0) ** 1.6
+    pit_rim = np.clip(np.roll(pit, 3, axis=0) - pit, 0.0, 1.0)
+    # 3. Faint angular patches (no outlines), specks and grain.
+    f1c, f2c, cid = worley_cells(size, 26, seed=80, warp=warp)
     pick = (np.random.default_rng(80).random(26 * 26) < 0.025)[cid]
     chip = pick * crisp(f2c - f1c, 0.05, 0.02)
-    # 3. Specks and grain.
     specks_l = crisp(n01(spectral_noise(size, 90, 300, -1.0, seed=81)), 0.9, 0.01)
     specks_d = crisp(n01(spectral_noise(size, 90, 300, -1.0, seed=82)), 0.91, 0.01)
     grain = spectral_noise(size, 200, 600, -0.8, seed=83)
-    v = (0.5 + 0.07 * (levels - 0.5) - 0.03 * chip
-         + 0.035 * specks_l - 0.06 * specks_d + 0.008 * grain)
+    v = (0.5 + 0.07 * (levels - 0.5) + 0.04 * (mid - 0.5) + 0.018 * mottle - 0.03 * chip
+         - 0.07 * pit + 0.025 * pit_rim + 0.035 * specks_l - 0.06 * specks_d + 0.01 * grain)
     rgb = np.stack([v * (1.0 + 0.04 * warm), v * (1.0 + 0.01 * warm), v * (1.0 - 0.04 * warm)], -1)
     save_rgb(os.path.join(OUT, "Rock", "T_Rock_D.png"), rgb)
-    height = spectral_noise(size, 2, 12, -1.8, seed=86) * 0.25
+    height = (spectral_noise(size, 2, 12, -1.8, seed=86) * 0.25 + spectral_noise(size, 12, 40, -1.5, seed=87) * 0.1
+              + spectral_noise(size, 40, 140, -1.2, seed=88) * 0.035 - pit * 0.12)
     save_normal(os.path.join(OUT, "Rock", "T_Rock_N.png"), height_to_normal(height, 6.0))
-    ao = np.ones_like(v)
-    rough = np.clip(0.82 - 0.06 * chip + 0.04 * (levels - 0.5), 0, 1)
+    ao = 1.0 - 0.25 * pit
+    rough = np.clip(0.82 - 0.06 * chip + 0.04 * (levels - 0.5) + 0.03 * (mid - 0.5), 0, 1)
     save_rgb(os.path.join(OUT, "Rock", "T_Rock_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
+
+
+def sand():
+    """Stylised sand for the seabed and beach (D29), neutral grey (the material tints it); triplanar, tile ~4 m:
+
+    painted ripple bands (lit crest, mid, shaded trough with soft edges; wavy and fading in patches), soft tone
+    patches, crisp light and dark grains at two sizes and a few pale shell flecks. Comic, not realistic: few
+    clear shapes, calm areas in between. The normal map carries the ripples and a fine grain."""
+    size = 1024
+    y, x = np.mgrid[0:size, 0:size] / size
+    w1 = spectral_noise(size, 1, 4, -2.0, seed=201)
+    w2 = spectral_noise(size, 2, 6, -1.8, seed=202)
+    # 1. Ripples: 9 crests per tile along U, warped (all terms periodic, so the tile repeats seamlessly).
+    phase = 2 * np.pi * (9 * x + 0.9 * w1 + 0.12 * np.sin(2 * np.pi * (2 * y + 0.3 * w2)))
+    ripple = 0.5 + 0.5 * np.sin(phase + 0.35 * np.sin(phase))          # slightly asymmetric crests
+    show = crisp(n01(spectral_noise(size, 1, 4, -1.9, seed=203)), 0.32, 0.25)
+    crest = crisp(ripple, 0.78, 0.08) * show
+    trough = crisp(1.0 - ripple, 0.8, 0.08) * show
+    # 2. Tone patches (soft), warm/cool.
+    tone = sum(crisp(n01(spectral_noise(size, 2, 9, -1.9, seed=204)), t, 0.05) for t in (0.4, 0.62)) / 2.0
+    warm = crisp(n01(spectral_noise(size, 2, 7, -1.8, seed=205)), 0.58, 0.05)
+    # 3. Grains and shell flecks.
+    g_l = crisp(n01(spectral_noise(size, 120, 400, -0.9, seed=206)), 0.88, 0.012)
+    g_d = crisp(n01(spectral_noise(size, 120, 400, -0.9, seed=207)), 0.9, 0.012)
+    g_big = crisp(n01(spectral_noise(size, 40, 120, -1.0, seed=208)), 0.93, 0.01)
+    shell = crisp(n01(spectral_noise(size, 30, 90, -1.0, seed=209)), 0.955, 0.008)
+    v = (0.5 + 0.05 * crest - 0.06 * trough + 0.05 * (tone - 0.5) + 0.04 * g_l - 0.05 * g_d - 0.04 * g_big
+         + 0.09 * shell)
+    rgb = np.stack([v * (1.0 + 0.03 * warm), v, v * (1.0 - 0.04 * warm)], -1)
+    save_rgb(os.path.join(OUT, "Sand", "T_Sand_D.png"), rgb)
+    height = (ripple - 0.5) * show * 0.6 + spectral_noise(size, 2, 10, -1.8, seed=210) * 0.15 \
+        + spectral_noise(size, 150, 450, -0.8, seed=211) * 0.012
+    save_normal(os.path.join(OUT, "Sand", "T_Sand_N.png"), height_to_normal(height, 3.0))
+    ao = 1.0 - 0.12 * trough
+    rough = np.clip(0.9 - 0.08 * shell, 0, 1)
+    save_rgb(os.path.join(OUT, "Sand", "T_Sand_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
 
 
 def rock_detail():
@@ -492,6 +537,7 @@ GENERATORS = {
     "metal": metal,
     "rope": rope,
     "rock": rock,
+    "sand": sand,
     "rock_detail": rock_detail,
     "macro_noise": macro_noise,
     "paint_surface": paint_surface,

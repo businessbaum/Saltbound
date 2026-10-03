@@ -537,8 +537,16 @@ def make_material(mpc, ush, rts):
     slw = sb_ue.expr(m, unreal.MaterialExpressionSingleLayerWaterMaterialOutput, 0, 1200)
     phase_g = sb_ue.scalar_param(m, "PhaseG", 0.2, -400, 1300, "Volume")
     behind = sb_ue.vector_param(m, "ColorScaleBehindWater", (0.9, 0.9, 0.9, 1), -400, 1400, "Volume")
-    link(nodes["LookScattering"], "", slw, "ScatteringCoefficients")
-    link(nodes["LookAbsorption"], "", slw, "AbsorptionCoefficients")
+    # Clarity (owner: "make it more look through", D29). Single Layer Water reads the coefficients per cm; the
+    # region values (Look*, written as 1/m) made the sea opaque within centimetres. Both coefficients are
+    # scaled by the same factor, so the shallows show the sand while deep water keeps its colour (unchanged
+    # scattering albedo). 0.005: about 8 m visibility in blue, turquoise shallows, blue beyond ~10 m depth.
+    clarity = sb_ue.scalar_param(m, "VolumeScale", 0.005, -600, 1200, "Volume")
+    for look, pin in (("LookScattering", "ScatteringCoefficients"), ("LookAbsorption", "AbsorptionCoefficients")):
+        mul = sb_ue.expr(m, unreal.MaterialExpressionMultiply, -200, 1200 if pin.startswith("S") else 1260)
+        link(nodes[look], "", mul, "A")
+        link(clarity, "", mul, "B")
+        link(mul, "", slw, pin)
     link(phase_g, "", slw, "PhaseG")
     link(behind, "", slw, "ColorScaleBehindWater")
 

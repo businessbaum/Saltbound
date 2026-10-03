@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 3, underwater revision 1: swimming, view from below, seabed, D28).
+Last updated: 2026-10-04 (session 3, underwater revision 1 and review round: D28, D29).
 
 ## Milestone status
 
@@ -200,6 +200,11 @@ for a higher screen percentage (for example 75 %) and more content.
 - **Evidence:** `Docs/Evidence/Underwater_rev1/` (contact sheet, a drop-off clip, a look-up clip in the
   open sea).
 - **Test:** `python Tools/swim_test.py` (PIE, 5 checks, all pass).
+- **Owner review round (D29):**
+  - Painted sand texture, and softer caustics that no longer stretch on slopes.
+  - Clear turquoise shallows: the sea was 100× too dense (per-cm coefficients). Deep water is unchanged.
+  - More detailed (soft) stone texture.
+  - Player 1.6 m tall (eyes at 1.5 m).
 
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
