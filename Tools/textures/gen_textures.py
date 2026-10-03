@@ -68,21 +68,65 @@ def save_normal(path, n):
 # --- textures --------------------------------------------------------------------------
 
 def ocean_ripples():
-    size = 512
-    # Wind ripples: slightly stretched across the wind, mid/high frequencies.
-    h = (spectral_noise(size, 6, 48, -1.6, seed=11, aniso=(1.0, 1.35)) * 0.7 +
-         spectral_noise(size, 24, 110, -1.2, seed=12) * 0.3)
-    save_normal(os.path.join(OUT, "Water", "T_OceanRipples_N.png"), height_to_normal(h, 6.0))
+    """Wind ripples, slightly stretched across the wind. Strong high frequencies give the crisp sun
+    glitter of the reference (many small facets catching the sun)."""
+    size = 1024
+    h = (spectral_noise(size, 6, 48, -1.6, seed=11, aniso=(1.0, 1.35)) * 0.55 +
+         spectral_noise(size, 24, 140, -1.1, seed=12) * 0.3 +
+         spectral_noise(size, 80, 300, -0.9, seed=13) * 0.15)
+    save_normal(os.path.join(OUT, "Water", "T_OceanRipples_N.png"), height_to_normal(h, 9.0))
+
+
+def worley_grid(size, cells_x, cells_y=None, seed=0, warp=None):
+    """Periodic Worley F1/F2 on a jittered grid (3x3 neighbourhood, O(9 N)). Distances in cell units.
+
+    warp: optional (wx, wy) periodic offset fields in UV units (domain warping keeps the tiling)."""
+    cells_y = cells_y or cells_x
+    rng = np.random.default_rng(seed)
+    jit = rng.uniform(0.0, 1.0, (cells_y, cells_x, 2))
+    v, u = np.mgrid[0:size, 0:size] / size
+    if warp is not None:
+        u = u + warp[0]
+        v = v + warp[1]
+    x, y = u * cells_x, v * cells_y
+    ix, iy = np.floor(x).astype(int), np.floor(y).astype(int)
+    f1 = np.full(x.shape, 9.0)
+    f2 = np.full(x.shape, 9.0)
+    for oy in (-1, 0, 1):
+        for ox in (-1, 0, 1):
+            cx, cy = ix + ox, iy + oy
+            j = jit[cy % cells_y, cx % cells_x]
+            d = np.sqrt((x - cx - j[..., 0]) ** 2 + (y - cy - j[..., 1]) ** 2)
+            f2 = np.where(d < f1, f1, np.minimum(f2, d))
+            f1 = np.minimum(f1, d)
+    return f1, f2
 
 
 def ocean_foam():
-    size = 512
-    cells = 1.0 - worley(size, 14, seed=21)                     # bubbly cells
-    breakup = spectral_noise(size, 2, 16, -1.8, seed=22) * 0.5 + 0.5
-    streaks = spectral_noise(size, 3, 40, -1.4, seed=23, aniso=(0.35, 1.0)) * 0.5 + 0.5
-    foam = np.clip(cells ** 2.2 * 0.75 + streaks * 0.35, 0, 1)
-    rgb = np.stack([foam, breakup, streaks], -1)
-    save_rgb(os.path.join(OUT, "Water", "T_OceanFoam_M.png"), rgb)
+    """Foam pattern for M_Ocean (U runs along the dominant wave direction).
+
+    R  graded lace: 1 on the foam filaments of a warped two-scale cell network, falling off into the cell
+       interiors. The material thresholds it by foam coverage: little coverage leaves thin lace, full
+       coverage fills the cells.
+    G  bubble holes (dots) punched into dense foam.
+    B  low-frequency patchiness (where residual foam gathers on the open sea)."""
+    size = 1024
+    warp_a = (spectral_noise(size, 1, 6, -1.8, seed=24) * 0.045, spectral_noise(size, 1, 6, -1.8, seed=25) * 0.045)
+    warp_b = (spectral_noise(size, 2, 12, -1.6, seed=26) * 0.02, spectral_noise(size, 2, 12, -1.6, seed=27) * 0.02)
+    # Filaments are stretched along U (wind / wave direction): fewer cells along U than across.
+    f1, f2 = worley_grid(size, 5, 8, seed=21, warp=warp_a)
+    big = np.clip(1.0 - (f2 - f1) / 0.55, 0, 1) ** 1.6
+    f1, f2 = worley_grid(size, 11, 17, seed=22, warp=warp_b)
+    small = np.clip(1.0 - (f2 - f1) / 0.45, 0, 1) ** 1.8
+    grain = spectral_noise(size, 40, 200, -1.0, seed=28)
+    # Uneven filament strength: thin coverage breaks the lace into fragments instead of a closed net.
+    strength = 0.62 + 0.38 * n01(spectral_noise(size, 3, 24, -1.5, seed=31))
+    lace = np.clip(np.maximum(big, small * 0.85) * strength + 0.06 * grain, 0, 1)
+    f1, _ = worley_grid(size, 56, 56, seed=29)
+    radius = 0.18 + 0.2 * n01(spectral_noise(size, 4, 30, -1.4, seed=30))
+    holes = np.clip((radius - f1) / 0.06, 0, 1)
+    patches = n01(spectral_noise(size, 1, 5, -2.0, seed=23))
+    save_rgb(os.path.join(OUT, "Water", "T_OceanFoam_M.png"), np.stack([lace, holes, patches], -1))
 
 
 def worley_f2f1(size, cells, seed=0):
@@ -167,29 +211,110 @@ def rope():
     save_normal(os.path.join(OUT, "Fabric", "T_Rope_N.png"), height_to_normal(height, 5.0))
 
 
+def spectral_noise_dir(size, k_min, k_max, slope, seed, angle_deg, stretch):
+    """Like spectral_noise, but anisotropic along an arbitrary direction: features are `stretch` times
+    longer along angle_deg (image space, 0 = +U) than across it. Tiles perfectly."""
+    rng = np.random.default_rng(seed)
+    f = np.fft.fftfreq(size) * size
+    kx, ky = np.meshgrid(f, f)
+    a = np.radians(angle_deg)
+    ku = kx * np.cos(a) + ky * np.sin(a)          # along the strokes
+    kv = -kx * np.sin(a) + ky * np.cos(a)         # across
+    k = np.sqrt((ku * stretch) ** 2 + kv ** 2)
+    amp = np.where((k >= k_min) & (k <= k_max), np.power(np.maximum(k, 1e-6), slope), 0.0)
+    field = np.real(np.fft.ifft2(amp * np.exp(1j * rng.uniform(0, 2 * np.pi, (size, size)))))
+    field -= field.mean()
+    return field / (np.abs(field).max() + 1e-9)
+
+
+def worley_cells(size, cells, seed=0, warp=None):
+    """Periodic Worley with the nearest cell's index: returns f1, f2 (cell units) and cell id (int)."""
+    rng = np.random.default_rng(seed)
+    jit = rng.uniform(0.0, 1.0, (cells, cells, 2))
+    v, u = np.mgrid[0:size, 0:size] / size
+    if warp is not None:
+        u = u + warp[0]
+        v = v + warp[1]
+    x, y = u * cells, v * cells
+    ix, iy = np.floor(x).astype(int), np.floor(y).astype(int)
+    f1 = np.full(x.shape, 9.0)
+    f2 = np.full(x.shape, 9.0)
+    cid = np.zeros(x.shape, dtype=np.int64)
+    for oy in (-1, 0, 1):
+        for ox in (-1, 0, 1):
+            cx, cy = (ix + ox) % cells, (iy + oy) % cells
+            j = jit[cy, cx]
+            d = np.sqrt((x - (ix + ox) - j[..., 0]) ** 2 + (y - (iy + oy) - j[..., 1]) ** 2)
+            closer = d < f1
+            f2 = np.where(closer, f1, np.minimum(f2, d))
+            cid = np.where(closer, cy * cells + cx, cid)
+            f1 = np.minimum(f1, d)
+    return f1, f2, cid
+
+
+def facet_normals(size, cells, seed, tilt, warp=None, bevel=0.06):
+    """Chiselled stone: every Voronoi cell is a flat facet with a random tilt (crisp borders), the
+    borders slightly rounded. Returns the tangent-space normal (x, y) slope field and an edge mask."""
+    f1, f2, cid = worley_cells(size, cells, seed, warp)
+    rng = np.random.default_rng(seed + 1)
+    slopes = rng.normal(0, tilt, (cells * cells, 2))
+    sx, sy = slopes[cid, 0], slopes[cid, 1]
+    edge = np.clip(1.0 - (f2 - f1) / bevel, 0, 1)
+    return sx * (1.0 - 0.6 * edge), sy * (1.0 - 0.6 * edge), edge
+
+
 def rock():
-    """Stylised coastal rock for world-aligned (triplanar) use: broad tone, sparse warped cracks, strata."""
-    size = 1024
-    y, x = np.mgrid[0:size, 0:size] / size
-    broad = spectral_noise(size, 1, 8, -2.2, seed=71)
-    mid = spectral_noise(size, 6, 40, -1.6, seed=72)
-    fine = spectral_noise(size, 40, 200, -1.0, seed=75)
-    cracks = worley_f2f1(size, 4, seed=73)
-    # Warp crack lines by sampling the distance field at noise-offset coordinates.
-    wx = (spectral_noise(size, 2, 10, -1.8, seed=76) * 18).astype(int)
-    wy = (spectral_noise(size, 2, 10, -1.8, seed=77) * 18).astype(int)
-    iy, ix = np.mgrid[0:size, 0:size]
-    cracks = cracks[(iy + wy) % size, (ix + wx) % size]
-    presence = np.clip(n01(spectral_noise(size, 1, 6, -1.6, seed=78)) * 1.8 - 0.5, 0, 1)
-    crack_line = np.clip(1.0 - cracks / 0.035, 0, 1) ** 1.6 * presence
-    strata = 0.5 + 0.5 * np.sin(2 * np.pi * (y * 5 + broad * 0.35))
-    height = broad * 0.7 + mid * 0.3 + fine * 0.05 - crack_line * 0.25 + strata * 0.15
-    albedo = 0.55 + 0.13 * broad + 0.06 * mid + 0.03 * strata - 0.08 * crack_line
-    save_rgb(os.path.join(OUT, "Rock", "T_Rock_D.png"), np.stack([albedo, albedo, albedo * 0.97], -1))
-    save_normal(os.path.join(OUT, "Rock", "T_Rock_N.png"), height_to_normal(height, 7.0))
-    ao = 1.0 - 0.25 * crack_line
-    rough = np.clip(0.78 + 0.1 * mid, 0, 1)
+    """Hand-painted stone for world-aligned (triplanar) use, tile ~2.5 m at 2048 px (about 1.2 mm per
+    texel, so it stays crisp up close).
+
+    Albedo: painted tonal blocks (soft noise, partly posterised so it reads as brush work), warm/cool hue
+    shifts, directional strokes at two angles, crisp light chips and dark pits, faint grain.
+    Normal: soft bumps plus faint stroke relief.
+    ORM: AO darkens pits; roughness matte with painted variation."""
+    size = 2048
+    broad = spectral_noise(size, 1, 6, -2.0, seed=71)
+    blocks = np.round(n01(broad) * 5.0) / 5.0                 # posterised tone blocks
+    tone = 0.55 * n01(broad) + 0.45 * blocks
+    hue = spectral_noise(size, 2, 8, -1.8, seed=72)
+    strokes = (spectral_noise_dir(size, 6, 60, -1.3, 73, 25.0, 4.0) * 0.6 +
+               spectral_noise_dir(size, 6, 60, -1.3, 74, -40.0, 4.0) * 0.4)
+    warp = (spectral_noise(size, 1, 5, -1.8, seed=76) * 0.02, spectral_noise(size, 1, 5, -1.8, seed=77) * 0.02)
+    # Irregular light flecks and small dark pits (thresholded noise, crisp edges, sparse).
+    fleck_field = n01(spectral_noise(size, 50, 160, -1.1, seed=78)) + 0.25 * n01(broad)
+    chips = np.clip((fleck_field - 0.86) / 0.02, 0, 1)
+    pits = np.clip((n01(spectral_noise(size, 80, 260, -1.0, seed=81)) - 0.9) / 0.02, 0, 1)
+    grain = spectral_noise(size, 120, 500, -0.8, seed=83)
+    # Relief: soft bumps and faint brush relief only. Facet normals (facet_normals) read as a polygon
+    # mosaic on large rocks, unlike the smooth painted reference.
+    bumps = spectral_noise(size, 2, 16, -1.8, seed=86) + 0.12 * spectral_noise(size, 16, 60, -1.4, seed=87)
+    height = bumps * 0.8 + strokes * 0.1 - pits * 0.03 + chips * 0.01
+    n = height_to_normal(height, 22.0)
+    v = (0.52 + 0.13 * (tone - 0.5) + 0.045 * strokes + 0.06 * chips - 0.1 * pits + 0.015 * grain)
+    rgb = np.stack([v * (1.0 + 0.05 * hue), v * (1.0 + 0.01 * hue), v * (1.0 - 0.05 * hue)], -1)
+    save_rgb(os.path.join(OUT, "Rock", "T_Rock_D.png"), rgb)
+    save_normal(os.path.join(OUT, "Rock", "T_Rock_N.png"), n)
+    ao = 1.0 - 0.3 * pits
+    rough = np.clip(0.8 + 0.08 * strokes - 0.1 * chips, 0, 1)
     save_rgb(os.path.join(OUT, "Rock", "T_Rock_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
+
+
+def rock_detail():
+    """Stylised rock detail masks (world-aligned/triplanar use, tile ~2.5 m):
+    R barnacles: small volcano-shaped dots (1 on the rim, darker centre), clustered;
+    G lichen: blobby patches with crisp, lobed edges (thresholded in the material);
+    B grit: fine speckle for albedo breakup."""
+    size = 1024
+    f1, f2 = worley_grid(size, 90, 90, seed=111)
+    radius = 0.22 + 0.16 * n01(spectral_noise(size, 6, 40, -1.4, seed=112))
+    r = f1 / radius
+    rim = np.clip(1.0 - np.abs(r - 0.75) / 0.3, 0, 1) * (r < 1.05)
+    centre = np.clip(1.0 - r / 0.45, 0, 1)
+    cluster = np.clip(n01(spectral_noise(size, 3, 20, -1.5, seed=113)) * 2.2 - 0.7, 0, 1)
+    barnacles = np.clip(rim - centre * 0.6, 0, 1) * cluster
+    lobes = spectral_noise(size, 2, 14, -1.7, seed=114) * 0.75 + spectral_noise(size, 20, 90, -1.2, seed=115) * 0.25
+    lichen = n01(lobes)
+    grit = n01(spectral_noise(size, 60, 300, -0.8, seed=116))
+    save_rgb(os.path.join(OUT, "Rock", "T_RockDetail_M.png"), np.stack([barnacles, lichen, grit], -1))
 
 
 def paint_surface():
@@ -238,6 +363,7 @@ GENERATORS = {
     "metal": metal,
     "rope": rope,
     "rock": rock,
+    "rock_detail": rock_detail,
     "macro_noise": macro_noise,
     "paint_surface": paint_surface,
     "canvas": canvas,

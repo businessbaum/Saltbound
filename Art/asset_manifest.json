@@ -71,5 +71,17 @@
     "dest": "/Game/Saltbound/Environment/Rocks",
     "nanite": true,
     "collision": "complex"
+  },
+  "SM_Rock_Scatter_A": {
+    "fbx": "VisualTest/SM_Rock_Scatter_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Rocks",
+    "nanite": true,
+    "collision": "complex"
+  },
+  "SM_Rock_Scatter_B": {
+    "fbx": "VisualTest/SM_Rock_Scatter_B.fbx",
+    "dest": "/Game/Saltbound/Environment/Rocks",
+    "nanite": true,
+    "collision": "complex"
   }
 }

@@ -3,13 +3,13 @@
 #include "Ocean/SaltOcean.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Core/SaltContent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "Ocean/SaltOceanSubsystem.h"
-#include "UObject/ConstructorHelpers.h"
 
 namespace SaltOceanParams
 {
@@ -52,14 +52,7 @@ ASaltOcean::ASaltOcean()
 	FullTiles = MakeTiles(TEXT("FullTiles"));
 	QuarterTiles = MakeTiles(TEXT("QuarterTiles"));
 
-	static ConstructorHelpers::FObjectFinder<UMaterialParameterCollection> MPC(TEXT("/Game/Saltbound/Water/MPC_Ocean.MPC_Ocean"));
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Mat(TEXT("/Game/Saltbound/Water/MI_Ocean.MI_Ocean"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Tile(TEXT("/Game/Saltbound/Water/SM_OceanTile32.SM_OceanTile32"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Quarter(TEXT("/Game/Saltbound/Water/SM_OceanTile16.SM_OceanTile16"));
-	ParameterCollection = MPC.Object;
-	Material = Mat.Object;
-	TileMesh = Tile.Object;
-	QuarterTileMesh = Quarter.Object;
+	// Content defaults (MPC, material, tile meshes) are resolved in OnConstruction; see SaltContent.h.
 
 	// Rolling swell from the west-south-west with wind sea on top: 12 components spread +-55 deg around
 	// the wind (20 deg), wavelengths 42 m .. 0.8 m. Peaks reach ~1.3 m where components align.
@@ -91,19 +84,30 @@ ASaltOcean::ASaltOcean()
 void ASaltOcean::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	FullTiles->SetStaticMesh(TileMesh);
-	QuarterTiles->SetStaticMesh(QuarterTileMesh);
-	FullTiles->SetMaterial(0, Material);
-	QuarterTiles->SetMaterial(0, Material);
+	ApplyContent();
 	RebuildWaveField();
 	LastSelectionView = FVector(1.0e12);
 	UpdateTiles(true);
 	PushParameters();
 }
 
+void ASaltOcean::ApplyContent()
+{
+	SaltContent::ResolveDefault<UMaterialParameterCollection>(ParameterCollection, SaltContent::OceanParameterCollection);
+	SaltContent::ResolveDefault<UMaterialInterface>(Material, SaltContent::OceanMaterial);
+	SaltContent::ResolveDefault<UStaticMesh>(TileMesh, SaltContent::OceanTile);
+	SaltContent::ResolveDefault<UStaticMesh>(QuarterTileMesh, SaltContent::OceanQuarterTile);
+	FullTiles->SetStaticMesh(TileMesh);
+	QuarterTiles->SetStaticMesh(QuarterTileMesh);
+	FullTiles->SetMaterial(0, Material);
+	QuarterTiles->SetMaterial(0, Material);
+}
+
 void ASaltOcean::BeginPlay()
 {
 	Super::BeginPlay();
+	// Cooked maps do not re-run construction; this covers actors saved before the defaults were resolved.
+	ApplyContent();
 	RebuildWaveField();
 	if (USaltOceanSubsystem* Sub = GetWorld()->GetSubsystem<USaltOceanSubsystem>())
 	{

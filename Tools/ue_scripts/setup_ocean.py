@@ -102,22 +102,53 @@ float2 XY = P0.xy;
 float3 N; float J;
 O.NormalAndJacobian(XY, Dist * FadeScale, N, J);
 
-// Detail ripples: two scrolling layers of one tiling normal map, fading out with distance.
+// Detail ripples: two scrolling layers of one tiling normal map fading out with distance, plus a fine
+// near-field layer so calm water never turns into a mirror.
 float RippleFade = saturate(1.0 - Dist / max(RippleFadeDistance, 1.0));
+float NearFade = saturate(1.0 - Dist / max(RippleFadeDistance * 0.15, 1.0));
 float2 R1 = Texture2DSample(RippleTex, RippleTexSampler, XY / RippleTile1 + RippleOffsets.xy).xy * 2.0 - 1.0;
 float2 R2 = Texture2DSample(RippleTex, RippleTexSampler, XY / RippleTile2 + RippleOffsets.zw).xy * 2.0 - 1.0;
-N = normalize(N + float3((R1 + R2) * (RippleStrength * RippleFade), 0.0));
+float2 R3 = Texture2DSample(RippleTex, RippleTexSampler, XY / RippleTile3 - RippleOffsets.yx * 1.7).xy * 2.0 - 1.0;
+float2 RippleSlope = (R1 + R2) * (RippleStrength * RippleFade) + R3 * (RippleStrength * 0.6 * NearFade);
+N = normalize(N + float3(RippleSlope, 0.0));
 
-// Foam: compressed crests (low Jacobian) and shallow water near geometry, broken up by a cell texture.
-float3 FT = Texture2DSample(FoamTex, FoamTexSampler, XY / FoamTile + RippleOffsets.xy * 0.5).rgb;
+// Foam. The texture is laid out along the dominant (longest) wave direction.
+//   R graded lace, G bubble holes, B patchiness. Coverage (0..1) erodes the lace: little coverage
+//   leaves thin filaments, full coverage fills the cells; thin foam stays translucent.
+float2 WDir = normalize(O.WA[0].xy + float2(1e-6, 0.0));
+float2 FXY = float2(dot(XY, WDir), dot(XY, float2(-WDir.y, WDir.x)));
+float2 Distort = RippleSlope * 0.6;
+float3 FA = Texture2DSample(FoamTex, FoamTexSampler, FXY / FoamTile + RippleOffsets.xy * 0.35 + Distort).rgb;
+float3 FB = Texture2DSample(FoamTex, FoamTexSampler, FXY / (FoamTile * 2.9) + float2(0.37, 0.61) - RippleOffsets.yx * 0.2 + Distort * 0.5).rgb;
+float Lace = max(FA.r, FB.r * 0.85);
+
+// Whitecaps: compressed crests, plus a fading trail where the crest has already passed (sampled down-wave).
+float3 NT; float JT1; float JT2;
+O.NormalAndJacobian(XY + WDir * (FoamTrailLength * 0.45), Dist * FadeScale, NT, JT1);
+O.NormalAndJacobian(XY + WDir * FoamTrailLength, Dist * FadeScale, NT, JT2);
 float Crest = saturate((FoamJStart - J) / max(FoamJRange, 1e-3));
-float Shore = saturate(1.0 - max(WaterDepth, 0.0) / max(ShoreFoamDepth, 1.0));
-float Amount = max(Crest, Shore * 0.85);
-float Foam = saturate((Amount * 1.4 - (1.0 - FT.r)) * 2.5) * lerp(0.55, 1.0, FT.g);
+float Trail = max(saturate((FoamJStart + 0.08 - JT1) / max(FoamJRange, 1e-3)) * 0.85,
+                  saturate((FoamJStart + 0.12 - JT2) / max(FoamJRange, 1e-3)) * 0.5) * FoamTrailStrength;
+// Shore: soft contact foam plus bands that lap outwards from the contact line.
+float Depth = max(WaterDepth, 0.0);
+// Width varies along the shore; the contact itself stays below full coverage so the lace shows through.
+float Shore = saturate(1.0 - Depth / max(ShoreFoamDepth * (0.45 + 1.1 * FB.b), 1.0));
+float Bands = 0.5 + 0.5 * sin(Depth / max(ShoreBandSpacing, 1.0) * 6.2831853 - Time * ShoreBandSpeed + FB.b * 3.0);
+float ShoreCover = pow(Shore, 1.5) * 0.5 + Shore * Bands * 0.3;
+float Cover = saturate(max(max(Crest * 0.9, Trail), ShoreCover));
+float Main = smoothstep(1.0 - Cover, 1.0 - Cover + FoamSoftness, Lace);
+Main *= 1.0 - FA.g * saturate(Cover * 1.5 - 0.3) * 0.6;   // bubble holes in dense foam
+Main *= lerp(0.4, 0.88, Cover);   // milky, see-through foam (reference: Sea of Thieves)
+// Residual foam marbling on the open sea (patchy, translucent, near and mid distance).
+float MarbleFade = saturate(1.0 - Dist / max(MarbleFadeDistance, 1.0));
+// Thin streaks from the large lace scale only (the small scale reads as speckle at this coverage).
+float MarbleCover = saturate(FB.b * 1.4 - 0.4) * MarbleAmount * MarbleFade;
+float Marble = smoothstep(1.0 - MarbleCover, 1.0 - MarbleCover + FoamSoftness, FB.r) * MarbleOpacity;
+float Foam = saturate(max(Main, Marble));
 FoamOut = Foam;
 // Rougher with distance: sub-pixel waves spread the sun highlight instead of sparkling.
 float BaseRough = lerp(WaterRoughness, FarRoughness, saturate(Dist / max(FarRoughnessDistance, 1.0)));
-RoughOut = lerp(BaseRough, 0.65, Foam);
+RoughOut = lerp(BaseRough, 0.7, Foam);
 
 // Light through thin wave crests: brighter on high, steep crests and when looking towards the sun.
 // Scaled by the sun's illuminance after the atmosphere, so it fades naturally in the evening and at dusk.
@@ -173,11 +204,15 @@ def make_material(mpc, ush):
                           texture=unreal.load_asset(DIR + "/Textures/T_OceanFoam_M"),
                           sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, group="Foam")
     scalars = {
-        "RippleTile1": (900.0, "Ripples"), "RippleTile2": (4200.0, "Ripples"), "RippleStrength": (0.15, "Ripples"),
-        "RippleFadeDistance": (25000.0, "Ripples"), "FoamTile": (700.0, "Foam"), "FoamJStart": (0.72, "Foam"),
-        "FoamJRange": (0.35, "Foam"), "ShoreFoamDepth": (45.0, "Foam"), "WaterRoughness": (0.04, "Surface"), "FarRoughness": (0.11, "Surface"), "FarRoughnessDistance": (30000.0, "Surface"),
-        "SSSStrength": (0.035, "Crest light"), "SSSCrestStart": (0.0, "Crest light"), "SSSCrestRange": (120.0, "Crest light"),
-        "SSSBacklitPower": (3.0, "Crest light"), "SSSAmbient": (0.45, "Crest light"),
+        "RippleTile1": (900.0, "Ripples"), "RippleTile2": (4200.0, "Ripples"), "RippleTile3": (260.0, "Ripples"),
+        "RippleStrength": (0.21, "Ripples"), "RippleFadeDistance": (25000.0, "Ripples"),
+        "FoamTile": (900.0, "Foam"), "FoamJStart": (0.72, "Foam"), "FoamJRange": (0.42, "Foam"),
+        "FoamSoftness": (0.12, "Foam"), "FoamTrailLength": (450.0, "Foam"), "FoamTrailStrength": (0.75, "Foam"),
+        "ShoreFoamDepth": (90.0, "Foam"), "ShoreBandSpacing": (22.0, "Foam"), "ShoreBandSpeed": (1.6, "Foam"),
+        "MarbleAmount": (0.36, "Foam"), "MarbleOpacity": (0.45, "Foam"), "MarbleFadeDistance": (9000.0, "Foam"),
+        "WaterRoughness": (0.05, "Surface"), "FarRoughness": (0.12, "Surface"), "FarRoughnessDistance": (30000.0, "Surface"),
+        "SSSStrength": (0.08, "Crest light"), "SSSCrestStart": (-20.0, "Crest light"), "SSSCrestRange": (130.0, "Crest light"),
+        "SSSBacklitPower": (3.0, "Crest light"), "SSSAmbient": (0.55, "Crest light"),
     }
     sp = {n: sb_ue.scalar_param(m, n, v, -1200, 1200 + i * 60, g) for i, (n, (v, g)) in enumerate(scalars.items())}
     scene_depth = sb_ue.expr(m, unreal.MaterialExpressionSceneDepthWithoutWater, -1500, 1800)
@@ -188,11 +223,13 @@ def make_material(mpc, ush):
 
     sun_dir = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightDirection, -1500, 2000)
     sun_illum = sb_ue.expr(m, unreal.MaterialExpressionSkyAtmosphereLightIlluminance, -1500, 2100)
-    sss_color = sb_ue.vector_param(m, "SSSColor", (0.1, 0.75, 0.62, 1), -1500, 2200, "Crest light")
-    ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "RippleTex", "FoamTex", "WaterDepth", "SunDir", "SunIllum", "SSSColor"]
+    sss_color = sb_ue.vector_param(m, "SSSColor", (0.12, 0.9, 0.78, 1), -1500, 2200, "Crest light")
+    time = sb_ue.expr(m, unreal.MaterialExpressionTime, -1500, 2300)
+    ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "RippleTex", "FoamTex", "WaterDepth", "SunDir", "SunIllum", "SSSColor", "Time"]
                  + list(scalars) + WAVE_PARAMS + OTHER_PARAMS)
     ps = custom(m, -700, 900, "SaltOcean PS (normal, ripples, foam, crest light)", ush + "\n" + PS_CODE, ps_inputs, F3,
                 [("FoamOut", F1), ("RoughOut", F1), ("EmissiveOut", F3)])
+    link(time, "", ps, "Time")
     link(sun_dir, "", ps, "SunDir")
     link(sun_illum, "", ps, "SunIllum")
     link(sss_color, "", ps, "SSSColor")
@@ -212,15 +249,15 @@ def make_material(mpc, ush):
     sb_ue.to_prop(ps, "FoamOut", unreal.MaterialProperty.MP_OPACITY)
     sb_ue.to_prop(ps, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
     sb_ue.to_prop(ps, "EmissiveOut", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    foam_color = sb_ue.vector_param(m, "FoamColor", (0.82, 0.86, 0.86, 1), -400, 600, "Foam")
+    foam_color = sb_ue.vector_param(m, "FoamColor", (0.78, 0.9, 0.88, 1), -400, 600, "Foam")
     sb_ue.to_prop(foam_color, "", unreal.MaterialProperty.MP_BASE_COLOR)
     spec = sb_ue.scalar_param(m, "Specular", 0.3, -400, 700, "Surface")
     sb_ue.to_prop(spec, "", unreal.MaterialProperty.MP_SPECULAR)
 
     # --- water volume (Single Layer Water output)
     slw = sb_ue.expr(m, unreal.MaterialExpressionSingleLayerWaterMaterialOutput, 0, 1200)
-    scat = sb_ue.vector_param(m, "ScatteringCoefficients", (0.004, 0.013, 0.022, 1), -400, 1100, "Volume")
-    absorb = sb_ue.vector_param(m, "AbsorptionCoefficients", (0.6, 0.18, 0.09, 1), -400, 1200, "Volume")
+    scat = sb_ue.vector_param(m, "ScatteringCoefficients", (0.008, 0.04, 0.1, 1), -400, 1100, "Volume")
+    absorb = sb_ue.vector_param(m, "AbsorptionCoefficients", (1.4, 0.36, 0.15, 1), -400, 1200, "Volume")
     phase_g = sb_ue.scalar_param(m, "PhaseG", 0.2, -400, 1300, "Volume")
     behind = sb_ue.vector_param(m, "ColorScaleBehindWater", (0.9, 0.9, 0.9, 1), -400, 1400, "Volume")
     link(scat, "", slw, "ScatteringCoefficients")

@@ -117,6 +117,9 @@ public:
 	int32 DebugTileCount = 0;
 
 private:
+	/** Resolves unset content defaults (SaltContent.h) and assigns meshes and material to the tiles. */
+	void ApplyContent();
+
 	struct FTileInstance
 	{
 		FVector2D Center;

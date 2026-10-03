@@ -95,6 +95,24 @@ rocks = [
 ]
 for label, m, loc, yaw, s in rocks:
     mesh(label, R + m, loc, (0, yaw, 0), s)
+
+# Shoreline scatter: small rocks half-submerged around the bases of the large ones (deterministic).
+import random  # noqa: E402
+rng = random.Random(7)
+scatter_n = 0
+for label, m, loc, yaw, s in rocks:
+    if m == "SM_Rock_Coast_C" and s < 1.3:
+        continue
+    reach = {"SM_Rock_Coast_A": 420.0, "SM_Rock_Coast_B": 190.0, "SM_Rock_Coast_C": 90.0}[m] * s
+    for k in range(int(4 + reach / 60.0)):
+        a = rng.uniform(0, 2 * math.pi)
+        d = reach * rng.uniform(0.75, 1.15)
+        kind = "SM_Rock_Scatter_A" if rng.random() < 0.55 else "SM_Rock_Scatter_B"
+        sc = rng.uniform(0.7, 1.6) * (1.3 if kind.endswith("A") else 1.0)
+        z = rng.uniform(-18.0, 4.0) * sc
+        mesh("Scatter_%03d" % scatter_n, R + kind, (loc[0] + math.cos(a) * d, loc[1] + math.sin(a) * d, z),
+             (rng.uniform(-12, 12), rng.uniform(0, 360), rng.uniform(-12, 12)), sc)
+        scatter_n += 1
 mesh("Landmark_Spire", R + "SM_Landmark_Spire", (42000, 15000, -600), (0, 35, 0), 2.0)
 
 # --- pier --------------------------------------------------------------------------------------------

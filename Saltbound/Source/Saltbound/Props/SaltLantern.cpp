@@ -3,11 +3,11 @@
 #include "Props/SaltLantern.h"
 
 #include "Components/PointLightComponent.h"
+#include "Core/SaltContent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Interaction/SaltInteractableComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -21,9 +21,8 @@ ASaltLantern::ASaltLantern()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 1.f / 30.f;
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeshFinder(TEXT("/Game/Saltbound/Props/SM_Lantern.SM_Lantern"));
+	// The mesh (SM_Lantern) is assigned in OnConstruction; see SaltContent.h.
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
-	Mesh->SetStaticMesh(MeshFinder.Object);
 	Mesh->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 	// The light sits inside opaque glass panes; a shadow-casting shell would trap it.
 	Mesh->SetCastShadow(false);
@@ -51,6 +50,10 @@ ASaltLantern::ASaltLantern()
 void ASaltLantern::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
+	if (!Mesh->GetStaticMesh())
+	{
+		Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, SaltContent::LanternMesh));
+	}
 	Light->SetTemperature(Temperature);
 	ApplyState();
 }
@@ -58,6 +61,10 @@ void ASaltLantern::OnConstruction(const FTransform& Transform)
 void ASaltLantern::BeginPlay()
 {
 	Super::BeginPlay();
+	if (!Mesh->GetStaticMesh())
+	{
+		Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, SaltContent::LanternMesh));
+	}
 	FlickerSeed = FMath::FRandRange(0.f, 100.f);
 	Use->OnInteract.AddDynamic(this, &ASaltLantern::HandleInteract);
 	const int32 GlassIndex = Mesh->GetMaterialIndex(GlassSlot);

@@ -26,11 +26,11 @@ def reset_material(name, folder):
     path = "%s/%s" % (folder, name)
     if eal.does_asset_exist(path):
         m = unreal.load_asset(path)
-        # delete_all_material_expressions removes only part of the graph per call (5.8); repeat until empty.
-        for _ in range(16):
-            if mel.get_num_material_expressions(m) == 0:
-                break
-            mel.delete_all_material_expressions(m)
+        # Never use delete_all_material_expressions: in 5.8 it removes from the expression array while
+        # iterating it (skips nodes, reads stale entries) and crashed the editor (!IsRooted assertion).
+        # Delete one by one from a copied list instead.
+        for e in list(mel.get_material_expressions(m)):
+            mel.delete_material_expression(m, e)
         if mel.get_num_material_expressions(m) != 0:
             raise RuntimeError("Could not clear material graph of " + path)
         return m

@@ -304,12 +304,25 @@ def make_rock(name, size, chunks, seed, target_faces=1800, bottom=-3.0):
     return rock
 
 
+ROCKS = (
+    # name, size (m), seed, chunks, planar cuts, face budget
+    ("SM_Rock_Coast_A", (9.0, 6.5, 6.0), 11, 6, 16, 40000),
+    ("SM_Rock_Coast_B", (4.0, 3.2, 2.6), 12, 4, 13, 24000),
+    ("SM_Rock_Coast_C", (1.6, 1.3, 1.0), 13, 3, 10, 12000),
+    ("SM_Rock_Scatter_A", (0.7, 0.55, 0.38), 14, 2, 8, 4000),
+    ("SM_Rock_Scatter_B", (0.38, 0.3, 0.22), 15, 2, 7, 2000),
+)
+
+
 def rocks():
-    for name, size, chunks, seed in (("SM_Rock_Coast_A", (9.0, 6.5, 6.0), 6, 11), ("SM_Rock_Coast_B", (4.0, 3.2, 2.6), 4, 12),
-                                     ("SM_Rock_Coast_C", (1.6, 1.3, 1.0), 3, 13)):
+    import sb_rock
+    for name, size, seed, chunks, cuts, faces in ROCKS:
         sb.reset_scene()
         mats()
-        r = make_rock(name, size, chunks, seed, target_faces=2400 if size[0] > 5 else 1200, bottom=-2.5)
+        bottom = -2.5 if size[0] > 1.0 else -0.3
+        r = sb_rock.stylised_rock(name, size, seed, chunks=chunks, cuts=cuts, bottom=bottom, target_faces=faces,
+                                  material=M["MI_Rock_Coast"])
+        print("SB_ROCK", name, len(r.data.polygons))
         sb.save_blend(name)
         sb.export_fbx([r], os.path.join("VisualTest", name + ".fbx"))
 

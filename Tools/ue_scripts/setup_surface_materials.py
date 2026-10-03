@@ -162,7 +162,8 @@ def build_surface():
 # --- M_SB_Rock ------------------------------------------------------------------------------------
 ROCK_CODE = """
 // Triplanar sampling in world space (cm). Blend weights from the world normal.
-float3 W = pow(abs(N), 4.0); W /= (W.x + W.y + W.z);
+// Sharp blend: a wide crossfade of two projections smears the painted detail.
+float3 W = pow(abs(N), 10.0); W /= (W.x + W.y + W.z);
 float2 UVX = P.yz / Scale, UVY = P.xz / Scale, UVZ = P.xy / Scale;
 float3 AX = Texture2DSample(AlbedoTex, AlbedoTexSampler, UVX).rgb;
 float3 AY = Texture2DSample(AlbedoTex, AlbedoTexSampler, UVY).rgb;
@@ -179,19 +180,42 @@ float2 NZ = Texture2DSample(NormalTex, NormalTexSampler, UVZ).xy * 2 - 1;
 float3 WN = normalize(N + float3(0, NX.x, NX.y) * W.x * NormalStrength +
                       float3(NY.x, 0, NY.y) * W.y * NormalStrength +
                       float3(NZ.x, NZ.y, 0) * W.z * NormalStrength);
+// Detail masks (barnacles, lichen lobes, grit), triplanar at a finer scale.
+float2 DX = P.yz / DetailScale, DY = P.xz / DetailScale, DZ = P.xy / DetailScale;
+float3 D = Texture2DSample(DetailTex, DetailTexSampler, DX).rgb * W.x + Texture2DSample(DetailTex, DetailTexSampler, DY).rgb * W.y
+         + Texture2DSample(DetailTex, DetailTexSampler, DZ).rgb * W.z;
 float3 Base = Tint * Alb * TexNormalize;
 float Macro = Texture2DSample(MacroTex, MacroTexSampler, P.xy / MacroScale).r;
 Base *= lerp(1.0 - MacroAmount, 1.0 + MacroAmount, Macro);
-// Lichen / moss on faces pointing up, patchy.
-float Lichen = saturate((WN.z - LichenUp) / max(1.0 - LichenUp, 0.01)) * saturate((Macro - (1.0 - LichenCoverage)) * 4.0);
-Lichen *= saturate((P.z - WaterLevel - LichenMinHeight) / 100.0);
-Base = lerp(Base, LichenColor.rgb * Alb * TexNormalize, Lichen);
-// Wet band above the waterline: darker and smoother.
-float Wet = saturate(1.0 - (P.z - WaterLevel) / max(WetHeight, 1.0));
-Base *= lerp(1.0, WetDarken, Wet);
+Base *= lerp(1.0 - GritAmount, 1.0 + GritAmount, D.b);
+// Painted light: faces turned to the sky are a little lighter.
+Base *= 1.0 + TopLighten * saturate(WN.z);
+// Strata banding: warm and cool layers alternate with height.
+float Band = 0.5 + 0.5 * sin(P.z / StrataScale * 6.2831853 + Macro * 5.0);
+Base *= lerp(StrataTintA.rgb, StrataTintB.rgb, Band);
+// Baked vertex masks: R convex edges (sunlit, worn), G cavities (dirt), B per-plate tone.
+float3 VM = lerp(float3(0, 0, 0.5), VC.rgb, VertexMaskAmount);
+Base *= lerp(1.0 - PlateVar, 1.0 + PlateVar, VM.b);
+Base *= lerp(1.0, EdgeLighten, VM.r);
+Base *= lerp(1.0, CavityDarken, VM.g);
+float H = P.z - WaterLevel;
+// Lichen: crisp lobed patches on faces pointing up, above the spray zone.
+float Up = saturate((WN.z - LichenUp) / max(1.0 - LichenUp, 0.01));
+float LichenField = D.g * 0.65 + Macro * 0.5 + Up * 0.35 - (1.0 - LichenCoverage);
+float Lichen = smoothstep(0.45, 0.5, LichenField) * saturate((H - LichenMinHeight) / 100.0) * step(0.05, Up);
+Base = lerp(Base, LichenColor.rgb * lerp(0.8, 1.15, D.b), Lichen);
+// Tide zone: green algae and barnacles from below the waterline up to TideHeight; wet band above it.
+float Tide = saturate(1.0 - H / max(TideHeight, 1.0)) * saturate((H + 200.0) / 60.0);
+float Algae = Tide * saturate(AlgaeAmount * (0.55 + 0.6 * Macro) - VM.r * 0.4);
+Base = lerp(Base, AlgaeColor.rgb * lerp(0.75, 1.2, D.b), Algae);
+float Barn = D.r * saturate(1.0 - abs(H - TideHeight * 0.25) / max(TideHeight * 0.4, 1.0)) * BarnacleAmount;
+Base = lerp(Base, BarnacleColor.rgb, saturate(Barn));
+float Wet = saturate(1.0 - (H - TideHeight) / max(WetHeight, 1.0));
+Base *= lerp(1.0, WetDarken, Wet * (1.0 - Barn));
 float Rough = lerp(O.y * RoughScale, WetRoughness, Wet);
+Rough = lerp(Rough, 0.85, Lichen);
 RoughOut = Rough;
-AOOut = O.x;
+AOOut = O.x * lerp(1.0, 0.45, VM.g);
 NormalOut = WN;
 return Base;
 """
@@ -202,32 +226,42 @@ def build_rock():
     m.set_editor_property("tangent_space_normal", False)
     wp = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -1800, 0)
     wn = sb_ue.expr(m, unreal.MaterialExpressionVertexNormalWS, -1800, 100)
+    vc = sb_ue.expr(m, unreal.MaterialExpressionVertexColor, -1800, 180)
     texobj = {
         "AlbedoTex": (TEX + "/Rock/T_Rock_D", unreal.MaterialSamplerType.SAMPLERTYPE_COLOR),
         "NormalTex": (TEX + "/Rock/T_Rock_N", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL),
         "ORMTex": (TEX + "/Rock/T_Rock_ORM", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR),
         "MacroTex": (TEX + "/Common/T_MacroNoise_M", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR),
+        "DetailTex": (TEX + "/Rock/T_RockDetail_M", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR),
     }
     tnodes = {}
     for i, (n, (p, st)) in enumerate(texobj.items()):
         tnodes[n] = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -1800, 250 + i * 120,
                                parameter_name=n, texture=tex(p), sampler_type=st, group="Textures")
     params = {
-        "Scale": ("s", 700.0, "Textures"), "NormalStrength": ("s", 0.7, "Textures"),
-        "Tint": ("v", (0.2, 0.21, 0.21, 1), "Color"), "TexNormalize": ("s", 2.0, "Color"),
-        "MacroScale": ("s", 1500.0, "Color"), "MacroAmount": ("s", 0.18, "Color"),
-        "LichenColor": ("v", (0.55, 0.5, 0.3, 1), "Lichen"), "LichenUp": ("s", 0.55, "Lichen"),
-        "LichenCoverage": ("s", 0.45, "Lichen"), "LichenMinHeight": ("s", 120.0, "Lichen"),
-        "WaterLevel": ("s", 0.0, "Wet"), "WetHeight": ("s", 90.0, "Wet"), "WetDarken": ("s", 0.45, "Wet"),
+        "Scale": ("s", 250.0, "Textures"), "NormalStrength": ("s", 0.8, "Textures"), "DetailScale": ("s", 250.0, "Textures"),
+        "Tint": ("v", (0.29, 0.275, 0.25, 1), "Color"), "TopLighten": ("s", 0.18, "Color"), "TexNormalize": ("s", 2.0, "Color"),
+        "MacroScale": ("s", 1500.0, "Color"), "MacroAmount": ("s", 0.18, "Color"), "GritAmount": ("s", 0.04, "Color"),
+        "StrataScale": ("s", 160.0, "Color"), "StrataTintA": ("v", (1.02, 1.0, 0.97, 1), "Color"),
+        "StrataTintB": ("v", (0.95, 0.97, 0.99, 1), "Color"),
+        "VertexMaskAmount": ("s", 1.0, "Vertex masks"), "PlateVar": ("s", 0.12, "Vertex masks"),
+        "EdgeLighten": ("s", 1.3, "Vertex masks"), "CavityDarken": ("s", 0.6, "Vertex masks"),
+        "LichenColor": ("v", (0.5, 0.36, 0.1, 1), "Lichen"), "LichenUp": ("s", 0.45, "Lichen"),
+        "LichenCoverage": ("s", 0.42, "Lichen"), "LichenMinHeight": ("s", 160.0, "Lichen"),
+        "WaterLevel": ("s", 0.0, "Wet"), "TideHeight": ("s", 70.0, "Wet"), "AlgaeAmount": ("s", 0.85, "Wet"),
+        "AlgaeColor": ("v", (0.07, 0.1, 0.035, 1), "Wet"), "BarnacleAmount": ("s", 0.6, "Wet"),
+        "BarnacleColor": ("v", (0.55, 0.53, 0.48, 1), "Wet"),
+        "WetHeight": ("s", 80.0, "Wet"), "WetDarken": ("s", 0.5, "Wet"),
         "WetRoughness": ("s", 0.3, "Wet"), "RoughScale": ("s", 1.0, "Surface"),
     }
     nodes = {}
     for i, (name, (kind, val, group)) in enumerate(params.items()):
         nodes[name] = (sb_ue.vector_param if kind == "v" else sb_ue.scalar_param)(m, name, val, -1300, -400 + i * 70, group)
-    inputs = ["P", "N"] + list(texobj) + list(params)
+    inputs = ["P", "N", "VC"] + list(texobj) + list(params)
     c = custom(m, -800, 200, "SB rock triplanar", ROCK_CODE, inputs, F3, [("RoughOut", F1), ("AOOut", F1), ("NormalOut", F3)])
     sb_ue.connect(wp, "", c, "P")
     sb_ue.connect(wn, "", c, "N")
+    sb_ue.connect(vc, "", c, "VC")
     for n in texobj:
         sb_ue.connect(tnodes[n], "", c, n)
     for n in params:
@@ -318,9 +352,11 @@ def main():
         sb_ue.make_mi(name, MI, surf, **kw)
     sb_ue.make_mi("MI_Rock_Coast", MI, rock)
     sb_ue.make_mi("MI_Stone_Ruin", MI, rock, vectors={"Tint": (0.42, 0.4, 0.36, 1), "LichenColor": (0.4, 0.46, 0.28, 1)},
-                  scalars={"Scale": 250.0, "LichenCoverage": 0.35, "NormalStrength": 0.6})
+                  scalars={"Scale": 250.0, "LichenCoverage": 0.35, "NormalStrength": 0.6, "StrataScale": 1.0e6})
+    # Engine primitives carry no vertex colours (they read as white): switch the masks off.
     sb_ue.make_mi("MI_Sand", MI, rock, vectors={"Tint": (0.62, 0.55, 0.42, 1), "LichenColor": (0.5, 0.48, 0.36, 1)},
-                  scalars={"Scale": 900.0, "LichenCoverage": 0.0, "NormalStrength": 0.25, "MacroAmount": 0.25, "WetDarken": 0.7})
+                  scalars={"Scale": 900.0, "LichenCoverage": 0.0, "NormalStrength": 0.25, "MacroAmount": 0.25, "WetDarken": 0.7,
+                           "VertexMaskAmount": 0.0, "AlgaeAmount": 0.0, "BarnacleAmount": 0.0, "StrataScale": 1.0e6})
     sb_ue.make_mi("MI_LanternGlass", MI, glow, vectors={"BaseColor": (0.35, 0.25, 0.14, 1), "GlowColor": (1.0, 0.52, 0.2, 1)}, scalars={"GlowIntensity": 80.0, "Roughness": 0.1})
     sb_ue.make_mi("MI_CandleFlame", MI, glow, vectors={"BaseColor": (0.9, 0.7, 0.4, 1), "GlowColor": (1.0, 0.62, 0.28, 1)}, scalars={"GlowIntensity": 600.0})
     sb_ue.make_mi("MI_AncientGlow", MI, glow, vectors={"BaseColor": (0.05, 0.12, 0.12, 1), "GlowColor": (0.35, 0.95, 0.85, 1)}, scalars={"GlowIntensity": 40.0})
