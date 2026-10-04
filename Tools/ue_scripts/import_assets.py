@@ -91,11 +91,12 @@ def import_entry(name, entry):
         mi = find_material(slot_name)
         if mi:
             sm.set_material(i, mi)
-    # Reimports keep the existing asset's Nanite flag: enforce the manifest (warn, a rebuild needs a fresh import).
+    # Reimports keep the existing asset's Nanite flag: switch it to the manifest's value (rebuilds the mesh).
     nanite = sm.get_editor_property("nanite_settings")
     if bool(nanite.enabled) != bool(entry.get("nanite", False)):
-        unreal.log_warning("SB_IMPORT %s: Nanite is %s but the manifest says %s; delete the asset and import again"
-                           % (name, nanite.enabled, entry.get("nanite", False)))
+        nanite.enabled = bool(entry.get("nanite", False))
+        sm.set_editor_property("nanite_settings", nanite)
+        unreal.log("SB_IMPORT %s: Nanite switched to %s" % (name, nanite.enabled))
     # Collision complexity
     body = sm.get_editor_property("body_setup")
     if body:

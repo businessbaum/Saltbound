@@ -207,3 +207,65 @@ def rough_post(name, radius, height, center_bottom, sides=None, taper=0.85, mate
     sb.soften_marked(obj, radius * rng.uniform(0.05, 0.09), 2)
     obj.data.transform(Matrix.Translation(Vector(center_bottom)))
     return obj
+
+
+def bend_board(obj, length, frame):
+    """Lay a straight board (built along local X, centred, by rough_plank at the origin) along a curve.
+
+    frame(s) for s in [0, 1] (from the board's -X end to its +X end) returns (P, A, N, width_scale): the point the
+    board's centre line passes, the unit direction its width (local Y) follows, the unit direction its thickness
+    (local Z) follows, and a width factor (strakes narrow towards the stem). Every irregularity of the board
+    (bends, grooves, worn edges, bevels) is kept, so curved hull planks look as hand-made as straight ones."""
+    me = obj.data
+    for v in me.vertices:
+        x, y, z = v.co
+        s = min(max(x / length + 0.5, 0.0), 1.0)
+        p, a, n, w = frame(s)
+        v.co = p + a * (y * w) + n * z
+    me.update()
+    return obj
+
+
+def spar(name, length, radius, end_radius, material=None, seed=0, sides=14, sweep=0.03, axis=(-1.0, 0.0, 0.0)):
+    """Hand-shaped round spar (mast, boom, gaff): tapered, faintly faceted, gently crooked along its length.
+    Built from the origin along `axis`; returns the object."""
+    rng = random.Random(seed)
+    rings = max(6, int(length / 0.3))
+    bow_y, bow_z = Wave1D(rng, 2, 0.5), Wave1D(rng, 2, 0.5)
+    radii = [rng.uniform(0.96, 1.04) for _ in range(sides)]
+    bm = bmesh.new()
+    rows = []
+    for r in range(rings + 1):
+        t = r / rings
+        rad = radius + (end_radius - radius) * t ** 1.3
+        cy = sweep * bow_y(t - 0.5) * math.sin(math.pi * t)
+        cz = sweep * bow_z(t - 0.5) * math.sin(math.pi * t)
+        row = []
+        for i in range(sides):
+            a = 2 * math.pi * i / sides
+            row.append(bm.verts.new((t * length, cy + math.cos(a) * rad * radii[i], cz + math.sin(a) * rad * radii[i])))
+        rows.append(row)
+    for r in range(rings):
+        for i in range(sides):
+            j = (i + 1) % sides
+            f = bm.faces.new((rows[r][i], rows[r][j], rows[r + 1][j], rows[r + 1][i]))
+            f.smooth = True
+    for row, rev in ((rows[0], True), (rows[-1], False)):
+        f = bm.faces.new(list(reversed(row)) if rev else row)
+        f.smooth = False
+    bm.normal_update()
+    uv = bm.loops.layers.uv.verify()
+    du = rng.uniform(0, 1)
+    for f in bm.faces:
+        for loop in f.loops:
+            c = loop.vert.co
+            loop[uv].uv = (c.x + du, math.atan2(c.z, c.y) * radius)      # grain along the spar
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    obj = sb.new_object(name, me)
+    if material:
+        obj.data.materials.append(material)
+    d = Vector(axis).normalized()
+    obj.data.transform(Vector((1, 0, 0)).rotation_difference(d).to_matrix().to_4x4())
+    return obj

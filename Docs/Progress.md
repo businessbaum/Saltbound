@@ -220,8 +220,11 @@ for a higher screen percentage (for example 75 %) and more content.
 - **Sand with shape (D37, awaiting the owner's check):** the ripples are sculpted geometry now (Nanite sand mesh,
   crests about 1.6 m apart and up to 20 cm high), lit on the crests; the sand texture only adds broad colour.
 
+- **Hand-crafted boat and materials (D38, awaiting the owner's check):** the boat rebuilt from individual hand-made
+  boards, spars, ropes and a paneled sail; wood golden-brown and matte with simplified grain, paint muted, metal dark.
+
 ## M4 – Sailing boat, technical part (D36)
-A greybox 10 m double-ender lies moored on the south side of the pier in `L_VisualTest` (`ASaltBoat`, meshes
+A 10 m double-ender (hand-made style since D38) lies moored on the south side of the pier in `L_VisualTest` (`ASaltBoat`, meshes
 from `Art/Blender/Scripts/build_boat.py`). Walk aboard through the gap in the bulwark, take the wheel, raise
 the sail and cast off.
 - **Physics:** buoyancy from 67 hull columns on the shared wave field (heave, pitch, roll, heel), keel and

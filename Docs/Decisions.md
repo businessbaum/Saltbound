@@ -753,3 +753,27 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - The sandbank and headland shoals blend smoothly (a hard max showed as a saw-toothed edge on the fine grid).
 - **Lesson:** never import assets while a play session runs: the static mesh build fails ("Bad MeshDescription")
   and nothing saves.
+
+### D38 · Boat and materials restyled to the owner's hand-crafted style brief (Adopted, awaiting owner review)
+- **Owner (2026-10-04):** "The ship and new added stuff again doesn't match our graphic style. Hand crafted, no
+  sharp corners, plain texture": chunky silhouettes, gently crooked geometry, broad bevels, deliberately sculpted
+  wear; textures simplified into broad colour variations, readable wood grooves and selective chips, no
+  photographic grain or dense noise; warm golden-brown wood, muted paint, dark metal with restrained highlights;
+  the painterly feel from geometry and texture design, no global blur, outlines or cel shading.
+- **Boat (`build_boat.py`), same hull shape and physics:**
+  - Every timber is an individual `sb_timber` board with its own seed (bends, grooves, worn edges, soft bevels).
+    New helper `sb_timber.bend_board` lays a straight board along a curve, so hull strakes, wale, bulwark boards,
+    cap rail and covering board follow the hull exactly and keep their hand-made irregularities.
+  - Hull: 9 carvel strakes a side with staggered butt joints over a dark core (seams read as caulked grooves),
+    the waterline painted across the planks; a golden wale; bulwarks of outer and inner boards on square
+    stanchions with a chunky cap rail; teak deck planks fore and aft with a covering board; a golden stem
+    timber; keel and sternpost with broad bevels.
+  - Rig: hewn, gently crooked spars (`sb_timber.spar`) with iron bands and forked jaws, mast cap, chunky rope
+    shrouds on deadeyes with lanyards over chain wales, forestay with a slight sag. Sail with eight sewn panels
+    (raised seams), hollow leech, boltrope, reef points and wooden mast hoops. Chunky wheel, planked rudder with
+    iron straps, bitts, a foredeck hatch, a coiled rope. Hull mesh now Nanite (408 k triangles).
+- **Materials (shared with the test deck section):** wood texture simplified (grain about 5.5 cm apart, soft,
+  broad colour bands, no fibre noise); paint texture calmer; teak and varnish golden-brown and matte (roughness
+  up); hull paint muted brick-oxblood, cream muted; iron darker and less metallic; hemp rope muted and its UVs
+  run along the rope.
+- **Unchanged:** the sailing physics and tests (18/18 pass after the restyle).

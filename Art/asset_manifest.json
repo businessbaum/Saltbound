@@ -119,9 +119,9 @@
   "SM_Boat_Hull": {
     "fbx": "Boat/SM_Boat_Hull.fbx",
     "dest": "/Game/Saltbound/Boat",
-    "nanite": false,
+    "nanite": true,
     "collision": "ucx",
-    "_note": "Greybox starter boat (D36). Hull shape mirrors Source/Saltbound/Boat/SaltHullShape.h; ASaltBoat moves the other parts."
+    "_note": "Hand-made starter boat (D36, D38): planked hull, deck, bulwarks, rig. Hull shape mirrors Source/Saltbound/Boat/SaltHullShape.h; ASaltBoat moves the other parts."
   },
   "SM_Boat_Boom": {
     "fbx": "Boat/SM_Boat_Boom.fbx",

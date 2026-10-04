@@ -231,18 +231,18 @@ def wood_field(size, seed=0, rings=90.0, line_w=0.07):
 
 
 def wood_grain():
-    """Hand-painted straight-grain wood (tinted per material), 1 tile = 1 m at 2048 px, grain along U."""
+    """Hand-painted wood for the boat (tinted per material), 1 tile = 1 m at 2048 px, grain along U (D38).
+    Simplified after the owner's style brief: broad colour bands and a few soft, readable grain grooves (~5.5 cm
+    apart), rare stretched arches, no fibre noise; the board shapes carry the rest."""
     size = 2048
-    # Broad, readable grain (stylised): lines ~2.2 cm apart, wider, fibres faint.
-    latewood, knot_dark, band, fibers, broad = wood_field(size, rings=45.0, line_w=0.11)
-    albedo = (0.6 + 0.07 * broad + 0.035 * (band - 0.5) - 0.13 * latewood - 0.02 * np.abs(fibers)
-              + 0.01 * fibers - 0.3 * knot_dark)
-    rgb = np.stack([albedo * 1.00, albedo * 0.92, albedo * 0.82], -1)
-    height = -latewood * 0.6 + fibers * 0.15 - knot_dark * 0.4 + band * 0.08
+    latewood, knot_dark, band, fibers, broad = wood_field(size, seed=4, rings=18.0, line_w=0.16)
+    albedo = 0.6 + 0.09 * broad + 0.05 * (band - 0.5) - 0.07 * latewood - 0.18 * knot_dark
+    rgb = np.stack([albedo * 1.00, albedo * 0.93, albedo * 0.84], -1)
+    height = -latewood * 0.8 + band * 0.12 - knot_dark * 0.4
     save_rgb(os.path.join(OUT, "Wood", "T_WoodGrain_D.png"), rgb)
-    save_normal(os.path.join(OUT, "Wood", "T_WoodGrain_N.png"), height_to_normal(height, 3.0))
-    ao = 1.0 - 0.12 * latewood - 0.2 * knot_dark
-    rough = np.clip(0.62 + 0.12 * latewood - 0.05 * broad + 0.04 * np.abs(fibers), 0, 1)
+    save_normal(os.path.join(OUT, "Wood", "T_WoodGrain_N.png"), height_to_normal(height, 2.2))
+    ao = 1.0 - 0.08 * latewood - 0.15 * knot_dark
+    rough = np.clip(0.66 + 0.08 * latewood - 0.04 * broad, 0, 1)
     save_rgb(os.path.join(OUT, "Wood", "T_WoodGrain_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
 
 
@@ -443,18 +443,17 @@ def rock_detail():
 
 
 def paint_surface():
-    """Painted wood (tinted per material), 1 tile = 1 m at 2048 px: visible brush strokes along U,
-    the board grain telegraphing through the paint, soft blotches. Crisp but calm."""
+    """Painted wood (tinted per material), 1 tile = 1 m at 2048 px (D38: calmer): broad soft blotches, a few long
+    brush strokes along U, the board grain only faintly telegraphing through."""
     size = 2048
-    latewood, knot_dark, _, fibers, broad = wood_field(size, seed=7)
-    brush = (spectral_noise_dir(size, 10, 160, -1.25, 91, 0.0, 7.0) * 0.7 +
-             spectral_noise_dir(size, 30, 300, -1.1, 94, 4.0, 10.0) * 0.3)
-    blotch = spectral_noise(size, 1, 8, -2.0, seed=92)
-    albedo = 0.62 + 0.05 * brush + 0.025 * blotch - 0.035 * latewood - 0.05 * knot_dark
+    latewood, knot_dark, _, fibers, broad = wood_field(size, seed=7, rings=18.0, line_w=0.16)
+    brush = spectral_noise_dir(size, 4, 40, -1.6, 91, 0.0, 9.0)
+    blotch = spectral_noise(size, 1, 6, -2.0, seed=92)
+    albedo = 0.62 + 0.03 * brush + 0.04 * blotch - 0.02 * latewood - 0.03 * knot_dark
     save_rgb(os.path.join(OUT, "Paint", "T_PaintSurface_D.png"), np.stack([albedo, albedo, albedo], -1))
-    height = brush * 0.6 - latewood * 0.3 - knot_dark * 0.2 + blotch * 0.05
-    save_normal(os.path.join(OUT, "Paint", "T_PaintSurface_N.png"), height_to_normal(height, 2.2))
-    rough = np.clip(0.5 + 0.07 * brush + 0.05 * blotch + 0.06 * latewood, 0, 1)
+    height = brush * 0.5 - latewood * 0.25 - knot_dark * 0.15 + blotch * 0.05
+    save_normal(os.path.join(OUT, "Paint", "T_PaintSurface_N.png"), height_to_normal(height, 1.6))
+    rough = np.clip(0.6 + 0.05 * brush + 0.04 * blotch, 0, 1)
     save_rgb(os.path.join(OUT, "Paint", "T_PaintSurface_ORM.png"), np.stack([np.ones_like(rough), rough, np.zeros_like(rough)], -1))
 
 

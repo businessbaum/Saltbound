@@ -459,24 +459,24 @@ def main():
     metal_tex = {"NormalTexture": TEX + "/Metal/T_Metal_N", "ORMTexture": TEX + "/Metal/T_Metal_ORM"}
     rope_tex = {"BaseTexture": TEX + "/Fabric/T_Rope_D", "NormalTexture": TEX + "/Fabric/T_Rope_N"}
     lib = {
-        # Boat: warm, cared for
-        "MI_Wood_Teak": dict(vectors={"Tint": (0.2, 0.12, 0.068, 1), "WearColor": (0.42, 0.24, 0.11, 1), "GrimeColor": (0.55, 0.45, 0.38, 1)},
-                             scalars={"RoughScale": 0.95, "WearStrength": 0.9, "GrimeAmount": 0.8, "VarAmount": 0.2}, textures=wood_textures()),
-        "MI_Wood_Varnish": dict(vectors={"Tint": (0.095, 0.05, 0.028, 1), "WearColor": (0.3, 0.14, 0.05, 1)},
-                                scalars={"RoughScale": 0.45, "RoughOffset": -0.05, "NormalStrength": 0.6, "WearStrength": 0.8, "WearRoughness": 0.55}, textures=wood_textures()),
-        "MI_Paint_Cream": dict(vectors={"Tint": (0.74, 0.64, 0.45, 1), "WearColor": (0.3, 0.17, 0.08, 1), "VarTint": (1.0, 0.97, 0.92, 1)},
+        # Boat: warm, cared for. D38 (owner style brief): golden-brown wood, muted paint, dark restrained metal.
+        "MI_Wood_Teak": dict(vectors={"Tint": (0.165, 0.112, 0.066, 1), "WearColor": (0.36, 0.25, 0.13, 1), "GrimeColor": (0.55, 0.45, 0.38, 1)},
+                             scalars={"RoughScale": 1.15, "WearStrength": 0.9, "GrimeAmount": 0.8, "VarAmount": 0.2}, textures=wood_textures()),
+        "MI_Wood_Varnish": dict(vectors={"Tint": (0.11, 0.068, 0.036, 1), "WearColor": (0.3, 0.19, 0.09, 1)},
+                                scalars={"RoughScale": 0.8, "RoughOffset": 0.0, "NormalStrength": 0.6, "WearStrength": 0.8, "WearRoughness": 0.55}, textures=wood_textures()),
+        "MI_Paint_Cream": dict(vectors={"Tint": (0.6, 0.54, 0.42, 1), "WearColor": (0.3, 0.17, 0.08, 1), "VarTint": (1.0, 0.97, 0.92, 1)},
                                scalars={"TexNormalize": 2.6, "NormalStrength": 0.6, "RoughScale": 1.1, "VarAmount": 0.04, "VarHue": 0.3, "WearStrength": 1.15, "WearRoughness": 0.7},
                                textures=paint_textures()),
         "MI_Metal_Brass": dict(vectors={"Tint": (0.5, 0.33, 0.12, 1), "WearColor": (0.85, 0.62, 0.3, 1), "GrimeColor": (0.35, 0.42, 0.3, 1)},
                                scalars={"Metallic": 1.0, "WearMetallic": 1.0, "WearRoughness": 0.2, "TexNormalize": 1.0, "RoughScale": 0.9, "VarAmount": 0.05, "MacroAmount": 0.04},
                                textures=dict(metal_tex, BaseTexture="/Engine/EngineResources/WhiteSquareTexture")),
-        "MI_Metal_Iron": dict(vectors={"Tint": (0.045, 0.042, 0.038, 1), "WearColor": (0.12, 0.11, 0.1, 1), "GrimeColor": (2.2, 1.0, 0.45, 1)},
-                              scalars={"Metallic": 0.75, "WearMetallic": 0.9, "WearRoughness": 0.35, "TexNormalize": 1.0, "RoughScale": 1.35, "GrimeAmount": 0.7},
+        "MI_Metal_Iron": dict(vectors={"Tint": (0.035, 0.033, 0.031, 1), "WearColor": (0.09, 0.085, 0.08, 1), "GrimeColor": (2.2, 1.0, 0.45, 1)},
+                              scalars={"Metallic": 0.6, "WearMetallic": 0.9, "WearRoughness": 0.35, "TexNormalize": 1.0, "RoughScale": 1.35, "GrimeAmount": 0.7},
                               textures=dict(metal_tex, BaseTexture="/Engine/EngineResources/WhiteSquareTexture")),
-        "MI_Rope_Hemp": dict(vectors={"Tint": (0.36, 0.27, 0.15, 1)},
-                             scalars={"RoughScale": 1.4, "WearStrength": 0.0, "TexNormalize": 1.8, "UVScale": 6.0, "MacroAmount": 0.0}, textures=rope_tex),
+        "MI_Rope_Hemp": dict(vectors={"Tint": (0.21, 0.165, 0.105, 1)},
+                             scalars={"RoughScale": 1.4, "WearStrength": 0.0, "TexNormalize": 1.6, "UVScale": 6.0, "MacroAmount": 0.0}, textures=rope_tex),
         "MI_Caulk_Dark": dict(vectors={"Tint": (0.025, 0.022, 0.02, 1)}, scalars={"RoughScale": 1.0, "NormalStrength": 0.2, "WearStrength": 0.0}, textures=wood_textures()),
-        "MI_Paint_Hull": dict(vectors={"Tint": (0.22, 0.04, 0.025, 1), "WearColor": (0.22, 0.1, 0.05, 1), "GrimeColor": (0.4, 0.5, 0.35, 1)},
+        "MI_Paint_Hull": dict(vectors={"Tint": (0.135, 0.045, 0.034, 1), "WearColor": (0.22, 0.1, 0.05, 1), "GrimeColor": (0.4, 0.5, 0.35, 1)},
                               scalars={"TexNormalize": 2.6, "NormalStrength": 0.6, "RoughScale": 0.9, "VarAmount": 0.03, "WearStrength": 1.0, "GrimeAmount": 1.0, "GrimeRoughness": 0.35},
                               textures=paint_textures()),
         "MI_Paint_Boottop": dict(vectors={"Tint": (0.03, 0.03, 0.032, 1), "GrimeColor": (0.8, 1.2, 0.7, 1)},
@@ -484,7 +484,7 @@ def main():
         "MI_Glass_Dark": dict(vectors={"Tint": (0.02, 0.03, 0.035, 1)},
                               scalars={"TexNormalize": 1.0, "NormalStrength": 0.0, "RoughScale": 0.0, "RoughOffset": 0.06, "WearStrength": 0.0, "GrimeAmount": 0.0},
                               textures={"BaseTexture": "/Engine/EngineResources/WhiteSquareTexture"}),
-        "MI_Canvas": dict(vectors={"Tint": (0.55, 0.51, 0.43, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 1.0, "RoughScale": 1.6, "WearStrength": 0.0, "UVScale": 1.0}, textures=canvas_textures()),
+        "MI_Canvas": dict(vectors={"Tint": (0.53, 0.5, 0.43, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.5, "RoughScale": 1.6, "WearStrength": 0.0, "UVScale": 1.0}, textures=canvas_textures()),
         # Harbour: weathered, cooler
         # Weathered dock timber (D20): desaturated grey-brown, olive-brown board variation, matte, broad grain;
         # edge accents only where the wear mask breaks through (no continuous pale outlines).
