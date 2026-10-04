@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45).
+Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46).
 
 ## Milestone status
 
@@ -10,7 +10,7 @@ Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45).
 | M2 First-person player & moving-platform tests | **Done** (verified in PIE and standalone) |
 | M3 Visual test scene | **Revision 3 in review** (stylised realism pass after owner feedback; see below) |
 | M4 Starting boat & navigable water | **Technical part done** (greybox boat sails, D36); art waits for the decisions |
-| M5 Starting harbor & complete loop | Planned |
+| M5 Starting harbor & complete loop | **In progress**: the loop (depart, sail, return, moor, save/load) works (D46) |
 
 ## Decisions needed from the owner (visual checkpoint)
 Recommendation is listed first. Evidence images: `Docs/Evidence/M3/` (Day / Evening / Dusk × 10 shots,
@@ -223,6 +223,8 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D46:** save and load. Mooring saves, the pause menu saves and loads, quitting saves; the packaged game continues
+  where the player left off (play-in-editor always starts fresh).
 - **D44 / D45 (awaiting the owner's check):** a settings menu (Esc / F10) with vsync off and a frame cap by default;
   a wind pennant at the masthead; the boat steers with an oar on the starboard quarter (the wheel is kept for later
   boats); the sea shows a bow wave, white water along the hull, a Kelvin wake and a foam trail that follows the turns.
@@ -277,7 +279,8 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.DumpFrames <n>`: the renderer writes the next n frames to `Saved/Screenshots` (with `-UseFixedTimeStep -FPS=<n>`, see `Tools/record_clip.py --dump`)
 - `sb.Dev.RunMovementTests [motion speed turn]`, `sb.Dev.Platform <motion> [speed turn]`
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
-- `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`, `sb.Dev.RunMenuTests`
+- `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`, `sb.Dev.RunMenuTests`,
+  `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched)
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`
   (SB_BOAT state line), `sb.Boat.Place X Y Yaw [Speed m/s]`, `sb.Boat.Hold Free|Moored|Anchored`,

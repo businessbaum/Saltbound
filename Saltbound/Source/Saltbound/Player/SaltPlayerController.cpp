@@ -3,6 +3,7 @@
 #include "Player/SaltPlayerController.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Core/SaltSaveSubsystem.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
@@ -31,6 +32,14 @@ void ASaltPlayerController::SetHUDVisible(bool bVisible)
 	if (HUDWidget)
 	{
 		HUDWidget->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+}
+
+void ASaltPlayerController::ShowNotice(const FText& Text)
+{
+	if (HUDWidget)
+	{
+		HUDWidget->ShowNotice(Text);
 	}
 }
 
@@ -102,4 +111,17 @@ void ASaltPlayerController::BeginPlay()
 		HUDWidget->AddToViewport(0);
 	}
 	SetInputMode(FInputModeGameOnly());
+
+	// The game continues from the last save (D46). Play-in-editor and tool runs (-SaltNewGame: captures, benchmarks)
+	// start from the map as built. Next tick: the boat has set itself up by then.
+	if (!GIsEditor && !FParse::Param(FCommandLine::Get(), TEXT("SaltNewGame")))
+	{
+		GetWorldTimerManager().SetTimerForNextTick([this]()
+		{
+			if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
+			{
+				Saves->LoadGame(GetWorld());
+			}
+		});
+	}
 }

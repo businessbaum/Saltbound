@@ -51,7 +51,7 @@ private:
 };
 
 /**
- * Pause menu: Resume, V-Sync, frame rate limit, resolution scale, window mode, field of view, mouse sensitivity,
+ * Pause menu: Resume, save, load the last save, V-Sync, frame rate limit, resolution scale, window mode, field of view, mouse sensitivity,
  * invert look, restore defaults, quit. Keyboard (arrows / WASD, Enter, Esc / F10), mouse and gamepad (d-pad,
  * A, B / Start). Every change applies at once and is saved.
  */
@@ -61,7 +61,8 @@ class SALTBOUND_API USaltMenuWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	enum class ERow : uint8 { Resume, VSync, FrameCap, ResolutionScale, WindowMode, FieldOfView, MouseSensitivity, InvertLook, Defaults, Quit };
+	enum class ERow : uint8 { Resume, Save, Load, VSync, FrameCap, ResolutionScale, WindowMode, FieldOfView, MouseSensitivity, InvertLook, Defaults, Quit };
+	static bool IsOption(ERow Row) { return Row >= ERow::VSync && Row <= ERow::InvertLook; }
 
 	/** Re-reads every value from the settings. */
 	void Refresh();

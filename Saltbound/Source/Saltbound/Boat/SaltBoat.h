@@ -91,6 +91,8 @@ public:
 	void Recover();
 	/** Development and tests: place the boat (origin, cm; heading in degrees), optionally with a forward speed (cm/s). */
 	void PlaceAt(const FVector& Location, float Yaw, float ForwardSpeed = 0.f);
+	/** A saved state (D46): moored boats lie at their mooring, anchored ones with the anchor down and holding. */
+	void RestoreState(const FVector& Location, float Yaw, ESaltBoatHold InHold, bool bSail);
 
 	// State --------------------------------------------------------------------
 	bool IsSailSet() const { return bSailSet; }

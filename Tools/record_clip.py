@@ -105,7 +105,7 @@ def main():
     else:
         args = [EDITOR, PROJECT, "/Game/Saltbound/Maps/L_VisualTest", "-game"]
     # Pinned at the top-left corner, no log console (it would cover the frame); the log file is still written.
-    args += ["-windowed", "-resx=%s" % rx, "-resy=%s" % ry, "-WinX=0", "-WinY=0", "-nosplash", '-ExecCmds=%s' % exec_cmds]
+    args += ["-windowed", "-resx=%s" % rx, "-resy=%s" % ry, "-WinX=0", "-WinY=0", "-nosplash", "-SaltNewGame", '-ExecCmds=%s' % exec_cmds]
     proc = subprocess.Popen(args)
     try:
         hwnd = int(find_window_handle([proc.pid]))
@@ -159,7 +159,7 @@ def record_dump(ns):
     exec_cmds = ",".join(["r.VSync 0"] + shot_commands(ns) + delayed)
     args = ([PACKAGED] if ns.packaged else [EDITOR, PROJECT, "/Game/Saltbound/Maps/L_VisualTest", "-game"]) + [
         "-windowed", "-resx=%s" % rx, "-resy=%s" % ry, "-WinX=0", "-WinY=0", "-nosplash",
-        "-UseFixedTimeStep", "-FPS=%d" % ns.fps, "-ExecCmds=%s" % exec_cmds]
+        "-UseFixedTimeStep", "-FPS=%d" % ns.fps, "-SaltNewGame", "-ExecCmds=%s" % exec_cmds]
     proc = subprocess.Popen(args)
     try:
         proc.wait(timeout=900)

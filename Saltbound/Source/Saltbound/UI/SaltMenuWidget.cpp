@@ -14,6 +14,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Core/SaltGameUserSettings.h"
+#include "Core/SaltSaveSubsystem.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
@@ -183,7 +184,7 @@ TSharedRef<SWidget> USaltMenuWidget::RebuildWidget()
 	SetIsFocusable(true);
 	if (WidgetTree && !WidgetTree->RootWidget)
 	{
-		Rows = { ERow::Resume, ERow::VSync, ERow::FrameCap, ERow::ResolutionScale, ERow::WindowMode, ERow::FieldOfView,
+		Rows = { ERow::Resume, ERow::Save, ERow::Load, ERow::VSync, ERow::FrameCap, ERow::ResolutionScale, ERow::WindowMode, ERow::FieldOfView,
 			ERow::MouseSensitivity, ERow::InvertLook, ERow::Defaults, ERow::Quit };
 
 		// Dimmed game behind a small dark panel in the middle.
@@ -211,7 +212,7 @@ TSharedRef<SWidget> USaltMenuWidget::RebuildWidget()
 			S->SetPadding(FMargin(16.f, 0.f, 0.f, 14.f));
 		}
 
-		static const TCHAR* Labels[] = { TEXT("Resume"), TEXT("V-Sync"), TEXT("Frame rate limit"), TEXT("Resolution scale"),
+		static const TCHAR* Labels[] = { TEXT("Resume"), TEXT("Save game"), TEXT("Load last save"), TEXT("V-Sync"), TEXT("Frame rate limit"), TEXT("Resolution scale"),
 			TEXT("Window mode"), TEXT("Field of view"), TEXT("Mouse sensitivity"), TEXT("Invert look"), TEXT("Restore defaults"),
 			TEXT("Quit to desktop") };
 		RowWidgets.Reset();
@@ -251,7 +252,7 @@ void USaltMenuWidget::Refresh()
 	for (int32 I = 0; I < RowWidgets.Num(); ++I)
 	{
 		const FText Value = ValueOf(Rows[I]);
-		const bool bOption = !Value.IsEmpty();
+		const bool bOption = IsOption(Rows[I]) && !Value.IsEmpty();
 		RowWidgets[I]->SetValue(bOption && I == Selected ? FText::Format(NSLOCTEXT("Saltbound", "MenuValueSelected", "<   {0}   >"), Value) : Value);
 		RowWidgets[I]->SetSelected(I == Selected);
 	}
@@ -259,6 +260,16 @@ void USaltMenuWidget::Refresh()
 
 FText USaltMenuWidget::ValueOf(ERow Row) const
 {
+	if (Row == ERow::Save || Row == ERow::Load)
+	{
+		// When the game was last saved; loading needs a save.
+		const USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this);
+		if (!Saves || !Saves->HasSave())
+		{
+			return Row == ERow::Load ? NSLOCTEXT("Saltbound", "NoSave", "no save yet") : FText::GetEmpty();
+		}
+		return FText::FromString(Saves->GetSaveTime().ToString(TEXT("%d.%m. %H:%M")));
+	}
 	const USaltGameUserSettings* S = USaltGameUserSettings::Get();
 	if (!S)
 	{
@@ -382,6 +393,23 @@ void USaltMenuWidget::ActivateRow(int32 Row)
 	case ERow::Resume:
 		RequestClose();
 		break;
+	case ERow::Save:
+		if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
+		{
+			Saves->SaveGame(GetWorld(), TEXT("menu"));
+			Refresh();
+		}
+		break;
+	case ERow::Load:
+		if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
+		{
+			if (Saves->HasSave())
+			{
+				RequestClose();
+				Saves->LoadGame(GetWorld());
+			}
+		}
+		break;
 	case ERow::Defaults:
 		if (USaltGameUserSettings* S = USaltGameUserSettings::Get())
 		{
@@ -395,6 +423,10 @@ void USaltMenuWidget::ActivateRow(int32 Row)
 		}
 		break;
 	case ERow::Quit:
+		if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
+		{
+			Saves->Autosave(GetWorld(), TEXT("quit"));
+		}
 		UKismetSystemLibrary::QuitGame(this, GetOwningPlayer(), EQuitPreference::Quit, false);
 		break;
 	default:

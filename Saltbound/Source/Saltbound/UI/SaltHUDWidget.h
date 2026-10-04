@@ -18,6 +18,10 @@ class SALTBOUND_API USaltHUDWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	/** A short notice at the top of the screen that fades after a few seconds. */
+	void ShowNotice(const FText& Text);
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
@@ -26,6 +30,8 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UImage> Dot;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> Prompt;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> Hint;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> Notice;
+	float NoticeTime = 0.f;
 
 	float PromptAlpha = 0.f;
 	float HintAlpha = 0.f;

@@ -43,7 +43,7 @@ namespace
 
 		PC->SetMenuOpen(true);
 		USaltMenuWidget* M = PC->GetMenu();
-		Report(TEXT("MenuOpens"), PC->IsMenuOpen() && World->IsPaused() && PC->bShowMouseCursor && M && M->GetRowCount() == 10,
+		Report(TEXT("MenuOpens"), PC->IsMenuOpen() && World->IsPaused() && PC->bShowMouseCursor && M && M->GetRowCount() == 12,
 			FString::Printf(TEXT("open=%d paused=%d cursor=%d rows=%d"), PC->IsMenuOpen() ? 1 : 0, World->IsPaused() ? 1 : 0,
 				PC->bShowMouseCursor ? 1 : 0, M ? M->GetRowCount() : 0));
 		if (!M)

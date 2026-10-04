@@ -56,7 +56,8 @@ All scripts are PowerShell (`powershell -ExecutionPolicy Bypass -File Tools\<scr
 | Run the packaged build (optional screenshot / console commands) | `Tools\Run-Build.ps1 -Seconds 60 -ExecCmds "sb.Dev.Benchmark 10" -Fullscreen` |
 | Automated movement tests in PIE | `python Tools\run_pie_test.py "sb.Dev.RunMovementTests 1 300 8"` |
 | Capture the visual test shots (Day/Evening/Dusk) | `python Tools\capture_shots.py visualtest --presets Day Evening Dusk` |
-| Automated sailing tests in PIE (`L_VisualTest`) | `python Toolsun_pie_test.py "sb.Dev.RunBoatTests" --timeout 560 --done "SB_TEST BoatSuite DONE"` |
+| Automated sailing tests in PIE (`L_VisualTest`) | `python Tools\run_pie_test.py "sb.Dev.RunBoatTests" --timeout 600 --done "SB_TEST BoatSuite DONE"` |
+| Settings menu and save/load checks in PIE | `python Tools\run_pie_test.py "sb.Dev.RunMenuTests" --done "SB_TEST MenuSuite DONE"` (and `sb.Dev.RunSaveTests` / `SaveSuite`) |
 | Regenerate procedural textures | `python Tools\textures\gen_textures.py` (then `import_textures.py`) |
 
 Editor automation: the project enables Python remote execution (`Tools/ue_exec.py` runs Python inside the
@@ -65,7 +66,7 @@ viewport captures and logs). Both start automatically with the editor.
 
 ## Controls
 
-Controls are documented per milestone in [Docs/Progress.md](Docs/Progress.md#controls) until a settings menu exists.
+Controls are listed in [Docs/Progress.md](Docs/Progress.md#controls); settings (display, look) are in the pause menu (Esc, F10 in the editor).
 
 ## Documentation
 

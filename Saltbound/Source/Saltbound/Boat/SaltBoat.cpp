@@ -6,6 +6,7 @@
 #include "CableComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Core/SaltContent.h"
+#include "Core/SaltSaveSubsystem.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -600,6 +601,29 @@ void ASaltBoat::PlaceAt(const FVector& Location, float Yaw, float ForwardSpeed)
 	ApplyTransform(0.f);
 }
 
+void ASaltBoat::RestoreState(const FVector& Location, float Yaw, ESaltBoatHold InHold, bool bSail)
+{
+	if (InHold == ESaltBoatHold::Moored)
+	{
+		ResetToStart();
+	}
+	else
+	{
+		SetHold(ESaltBoatHold::Free);
+		PlaceAt(Location, Yaw);
+		RudderAngle = 0.f;
+		SetHold(InHold);
+		if (InHold == ESaltBoatHold::Anchored)
+		{
+			AnchorAlpha = AnchorHold = 1.f;
+			bHoldSet = true;
+		}
+	}
+	bSailSet = bSail;
+	Hoist = bSail ? 1.f : 0.f;
+	Fill = FillVel = 0.f;
+}
+
 void ASaltBoat::ResetToStart()
 {
 	SetHold(ESaltBoatHold::Free);
@@ -704,6 +728,14 @@ void ASaltBoat::HandleSailRope(USaltInteractableComponent* Interactable, ASaltPl
 void ASaltBoat::HandleWindlass(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
 {
 	ToggleHold();
+	if (Hold == ESaltBoatHold::Moored)
+	{
+		// Home again: the end of a voyage saves the game (D46).
+		if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
+		{
+			Saves->Autosave(GetWorld(), TEXT("moored"));
+		}
+	}
 }
 
 void ASaltBoat::GetLadderPath(bool bStarboard, bool bUp, float CapsuleHalfHeight, TArray<FVector>& OutPoints, TArray<bool>& OutStepped) const

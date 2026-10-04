@@ -60,6 +60,15 @@ TSharedRef<SWidget> USaltHUDWidget::RebuildWidget()
 			S->SetPosition(FVector2D(0.f, 36.f));
 		}
 
+		Notice = MakeText(WidgetTree, TEXT("Notice"), 16);
+		if (UCanvasPanelSlot* S = Root->AddChildToCanvas(Notice))
+		{
+			S->SetAnchors(FAnchors(0.5f, 0.f));
+			S->SetAlignment(FVector2D(0.5f, 0.f));
+			S->SetAutoSize(true);
+			S->SetPosition(FVector2D(0.f, 48.f));
+		}
+
 		Hint = MakeText(WidgetTree, TEXT("Hint"), 14);
 		if (UCanvasPanelSlot* S = Root->AddChildToCanvas(Hint))
 		{
@@ -72,9 +81,23 @@ TSharedRef<SWidget> USaltHUDWidget::RebuildWidget()
 	return Super::RebuildWidget();
 }
 
+void USaltHUDWidget::ShowNotice(const FText& Text)
+{
+	if (Notice)
+	{
+		Notice->SetText(Text);
+		NoticeTime = 2.5f;
+	}
+}
+
 void USaltHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (Notice)
+	{
+		NoticeTime = FMath::Max(NoticeTime - InDeltaTime, 0.f);
+		Notice->SetRenderOpacity(0.85f * FMath::Clamp(NoticeTime / 0.6f, 0.f, 1.f));
+	}
 
 	const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn());
 	const FText PromptText = Player ? Player->GetPromptText() : FText::GetEmpty();

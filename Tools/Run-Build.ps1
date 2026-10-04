@@ -14,6 +14,8 @@ $exe = Join-Path $RepoRoot "Builds\$Configuration\Windows\Saltbound.exe"
 if (-not (Test-Path $exe)) { throw "Build not found: $exe (run Tools\Package-Game.ps1)" }
 $mode = if ($Fullscreen) { '-fullscreen' } else { '-windowed' }
 $gameArgs = @($mode, "-resx=$ResX", "-resy=$ResY", '-log', '-nosplash')
+# Tool runs start from the map as built, not from the player's last save (D46).
+$gameArgs += "-SaltNewGame"
 if ($ExecCmds) { $gameArgs += "-ExecCmds=`"$ExecCmds`"" }
 $proc = Start-Process -FilePath $exe -ArgumentList $gameArgs -PassThru
 if ($Seconds -le 0) { return }

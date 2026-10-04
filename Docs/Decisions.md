@@ -907,3 +907,16 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   `WakeStrength` on the boat.
 - **Tests:** `sb.Dev.RunBoatTests` 28/28 (new: the sea gets the boat's speed and a trail sampled a second apart, 3.79 m
   spacing at 3.79 m/s); `Tools/swim_test.py` 5/5; `sb.Dev.RunMenuTests` 7/7.
+
+### D46 · Save and load: the M5 loop closes (Adopted)
+- **Why:** M5's loop is depart, sail, return, moor, save/load; everything but the save existed.
+- **What is saved** (`USaltSaveSubsystem`, slot `Main`, `Saved/SaveGames/Main.sav`): the boat's place, heading, hold
+  (moored, anchored, free) and sail; the player's feet and view, in the boat's frame while aboard (they wake up on
+  their deck wherever it lies); time-of-day preset, region, weather, sea state and wind.
+- **When:** mooring at the windlass ends a voyage and saves; quitting from the menu saves; the pause menu has "Save
+  game" (with the time of the last save) and "Load last save". A short notice ("Game saved") shows at the top.
+- **Loading:** the packaged game continues from the last save on start. Play-in-editor never loads (editor sessions and
+  tests start from the map as built), nor do tool runs (`-SaltNewGame`: Run-Build.ps1, record_clip.py). A save from
+  another map is ignored. Restoring puts a moored boat at its mooring and an anchored one with the anchor down.
+- **Tests:** `sb.Dev.RunSaveTests` 5/5 (in a test slot: anchored boat with the sail set, player aboard, sea and wind
+  restored exactly; mooring saves).
