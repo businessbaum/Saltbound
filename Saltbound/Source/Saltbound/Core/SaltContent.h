@@ -24,6 +24,11 @@ namespace SaltContent
 	inline const TCHAR* UnderwaterParticleMesh = TEXT("/Engine/BasicShapes/Plane.Plane");
 	inline const TCHAR* LanternMesh = TEXT("/Game/Saltbound/Props/SM_Lantern.SM_Lantern");
 	inline const TCHAR* CloudMaterial = TEXT("/Game/Saltbound/Environment/Sky/MI_Clouds_Stylized.MI_Clouds_Stylized");
+	/** Starter boat parts (Art/Blender/Scripts/build_boat.py): /Game/Saltbound/Boat/SM_Boat_<Part>. */
+	inline FString BoatMesh(const TCHAR* Part)
+	{
+		return FString::Printf(TEXT("/Game/Saltbound/Boat/SM_Boat_%s.SM_Boat_%s"), Part, Part);
+	}
 	/** FFT ocean render targets (setup_ocean.py): /Game/Saltbound/Water/FFT/RT_Ocean<Kind><Cascade>. */
 	inline FString OceanFFTTarget(const TCHAR* Kind, int32 Cascade)
 	{

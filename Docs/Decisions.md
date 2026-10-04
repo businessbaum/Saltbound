@@ -683,3 +683,57 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     above.
   - The D34 roughness floor is removed (it had no effect).
   - The Snell window fades into total internal reflection beyond 40 m (`WindowFadeDistance`).
+
+### D36 · Sailing boat: kinematic rigid body with hull columns, foil sail, keel and rudder (Adopted, M4 technical)
+- **Goal:** the M4 technical part that does not wait for the art decisions (cabin, hull colour): a boat that
+  floats on the shared wave field, sails by wind, sail trim, keel and rudder, collides with the pier, rocks
+  and seabed, carries the player, and can be reset. D7 (kinematic deck, our own integrator) still holds.
+- **Greybox:** `Art/Blender/Scripts/build_boat.py` builds a 10 m double-ender (3.4 m beam, 0.75 m freeboard,
+  long keel to 1.45 m) with an open deck, boarding gaps midship, a gaff main, shrouds, a wheel and an
+  outboard rudder. Its hull formulas are the same as `Boat/SaltHullShape.h`, so mesh and physics agree.
+  Moving parts (boom, gaff, sail, rudder, wheel) are separate meshes.
+- **Physics (`ASaltBoat`, SI units, 120 Hz substeps):**
+  - Buoyancy from 67 vertical hull columns (the deck plan in 10 × 6 strips plus the keel), each pushed up
+    by the water it displaces at the CPU wave surface and damped against the water's own vertical motion.
+    Mass = displacement at the design waterline (10.9 t); the centre of mass sits over the centre of
+    buoyancy, 0.15 m above the waterline. Heave, pitch, roll and the righting moment follow from the shape.
+  - Hull: forward resistance rising steeply past hull speed (3.75 m/s); the lateral plane as a
+    low-aspect wing (leeway, stall at 14°) plus crossflow drag; yaw, roll and pitch damping; added mass.
+  - Rudder: a foil at the stern; a little torque at rest ("sculling") so the boat can turn in harbour.
+  - Sail: a foil in the apparent wind at its centre of effort. The boom swings free up to the sheet's
+    limit, so head to wind the sail luffs (no-go zone emerges) and dead downwind it gybes (with 15° by
+    the lee before it crosses). 40 m² stands for the full rig of a boat this heavy; the greybox draws only
+    the 27 m² main.
+  - Lines: moored (bow and stern springs to the start position) or anchored (one 14 m rode); tension capped
+    so a displaced boat is pulled in gently.
+- **Collision:** 45 capsules (three rings along the hull, keel, bilges) against static geometry. One box
+  overlap per frame skips everything in open water. Near geometry, the capsules' overlaps give contact
+  planes (MTD) that act as stiff damped springs with friction inside the substeps, and swept capsules stop
+  the boat at the first hit so it cannot pass between thin posts.
+- **Recovery:** capsized for 3 s → upright at the last safe position (recorded every 2 s while clear);
+  `sb.Boat.Reset` returns to the mooring; `sb.Boat.Recover` on demand.
+- **Controls:** at the wheel A / D steer (the rudder recentres when let go), W / S sheet in / out, Space
+  raises or lowers the sail, C casts off / moors (near the start) / anchors / weighs anchor. The mast has a
+  "Raise the sail" interaction too. Stations gained generic action buttons (Jump and Dive keys).
+- **Evidence (`sb.Dev.RunBoatTests`, 18/18 pass, PIE, steady 7 m/s wind unless noted):**
+
+  | Check | Result |
+  |---|---|
+  | Floats at rest | waterline 0.2 cm off, level |
+  | Roll period / decay per half swing | 2.7 s / 0.60 |
+  | Beam reach / close-hauled (50°) / broad reach / running | 7.0 / 5.9 / 6.1 / 5.4 kn |
+  | Heel close-hauled / leeway | 12.7° / 2.5° |
+  | Head to wind (10°) | no headway (drifts back at 0.9 kn) |
+  | Turning circle at 2.9 m/s, full rudder | radius 22 m (7.7°/s); 3.9°/s at rest |
+  | Into the pier end at 2.5 m/s | stops at the posts, no penetration, bounces back at 0.4 m/s |
+  | Aground on the beach at 2 m/s | stops, 5 cm into the sand, lifted 24 cm |
+  | Player standing aboard at 6.9 kn | no drift, no jitter, stays based on the deck |
+  | Helm at sea | focus, steers 7°/s to starboard, leaves onto the deck |
+  | Rough sea, beam reach, 8 m/s | 7.5 kn, max heel 21°, heave range 1.7 m |
+  | Storm sea, bare poles, 14 m/s | max heel 41°, max pitch 28°, heave range 10 m, no capsize |
+  | Moored in 7 m/s | holds within 30 cm |
+- **Trade-offs:** heavy and stiff like a real double-ender, so it gathers way slowly (about half a minute
+  to full speed). The tunables (sail area, centre of mass height, damping) are exposed for tuning by feel.
+  The CPU wave field carries only the long waves (D27), so the boat ignores short chop. A thin horizontal
+  slab hit at the bulwark's height can flip the contact normal upward (the bow rides up). The boat does
+  not push a swimmer; the swimmer's movement resolves the overlap.

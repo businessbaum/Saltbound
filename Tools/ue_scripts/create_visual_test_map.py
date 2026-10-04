@@ -3,6 +3,7 @@
 A small cove: coastal rocks, a two-section pier, the boat deck section moored alongside (riding the waves),
 lanterns, a distant landmark in the fog, the ocean with a calm zone, and a lighting rig (Day / Evening).
 Under the water (D28): a sculpted sand seabed (beach, pier ridge, drop-off, sandbank) with sea-grass patches.
+The sailing boat (M4, D36) lies moored on the other side of the pier.
 """
 import math
 import os
@@ -159,6 +160,9 @@ crate = mesh("Crate_Boat", "/Game/Saltbound/Props/SM_Crate_Small", local_to_worl
 crate.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
 attach(crate, boat)
 spawn(unreal.SaltLantern, (1310, -70, 110), (0, -30, 0), "Lantern_Dock")
+
+# --- the sailing boat (M4, D36): greybox, moored on the pier's south side with the bow to the sea --------------
+spawn(unreal.SaltBoat, (900, -350, 0), (0, 0, 0), "Boat")
 mesh("Crate_Dock", "/Game/Saltbound/Props/SM_Crate_Small", (1180, -60, 110), (0, 25, 0))
 mesh("Crate_Dock2", "/Game/Saltbound/Props/SM_Crate_Small", (1185, -62, 150.5), (0, 12, 0), 0.85)
 

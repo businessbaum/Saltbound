@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 3, underwater revision 1 and review round: D28, D29).
+Last updated: 2026-10-04 (session 4: M4 sailing boat, technical part, D36).
 
 ## Milestone status
 
@@ -9,7 +9,7 @@ Last updated: 2026-10-04 (session 3, underwater revision 1 and review round: D28
 | M1 Infrastructure & foundation | **Done** (verified) |
 | M2 First-person player & moving-platform tests | **Done** (verified in PIE and standalone) |
 | M3 Visual test scene | **Revision 3 in review** (stylised realism pass after owner feedback; see below) |
-| M4 Starting boat & navigable water | Next (technical parts can start without the decisions) |
+| M4 Starting boat & navigable water | **Technical part done** (greybox boat sails, D36); art waits for the decisions |
 | M5 Starting harbor & complete loop | Planned |
 
 ## Decisions needed from the owner (visual checkpoint)
@@ -212,6 +212,26 @@ for a higher screen percentage (for example 75 %) and more content.
   - A storm area 3 km south of the cove. In play mode, use `sb.Dev.Camera 0 -300000 350 -8 90 90 1` to
     view it (`sb.Dev.Camera 2500 -900 350 -8 90 90 1` for the cove, `sb.Dev.Camera off` to return), or
     `sb.Dev.Teleport 0 -300000 0` to swim in it.
+- **Later review rounds (awaiting the owner's check):** more visible particles and calmer distant crests
+  (D31); Rough sea with one dominant direction, broader crests and crest foam patches (D32); foam structure,
+  fresh foam vs residue, varied crest spacing (D33); the coloured specks on distant crests fixed at the
+  cause, an overflow in the underside's underwater light (D35; D34 was a wrong guess and is reverted).
+
+## M4 – Sailing boat, technical part (D36)
+A greybox 10 m double-ender lies moored on the south side of the pier in `L_VisualTest` (`ASaltBoat`, meshes
+from `Art/Blender/Scripts/build_boat.py`). Walk aboard through the gap in the bulwark, take the wheel, raise
+the sail and cast off.
+- **Physics:** buoyancy from 67 hull columns on the shared wave field (heave, pitch, roll, heel), keel and
+  hull resistance, a rudder foil, the gaff sail as a foil in the apparent wind with a free-swinging boom
+  limited by the sheet (luffs head to wind, gybes downwind). 10.9 t, gathers way in about half a minute.
+- **Collision:** capsules along the hull against the pier, rocks and seabed (contact springs and sweeps);
+  it stops at the pier and runs aground on the beach.
+- **Holding:** moored at the start (bow and stern lines), anchor anywhere when slow, cast off with C.
+- **Recovery:** capsized boats right themselves at their last safe position; `sb.Boat.Reset` returns to the
+  mooring.
+- **Test:** `python Tools/run_pie_test.py "sb.Dev.RunBoatTests" --timeout 560 --done "SB_TEST BoatSuite DONE"`
+  (18 checks, all pass: points of sail 5.4–7.0 kn in 13.6 kn of wind, no headway head to wind, 22 m
+  turning circle, pier and beach collisions, player aboard, helm, Rough and Storm seas, mooring).
 
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
@@ -223,6 +243,7 @@ for a higher screen percentage (for example 75 %) and more content.
 | Dive (while swimming) | Left Ctrl / C | B / Circle |
 | Interact / leave station | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
+| At the boat's wheel | A / D steer, W / S sheet in / out, Space raise / lower the sail, C cast off / moor / anchor | Left stick, A, B |
 
 Developer console (`~`, non-shipping builds):
 - `sb.Lighting Day|Evening|Dusk`
@@ -234,6 +255,10 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.RunMovementTests [motion speed turn]`, `sb.Dev.Platform <motion> [speed turn]`
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`
+- `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
+- `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`
+  (SB_BOAT state line), `sb.Boat.Place X Y Yaw [Speed m/s]`, `sb.Boat.Hold Free|Moored|Anchored`,
+  `sb.Boat.Control <Rudder> <Sheet> [Sail 0|1]` / `sb.Boat.Control off`, `sb.Dev.RunBoatTests`
 - `sb.Dev.Teleport X Y Z [Yaw] [Pitch]` (feet position), `sb.Dev.Input <Forward> <Right> [Up] [Dive]` (simulated
   input), `sb.Dev.WaterState` (logs `SB_WATER`: movement mode, immersion, surface, camera height above the water)
 
@@ -275,7 +300,15 @@ Developer console (`~`, non-shipping builds):
   below the waterline (decision 2).
 - **Test deck section:** it is a slice of the boat with flat end caps (not a full hull), and its deckhouse
   is a shed-like 95 cm box.
-- **Floater:** `ASaltDevFloater` is a simple spring-fitted floater, not the M4 boat model.
+- **Floater:** `ASaltDevFloater` (the moored test deck section) is a simple spring-fitted floater, not the M4
+  boat model.
+- **Sailing boat (D36):**
+  - Greybox only: open deck (no cabin until decision 2), no sheet or halyard ropes, no anchor or mooring
+    line visuals, a simple shiver when the sail luffs. 40 m² of sail are simulated, the mesh shows the 27 m² main.
+  - Heavy and stiff: half a minute to full speed. Tunables are on the actor (Boat category) for tuning by feel.
+  - Ignores short chop (the CPU mirrors only the long waves). Water is not masked inside the hull; the deck
+    stays above the water except in a storm.
+  - The boat does not push a swimmer away; a thin slab hit at bulwark height can make the bow ride up.
 - About 0.25 cm vertical camera pops on heaving decks (CharacterMovement floor correction), below the visible threshold.
 - Mouse sensitivity has not been tested by a human (`sb.MouseSensitivity`). The prompt key label is fixed to "E".
 - No audio yet. No player body or hands.
@@ -285,12 +318,9 @@ Developer console (`~`, non-shipping builds):
 1. Owner review of M3 revision 2 (`Docs/Evidence/M3_rev2/`). Remaining checkpoint decisions: cabin
    concept, hull colour, sea state.
 2. Owner feedback on revision 3 (`Docs/Evidence/M3_rev3/`); then M4 sailing (wind subsystem is in place).
-3. **M4 technical, independent of the decisions:**
-   - Boat motion model: buoyancy from multi-point samples of the shared wave field, heave/pitch/roll response.
-   - Simplified sailing: wind direction and strength, no-go zone, sail trim/raise, keel lateral resistance,
-     rudder, heel.
-   - Helm station driving the boat; collision sweeps against the pier and rocks; reset/recovery utility.
-   - Water masking inside the hull if needed.
+3. **M4:** owner feedback on the sailing feel (speed, heel, turning, controls, D36). Then the boat art after
+   the decisions; water masking inside the hull if the cabin goes below the waterline; sail and rope visuals;
+   a wind indicator (flag or telltale).
 4. M4 art after the decisions: full starter boat in Blender (about 10 m double-ender, 3.4 m beam), interior, sail.
 5. Water polish: bow wave and wake, spray at crests (`SprayAmount`), verification captures of all
    region × weather × time-of-day combinations, curved (non-Gerstner) crests against the remaining banding.

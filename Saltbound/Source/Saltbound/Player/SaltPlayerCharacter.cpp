@@ -217,7 +217,11 @@ void ASaltPlayerCharacter::ApplyLook(float YawDelta, float PitchDelta)
 void ASaltPlayerCharacter::HandleJumpStarted()
 {
 	bSwimUpHeld = true;
-	if (!ActiveStation && !IsSwimming())
+	if (ActiveStation)
+	{
+		ActiveStation->TriggerAction(0);
+	}
+	else if (!IsSwimming())
 	{
 		Jump();
 	}
@@ -232,6 +236,10 @@ void ASaltPlayerCharacter::HandleJumpCompleted()
 void ASaltPlayerCharacter::HandleDiveStarted()
 {
 	bSwimDownHeld = true;
+	if (ActiveStation)
+	{
+		ActiveStation->TriggerAction(1);
+	}
 }
 
 void ASaltPlayerCharacter::HandleDiveCompleted()

@@ -56,6 +56,7 @@ All scripts are PowerShell (`powershell -ExecutionPolicy Bypass -File Tools\<scr
 | Run the packaged build (optional screenshot / console commands) | `Tools\Run-Build.ps1 -Seconds 60 -ExecCmds "sb.Dev.Benchmark 10" -Fullscreen` |
 | Automated movement tests in PIE | `python Tools\run_pie_test.py "sb.Dev.RunMovementTests 1 300 8"` |
 | Capture the visual test shots (Day/Evening/Dusk) | `python Tools\capture_shots.py visualtest --presets Day Evening Dusk` |
+| Automated sailing tests in PIE (`L_VisualTest`) | `python Toolsun_pie_test.py "sb.Dev.RunBoatTests" --timeout 560 --done "SB_TEST BoatSuite DONE"` |
 | Regenerate procedural textures | `python Tools\textures\gen_textures.py` (then `import_textures.py`) |
 
 Editor automation: the project enables Python remote execution (`Tools/ue_exec.py` runs Python inside the

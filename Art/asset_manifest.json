@@ -108,5 +108,42 @@
     "dest": "/Game/Saltbound/Environment/Underwater",
     "nanite": false,
     "collision": "none"
+  },
+  "SM_Boat_Hull": {
+    "fbx": "Boat/SM_Boat_Hull.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "Greybox starter boat (D36). Hull shape mirrors Source/Saltbound/Boat/SaltHullShape.h; ASaltBoat moves the other parts."
+  },
+  "SM_Boat_Boom": {
+    "fbx": "Boat/SM_Boat_Boom.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Boat_Gaff": {
+    "fbx": "Boat/SM_Boat_Gaff.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Boat_Sail": {
+    "fbx": "Boat/SM_Boat_Sail.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Boat_Rudder": {
+    "fbx": "Boat/SM_Boat_Rudder.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Boat_Wheel": {
+    "fbx": "Boat/SM_Boat_Wheel.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
   }
 }

@@ -29,6 +29,8 @@ public:
 	virtual TStatId GetStatId() const override;
 
 	void RunMovementSuite(float MotionScale, float Speed, float TurnRate);
+	/** Sailing tests (SaltDevBoatTests.cpp): buoyancy, points of sail, turning, collision, grounding, player aboard. */
+	void RunBoatSuite();
 	void ConfigurePlatform(float MotionScale, bool bForce, float Speed, float TurnRate);
 	void ResetPlayer();
 	void StartPerf(float Seconds);
@@ -85,6 +87,16 @@ private:
 	FVector LandLocal = FVector::ZeroVector;
 	bool bWasAirborne = false;
 	bool bLanded = false;
+
+	// Boat suite state.
+	TWeakObjectPtr<class ASaltBoat> TestBoat;
+	FName SavedSeaState;
+	FVector SavedWind = FVector::ZeroVector;    // from (deg), speed (cm/s), gustiness
+	TArray<FVector> Samples;
+	FVector MarkWorld = FVector::ZeroVector;
+	float MarkYaw = 0.f;
+	float MaxValue = 0.f;
+	float MinValue = 0.f;
 
 	TWeakObjectPtr<class ACameraActor> FloatCamera;
 	float FloatHeight = 0.f;

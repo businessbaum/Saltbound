@@ -7,6 +7,7 @@
 #include "SaltStationComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSaltStationOccupancySignature, class USaltStationComponent*, Station, ASaltPlayerCharacter*, Player);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSaltStationActionSignature, class USaltStationComponent*, Station, int32, Action);
 
 /**
  * A focus volume that, when used, puts the player into "station mode":
@@ -54,6 +55,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Station")
 	FSaltStationOccupancySignature OnLeft;
 
+	/** Button presses while operating the station: 0 = primary (Jump key), 1 = secondary (Dive key). */
+	UPROPERTY(BlueprintAssignable, Category = "Station")
+	FSaltStationActionSignature OnAction;
+
 	//~ USaltInteractableComponent
 	virtual bool CanInteract(const ASaltPlayerCharacter* Player) const override;
 	virtual void Interact(ASaltPlayerCharacter* Player) override;
@@ -69,6 +74,7 @@ public:
 	void NotifyEntered(ASaltPlayerCharacter* Player);
 	void NotifyLeft(ASaltPlayerCharacter* Player);
 	void SetControlInput(const FVector2D& Input) { ControlInput = Input; }
+	void TriggerAction(int32 Action) { OnAction.Broadcast(this, Action); }
 
 	FVector GetStandLocation() const { return GetComponentTransform().TransformPosition(StandOffset); }
 	FVector GetExitLocation() const { return GetComponentTransform().TransformPosition(ExitOffset); }
