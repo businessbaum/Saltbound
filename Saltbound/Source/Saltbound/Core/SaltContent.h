@@ -20,6 +20,8 @@ namespace SaltContent
 	/** The sea seen from below and the underwater post-process pass (setup_ocean.py). */
 	inline const TCHAR* OceanUnderMaterial = TEXT("/Game/Saltbound/Water/MI_OceanUnder.MI_OceanUnder");
 	inline const TCHAR* UnderwaterPostMaterial = TEXT("/Game/Saltbound/Water/MI_PP_Underwater.MI_PP_Underwater");
+	inline const TCHAR* UnderwaterParticleMaterial = TEXT("/Game/Saltbound/Water/MI_UnderwaterParticles.MI_UnderwaterParticles");
+	inline const TCHAR* UnderwaterParticleMesh = TEXT("/Engine/BasicShapes/Plane.Plane");
 	inline const TCHAR* LanternMesh = TEXT("/Game/Saltbound/Props/SM_Lantern.SM_Lantern");
 	inline const TCHAR* CloudMaterial = TEXT("/Game/Saltbound/Environment/Sky/MI_Clouds_Stylized.MI_Clouds_Stylized");
 	/** FFT ocean render targets (setup_ocean.py): /Game/Saltbound/Water/FFT/RT_Ocean<Kind><Cascade>. */

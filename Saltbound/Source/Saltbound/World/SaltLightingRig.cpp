@@ -106,7 +106,8 @@ ASaltLightingRig::ASaltLightingRig()
 	Day.Name = TEXT("Day");
 	Day.SunElevation = 32.f;
 	Day.SunTemperature = 5400.f;   // golden, but sun glints still read white
-	Day.SunSourceAngle = 2.2f;
+	// D30: 2.2 deg made large round glare spots on the waves; a smaller sun breaks into strokes along them.
+	Day.SunSourceAngle = 1.3f;
 	Day.SkyLightIntensity = 1.15f;
 	Day.SkyLightTint = FLinearColor(0.8f, 0.92f, 1.15f);
 	Day.RayleighScale = 0.045f;
@@ -290,9 +291,12 @@ ASaltLightingRig::ASaltLightingRig()
 	Sea(TEXT("Calm"),     0.6f,  0.4f,  0.5f,  55.f,  500.f,  3.3f, 3.f, 1.5f, 0.55f, 0.f, 1.4f, 2.5f);
 	Sea(TEXT("Moderate"), 0.6f,  0.8f,  0.55f, 130.f, 1800.f, 4.f,  6.f, 2.5f, 1.f,   0.f, 1.1f, 1.3f);
 	// Rough (owner's rough reference): substantial swell carrying steep, short-crested wind waves with
-	// distinctive major ridges (peaky spectrum, sharp crests) rather than uniformly tall waves.
-	Sea(TEXT("Rough"),    0.7f,  1.f,   0.5f,  280.f, 2600.f, 5.f,  8.f, 2.5f, 1.2f,  0.f, 1.f,  1.f);
-	Sea(TEXT("Storm"),    1.1f,  1.05f, 0.4f,  420.f, 4500.f, 5.f,  6.f, 2.f,  1.3f,  0.f, 1.f,  1.2f);}
+	// distinctive major ridges (peaky spectrum, sharp crests) rather than uniformly tall waves. D30 (owner
+	// brief): less broad rounded swell, narrower and more varied crests (choppier, more crossing directions),
+	// stronger medium waves across the faces so highlights break into strokes.
+	Sea(TEXT("Rough"),    0.6f,  1.f,   0.5f,  280.f, 2600.f, 5.f,  6.f, 2.f,  1.35f, 0.f, 1.5f, 1.f);
+	// Storm (D30: "way bigger waves", used by the storm area): tall long swell and a big, long wind sea.
+	Sea(TEXT("Storm"),    1.8f,  1.f,   0.35f, 650.f, 6000.f, 4.f,  5.f, 2.f,  1.25f, 0.f, 1.3f, 1.f);}
 
 // --- Layers ---------------------------------------------------------------------------------------
 
@@ -444,9 +448,10 @@ bool ASaltLightingRig::SetSeaState(FName SeaStateName, float BlendSeconds)
 
 FString ASaltLightingRig::DescribeEnvironment() const
 {
-	return FString::Printf(TEXT("time=%s region=%s (%.0f%%) weather=%s (%.0f%%) sea=%s (%.0f%%) zones=%.2f"),
+	return FString::Printf(TEXT("time=%s region=%s (%.0f%%) weather=%s (%.0f%%) sea=%s (%.0f%%) zones=%.2f seaZones=%.2f"),
 		*CurrentPreset.ToString(), *CurrentRegion.ToString(), RegionLayer.Alpha * 100.f, *CurrentWeather.ToString(),
-		WeatherLayer.Alpha * 100.f, *CurrentSeaState.ToString(), SeaLayer.Alpha * 100.f, FMath::Max(LastZoneWeightSum, 0.f));
+		WeatherLayer.Alpha * 100.f, *CurrentSeaState.ToString(), SeaLayer.Alpha * 100.f, FMath::Max(LastZoneWeightSum, 0.f),
+		FMath::Max(LastSeaZoneWeightSum, 0.f));
 }
 
 FSaltRegionPreset ASaltLightingRig::ComposeRegion(float* OutZoneWeightSum) const
@@ -477,6 +482,36 @@ FSaltRegionPreset ASaltLightingRig::ComposeRegion(float* OutZoneWeightSum) const
 		*OutZoneWeightSum = WeightSum;
 	}
 	return R;
+}
+
+FSaltSeaStatePreset ASaltLightingRig::ComposeSeaState(float* OutZoneWeightSum) const
+{
+	FSaltSeaStatePreset S = LerpSeaState(SeaLayer.From, SeaLayer.To, Smooth(SeaLayer.Alpha));
+	float WeightSum = 0.f;
+	const UWorld* World = GetWorld();
+	if (World && World->ViewLocationsRenderedLastFrame.Num() > 0)
+	{
+		const FVector View = World->ViewLocationsRenderedLastFrame[0];
+		for (TActorIterator<ASaltSeaStateZone> It(World); It; ++It)
+		{
+			const float W = It->WeightAt(View);
+			if (W <= 0.f)
+			{
+				continue;
+			}
+			const FName ZoneSea = It->SeaState;
+			if (const FSaltSeaStatePreset* Z = SeaStates.FindByPredicate([ZoneSea](const FSaltSeaStatePreset& X) { return X.Name == ZoneSea; }))
+			{
+				S = LerpSeaState(S, *Z, W);
+				WeightSum += W;
+			}
+		}
+	}
+	if (OutZoneWeightSum)
+	{
+		*OutZoneWeightSum = WeightSum;
+	}
+	return S;
 }
 
 // --- Lifecycle ------------------------------------------------------------------------------------
@@ -521,6 +556,12 @@ void ASaltLightingRig::Tick(float DeltaSeconds)
 	float ZoneSum = 0.f;
 	ComposeRegion(&ZoneSum);
 	if (FMath::Abs(ZoneSum - LastZoneWeightSum) > 0.002f)
+	{
+		bChanged = true;
+	}
+	float SeaZoneSum = 0.f;
+	ComposeSeaState(&SeaZoneSum);
+	if (FMath::Abs(SeaZoneSum - LastSeaZoneWeightSum) > 0.002f)
 	{
 		bChanged = true;
 	}
@@ -606,8 +647,10 @@ void ASaltLightingRig::ApplyEnvironment()
 	float ZoneSum = 0.f;
 	const FSaltRegionPreset R = ComposeRegion(&ZoneSum);
 	LastZoneWeightSum = ZoneSum;
-	PushEnvironment(*P, R, LerpWeather(WeatherLayer.From, WeatherLayer.To, Smooth(WeatherLayer.Alpha)),
-		LerpSeaState(SeaLayer.From, SeaLayer.To, Smooth(SeaLayer.Alpha)));
+	float SeaZoneSum = 0.f;
+	const FSaltSeaStatePreset S = ComposeSeaState(&SeaZoneSum);
+	LastSeaZoneWeightSum = SeaZoneSum;
+	PushEnvironment(*P, R, LerpWeather(WeatherLayer.From, WeatherLayer.To, Smooth(WeatherLayer.Alpha)), S);
 }
 
 void ASaltLightingRig::PushEnvironment(const FSaltLightingPreset& P, const FSaltRegionPreset& R, const FSaltWeatherPreset& W, const FSaltSeaStatePreset& S)
@@ -729,6 +772,21 @@ void ASaltLightingRig::PushEnvironment(const FSaltLightingPreset& P, const FSalt
 	{
 		It->SetLit(P.bLanternsLit);
 	}
+}
+
+// --- Sea state zone -------------------------------------------------------------------------------
+
+ASaltSeaStateZone::ASaltSeaStateZone()
+{
+	PrimaryActorTick.bCanEverTick = false;
+	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
+}
+
+float ASaltSeaStateZone::WeightAt(const FVector& WorldLocation) const
+{
+	const float D = (float)FVector2D::Distance(FVector2D(WorldLocation), FVector2D(GetActorLocation()));
+	const float T = FMath::Clamp((D - InnerRadius) / FMath::Max(OuterRadius - InnerRadius, 1.f), 0.f, 1.f);
+	return 1.f - T * T * (3.f - 2.f * T);
 }
 
 // --- Region zone ----------------------------------------------------------------------------------

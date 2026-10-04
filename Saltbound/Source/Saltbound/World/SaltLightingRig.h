@@ -78,10 +78,10 @@ struct FSaltRegionPreset
 
 	/** Single Layer Water volume (1/m): absorption sets the deep colour, scattering the body colour and
 	 *  how bright shallows become over light ground. */
-	// Defaults = Shores of Plenty (D27): blue body and deep blue troughs, turquoise only where light passes
+	// Defaults = Shores of Plenty (D27, D30 a little greener): blue-green body and deep troughs, turquoise only where light passes
 	// through thin water.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor WaterAbsorption = FLinearColor(1.35f, 0.26f, 0.15f);
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor WaterScattering = FLinearColor(0.01f, 0.065f, 0.1f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor WaterScattering = FLinearColor(0.01f, 0.072f, 0.095f);
 	/** Light passing through thin, backlit crests. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") FLinearColor CrestLightColor = FLinearColor(0.1f, 0.95f, 0.9f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Water") float CrestLightStrength = 1.f;
@@ -267,6 +267,8 @@ private:
 	void ResolveSceneActors();
 	void EnsureClouds();
 	FSaltRegionPreset ComposeRegion(float* OutZoneWeightSum) const;
+	/** Sea state layer blended with ASaltSeaStateZone actors by the viewer's position. */
+	FSaltSeaStatePreset ComposeSeaState(float* OutZoneWeightSum) const;
 	void PushEnvironment(const FSaltLightingPreset& P, const FSaltRegionPreset& R, const FSaltWeatherPreset& W, const FSaltSeaStatePreset& S);
 	void InitLayersIfNeeded();
 
@@ -275,11 +277,33 @@ private:
 	FLayer<FSaltSeaStatePreset> SeaLayer;
 	bool bLayersInitialised = false;
 	float LastZoneWeightSum = -1.f;
+	float LastSeaZoneWeightSum = -1.f;
 	FSaltSeaStatePreset LastAppliedSea;
 	bool bHaveAppliedSea = false;
 
 	UPROPERTY(Transient) TObjectPtr<UVolumetricCloudComponent> Clouds;
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> CloudMID;
+};
+
+/**
+ * Area with its own sea state (e.g. a storm area): inside InnerRadius the sea state fully applies, it fades
+ * out to the rig's sea state at OuterRadius (horizontal distance from the viewer). The ocean is one global
+ * simulation, so the whole visible sea changes with the viewer's position (like ASaltRegionZone).
+ */
+UCLASS()
+class SALTBOUND_API ASaltSeaStateZone : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	ASaltSeaStateZone();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea") FName SeaState = TEXT("Storm");
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea", meta = (Units = "cm")) float InnerRadius = 50000.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sea", meta = (Units = "cm")) float OuterRadius = 150000.f;
+
+	/** 0..1 influence at a world position. */
+	float WeightAt(const FVector& WorldLocation) const;
 };
 
 /**

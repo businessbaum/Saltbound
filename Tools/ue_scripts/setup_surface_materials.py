@@ -180,6 +180,20 @@ float2 O = OX * W.x + OY * W.y + OZ * W.z;
 float2 NX = Texture2DSample(NormalTex, NormalTexSampler, UVX).xy * 2 - 1;
 float2 NY = Texture2DSample(NormalTex, NormalTexSampler, UVY).xy * 2 - 1;
 float2 NZ = Texture2DSample(NormalTex, NormalTexSampler, UVZ).xy * 2 - 1;
+// Anti-tiling on wide flat ground (sand, D30): a second top sample, rotated by 37 degrees and scaled, blends in
+// across large world patches, so neither the tile repeat nor a single ripple direction reads.
+if (AntiTile > 0.0)
+{
+    const float C = 0.799, S = 0.602;
+    float2 UVR = float2(C * UVZ.x - S * UVZ.y, S * UVZ.x + C * UVZ.y) * 0.71 + float2(0.37, 0.19);
+    float Mix = smoothstep(0.35, 0.65, Texture2DSample(MacroTex, MacroTexSampler, P.xy / AntiTileScale + 0.31).g) * AntiTile;
+    AZ = lerp(AZ, Texture2DSample(AlbedoTex, AlbedoTexSampler, UVR).rgb, Mix);
+    float2 NR = Texture2DSample(NormalTex, NormalTexSampler, UVR).xy * 2 - 1;
+    NZ = lerp(NZ, float2(C * NR.x + S * NR.y, -S * NR.x + C * NR.y) * 0.71, Mix);
+    Alb = AX * W.x + AY * W.y + AZ * W.z;
+}
+// Pattern strength: 1 = as painted, lower = the texture fades towards a flat tone.
+Alb = lerp(0.5, Alb, PatternContrast);
 float3 WN = normalize(N + float3(0, NX.x, NX.y) * W.x * NormalStrength +
                       float3(NY.x, 0, NY.y) * W.y * NormalStrength +
                       float3(NZ.x, NZ.y, 0) * W.z * NormalStrength);
@@ -256,6 +270,7 @@ def build_rock():
         "BarnacleColor": ("v", (0.55, 0.53, 0.48, 1), "Wet"),
         "WetHeight": ("s", 80.0, "Wet"), "WetDarken": ("s", 0.5, "Wet"),
         "WetRoughness": ("s", 0.3, "Wet"), "RoughScale": ("s", 1.0, "Surface"),
+        "AntiTile": ("s", 0.0, "Textures"), "AntiTileScale": ("s", 6000.0, "Textures"), "PatternContrast": ("s", 1.0, "Textures"),
     }
     nodes = {}
     for i, (name, (kind, val, group)) in enumerate(params.items()):
@@ -314,8 +329,8 @@ def add_caustics(m, base_node, wp, wn, water_level, x, y):
     ctex = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, x - 500, y, parameter_name="CausticTex",
                       texture=tex(TEX + "/Common/T_Caustics_M"), sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR,
                       group="Caustics")
-    params = {"CausticStrength": 0.6, "CausticScale": 350.0, "CausticSpeed": 0.03, "CausticDepthFade": 1500.0,
-              "CausticBlur": 1.5}
+    params = {"CausticStrength": 0.35, "CausticScale": 350.0, "CausticSpeed": 0.03, "CausticDepthFade": 1500.0,
+              "CausticBlur": 1.8}
     pn = {n: sb_ue.scalar_param(m, n, v, x - 500, y + 120 + i * 60, "Caustics") for i, (n, v) in enumerate(params.items())}
     time = sb_ue.expr(m, unreal.MaterialExpressionTime, x - 500, y + 400)
     # Sun illuminance sampled above the water (points below the planet's ground are in the planet's shadow).
@@ -495,7 +510,7 @@ def main():
     # Sand has its own painted texture set (ripple bands, grains; D29).
     sb_ue.make_mi("MI_Sand", MI, rock, vectors={"Tint": (0.62, 0.55, 0.42, 1), "LichenColor": (0.5, 0.48, 0.36, 1)},
                   textures={"AlbedoTex": TEX + "/Sand/T_Sand_D", "NormalTex": TEX + "/Sand/T_Sand_N", "ORMTex": TEX + "/Sand/T_Sand_ORM"},
-                  scalars={"Scale": 400.0, "LichenCoverage": 0.0, "NormalStrength": 0.8, "MacroAmount": 0.25, "WetDarken": 0.7,
+                  scalars={"Scale": 550.0, "AntiTile": 1.0, "PatternContrast": 0.6, "LichenCoverage": 0.0, "NormalStrength": 0.5, "MacroAmount": 0.25, "WetDarken": 0.7,
                            "VertexMaskAmount": 0.0, "AlgaeAmount": 0.0, "BarnacleAmount": 0.0, "StrataScale": 1.0e6})
     sb_ue.make_mi("MI_SeaGrass", MI, grass)
     sb_ue.make_mi("MI_LanternGlass", MI, glow, vectors={"BaseColor": (0.35, 0.25, 0.14, 1), "GlowColor": (1.0, 0.52, 0.2, 1)}, scalars={"GlowIntensity": 80.0, "Roughness": 0.1})

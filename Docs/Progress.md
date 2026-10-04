@@ -205,6 +205,13 @@ for a higher screen percentage (for example 75 %) and more content.
   - Clear turquoise shallows: the sea was 100× too dense (per-cm coefficients). Deep water is unchanged.
   - More detailed (soft) stone texture.
   - Player 1.6 m tall (eyes at 1.5 m).
+- **Review round 2 (D30, awaiting the owner's check):**
+  - Sand without visible repetition and with fainter ripples; no small scatter rocks.
+  - Faint underwater particles; more water tint over the floor and softer caustics.
+  - Rough sea with narrower crests, stronger medium waves and smaller highlights.
+  - A storm area 3 km south of the cove. In play mode, use `sb.Dev.Camera 0 -300000 350 -8 90 90 1` to
+    view it (`sb.Dev.Camera 2500 -900 350 -8 90 90 1` for the cove, `sb.Dev.Camera off` to return), or
+    `sb.Dev.Teleport 0 -300000 0` to swim in it.
 
 ## Controls
 | Action | Keyboard / mouse | Gamepad |

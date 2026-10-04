@@ -97,6 +97,11 @@ ASaltOcean::ASaltOcean()
 		C->SetRelativeScale3D(FVector(1.0, 1.0, -1.0));
 		C->SetVisibility(false);
 	}
+	// Drifting particles around a submerged camera (positions come from the material, see the header).
+	UnderwaterParticles = MakeTiles(TEXT("UnderwaterParticles"));
+	UnderwaterParticles->SetNumCustomDataFloats(4);
+	UnderwaterParticles->SetVisibility(false);
+	UnderwaterParticles->SetBoundsScale(20.f);
 	// Underwater fog and light loss; blended in only near or below the surface (UpdateUnderwater).
 	UnderwaterPost = CreateDefaultSubobject<UPostProcessComponent>(TEXT("UnderwaterPost"));
 	UnderwaterPost->SetupAttachment(Root);
@@ -152,6 +157,11 @@ void ASaltOcean::ApplyContent()
 	UnderQuarterTiles->SetStaticMesh(QuarterTileMesh);
 	UnderFullTiles->SetMaterial(0, UnderMaterial);
 	UnderQuarterTiles->SetMaterial(0, UnderMaterial);
+	SaltContent::ResolveDefault<UMaterialInterface>(ParticleMaterial, SaltContent::UnderwaterParticleMaterial);
+	SaltContent::ResolveDefault<UStaticMesh>(ParticleMesh, SaltContent::UnderwaterParticleMesh);
+	UnderwaterParticles->SetStaticMesh(ParticleMesh);
+	UnderwaterParticles->SetMaterial(0, ParticleMaterial);
+	BuildParticles();
 	UnderwaterPost->Settings.WeightedBlendables.Array.Reset();
 	if (UnderwaterPostMaterial)
 	{
@@ -186,7 +196,7 @@ void ASaltOcean::SimulateWindSea(float DeltaSeconds)
 {
 	// Maps saved before the FFT targets or the underwater materials existed: construction does not re-run on
 	// load in the editor (retried every few seconds, so a missing asset does not load every frame).
-	if (!FFTDisp[0] || !FFTAux[SaltOceanFFT::NumCascades - 1] || !UnderMaterial || !UnderwaterPostMaterial)
+	if (!FFTDisp[0] || !FFTAux[SaltOceanFFT::NumCascades - 1] || !UnderMaterial || !UnderwaterPostMaterial || !ParticleMaterial)
 	{
 		const double Now = FPlatformTime::Seconds();
 		if (Now - LastContentRetry > 2.0)
@@ -271,9 +281,38 @@ void ASaltOcean::Tick(float DeltaSeconds)
 	UpdateUnderwater(View);
 }
 
+void ASaltOcean::BuildParticles()
+{
+	if (UnderwaterParticles->GetInstanceCount() == UnderwaterParticleCount)
+	{
+		return;
+	}
+	UnderwaterParticles->ClearInstances();
+	TArray<FTransform> Transforms;
+	Transforms.Init(FTransform::Identity, UnderwaterParticleCount);
+	UnderwaterParticles->AddInstances(Transforms, false, false, false);
+	FRandomStream Rng(17);
+	for (int32 i = 0; i < UnderwaterParticleCount; ++i)
+	{
+		const float Data[4] = { Rng.FRand(), Rng.FRand(), Rng.FRand(), Rng.FRand() };
+		UnderwaterParticles->SetCustomData(i, Data, false);
+	}
+	UnderwaterParticles->MarkRenderStateDirty();
+}
+
 void ASaltOcean::UpdateUnderwater(const FVector& View)
 {
 	CameraHeightAboveWater = (float)(View.Z - Field.Sample(FVector2D(View.X, View.Y)).Location.Z);
+	// Particles follow the camera (the material wraps them into a box around it); only under water.
+	const bool bParticles = CameraHeightAboveWater < 0.f && UnderwaterParticleCount > 0;
+	if (UnderwaterParticles->IsVisible() != bParticles)
+	{
+		UnderwaterParticles->SetVisibility(bParticles);
+	}
+	if (bParticles)
+	{
+		UnderwaterParticles->SetWorldLocation(View);
+	}
 	const bool bActive = CameraHeightAboveWater < UnderwaterActivationHeight;
 	if (bActive == bUnderwaterActive)
 	{

@@ -12,11 +12,11 @@
     "nanite": false,
     "collision": "none",
     "bounds_extension": [
-      26,
-      26,
-      600
+      40,
+      40,
+      1000
     ],
-    "_note": "xy in cells (instance scale = cell size), z in cm. Must cover the largest wave displacement: horizontal sum(steepness*lambda/2pi) ~6 m (= 24 LOD0 cells), vertical ~5 m at Storm."
+    "_note": "xy in cells (instance scale = cell size), z in cm. Must cover the largest wave displacement: horizontal swells + wind sea ~10 m (= 40 LOD0 cells), vertical ~8-9 m at Storm (D30)."
   },
   "SM_OceanTile16": {
     "fbx": "Water/SM_OceanTile16.fbx",
@@ -24,11 +24,11 @@
     "nanite": false,
     "collision": "none",
     "bounds_extension": [
-      26,
-      26,
-      600
+      40,
+      40,
+      1000
     ],
-    "_note": "xy in cells (instance scale = cell size), z in cm. Must cover the largest wave displacement: horizontal sum(steepness*lambda/2pi) ~6 m (= 24 LOD0 cells), vertical ~5 m at Storm."
+    "_note": "xy in cells (instance scale = cell size), z in cm. Must cover the largest wave displacement: horizontal swells + wind sea ~10 m (= 40 LOD0 cells), vertical ~8-9 m at Storm (D30)."
   },
   "SM_TestDeckSection": {
     "fbx": "VisualTest/SM_TestDeckSection.fbx",

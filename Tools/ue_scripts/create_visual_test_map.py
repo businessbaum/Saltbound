@@ -100,6 +100,12 @@ region_zone = spawn(unreal.SaltRegionZone, (200000, 0, 0), label="RegionZone_Anc
 region_zone.set_editor_property("region", "AncientIsles")
 region_zone.set_editor_property("inner_radius", 30000.0)
 region_zone.set_editor_property("outer_radius", 90000.0)
+# Storm area (D30): 3 km south of the cove the sea blends into the Storm sea state (much bigger, longer waves)
+# within 1.6 km and is fully stormy within 600 m. Fly or sail there to compare with the cove's Rough sea.
+storm_zone = spawn(unreal.SaltSeaStateZone, (0, -300000, 0), label="SeaStateZone_Storm")
+storm_zone.set_editor_property("sea_state", "Storm")
+storm_zone.set_editor_property("inner_radius", 60000.0)
+storm_zone.set_editor_property("outer_radius", 160000.0)
 
 # --- coast -------------------------------------------------------------------------------------------
 R = "/Game/Saltbound/Environment/Rocks/"
@@ -122,26 +128,8 @@ rocks = [
 for label, m, loc, yaw, s in rocks:
     mesh(label, R + m, loc, (0, yaw, 0), s)
 
-# Shoreline scatter: small rocks half-submerged around the bases of the large ones (deterministic).
+# No small scatter rocks around the big ones (owner: "we dont need those", D30).
 import random  # noqa: E402
-rng = random.Random(7)
-scatter_n = 0
-for label, m, loc, yaw, s in rocks:
-    if m == "SM_Rock_Coast_C" and s < 1.3:
-        continue
-    reach = {"SM_Rock_Coast_A": 420.0, "SM_Rock_Coast_B": 190.0, "SM_Rock_Coast_C": 90.0}[m] * s
-    for k in range(int(4 + reach / 60.0)):
-        a = rng.uniform(0, 2 * math.pi)
-        d = reach * rng.uniform(0.75, 1.15)
-        kind = "SM_Rock_Scatter_A" if rng.random() < 0.55 else "SM_Rock_Scatter_B"
-        sc = rng.uniform(0.7, 1.6) * (1.3 if kind.endswith("A") else 1.0)
-        px, py = loc[0] + math.cos(a) * d, loc[1] + math.sin(a) * d
-        # Resting on the ground below (the sand or the big rock), partly sunk in.
-        gz, _ = ground(px, py)
-        z = (gz if gz is not None else 0.0) + rng.uniform(-6.0, 10.0) * sc
-        mesh("Scatter_%03d" % scatter_n, R + kind, (px, py, z),
-             (rng.uniform(-12, 12), rng.uniform(0, 360), rng.uniform(-12, 12)), sc)
-        scatter_n += 1
 mesh("Landmark_Spire", R + "SM_Landmark_Spire", (42000, 15000, -600), (0, 35, 0), 2.0)
 
 # --- pier --------------------------------------------------------------------------------------------

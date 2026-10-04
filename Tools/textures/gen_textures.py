@@ -409,7 +409,8 @@ def sand():
     w1 = spectral_noise(size, 1, 4, -2.0, seed=201)
     w2 = spectral_noise(size, 2, 6, -1.8, seed=202)
     # 1. Ripples: 9 crests per tile along U, warped (all terms periodic, so the tile repeats seamlessly).
-    phase = 2 * np.pi * (9 * x + 0.9 * w1 + 0.12 * np.sin(2 * np.pi * (2 * y + 0.3 * w2)))
+    # Strong warp: crest spacing and direction wander, so the tile does not read as regular stripes (D30).
+    phase = 2 * np.pi * (9 * x + 1.5 * w1 + 0.18 * np.sin(2 * np.pi * (2 * y + 0.5 * w2)) + 0.25 * w2)
     ripple = 0.5 + 0.5 * np.sin(phase + 0.35 * np.sin(phase))          # slightly asymmetric crests
     show = crisp(n01(spectral_noise(size, 1, 4, -1.9, seed=203)), 0.32, 0.25)
     crest = crisp(ripple, 0.78, 0.08) * show

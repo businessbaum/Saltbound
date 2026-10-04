@@ -219,6 +219,19 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Underwater", meta = (ClampMin = "0", Units = "cm"))
 	float UnderwaterActivationHeight = 500.f;
 
+	/** Faint particles drifting in the water around a submerged camera (D30). The material places them: each
+	 *  instance carries an anchor (custom data 0-2, 0..1 of the box) and a random value (3); positions wrap
+	 *  into a box around the camera, so they stay put in the world while the camera moves. */
+	UPROPERTY(EditAnywhere, Category = "Underwater")
+	TObjectPtr<UMaterialInterface> ParticleMaterial;
+
+	/** A 100 cm quad (turned to the camera in the material). */
+	UPROPERTY(EditAnywhere, Category = "Underwater")
+	TObjectPtr<UStaticMesh> ParticleMesh;
+
+	UPROPERTY(EditAnywhere, Category = "Underwater", meta = (ClampMin = "0", ClampMax = "4000"))
+	int32 UnderwaterParticleCount = 260;
+
 	/** Camera height above the surface at the camera (negative = under water), CPU estimate, last frame. */
 	UFUNCTION(BlueprintPure, Category = "Ocean")
 	float GetCameraHeightAboveWater() const { return CameraHeightAboveWater; }
@@ -262,6 +275,12 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TObjectPtr<UPostProcessComponent> UnderwaterPost;
+
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	TObjectPtr<UInstancedStaticMeshComponent> UnderwaterParticles;
+
+	/** Creates the particle instances (anchors) when the count changed. */
+	void BuildParticles();
 
 	FSaltWaveField Field;
 	float CameraHeightAboveWater = 1.0e6f;

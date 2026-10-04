@@ -530,3 +530,48 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
      - Soft bumps in the normal map at the same scales.
      - Still no lines.
   6. **Player:** capsule 176 → 160 cm, eye height 165 → 150 cm. `Tools/swim_test.py` still passes 5/5.
+
+### D30 · Review round 2: sand repetition, no scatter rocks, underwater particles, softer floor, rough sea, storm area (Adopted, awaiting owner review)
+- **Owner review (2026-10-04)** with screenshots of the beach and the rocks, plus a water brief for the
+  rough sea ("dont test it yourself. Ask me about the results"):
+  1. Sand patterns repeat visibly; make them fainter.
+  2. Remove the small stones around the big rocks.
+  3. A few small particles in the water, not too obvious.
+  4. The sea floor seen through the water is too strong: "there is water in between and its not a mirror".
+  5. Rough sea after the Sea of Thieves reference:
+     - Narrower, more varied crests and secondary waves on the faces.
+     - Smaller highlights that follow the waves, with no large round glare.
+     - Selective turquoise crest light; fewer smeared reflection bands.
+     - Calm and Flat unchanged.
+  6. A storm area with much bigger waves for comparison.
+- **Changes:**
+  1. **Sand:**
+     - `M_SB_Rock` gained `AntiTile`: a second, rotated (37°) and scaled sample of the top projection
+       blends in across large world patches (`T_MacroNoise_M`). It is used by `MI_Sand` only; the rocks
+       are unchanged.
+     - `PatternContrast` 0.6 for the sand, normal strength 0.5, tile 5.5 m.
+     - The ripples in `T_Sand_*` are warped more strongly.
+  2. **Scatter rocks:** removed from `create_visual_test_map.py`.
+  3. **Particles:** `ASaltOcean::UnderwaterParticles`, 260 instances of a quad, visible only while the
+     camera is under water.
+     - `M_UnderwaterParticles` (additive, after depth of field) places them from per-instance anchors,
+       wrapped into a 12 m box around the camera. They stay put in the world and drift slowly.
+     - Soft 1.2 cm dots, faded near, far, above the water and with depth.
+  4. **Floor through water:** `VolumeScale` 0.005 → 0.009 (more water tint). Caustics 0.6 → 0.35, blur
+     1.5 → 1.8.
+  5. **Rough sea:**
+     - Swell 0.7 → 0.6; wind-sea spreading 8/2.5 → 6/2 (more crossing, shorter crests).
+     - Choppiness 1.2 → 1.35; medium waves ×1.5 (cascade gain 0.75).
+     - Day sun source angle 2.2° → 1.3°: the large round glare spots break into strokes.
+     - Shores of Plenty scattering slightly greener (0.01, 0.072, 0.095) for blue-green troughs.
+     - Calm and Flat presets unchanged.
+  6. **Storm area:** `ASaltSeaStateZone` (like `ASaltRegionZone`, blended by the viewer's distance in
+     `ASaltLightingRig::ComposeSeaState`).
+     - The map places one 3 km south of the cove (full storm within 600 m, gone at 1.6 km).
+     - Storm preset: swell 1.8, Hs 6.5 m at 60 m, gamma 4, chop 1.25.
+     - The ocean tiles' bounds were extended (±40 cells, ±10 m) for the bigger displacement.
+     - The ocean is one global simulation, so the whole visible sea changes with the viewer's position.
+       The rig composes zones in play mode only.
+- **Tooling:** `Launch-Editor.ps1` refuses to start a second editor. A second instance had locked the
+  content files, and saves failed with error 32 (sharing violation).
+- **Not verified visually by me** (owner's request); materials compile and the map builds.

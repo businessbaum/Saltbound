@@ -14,6 +14,8 @@
   /Game/Saltbound/Water/M_OceanUnder (+ MI_) the sea seen from below (D28): same vertex displacement, drawn by
                                     ASaltOcean's mirrored underside tiles; Snell's window (refracted sky and
                                     sun), total internal reflection of the water body outside it
+  /Game/Saltbound/Water/M_UnderwaterParticles (+ MI_) faint drifting specks around a submerged camera (D30),
+                                    placed by the vertex shader (ASaltOcean's particle instances carry anchors)
   /Game/Saltbound/Water/M_PP_Underwater (+ MI_) post-process pass for a submerged camera (D28): finds the
                                     surface above the camera on the GPU, then view-distance fog, light lost
                                     with depth and in-scattered light from the region's water (MPC Look*)
@@ -540,8 +542,9 @@ def make_material(mpc, ush, rts):
     # Clarity (owner: "make it more look through", D29). Single Layer Water reads the coefficients per cm; the
     # region values (Look*, written as 1/m) made the sea opaque within centimetres. Both coefficients are
     # scaled by the same factor, so the shallows show the sand while deep water keeps its colour (unchanged
-    # scattering albedo). 0.005: about 8 m visibility in blue, turquoise shallows, blue beyond ~10 m depth.
-    clarity = sb_ue.scalar_param(m, "VolumeScale", 0.005, -600, 1200, "Volume")
+    # scattering albedo). 0.009 (D30, owner: the ground must read as under water, not through glass): about 4 m
+    # visibility in blue, turquoise shallows, blue beyond ~6 m depth.
+    clarity = sb_ue.scalar_param(m, "VolumeScale", 0.009, -600, 1200, "Volume")
     for look, pin in (("LookScattering", "ScatteringCoefficients"), ("LookAbsorption", "AbsorptionCoefficients")):
         mul = sb_ue.expr(m, unreal.MaterialExpressionMultiply, -200, 1200 if pin.startswith("S") else 1260)
         link(nodes[look], "", mul, "A")
@@ -648,6 +651,90 @@ def make_post_material(mpc, ush, under_ush, rts):
     return m
 
 
+# --- underwater particles (M_UnderwaterParticles, D30) ---------------------------------------------------
+# Each instance carries an anchor (custom data 0-2, 0..1 of the box) and a random value (3). The anchor drifts
+# with a slow current plus a little wobble and is wrapped into a box around the camera: particles stay put in
+# the world while the camera moves. The quad (100 cm, Engine Plane) is turned to the camera. Drawn after depth of
+# field, so the underwater fog does not apply: the fades below stand in for it.
+PARTICLE_VS_CODE = """
+float3 A = float3(D0, D1, D2) * Box;
+float3 Wobble = float3(sin(Time * 0.37 + R * 6.28), cos(Time * 0.29 + R * 4.1), sin(Time * 0.21 + R * 2.3)) * 6.0;
+float3 Rel = (frac((A + Drift.xyz * Time + Wobble - CamPos) / Box + 0.5) - 0.5) * Box;
+float3 Centre = CamPos + Rel;
+float Dist = length(Rel);
+float S = Size * lerp(0.5, 1.5, R) * 0.01;
+float Below = Globals.y - Centre.z;
+FadeOut = smoothstep(15.0, 60.0, Dist) * (1.0 - smoothstep(Box * 0.3, Box * 0.48, Dist)) * saturate(Below / 40.0)
+        * exp(-max(Below, 0.0) / 2500.0);
+return Centre + (LocalPos.x * Right + LocalPos.y * Up) * S - WorldPos;
+"""
+
+PARTICLE_PS_CODE = """
+float D = length(UV - 0.5) * 2.0;
+float Dot = saturate(1.0 - D);
+Dot *= Dot;
+float SunLum = dot(SunIllum, float3(0.2126, 0.7152, 0.0722));
+return Tint.rgb * (SunLum * Glow * Dot * Fade);
+"""
+
+
+def make_particle_material(mpc):
+    m = sb_ue.reset_material("M_UnderwaterParticles", DIR)
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    m.set_editor_property("two_sided", True)
+    m.set_editor_property("translucency_pass", unreal.MaterialTranslucencyPass.MTP_AFTER_DOF)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
+    ctx = {"nodes": {"Globals": mpc_param(m, mpc, "Globals", -1600, 0)},
+           "cam": sb_ue.expr(m, unreal.MaterialExpressionCameraPositionWS, -1600, 80)}
+    cd = [sb_ue.expr(m, unreal.MaterialExpressionPerInstanceCustomData, -1600, 160 + i * 70, data_index=i) for i in range(4)]
+    wp = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -1600, 480,
+                    world_position_shader_offset=unreal.WorldPositionIncludedOffsets.WPT_EXCLUDE_ALL_SHADER_OFFSETS)
+    lp = sb_ue.expr(m, unreal.MaterialExpressionLocalPosition, -1600, 560)
+    time = sb_ue.expr(m, unreal.MaterialExpressionTime, -1600, 640)
+    axes = []
+    for i, v in enumerate(((1, 0, 0), (0, 1, 0))):
+        c = sb_ue.expr(m, unreal.MaterialExpressionConstant3Vector, -1800, 720 + i * 120, constant=unreal.LinearColor(*v, 1))
+        t = sb_ue.expr(m, unreal.MaterialExpressionTransform, -1600, 720 + i * 120,
+                       transform_source_type=unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_VIEW,
+                       transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
+        link(c, "", t, "")
+        axes.append(t)
+    params = {"Box": sb_ue.scalar_param(m, "Box", 1200.0, -1300, 900, "Particles"),
+              "Size": sb_ue.scalar_param(m, "Size", 1.2, -1300, 960, "Particles"),
+              "Drift": sb_ue.vector_param(m, "Drift", (8.0, 3.0, 0.8, 0), -1300, 1020, "Particles"),
+              "Glow": sb_ue.scalar_param(m, "Glow", 0.004, -1300, 1100, "Particles"),
+              "Tint": sb_ue.vector_param(m, "Tint", (0.8, 0.95, 0.9, 1), -1300, 1160, "Particles")}
+    vs_in = ["D0", "D1", "D2", "R", "Box", "Drift", "Time", "CamPos", "Size", "Globals", "LocalPos", "WorldPos", "Right", "Up"]
+    vs = custom(m, -1000, 300, "Underwater particles (placement, billboard)", PARTICLE_VS_CODE, vs_in, F3, [("FadeOut", F1)])
+    for i, n in enumerate(("D0", "D1", "D2", "R")):
+        link(cd[i], "", vs, n)
+    for n in ("Box", "Drift", "Size"):
+        link(params[n], "", vs, n)
+    link(time, "", vs, "Time")
+    link(ctx["cam"], "", vs, "CamPos")
+    link(ctx["nodes"]["Globals"], "", vs, "Globals")
+    link(lp, "", vs, "LocalPos")
+    link(wp, "", vs, "WorldPos")
+    link(axes[0], "", vs, "Right")
+    link(axes[1], "", vs, "Up")
+    sb_ue.to_prop(vs, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+    fade = sb_ue.expr(m, unreal.MaterialExpressionVertexInterpolator, -700, 400)
+    link(vs, "FadeOut", fade, "")
+    uv = sb_ue.expr(m, unreal.MaterialExpressionTextureCoordinate, -700, 500)
+    _, sun_illum = sun_nodes(m, -700, 600, above_water_position(m, ctx, -1000, 700))
+    ps = custom(m, -400, 500, "Underwater particles (soft dot)", PARTICLE_PS_CODE, ["UV", "Fade", "SunIllum", "Glow", "Tint"], F3)
+    link(uv, "", ps, "UV")
+    link(fade, "", ps, "Fade")
+    link(sun_illum, "", ps, "SunIllum")
+    link(params["Glow"], "", ps, "Glow")
+    link(params["Tint"], "", ps, "Tint")
+    sb_ue.to_prop(ps, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(m)
+    sb_ue.eal.save_loaded_asset(m)
+    return m
+
+
 def make_instance(name, parent):
     mi = sb_ue.make_mi(name, DIR, parent)
     # Instance overrides from earlier experiments would mask the master defaults: start clean.
@@ -658,8 +745,8 @@ def make_instance(name, parent):
 
 
 def main():
-    """Optional arguments pick materials to rebuild: ocean, under, post (default: all)."""
-    parts = sys.argv[1:] or ["ocean", "under", "post"]
+    """Optional arguments pick materials to rebuild: ocean, under, post, particles (default: all)."""
+    parts = sys.argv[1:] or ["ocean", "under", "post", "particles"]
     with open(USH, encoding="utf-8") as f:
         ush = f.read()
     with open(UNDER_USH, encoding="utf-8") as f:
@@ -679,6 +766,10 @@ def main():
         post = make_post_material(mpc, ush, under_ush, rts)
         make_instance("MI_PP_Underwater", post)
         stats.append(("post", post))
+    if "particles" in parts:
+        particles = make_particle_material(mpc)
+        make_instance("MI_UnderwaterParticles", particles)
+        stats.append(("particles", particles))
     print("SB_OCEAN_ASSETS_OK", " ".join("%s=%d" % (n, mel.get_statistics(x).num_pixel_shader_instructions) for n, x in stats))
 
 
