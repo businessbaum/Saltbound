@@ -42,6 +42,8 @@ ASaltPlayerCharacter::ASaltPlayerCharacter(const FObjectInitializer& ObjectIniti
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<USaltCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	PrimaryActorTick.bCanEverTick = true;
+	// The tools the player starts with (D55, owner).
+	OwnedTools = { TEXT("Compass"), TEXT("Spyglass"), TEXT("Lantern") };
 
 	GetCapsuleComponent()->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
 
@@ -224,14 +226,50 @@ bool ASaltPlayerCharacter::IsSwimming() const
 	return GetCharacterMovement() && GetCharacterMovement()->IsSwimming();
 }
 
+void ASaltPlayerCharacter::SetHeldTool(FName Tool)
+{
+	if (Tool != HeldTool)
+	{
+		HeldTool = Tool;
+		UE_LOG(LogSaltbound, Display, TEXT("SB_TOOL held=%s"), *Tool.ToString());
+	}
+}
+
+void ASaltPlayerCharacter::SetToolOwned(FName Tool, bool bOwned)
+{
+	if (bOwned)
+	{
+		OwnedTools.Add(Tool);
+	}
+	else
+	{
+		OwnedTools.Remove(Tool);
+		if (HeldTool == Tool)
+		{
+			SetHeldTool(NAME_None);
+		}
+	}
+}
+
 void ASaltPlayerCharacter::HandleLookMouse(const FInputActionValue& Value)
 {
+	// While the tool wheel is open, the mouse aims at a tool instead of turning (D55).
+	if (ASaltPlayerController* PC = Cast<ASaltPlayerController>(Controller); PC && PC->IsToolWheelOpen())
+	{
+		PC->AimToolWheel(Value.Get<FVector2D>(), false);
+		return;
+	}
 	const FVector2D Delta = Value.Get<FVector2D>() * (MouseSensitivity * CVarMouseSensitivity.GetValueOnGameThread());
 	ApplyLook(Delta.X, bInvertLookY ? -Delta.Y : Delta.Y);
 }
 
 void ASaltPlayerCharacter::HandleLookGamepad(const FInputActionValue& Value)
 {
+	if (ASaltPlayerController* PC = Cast<ASaltPlayerController>(Controller); PC && PC->IsToolWheelOpen())
+	{
+		PC->AimToolWheel(Value.Get<FVector2D>(), true);
+		return;
+	}
 	const float Dt = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f;
 	const FVector2D Delta = Value.Get<FVector2D>() * (GamepadLookRate * Dt);
 	ApplyLook(Delta.X, bInvertLookY ? -Delta.Y : Delta.Y);
@@ -271,6 +309,12 @@ void ASaltPlayerCharacter::HandleJumpCompleted()
 
 void ASaltPlayerCharacter::HandleDiveStarted()
 {
+	// B on a gamepad cancels the tool wheel (D55).
+	if (ASaltPlayerController* PC = Cast<ASaltPlayerController>(Controller); PC && PC->IsToolWheelOpen())
+	{
+		PC->CloseToolWheel(false);
+		return;
+	}
 	bSwimDownHeld = true;
 	if (ActiveStation)
 	{

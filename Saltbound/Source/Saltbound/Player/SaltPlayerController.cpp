@@ -4,6 +4,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Core/SaltSaveSubsystem.h"
+#include "Core/SaltTools.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
@@ -13,6 +14,7 @@
 #include "UI/SaltMenuWidget.h"
 #include "UI/SaltSatchelWidget.h"
 #include "UI/SaltStoreWidget.h"
+#include "UI/SaltToolWheelWidget.h"
 #include "Player/SaltInventoryComponent.h"
 
 ASaltPlayerController::ASaltPlayerController()
@@ -187,10 +189,141 @@ void ASaltPlayerController::SetupInputComponent()
 	Super::SetupInputComponent();
 	if (UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(InputComponent))
 	{
-		Input->BindAction(GetInputConfig()->Menu, ETriggerEvent::Started, this, &ASaltPlayerController::ToggleMenu);
+		Input->BindAction(GetInputConfig()->Menu, ETriggerEvent::Started, this, &ASaltPlayerController::HandleMenuKey);
 		Input->BindAction(GetInputConfig()->Inventory, ETriggerEvent::Started, this, &ASaltPlayerController::OpenInventory);
 		Input->BindAction(GetInputConfig()->Map, ETriggerEvent::Started, this, &ASaltPlayerController::OpenMap);
+		Input->BindAction(GetInputConfig()->ToolWheel, ETriggerEvent::Started, this, &ASaltPlayerController::OpenToolWheel);
+		Input->BindAction(GetInputConfig()->ToolWheel, ETriggerEvent::Completed, this, &ASaltPlayerController::TakeFromToolWheel);
+		for (int32 I = 0; I < GetInputConfig()->Tools.Num(); ++I)
+		{
+			Input->BindAction(GetInputConfig()->Tools[I], ETriggerEvent::Started, this, &ASaltPlayerController::SelectTool, I);
+		}
 	}
+}
+
+void ASaltPlayerController::HandleMenuKey()
+{
+	if (bToolWheel)
+	{
+		CloseToolWheel(false);
+		return;
+	}
+	ToggleMenu();
+}
+
+void ASaltPlayerController::OpenToolWheel()
+{
+	ASaltPlayerCharacter* SaltCharacter = Cast<ASaltPlayerCharacter>(GetPawn());
+	USaltToolWheelWidget* Wheel = HUDWidget ? HUDWidget->GetToolWheel() : nullptr;
+	if (bToolWheel || !IsLocalController() || !SaltCharacter || !Wheel || IsMenuOpen() || IsSatchelOpen() || IsStoreOpen())
+	{
+		return;
+	}
+	bToolWheel = true;
+	WheelPointer = FVector2D::ZeroVector;
+	TArray<bool> Owned;
+	for (const FSaltToolDef& T : SaltTools::All())
+	{
+		Owned.Add(T.bAlwaysOwned || SaltCharacter->IsToolOwned(T.Id));
+	}
+	// It opens on what is in hand (empty hands when nothing is).
+	const FName Held = SaltCharacter->GetHeldTool();
+	Wheel->Open(FMath::Max(SaltTools::IndexOf(Held.IsNone() ? FName(TEXT("EmptyHands")) : Held), 0), Owned);
+}
+
+void ASaltPlayerController::CloseToolWheel(bool bTake)
+{
+	if (!bToolWheel)
+	{
+		return;
+	}
+	bToolWheel = false;
+	USaltToolWheelWidget* Wheel = HUDWidget ? HUDWidget->GetToolWheel() : nullptr;
+	const int32 Chosen = Wheel ? Wheel->GetSelected() : INDEX_NONE;
+	if (Wheel)
+	{
+		Wheel->Close();
+	}
+	if (bTake && Chosen != INDEX_NONE)
+	{
+		UseTool(Chosen);
+	}
+}
+
+void ASaltPlayerController::AimToolWheel(FVector2D Input, bool bStick)
+{
+	USaltToolWheelWidget* Wheel = HUDWidget ? HUDWidget->GetToolWheel() : nullptr;
+	if (!bToolWheel || !Wheel)
+	{
+		return;
+	}
+	// Screen space, y down.
+	FVector2D Dir;
+	if (bStick)
+	{
+		Dir = FVector2D(Input.X, -Input.Y);
+		if (Dir.Size() < 0.35f)
+		{
+			return;
+		}
+	}
+	else
+	{
+		WheelPointer = (WheelPointer + FVector2D(Input.X, -Input.Y)).GetClampedToMaxSize(150.f);
+		if (WheelPointer.Size() < 40.f)
+		{
+			return;
+		}
+		Dir = WheelPointer;
+	}
+	// The medallions sit at -90 + 60 i degrees: the one in the pointer's direction.
+	const float Deg = FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X));
+	Wheel->SetSelected(((FMath::RoundToInt((Deg + 90.f) / 60.f) % 6) + 6) % 6);
+}
+
+void ASaltPlayerController::SelectTool(int32 Index)
+{
+	USaltToolWheelWidget* Wheel = HUDWidget ? HUDWidget->GetToolWheel() : nullptr;
+	if (bToolWheel && Wheel)
+	{
+		Wheel->SetSelected(Index);
+		CloseToolWheel(true);
+		return;
+	}
+	if (!IsMenuOpen() && !IsSatchelOpen() && !IsStoreOpen())
+	{
+		UseTool(Index);
+	}
+}
+
+bool ASaltPlayerController::UseTool(int32 Index)
+{
+	ASaltPlayerCharacter* SaltCharacter = Cast<ASaltPlayerCharacter>(GetPawn());
+	if (!SaltCharacter || !SaltTools::All().IsValidIndex(Index))
+	{
+		return false;
+	}
+	const FSaltToolDef& Tool = SaltTools::All()[Index];
+	if (!Tool.bAlwaysOwned && !SaltCharacter->IsToolOwned(Tool.Id))
+	{
+		return false;
+	}
+	switch (Tool.Use)
+	{
+	case ESaltToolUse::Held:
+		SaltCharacter->SetHeldTool(Tool.Id);
+		break;
+	case ESaltToolUse::Satchel:
+		SetSatchelOpen(true, 0);
+		break;
+	case ESaltToolUse::Chart:
+		SetSatchelOpen(true, 1);
+		break;
+	case ESaltToolUse::PutAway:
+		SaltCharacter->SetHeldTool(NAME_None);
+		break;
+	}
+	return true;
 }
 
 void ASaltPlayerController::BeginPlay()

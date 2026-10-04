@@ -12,6 +12,7 @@ class UImage;
 class UMaterialInstanceDynamic;
 class UTextBlock;
 class USaltLandfallWidget;
+class USaltToolWheelWidget;
 class USaltPaintedText;
 
 /**
@@ -35,6 +36,8 @@ public:
 	float GetSaveSignShownTime() const { return SignTime; }
 	/** The landfall banner (section 9): shown when USaltLandfallSubsystem finds an island. */
 	USaltLandfallWidget* GetLandfall() const { return Landfall; }
+	/** The tool wheel (section 4), driven by the player controller. */
+	USaltToolWheelWidget* GetToolWheel() const { return ToolWheel; }
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -69,6 +72,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UImage> SignRing;
 	UPROPERTY(Transient) TObjectPtr<UImage> SignRose;
 	UPROPERTY(Transient) TObjectPtr<USaltLandfallWidget> Landfall;
+	UPROPERTY(Transient) TObjectPtr<USaltToolWheelWidget> ToolWheel;
 
 	FPromptRow Rows[2];
 	int32 ActiveRow = 0;

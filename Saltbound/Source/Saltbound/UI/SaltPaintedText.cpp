@@ -35,6 +35,13 @@ void USaltPaintedText::SetText(const FText& InText)
 	}
 }
 
+void USaltPaintedText::SetPlainColor(const FLinearColor& Color)
+{
+	bPlain = true;
+	PlainColor = Color;
+	ApplyFonts();
+}
+
 float USaltPaintedText::MeasureWidth() const
 {
 	if (!FSlateApplication::IsInitialized())
@@ -89,6 +96,10 @@ void USaltPaintedText::ApplyFonts()
 			F.OutlineSettings.bSeparateFillAlpha = true;
 			T->SetColorAndOpacity(FSlateColor(FLinearColor(0.f, 0.f, 0.f, 0.f)));
 			T->SetRenderTranslation(FVector2D(0.f, 2.f));
+		}
+		else if (bPlain)
+		{
+			T->SetColorAndOpacity(FSlateColor(PlainColor));
 		}
 		else
 		{

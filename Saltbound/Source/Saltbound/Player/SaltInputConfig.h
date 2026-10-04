@@ -40,6 +40,10 @@ public:
 	/** Opens the satchel on its inventory page (Tab, I, gamepad Back) or its map page (M). D50. */
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Inventory;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Map;
+	/** The tool wheel (D55): held open with Q or LB; letting go takes the tool. */
+	UPROPERTY(Transient) TObjectPtr<UInputAction> ToolWheel;
+	/** Keys 1 to 6: take a tool directly (the wheel's order). */
+	UPROPERTY(Transient) TArray<TObjectPtr<UInputAction>> Tools;
 
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> DefaultContext;
 };

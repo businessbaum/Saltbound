@@ -25,6 +25,8 @@ public:
 	/** Face and size in 1080p pixels; call before the widget is shown. */
 	void Setup(ESaltFace InFace, float InSize, ETextJustify::Type InJustify = ETextJustify::Left, float InLetterSpacing = 0.f);
 	void SetText(const FText& InText);
+	/** Plain lettering in one colour, keeping the soft halo but no paint and no rim (the tool wheel's smaller lines). */
+	void SetPlainColor(const FLinearColor& Color);
 	const FText& GetText() const { return Text; }
 	/** Width of the text in 1080p pixels (for laying out a prompt row). */
 	float MeasureWidth() const;
@@ -44,4 +46,6 @@ private:
 	float LetterSpacing = 0.f;
 	TEnumAsByte<ETextJustify::Type> Justify = ETextJustify::Left;
 	FText Text;
+	bool bPlain = false;
+	FLinearColor PlainColor = FLinearColor::White;
 };

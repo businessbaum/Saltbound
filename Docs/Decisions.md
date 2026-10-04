@@ -1180,4 +1180,21 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Item icons (step 7): skipped (owner, 2026-10-05):** "these icons were only for testing and looks bad and need recreating.
   i didnt even think which items are needed so maybe skip it". The test icons stay until the owner decides the items; the
   icon booth (a show-only scene capture of each pickup) is not built.
-- **Next (spec order):** the tool wheel (hold Q) with the held tools.
+- **Tool wheel (section 4):** held open with **Q** (owner) or LB (new `IA_ToolWheel`); Tab and I still open the satchel.
+  - The design's own parts: the rope ring on its dark disc, a lashing (placed and turned per medallion as it grows), the
+    medallion (leather, inner shadow, brass bezel, rivets; drawn at the chosen size 84 and scaled to 70), the amber halo and
+    bright rim of the chosen one, the six painted tools, the divider with its turquoise diamond, the hints ("Q hold, aim,
+    let go . 1 - 6 pick directly"). Keys 1 to 6 are keycaps outside the medallions.
+  - In the middle: the tool's name (painted lettering, 64 px), its hint and "let go of Q to take it" (plain lettering
+    with the soft halo, `USaltPaintedText::SetPlainColor`).
+  - While it is held the mouse (a pointer with a 40 px dead zone) or the right stick (0.35) aims instead of turning the
+    camera; the medallion in that direction is chosen. Letting go takes it, Esc / B cancel, keys 1 to 6 take a tool
+    directly (also without the wheel). It opens on what is in hand, scaling from 0.9 with a fade (0.12 s), the
+    medallions popping in 20 ms apart.
+  - Tools are data (`Core/SaltTools`): compass, spyglass, chart, lantern, satchel, empty hands. The chart opens the map,
+    the satchel the satchel, empty hands puts away; compass, spyglass and lantern are held (`GetHeldTool`). The player
+    owns the compass, the spyglass and the lantern from the start (owner); a tool not owned shows an empty medallion
+    and is not taken.
+  - `sb.Dev.Wheel 1 [n] | 0`; tests `WheelOnQ`, `WheelByAngle`, `WheelTakesTool`, `WheelCancels`, `WheelKeys`,
+    `WheelNeedsTool`. Inventory 31/31.
+- **Next (spec order):** the held tools (compass, spyglass, lantern) and their props.

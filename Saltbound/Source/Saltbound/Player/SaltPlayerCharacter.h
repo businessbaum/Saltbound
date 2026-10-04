@@ -121,6 +121,13 @@ public:
 	/** The satchel (D50). */
 	USaltInventoryComponent* GetInventory() const { return Inventory; }
 
+	/** The tool in hand (D55): Compass, Spyglass or Lantern; None is empty hands. */
+	FName GetHeldTool() const { return HeldTool; }
+	void SetHeldTool(FName Tool);
+	/** Tools the player has (the compass, the spyglass and the lantern from the start, owner). */
+	bool IsToolOwned(FName Tool) const { return OwnedTools.Contains(Tool); }
+	void SetToolOwned(FName Tool, bool bOwned);
+
 	/** Applies the look settings (field of view, mouse sensitivity, invert look) from USaltGameUserSettings. */
 	void ApplyUserSettings();
 	/** Forgets held movement keys (the pause menu takes the input away while they are down). */
@@ -172,6 +179,9 @@ protected:
 	TObjectPtr<USaltInventoryComponent> Inventory;
 
 private:
+	FName HeldTool;
+	TSet<FName> OwnedTools;
+
 	void HandleMove(const FInputActionValue& Value);
 	void HandleMoveCompleted(const FInputActionValue& Value);
 	void HandleLookMouse(const FInputActionValue& Value);

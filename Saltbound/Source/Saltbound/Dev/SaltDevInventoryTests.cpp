@@ -9,11 +9,14 @@
 #include "Core/SaltItems.h"
 #include "Core/SaltPlaces.h"
 #include "Core/SaltSaveSubsystem.h"
+#include "Core/SaltTools.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
+#include "InputMappingContext.h"
 #include "Interaction/SaltInteractableComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Player/SaltInputConfig.h"
 #include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
@@ -22,6 +25,7 @@
 #include "UI/SaltLandfallWidget.h"
 #include "UI/SaltSatchelWidget.h"
 #include "UI/SaltStoreWidget.h"
+#include "UI/SaltToolWheelWidget.h"
 #include "World/SaltPickup.h"
 
 #if !UE_BUILD_SHIPPING
@@ -441,6 +445,64 @@ namespace
 			Report(TEXT("LandfallFoundOnce"), false, TEXT("no landfall subsystem or HUD"));
 		}
 
+		// D55: the tool wheel. Q and LB hold it open (Tab and I still open the satchel); the mouse or the stick aims at a tool
+		// by its direction; letting go takes it; Esc cancels; keys 1 to 6 take one directly; a tool not owned is not taken.
+		if (USaltToolWheelWidget* Wheel = Hud ? Hud->GetToolWheel() : nullptr)
+		{
+			USaltInputConfig* Cfg = PC->GetInputConfig();
+			auto Mapped = [Cfg](const UInputAction* Action, const FKey& Key)
+			{
+				return Cfg->DefaultContext->GetMappings().ContainsByPredicate([&](const FEnhancedActionKeyMapping& M) { return M.Action == Action && M.Key == Key; });
+			};
+			Report(TEXT("WheelOnQ"), Mapped(Cfg->ToolWheel, EKeys::Q) && Mapped(Cfg->ToolWheel, EKeys::Gamepad_LeftShoulder) && !Mapped(Cfg->ToolWheel, EKeys::Tab)
+				&& Mapped(Cfg->Inventory, EKeys::Tab) && Mapped(Cfg->Inventory, EKeys::I) && Cfg->Tools.Num() == 6 && Mapped(Cfg->Tools[0], EKeys::One)
+				&& Mapped(Cfg->Tools[5], EKeys::Six), TEXT("Q / LB: wheel; Tab / I: satchel; 1..6: tools"));
+			const FName OwnHeld = Player->GetHeldTool();
+			Player->SetHeldTool(NAME_None);
+			PC->OpenToolWheel();
+			const bool bOpened = PC->IsToolWheelOpen() && Wheel->IsOpen() && Wheel->GetSelected() == 5;
+			PC->AimToolWheel(FVector2D(0.f, 60.f), false);          // the mouse up: the compass at the top
+			const int32 Up = Wheel->GetSelected();
+			PC->AimToolWheel(FVector2D(-300.f, -300.f), false);     // left and down: the satchel, lower left
+			const int32 LowerLeft = Wheel->GetSelected();
+			PC->AimToolWheel(FVector2D(0.2f, 0.f), true);            // inside the stick's dead zone: no change
+			const int32 Dead = Wheel->GetSelected();
+			PC->AimToolWheel(FVector2D(0.87f, -0.5f), true);         // the stick right and down: the chart, lower right
+			const int32 LowerRight = Wheel->GetSelected();
+			PC->AimToolWheel(FVector2D(0.87f, 0.5f), true);          // right and up: the spyglass
+			const int32 UpperRight = Wheel->GetSelected();
+			PC->CloseToolWheel(true);
+			const FName Taken = Player->GetHeldTool();
+			Report(TEXT("WheelByAngle"), bOpened && Up == 0 && LowerLeft == 4 && Dead == 4 && LowerRight == 2 && UpperRight == 1,
+				FString::Printf(TEXT("opened on empty hands=%d up=%d lower left=%d dead zone=%d lower right=%d upper right=%d"), bOpened ? 1 : 0, Up, LowerLeft,
+					Dead, LowerRight, UpperRight));
+			Report(TEXT("WheelTakesTool"), Taken == TEXT("Spyglass") && !PC->IsToolWheelOpen(), FString::Printf(TEXT("in hand=%s"), *Taken.ToString()));
+			PC->OpenToolWheel();
+			PC->AimToolWheel(FVector2D(0.f, 60.f), false);
+			PC->HandleMenuKey();
+			Report(TEXT("WheelCancels"), !PC->IsToolWheelOpen() && !PC->IsMenuOpen() && Player->GetHeldTool() == TEXT("Spyglass"),
+				FString::Printf(TEXT("open=%d menu=%d in hand=%s"), PC->IsToolWheelOpen() ? 1 : 0, PC->IsMenuOpen() ? 1 : 0, *Player->GetHeldTool().ToString()));
+			PC->SelectTool(3);
+			const FName Four = Player->GetHeldTool();
+			PC->SelectTool(5);
+			const FName Six = Player->GetHeldTool();
+			PC->SelectTool(4);
+			const bool bSatchel = PC->IsSatchelOpen();
+			PC->SetSatchelOpen(false);
+			Report(TEXT("WheelKeys"), Four == TEXT("Lantern") && Six.IsNone() && bSatchel, FString::Printf(TEXT("4=%s 6=%s 5 opens the satchel=%d"),
+				*Four.ToString(), *Six.ToString(), bSatchel ? 1 : 0));
+			Player->SetToolOwned(TEXT("Compass"), false);
+			PC->SelectTool(0);
+			const bool bRefused = Player->GetHeldTool() != TEXT("Compass");
+			Player->SetToolOwned(TEXT("Compass"), true);
+			Report(TEXT("WheelNeedsTool"), bRefused && Player->IsToolOwned(TEXT("Compass")), FString::Printf(TEXT("a compass not owned taken=%d"), bRefused ? 0 : 1));
+			Player->SetHeldTool(OwnHeld);
+		}
+		else
+		{
+			Report(TEXT("WheelOnQ"), false, TEXT("no HUD tool wheel"));
+		}
+
 		// Saved and loaded: the satchel's contents and the taken pickup.
 		const FString OwnSlot = Saves->Slot;
 		Saves->Slot = TEXT("SaltDevTest");
@@ -591,6 +653,29 @@ namespace
 			Hud->GetLandfall()->Clear();
 			Hud->GetLandfall()->HoldAt(Args.Num() > 1 ? FCString::Atof(*Args[1]) : -1.f);
 			Hud->GetLandfall()->Show(FName(*Args[0]));
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdWheel(
+		TEXT("sb.Dev.Wheel"),
+		TEXT("The tool wheel for captures: sb.Dev.Wheel 1 [n] opens it (on tool n, 1 to 6) and keeps it open; sb.Dev.Wheel 0 closes it."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ASaltPlayerController* PC = World ? Cast<ASaltPlayerController>(UGameplayStatics::GetPlayerController(World, 0)) : nullptr;
+			if (!PC)
+			{
+				return;
+			}
+			if (Args.Num() > 0 && Args[0] == TEXT("0"))
+			{
+				PC->CloseToolWheel(false);
+				return;
+			}
+			PC->OpenToolWheel();
+			USaltToolWheelWidget* Wheel = PC->GetHUDWidget() ? PC->GetHUDWidget()->GetToolWheel() : nullptr;
+			if (Wheel && Args.Num() > 1)
+			{
+				Wheel->SetSelected(FCString::Atoi(*Args[1]) - 1);
+			}
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdGive(

@@ -34,6 +34,8 @@ public:
 	/** Pause menu with the settings (Esc in the game, F10 in the editor, Start on a gamepad): pauses the game. */
 	void SetMenuOpen(bool bOpen);
 	void ToggleMenu() { SetMenuOpen(!IsMenuOpen()); }
+	/** Esc / Start: cancels the tool wheel when it is open, otherwise the pause menu. */
+	void HandleMenuKey();
 	bool IsMenuOpen() const;
 	USaltMenuWidget* GetMenu() const { return MenuWidget; }
 
@@ -47,6 +49,18 @@ public:
 	void CloseStore();
 	bool IsStoreOpen() const;
 	USaltStoreWidget* GetStoreWidget() const { return StoreWidget; }
+
+	/** The tool wheel (D55, UI_Design.md section 4): held open with Q or LB; the mouse or the right stick aims at a tool
+	 *  (instead of turning the camera), letting go takes it, Esc / B cancel. The world goes on. */
+	void OpenToolWheel();
+	void CloseToolWheel(bool bTake);
+	bool IsToolWheelOpen() const { return bToolWheel; }
+	/** Mouse counts (accumulated as a pointer, 40 px dead zone) or the stick (0.35 dead zone); y up. */
+	void AimToolWheel(FVector2D Input, bool bStick);
+	/** Keys 1 to 6 (Index 0..5): takes that tool, closing the wheel if it is open. */
+	void SelectTool(int32 Index);
+	/** Does what the tool does: takes it in hand, opens the satchel or the chart, or empties the hands. */
+	bool UseTool(int32 Index);
 
 protected:
 	virtual void BeginPlay() override;
@@ -73,4 +87,8 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<USaltHUDWidget> HUDWidget;
+
+	void TakeFromToolWheel() { CloseToolWheel(true); }
+	bool bToolWheel = false;
+	FVector2D WheelPointer = FVector2D::ZeroVector;
 };

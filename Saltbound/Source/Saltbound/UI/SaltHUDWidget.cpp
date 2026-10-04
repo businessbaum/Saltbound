@@ -16,6 +16,7 @@
 #include "Styling/CoreStyle.h"
 #include "UI/SaltLandfallWidget.h"
 #include "UI/SaltPaintedText.h"
+#include "UI/SaltToolWheelWidget.h"
 #include "UI/SaltUIStyle.h"
 
 namespace
@@ -180,6 +181,15 @@ TSharedRef<SWidget> USaltHUDWidget::RebuildWidget()
 			S->SetOffsets(FMargin(0.f));
 		}
 		Landfall->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+		// The tool wheel over everything else of the HUD.
+		ToolWheel = CreateWidget<USaltToolWheelWidget>(this, USaltToolWheelWidget::StaticClass());
+		if (UCanvasPanelSlot* S = Root->AddChildToCanvas(ToolWheel))
+		{
+			S->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			S->SetOffsets(FMargin(0.f));
+		}
+		ToolWheel->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
 	return Super::RebuildWidget();
 }

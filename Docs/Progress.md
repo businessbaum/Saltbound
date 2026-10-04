@@ -227,7 +227,7 @@ for a higher screen percentage (for example 75 %) and more content.
   the key-scrap prompt with painted lettering, the hold (raising the anchor) with the ink soaking up through the key's
   scrap, the save sign in the corner, the launch intro (startup movie, any key skips), the satchel (leather bag, pressed pockets, the tag on twine), the stores (the satchel beside the open crate or the
   round barrel, items flying between them), the landfall banner for a new island (found within 300 m of its shore,
-  saved); the camera at 1.2 m. The item icons wait for the owner to decide the items. Next: the tool wheel (hold Q).
+  saved); the camera at 1.2 m. The item icons wait for the owner to decide the items. The tool wheel (hold Q). Next: the held tools.
 - **D54 (awaiting the owner's check):** calm flags (a slow wave, no side-to-side swing with the boat's roll); the player
   1.4 m and slimmer; ladders climbed with W / S after taking hold with E, E lets go, off the bottom into the sea, over
   the top on board.
@@ -294,6 +294,7 @@ the sail and cast off.
 | At a station | W/S and A/D are routed to the station | Left stick |
 | Pause menu / settings | Esc (in the editor: F10) | Start |
 | Satchel / map | Tab or I / M (arrows choose a pocket, R turn the item, G drop one; Tab, I or Esc close) | Back |
+| Tool wheel | Hold Q, aim with the mouse, let go to take the tool; Esc cancels; 1 to 6 take a tool directly | Hold LB, aim with the right stick; B cancels |
 | On the boat | Steering oar (starboard quarter, E at its handle): A / D steer. Pin rails by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Bell rope: E rings the bell; lantern: E lights / douses it. Ladders (both sides, midship): E takes hold (from the water or the deck), W / S climb, E lets go; off the bottom into the sea, over the top on board | |
 | Store (barrel or crate on the boat, E at its lid) | Click moves the stack, Shift-click one; arrows choose, Enter moves the stack; E / Esc close | D-pad, A (the stack), X (one), B close |
 
@@ -308,7 +309,7 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`, `sb.Dev.RunMenuTests`,
   `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched), `sb.Dev.RunInventoryTests`,
-  `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel 0|1 [chart]|off`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`
+  `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel 0|1 [chart]|off`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`
   (SB_BOAT state line), `sb.Boat.Place X Y Yaw [Speed m/s]`, `sb.Boat.Hold Free|Moored|Anchored`,

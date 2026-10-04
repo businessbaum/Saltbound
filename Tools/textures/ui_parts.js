@@ -298,3 +298,43 @@ for (const [id, name] of LANDFALL) {
 }
 /* The oxblood wax seal (radius 40) with the island-and-gateway glyph, centred in a 120 x 120 frame. */
 part('T_UI_LandfallSeal', 120, 120, 2, c => { waxSeal(c, 60, 60, 40, '', 7); sealGlyph(c, 'island', 60, 60, 40); });
+
+/* ---------- 8. the tool wheel (section 4) ---------- */
+/* The rope ring (radius 262, 46 thick) on its soft dark disc (radius 327), as the design draws it. Frame: 720 x 720
+   centred on the screen (960, 540). */
+const WH_R = 262, WH_T = 46;
+part('T_UI_WheelRing', 720, 720, 1, c => {
+  c.translate(360 - 960, 360 - 540);
+  const cx = 960, cy = 540, R = WH_R;
+  const g = c.createRadialGradient(cx, cy, 0, cx, cy, R * 1.25); g.addColorStop(0, 'rgba(8,6,4,.62)'); g.addColorStop(.7, 'rgba(8,6,4,.35)'); g.addColorStop(1, 'rgba(8,6,4,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(cx, cy, R * 1.25, 0, TAU); c.fill();
+  ropeRing(c, cx, cy, R, WH_T);
+});
+/* One lashing (5 turns of pale twine) across the rope, unrotated: its centre at (40, 24) of an 80 x 48 frame; the
+   widget turns it to the ring's angle. */
+part('T_UI_WheelLashing', 80, 48, 2, c => lashing(c, 40 - WH_R, 24, WH_R, WH_T, 0));
+/* A medallion at radius 84 (the selected size; the widget scales it to 70): leather disc, inner shadow, brass bezel and
+   eight rivets. Frame 240 x 240, centred. The selection's halo (x 2.1) and bright rim are their own parts. */
+part('T_UI_WheelMedallion', 240, 240, 1, c => medallion(c, 120, 120, 84, false));
+part('T_UI_WheelHalo', 360, 360, 1, c => { const g = c.createRadialGradient(180, 180, 84 * .6, 180, 180, 84 * 2.1); g.addColorStop(0, 'rgba(255,200,110,.55)'); g.addColorStop(1, 'rgba(255,170,70,0)'); c.fillStyle = g; c.beginPath(); c.arc(180, 180, 84 * 2.1, 0, TAU); c.fill(); });
+part('T_UI_WheelRim', 240, 240, 1, c => { c.save(); c.strokeStyle = 'rgba(255,226,150,.85)'; c.lineWidth = 2; c.shadowBlur = 14; c.shadowColor = 'rgba(255,200,100,.9)'; c.beginPath(); c.arc(120, 120, 85, 0, TAU); c.stroke(); c.restore(); });
+/* The tools painted for the medallions, at the selected size (scale 84 / 62 of their 100-unit box). Frame 180 x 180. */
+for (const [name, draw] of [['Compass', toolCompass], ['Spyglass', toolSpyglass], ['Chart', toolChart], ['Lantern', toolLantern], ['Satchel', toolSatchel], ['Hands', toolHand]]) {
+  part('T_UI_Tool_' + name, 180, 180, 2, c => { c.translate(90, 90); c.scale(84 / 62, 84 / 62); draw(c); });
+}
+/* The thin divider under the hint with its small turquoise diamond. Frame 240 x 20, centred. */
+part('T_UI_WheelDivider', 240, 20, 2, c => {
+  c.translate(120, 10 - 62);
+  c.save(); c.strokeStyle = 'rgba(227,211,178,.55)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-110, 62); c.lineTo(-14, 62); c.moveTo(14, 62); c.lineTo(110, 62); c.stroke();
+  c.fillStyle = '#5ae6d2'; c.beginPath(); c.moveTo(0, 56); c.lineTo(6, 62); c.lineTo(0, 68); c.lineTo(-6, 62); c.fill(); c.restore();
+});
+/* The hints along the bottom: Q "hold, aim, let go" . 1 - 6 "pick directly" (the wheel is on Q, owner). Baseline 1000;
+   frame 1080p x 600..1320, y 950..1040. */
+part('T_UI_WheelHints', 720, 90, 1, c => {
+  c.translate(-600, -950);
+  const sh = { shadow: ['rgba(0,0,0,.9)', 8, 0, 2] }, y = 1000;
+  let x = W / 2 - 290; x += keycap(c, 'Q', x, y - 30, 40) + 14;
+  txt(c, 'hold, aim, let go', x, y, '400 26px Alegreya,Georgia,serif', '#efe4cb', sh); x += 230;
+  x += keycap(c, '1', x, y - 30, 40) + 6; txt(c, '–', x, y - 2, '400 26px Alegreya', '#efe4cb'); x += 20; x += keycap(c, '6', x, y - 30, 40) + 14;
+  txt(c, 'pick directly', x, y, '400 26px Alegreya,Georgia,serif', '#efe4cb', sh);
+});

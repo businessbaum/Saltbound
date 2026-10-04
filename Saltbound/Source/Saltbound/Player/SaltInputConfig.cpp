@@ -45,6 +45,12 @@ void USaltInputConfig::Build()
 	Menu->bTriggerWhenPaused = true;
 	Inventory = MakeAction(this, TEXT("IA_Inventory"), EInputActionValueType::Boolean);
 	Map = MakeAction(this, TEXT("IA_Map"), EInputActionValueType::Boolean);
+	ToolWheel = MakeAction(this, TEXT("IA_ToolWheel"), EInputActionValueType::Boolean);
+	Tools.Reset();
+	for (int32 I = 1; I <= 6; ++I)
+	{
+		Tools.Add(MakeAction(this, *FString::Printf(TEXT("IA_Tool%d"), I), EInputActionValueType::Boolean));
+	}
 
 	DefaultContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Default"));
 	UInputMappingContext* C = DefaultContext;
@@ -80,4 +86,12 @@ void USaltInputConfig::Build()
 	C->MapKey(Inventory, EKeys::I);
 	C->MapKey(Inventory, EKeys::Gamepad_Special_Left);
 	C->MapKey(Map, EKeys::M);
+	// D55: the tool wheel on Q (owner; Tab and I keep opening the satchel) and LB; keys 1 to 6 take a tool directly.
+	C->MapKey(ToolWheel, EKeys::Q);
+	C->MapKey(ToolWheel, EKeys::Gamepad_LeftShoulder);
+	const FKey Digits[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six };
+	for (int32 I = 0; I < Tools.Num(); ++I)
+	{
+		C->MapKey(Tools[I], Digits[I]);
+	}
 }
