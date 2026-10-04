@@ -16,6 +16,7 @@
 #include "Interaction/SaltInteractableComponent.h"
 #include "Interaction/SaltStationComponent.h"
 #include "Player/SaltCharacterMovementComponent.h"
+#include "Player/SaltHeldTools.h"
 #include "Player/SaltInputConfig.h"
 #include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerController.h"
@@ -49,6 +50,7 @@ ASaltPlayerCharacter::ASaltPlayerCharacter(const FObjectInitializer& ObjectIniti
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Inventory = CreateDefaultSubobject<USaltInventoryComponent>(TEXT("Inventory"));
+	HeldTools = CreateDefaultSubobject<USaltHeldToolsComponent>(TEXT("HeldTools"));
 	Camera->SetupAttachment(GetCapsuleComponent());
 	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - CapsuleHalfHeight));
 	Camera->bUsePawnControlRotation = true;
@@ -232,6 +234,10 @@ void ASaltPlayerCharacter::SetHeldTool(FName Tool)
 	{
 		HeldTool = Tool;
 		UE_LOG(LogSaltbound, Display, TEXT("SB_TOOL held=%s"), *Tool.ToString());
+		if (HeldTools)
+		{
+			HeldTools->SetTool(Tool);
+		}
 	}
 }
 
@@ -259,7 +265,9 @@ void ASaltPlayerCharacter::HandleLookMouse(const FInputActionValue& Value)
 		PC->AimToolWheel(Value.Get<FVector2D>(), false);
 		return;
 	}
-	const FVector2D Delta = Value.Get<FVector2D>() * (MouseSensitivity * CVarMouseSensitivity.GetValueOnGameThread());
+	// Through the spyglass the view turns slower, as narrow as it is.
+	const float Zoom = HeldTools ? HeldTools->GetLookScale() : 1.f;
+	const FVector2D Delta = Value.Get<FVector2D>() * (MouseSensitivity * CVarMouseSensitivity.GetValueOnGameThread() * Zoom);
 	ApplyLook(Delta.X, bInvertLookY ? -Delta.Y : Delta.Y);
 }
 
@@ -271,7 +279,7 @@ void ASaltPlayerCharacter::HandleLookGamepad(const FInputActionValue& Value)
 		return;
 	}
 	const float Dt = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f;
-	const FVector2D Delta = Value.Get<FVector2D>() * (GamepadLookRate * Dt);
+	const FVector2D Delta = Value.Get<FVector2D>() * (GamepadLookRate * Dt * (HeldTools ? HeldTools->GetLookScale() : 1.f));
 	ApplyLook(Delta.X, bInvertLookY ? -Delta.Y : Delta.Y);
 }
 

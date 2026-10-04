@@ -1197,4 +1197,17 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     and is not taken.
   - `sb.Dev.Wheel 1 [n] | 0`; tests `WheelOnQ`, `WheelByAngle`, `WheelTakesTool`, `WheelCancels`, `WheelKeys`,
     `WheelNeedsTool`. Inventory 31/31.
-- **Next (spec order):** the held tools (compass, spyglass, lantern) and their props.
+- **Held tools (`USaltHeldToolsComponent`):** shown in front of the camera (there are no arms yet); a tool rises into
+  view in 0.25 s and sinks out when put away.
+  - **Compass** (`SM_Tool_Compass` and `SM_Tool_CompassNeedle`, `Art/Blender/Scripts/build_tools.py`): a brass pocket
+    compass with a bezel, a pendant and a bow, a cream dial with dark ticks and a red north mark, plain shapes and the
+    project's materials. Held low on the right, tilted towards the eye; the needle swings to world north (+X) as a damped
+    pendulum (0.9 s, damping 0.25) and settles.
+  - **Spyglass:** looked through, so no mesh: the view narrows to 20 degrees in 0.35 s, the HUD shows a dark round view
+    with a brass rim (`T_UI_SpyglassMask`), and the mouse and stick turn slower in proportion.
+  - **Lantern:** the boat's lantern hanging from the left hand at arm's length, swinging under it
+    (`USaltSwingComponent`), with the boat lantern's warm light (2100 K) and flicker.
+  - Not built: the rolled chart, the small satchel and the gloves were only for medallion pictures from the icon booth,
+    which is skipped; the wheel keeps the design's painted pictures.
+  - `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`; tests `HeldCompassNorth`, `HeldSpyglass`, `HeldLantern`. Inventory 34/34.
+  - `build_boat.py` now runs its builds only as the build script, so other scripts can use its parts.

@@ -127,6 +127,8 @@ public:
 	/** Tools the player has (the compass, the spyglass and the lantern from the start, owner). */
 	bool IsToolOwned(FName Tool) const { return OwnedTools.Contains(Tool); }
 	void SetToolOwned(FName Tool, bool bOwned);
+	/** Shows the held tool (compass, spyglass view, lantern). */
+	class USaltHeldToolsComponent* GetHeldTools() const { return HeldTools; }
 
 	/** Applies the look settings (field of view, mouse sensitivity, invert look) from USaltGameUserSettings. */
 	void ApplyUserSettings();
@@ -177,6 +179,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USaltInventoryComponent> Inventory;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<class USaltHeldToolsComponent> HeldTools;
 
 private:
 	FName HeldTool;

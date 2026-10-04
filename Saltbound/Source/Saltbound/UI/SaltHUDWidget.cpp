@@ -12,6 +12,7 @@
 #include "HAL/IConsoleManager.h"
 #include "Interaction/SaltInteractableComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Player/SaltHeldTools.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Styling/CoreStyle.h"
 #include "UI/SaltLandfallWidget.h"
@@ -172,6 +173,16 @@ TSharedRef<SWidget> USaltHUDWidget::RebuildWidget()
 		};
 		SignRing = SignLayer(TEXT("T_UI_SaveKnot_Ring"));
 		SignRose = SignLayer(TEXT("T_UI_SaveKnot_Rose"));
+
+		// Looking through the spyglass: dark round the view, a brass rim (section 4). Under the banners and the wheel.
+		SpyglassMask = WidgetTree->ConstructWidget<UImage>();
+		SpyglassMask->SetBrush(SaltUI::ImageBrush(SaltUI::Tex(TEXT("T_UI_SpyglassMask")), FVector2D(960.f, 540.f)));
+		SpyglassMask->SetVisibility(ESlateVisibility::Collapsed);
+		if (UCanvasPanelSlot* S = Root->AddChildToCanvas(SpyglassMask))
+		{
+			S->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			S->SetOffsets(FMargin(0.f));
+		}
 
 		// The landfall banner over the whole screen (it places itself at 1080p design coordinates).
 		Landfall = CreateWidget<USaltLandfallWidget>(this, USaltLandfallWidget::StaticClass());
@@ -407,6 +418,11 @@ void USaltHUDWidget::TickSaveSign(float DeltaSeconds)
 	}
 }
 
+float USaltHUDWidget::GetSpyglassMaskOpacity() const
+{
+	return SpyglassMask && SpyglassMask->GetVisibility() != ESlateVisibility::Collapsed ? SpyglassMask->GetRenderOpacity() : 0.f;
+}
+
 void USaltHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
@@ -418,6 +434,12 @@ void USaltHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	}
 
 	const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn());
+	if (SpyglassMask)
+	{
+		const float Spy = Player && Player->GetHeldTools() ? Player->GetHeldTools()->GetSpyglass() : 0.f;
+		SpyglassMask->SetRenderOpacity(FMath::SmoothStep(0.f, 1.f, Spy));
+		SpyglassMask->SetVisibility(Spy > 0.f ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
 	const FText HintText = Player ? Player->GetHintText() : FText::GetEmpty();
 	const bool bAtStation = Player && Player->IsAtStation();
 	const bool bFocus = Player && Player->GetFocusedInteractable() != nullptr;

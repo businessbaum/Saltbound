@@ -314,5 +314,17 @@
     "dest": "/Game/Saltbound/Boat",
     "nanite": false,
     "collision": "ucx"
+  },
+  "SM_Tool_Compass": {
+    "fbx": "Tools/SM_Tool_Compass.fbx",
+    "dest": "/Game/Saltbound/Props/Tools",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Tool_CompassNeedle": {
+    "fbx": "Tools/SM_Tool_CompassNeedle.fbx",
+    "dest": "/Game/Saltbound/Props/Tools",
+    "nanite": false,
+    "collision": "none"
   }
 }

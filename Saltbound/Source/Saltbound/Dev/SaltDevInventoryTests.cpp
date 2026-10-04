@@ -16,6 +16,7 @@
 #include "InputMappingContext.h"
 #include "Interaction/SaltInteractableComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Player/SaltHeldTools.h"
 #include "Player/SaltInputConfig.h"
 #include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerCharacter.h"
@@ -52,6 +53,7 @@ namespace
 			ESaltBoatHold OwnHold = ESaltBoatHold::Moored;
 			TArray<FSaltItemStack> OwnSatchel;
 			TArray<FSaltItemStack> OwnCrate;
+			FName OwnTool;
 		};
 		TSharedRef<FState> S = MakeShared<FState>();
 		S->World = World;
@@ -218,6 +220,51 @@ namespace
 				{
 					USaltLandfallWidget* L = Hud->GetLandfall();
 					Report(TEXT("LandfallRollsUp"), L && !L->IsShowing(), FString::Printf(TEXT("6.4 s after it showed: showing=%d"), L && L->IsShowing() ? 1 : 0));
+					// The held tools (D55): the compass first.
+					S->OwnTool = P->GetHeldTool();
+					P->SetHeldTool(TEXT("Compass"));
+					Next();
+				}
+				break;
+			case 10:
+				if (T > 2.5f)
+				{
+					// The needle has settled on north; then the player turns a quarter and it settles again.
+					S->Value = FVector::DotProduct(P->GetHeldTools()->GetNeedleNorth(), FVector::ForwardVector);
+					PC->SetControlRotation(PC->GetControlRotation() + FRotator(0.f, 90.f, 0.f));
+					Next();
+				}
+				break;
+			case 11:
+				if (T > 2.5f)
+				{
+					const float After = FVector::DotProduct(P->GetHeldTools()->GetNeedleNorth(), FVector::ForwardVector);
+					Report(TEXT("HeldCompassNorth"), P->GetHeldTools()->GetRaise() > 0.99f && S->Value > 0.97f && After > 0.97f,
+						FString::Printf(TEXT("needle . north: %.3f, after a quarter turn %.3f"), S->Value, After));
+					P->SetHeldTool(TEXT("Spyglass"));
+					Next();
+				}
+				break;
+			case 12:
+				if (T > 0.6f)
+				{
+					const float Fov = P->GetCamera()->FieldOfView;
+					const float Look = P->GetHeldTools()->GetLookScale();
+					const float Mask = Hud->GetSpyglassMaskOpacity();
+					Report(TEXT("HeldSpyglass"), FMath::Abs(Fov - USaltHeldToolsComponent::SpyglassFOV) < 0.5f && Look < 0.3f && Mask > 0.9f,
+						FString::Printf(TEXT("field of view %.1f, look speed x%.2f, round view %.2f"), Fov, Look, Mask));
+					P->SetHeldTool(TEXT("Lantern"));
+					Next();
+				}
+				break;
+			case 13:
+				if (T > 1.0f)
+				{
+					USaltHeldToolsComponent* H = P->GetHeldTools();
+					const float Fov = P->GetCamera()->FieldOfView;
+					Report(TEXT("HeldLantern"), H->GetRaise() > 0.99f && FMath::Abs(Fov - P->FieldOfView) < 0.5f && Hud->GetSpyglassMaskOpacity() < 0.01f,
+						FString::Printf(TEXT("lantern raised %.2f, field of view back to %.1f (%.1f)"), H->GetRaise(), Fov, P->FieldOfView));
+					P->SetHeldTool(S->OwnTool);
 					UE_LOG(LogSaltbound, Display, TEXT("SB_TEST InventorySuite DONE passed=%d failed=%d"), S->Passed, S->Failed);
 					return false;
 				}
@@ -675,6 +722,18 @@ namespace
 			if (Wheel && Args.Num() > 1)
 			{
 				Wheel->SetSelected(FCString::Atoi(*Args[1]) - 1);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdTool(
+		TEXT("sb.Dev.Tool"),
+		TEXT("Take a tool in hand (captures): sb.Dev.Tool Compass|Spyglass|Lantern|none."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			APlayerController* PC = World ? UGameplayStatics::GetPlayerController(World, 0) : nullptr;
+			if (ASaltPlayerCharacter* Player = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr)
+			{
+				Player->SetHeldTool(Args.Num() > 0 && Args[0] != TEXT("none") ? FName(*Args[0]) : NAME_None);
 			}
 		}));
 

@@ -38,6 +38,8 @@ public:
 	USaltLandfallWidget* GetLandfall() const { return Landfall; }
 	/** The tool wheel (section 4), driven by the player controller. */
 	USaltToolWheelWidget* GetToolWheel() const { return ToolWheel; }
+	/** The spyglass's round view (its opacity follows the zoom). */
+	float GetSpyglassMaskOpacity() const;
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -73,6 +75,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UImage> SignRose;
 	UPROPERTY(Transient) TObjectPtr<USaltLandfallWidget> Landfall;
 	UPROPERTY(Transient) TObjectPtr<USaltToolWheelWidget> ToolWheel;
+	UPROPERTY(Transient) TObjectPtr<UImage> SpyglassMask;
 
 	FPromptRow Rows[2];
 	int32 ActiveRow = 0;

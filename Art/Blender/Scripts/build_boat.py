@@ -1905,4 +1905,6 @@ def main():
             fn()
 
 
-main()
+# Run as the build script (Blender's -P runs it as __main__); build_tools.py imports the parts.
+if __name__ == "__main__":
+    main()

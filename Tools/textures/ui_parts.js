@@ -338,3 +338,14 @@ part('T_UI_WheelHints', 720, 90, 1, c => {
   x += keycap(c, '1', x, y - 30, 40) + 6; txt(c, '–', x, y - 2, '400 26px Alegreya', '#efe4cb'); x += 20; x += keycap(c, '6', x, y - 30, 40) + 14;
   txt(c, 'pick directly', x, y, '400 26px Alegreya,Georgia,serif', '#efe4cb', sh);
 });
+
+/* Looking through the spyglass (section 4): dark round a circle (radius about 470 at 1080p, a soft inner edge) with a brass
+   rim on its edge. Full screen, drawn at half resolution. */
+part('T_UI_SpyglassMask', 1920, 1080, 0.5, c => {
+  c.fillStyle = '#050403'; c.fillRect(0, 0, W, H);
+  c.globalCompositeOperation = 'destination-out';
+  const g = c.createRadialGradient(960, 540, 400, 960, 540, 478); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(960, 540, 480, 0, TAU); c.fill();
+  c.globalCompositeOperation = 'source-over';
+  brassRing(c, 960, 540, 494, 474);
+});
