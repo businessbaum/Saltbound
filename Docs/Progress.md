@@ -223,6 +223,8 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D51 (proposal):** the second boat, a 14 m gaff cutter with a top deck and a lower deck: `Docs/Design/Boat2.md` and its
+  plan sheet; waiting for the owner's answers before the blockout.
 - **D49 / D50 (awaiting the owner's check):** sea haze limits the view; the trail's density and width follow the speed;
   a satchel (Tab / I) with 24 slots, pickups on the beaches and the ancient shard at the ruin, and a map tab (M) with
   two parchment charts and markers for you and your boat.

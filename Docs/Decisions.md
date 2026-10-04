@@ -988,3 +988,13 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Tests:** `sb.Dev.RunInventoryTests` 7/7 (stacking, a full satchel, a pickup, the screen, the map marker exactly
   where the player is, saving). Dev commands: `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel 0|1 [chart]|off`.
 - **Open:** items have no use yet (repairs, trade or the ancient shards' story come later).
+
+### D51 · The second boat: a 14 m gaff cutter with a top deck and a lower deck (Proposal, awaiting the owner)
+- **Owner (2026-10-04):** "start designing an new boat with a top deck and under deck and with more space."
+- **Proposal** (`Docs/Design/Boat2.md`, plan sheet `Docs/Design/Boat2_Plans.png`): 14 m on deck, 4.4 m beam, about 30 t;
+  transom stern with a raised quarterdeck and the wheel; a deckhouse with skylight and companionway; below deck a hold,
+  a saloon (table, bunks, stove, chart table) and a captain's cabin, 1.65 m clear under the beams, 2.45 m under the
+  deckhouse. Gaff main, staysail and jib; the same simple sailing.
+- **Technical plan:** a hull shape per boat (physics, collision, the sea's cut-out from MPC_Ocean), no underwater look
+  and no swimming inside the hull, walkable interior collision, light below deck.
+- **Next:** the owner's answers (rig, stern, helm, size, how the player gets it), then a walkable blockout.
