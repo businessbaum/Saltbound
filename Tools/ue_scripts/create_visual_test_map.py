@@ -63,6 +63,7 @@ rig = spawn(unreal.SaltLightingRig, (0, 0, 300), label="LightingRig")
 
 # --- ocean -------------------------------------------------------------------------------------------
 ocean = spawn(unreal.SaltOcean, (0, 0, 0), label="Ocean")
+ocean.set_editor_property("underwater_particle_count", 380)   # D31: more visible particles
 zone = unreal.SaltCalmZone()
 zone.set_editor_property("center", unreal.Vector2D(500, 300))
 zone.set_editor_property("inner_radius", 2500.0)

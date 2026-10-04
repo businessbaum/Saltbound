@@ -575,3 +575,17 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Tooling:** `Launch-Editor.ps1` refuses to start a second editor. A second instance had locked the
   content files, and saves failed with error 32 (sharing violation).
 - **Not verified visually by me** (owner's request); materials compile and the map builds.
+
+### D31 · Review round 3: visible particles, no sparkling pixels on distant crests (Adopted, awaiting owner review)
+- **Owner (2026-10-04):** "the particles under water are basically invisible, make them more visible";
+  "there are pixel errors in the distance at the top of the waves" (single bright, partly coloured pixels on
+  far crests).
+- **Particles:** size 1.2 → 2.2 cm, brightness ×3 (`Glow` 0.012), a crisper dot, 380 instead of 260.
+- **Distant crests:** highlight aliasing.
+  - The smaller sun (D30) and the sharper Rough crests made sub-pixel crests catch the full sun glint in
+    single pixels.
+  - The roughness cap now rises with distance (`MaxAlpha2` 0.004 near → `FarMaxAlpha2` 0.03 at
+    150 m).
+  - Far roughness 0.08 from 150 m (was 0.06 from 300 m); specular anti-aliasing may add up to 0.004
+    (was 0.001).
+  - Near highlights stay crisp. The crest glow fades to 10 % by 80 m (was 30 % at 120 m).

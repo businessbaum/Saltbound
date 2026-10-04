@@ -244,9 +244,13 @@ N = normalize(float3(N.xy, max(N.z, 0.08)));         // folded crest tips: keep 
 float3 dNx = ddx(N);
 float3 dNy = ddy(N);
 float Variance = SpecAAVariance * (dot(dNx, dNx) + dot(dNy, dNy));
-float BaseRough = lerp(WaterRoughness, FarRoughness, saturate(Dist / max(FarRoughnessDistance, 1.0)));
+float FarK = saturate(Dist / max(FarRoughnessDistance, 1.0));
+float BaseRough = lerp(WaterRoughness, FarRoughness, FarK);
 float Alpha2 = BaseRough * BaseRough * BaseRough * BaseRough + min(Variance, SpecAAMax) + SlopeVar * SlopeVarScale;
-float Rough = sqrt(sqrt(min(Alpha2, MaxAlpha2)));
+// The cap keeps near highlights crisp (D27); far away a crest is smaller than a pixel, so the cap rises and the
+// sun spreads over the pixel instead of sparking in single pixels (owner: "pixel errors at the top of the
+// waves in the distance", D31).
+float Rough = sqrt(sqrt(min(Alpha2, lerp(MaxAlpha2, FarMaxAlpha2, FarK))));
 
 // --- Reflection horizon occlusion (D26): where the reflected ray points at or below the horizon it would
 // hit the next wave; the ocean is not in the ray-tracing scene, so dim the reflectance there.
@@ -268,7 +272,7 @@ float Thin = saturate(CrestH * saturate(1.0 - Nm.z) * ThinScale) * saturate(1.5 
 float Forward = pow(saturate(dot(-V, L) * 0.6 + 0.4), SSSBacklitPower);
 float Facing = saturate(dot(Nm, V) * 1.5);
 float Glow = Thin * Forward * (0.35 + 0.65 * Facing) + SSSAmbient * CrestH * CrestH * Facing;
-Glow *= lerp(1.0, 0.3, saturate(Dist / max(SSSFarDistance, 1.0)));
+Glow *= lerp(1.0, 0.1, saturate(Dist / max(SSSFarDistance, 1.0)));
 float SunLum = dot(SunIllum, float3(0.2126, 0.7152, 0.0722));
 EmissiveOut = LookCrest.rgb * SunLum * (Glow * SSSStrength * LookCrest.a);
 // Diagnostics: DebugView 1 = magenta where reflections are occluded; 3 = slope variance.
@@ -285,15 +289,15 @@ SCALARS = {
     "TroughCalm": (0.2, "Waves"), "QuietAmount": (0.55, "Waves"), "QuietTile": (7000.0, "Waves"),
     "RippleFloor": (0.5, "Waves"),
     # surface
-    "WaterRoughness": (0.025, "Surface"), "FarRoughness": (0.06, "Surface"), "FarRoughnessDistance": (30000.0, "Surface"),
-    "SpecAAVariance": (0.03, "Surface"), "SpecAAMax": (0.001, "Surface"), "SlopeVarScale": (0.25, "Surface"),
-    "MaxAlpha2": (0.004, "Surface"),
+    "WaterRoughness": (0.025, "Surface"), "FarRoughness": (0.08, "Surface"), "FarRoughnessDistance": (15000.0, "Surface"),
+    "SpecAAVariance": (0.03, "Surface"), "SpecAAMax": (0.004, "Surface"), "SlopeVarScale": (0.25, "Surface"),
+    "MaxAlpha2": (0.004, "Surface"), "FarMaxAlpha2": (0.03, "Surface"),
     "Specular": (0.24, "Surface"), "HorizonOcclusion": (1.0, "Surface"), "HorizonOccTop": (0.08, "Surface"),
     "HorizonOccBottom": (0.0, "Surface"), "HorizonOccFloor": (0.2, "Surface"), "DebugView": (0.0, "Diagnostics"),
     # crest light (CrestStart / CrestRange are fractions of the sea height)
     "SSSStrength": (0.22, "Crest light"), "CrestStart": (0.15, "Crest light"), "CrestRange": (0.55, "Crest light"),
     "SSSBacklitPower": (2.5, "Crest light"), "SSSAmbient": (0.02, "Crest light"), "ThinScale": (6.0, "Crest light"),
-    "SSSFarDistance": (12000.0, "Crest light"),
+    "SSSFarDistance": (8000.0, "Crest light"),
 }
 
 VS_TEXTURES = ["Disp0", "Disp1", "DispPrev0", "DispPrev1"]
@@ -672,7 +676,7 @@ return Centre + (LocalPos.x * Right + LocalPos.y * Up) * S - WorldPos;
 PARTICLE_PS_CODE = """
 float D = length(UV - 0.5) * 2.0;
 float Dot = saturate(1.0 - D);
-Dot *= Dot;
+Dot = Dot * sqrt(Dot);
 float SunLum = dot(SunIllum, float3(0.2126, 0.7152, 0.0722));
 return Tint.rgb * (SunLum * Glow * Dot * Fade);
 """
@@ -701,9 +705,9 @@ def make_particle_material(mpc):
         link(c, "", t, "")
         axes.append(t)
     params = {"Box": sb_ue.scalar_param(m, "Box", 1200.0, -1300, 900, "Particles"),
-              "Size": sb_ue.scalar_param(m, "Size", 1.2, -1300, 960, "Particles"),
+              "Size": sb_ue.scalar_param(m, "Size", 2.2, -1300, 960, "Particles"),
               "Drift": sb_ue.vector_param(m, "Drift", (8.0, 3.0, 0.8, 0), -1300, 1020, "Particles"),
-              "Glow": sb_ue.scalar_param(m, "Glow", 0.004, -1300, 1100, "Particles"),
+              "Glow": sb_ue.scalar_param(m, "Glow", 0.012, -1300, 1100, "Particles"),
               "Tint": sb_ue.vector_param(m, "Tint", (0.8, 0.95, 0.9, 1), -1300, 1160, "Particles")}
     vs_in = ["D0", "D1", "D2", "R", "Box", "Drift", "Time", "CamPos", "Size", "Globals", "LocalPos", "WorldPos", "Right", "Up"]
     vs = custom(m, -1000, 300, "Underwater particles (placement, billboard)", PARTICLE_VS_CODE, vs_in, F3, [("FadeOut", F1)])
