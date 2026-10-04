@@ -227,7 +227,7 @@ for a higher screen percentage (for example 75 %) and more content.
   the key-scrap prompt with painted lettering, the hold (raising the anchor) with the ink soaking up through the key's
   scrap, the save sign in the corner, the launch intro (startup movie, any key skips), the satchel (leather bag, pressed pockets, the tag on twine), the stores (the satchel beside the open crate or the
   round barrel, items flying between them), the landfall banner for a new island (found within 300 m of its shore,
-  saved); the camera at 1.2 m. Next: icons, tool wheel (hold Q).
+  saved); the camera at 1.2 m. The item icons wait for the owner to decide the items. Next: the tool wheel (hold Q).
 - **D54 (awaiting the owner's check):** calm flags (a slow wave, no side-to-side swing with the boat's roll); the player
   1.4 m and slimmer; ladders climbed with W / S after taking hold with E, E lets go, off the bottom into the sea, over
   the top on board.

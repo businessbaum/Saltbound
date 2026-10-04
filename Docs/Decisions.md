@@ -1177,5 +1177,7 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     Cove"; north is +X). "· now on your chart" waits until the chart marks found places (spec).
   - `sb.Dev.Landfall <Id> [t] | reset`; tests `LandfallFoundOnce`, `LandfallSaved`, `LandfallBanner`, `LandfallRollsUp`.
     Inventory 25/25.
-- **Next (spec order):** the item icons from an icon booth,
-  the tool wheel (hold Q) with the held tools.
+- **Item icons (step 7): skipped (owner, 2026-10-05):** "these icons were only for testing and looks bad and need recreating.
+  i didnt even think which items are needed so maybe skip it". The test icons stay until the owner decides the items; the
+  icon booth (a show-only scene capture of each pickup) is not built.
+- **Next (spec order):** the tool wheel (hold Q) with the held tools.
