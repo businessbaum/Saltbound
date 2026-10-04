@@ -9,9 +9,12 @@
 #include "Engine/Texture2D.h"
 #include "Styling/CoreStyle.h"
 
+class UCanvasPanel;
+class UCanvasPanelSlot;
 class UMaterialInterface;
 class UOverlay;
 class UWidget;
+struct FSaltItemDef;
 
 /** The UI typefaces (SIL OFL, Tools/fonts/get_fonts.py): IM Fell English for names, titles, prompts and labels,
  *  Alegreya for descriptions, hints and counts. */
@@ -100,4 +103,17 @@ namespace SaltUI
 	 *  number. */
 	SALTBOUND_API UOverlay* CountCoin(UWidgetTree* Tree, UTextBlock** OutText, float Radius = 17.f);
 	SALTBOUND_API void SetCoinCount(UWidget* Coin, UTextBlock* Text, int32 Count);
+
+	/** Burned into wood (a store's count): dark brown letters, a little blurred at the edge, in a soft scorch. */
+	SALTBOUND_API UOverlay* Burn(UWidgetTree* Tree, const FText& Value, ESaltFace Face, float Size, ETextJustify::Type Justify);
+	/** Sets the text of every layer of a layered text (Deboss, Burn). */
+	SALTBOUND_API void SetLayeredText(UOverlay* Layers, const FText& Value);
+
+	/** Places a child of a centre-anchored full-screen canvas at 1080p design coordinates (the screen centre is 960, 540).
+	 *  A size of zero sizes it to its content. */
+	SALTBOUND_API UCanvasPanelSlot* At(UCanvasPanel* Canvas, UWidget* W, FVector2D Design, FVector2D Size, FVector2D Alignment = FVector2D::ZeroVector);
+
+	/** An item's icon (T_Icon_X) and the soft shadow made from it (T_UI_IconShadow_X, Tools/textures/gen_ui_parts.py). */
+	SALTBOUND_API UTexture2D* ItemIcon(const FSaltItemDef* Item);
+	SALTBOUND_API UTexture2D* ItemIconShadow(const FSaltItemDef* Item);
 }

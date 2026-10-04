@@ -10,31 +10,46 @@ USaltInventoryComponent::USaltInventoryComponent()
 	Slots[0] = { TEXT("RopeCoil"), 2 };
 }
 
-int32 USaltInventoryComponent::Add(FName Id, int32 Count)
+int32 USaltInventoryComponent::Add(FName Id, int32 Count, int32* OutFirstSlot)
 {
+	if (OutFirstSlot)
+	{
+		*OutFirstSlot = INDEX_NONE;
+	}
 	const FSaltItemDef* Def = SaltItems::Find(Id);
 	if (!Def || Count <= 0)
 	{
 		return 0;
 	}
 	int32 Left = Count;
-	// Top up stacks of the same item, then fill empty slots.
-	for (FSaltItemStack& S : Slots)
+	auto Took = [OutFirstSlot](int32 I)
 	{
+		if (OutFirstSlot && *OutFirstSlot == INDEX_NONE)
+		{
+			*OutFirstSlot = I;
+		}
+	};
+	// Top up stacks of the same item, then fill empty slots.
+	for (int32 I = 0; I < Slots.Num(); ++I)
+	{
+		FSaltItemStack& S = Slots[I];
 		if (Left > 0 && S.Id == Id && S.Count < Def->MaxStack)
 		{
 			const int32 N = FMath::Min(Left, Def->MaxStack - S.Count);
 			S.Count += N;
 			Left -= N;
+			Took(I);
 		}
 	}
-	for (FSaltItemStack& S : Slots)
+	for (int32 I = 0; I < Slots.Num(); ++I)
 	{
+		FSaltItemStack& S = Slots[I];
 		if (Left > 0 && S.IsEmpty())
 		{
 			const int32 N = FMath::Min(Left, Def->MaxStack);
 			S = { Id, N };
 			Left -= N;
+			Took(I);
 		}
 	}
 	const int32 Added = Count - Left;
@@ -96,14 +111,18 @@ void USaltInventoryComponent::InitStore(FName InStorageId, const FText& InName, 
 	Slots.SetNum(FMath::Max(InCapacity, 1));
 }
 
-int32 USaltInventoryComponent::MoveStack(int32 Index, USaltInventoryComponent* To)
+int32 USaltInventoryComponent::MoveStack(int32 Index, USaltInventoryComponent* To, int32 MaxCount, int32* OutToSlot)
 {
-	if (!To || To == this || !Slots.IsValidIndex(Index) || Slots[Index].IsEmpty())
+	if (OutToSlot)
+	{
+		*OutToSlot = INDEX_NONE;
+	}
+	if (!To || To == this || !Slots.IsValidIndex(Index) || Slots[Index].IsEmpty() || MaxCount <= 0)
 	{
 		return 0;
 	}
 	const FSaltItemStack Stack = Slots[Index];
-	const int32 Moved = To->Add(Stack.Id, Stack.Count);
+	const int32 Moved = To->Add(Stack.Id, FMath::Min(Stack.Count, MaxCount), OutToSlot);
 	if (Moved > 0)
 	{
 		Slots[Index].Count -= Moved;

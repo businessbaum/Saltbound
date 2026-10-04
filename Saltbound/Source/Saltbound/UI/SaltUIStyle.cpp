@@ -2,10 +2,13 @@
 
 #include "UI/SaltUIStyle.h"
 
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/SizeBox.h"
+#include "Core/SaltItems.h"
 #include "Engine/FontFace.h"
 #include "Fonts/CompositeFont.h"
 #include "Materials/MaterialInterface.h"
@@ -150,4 +153,80 @@ void SaltUI::SetCoinCount(UWidget* Coin, UTextBlock* Text, int32 Count)
 		Text->SetFont(Font(ESaltFace::AlegreyaBold, Count > 9 ? 17.f : 19.f));
 		Text->SetText(FText::AsNumber(Count));
 	}
+}
+
+UOverlay* SaltUI::Burn(UWidgetTree* Tree, const FText& Value, ESaltFace Face, float Size, ETextJustify::Type Justify)
+{
+	UOverlay* O = Tree->ConstructWidget<UOverlay>();
+	const EHorizontalAlignment HAlign = Justify == ETextJustify::Right ? HAlign_Right : Justify == ETextJustify::Center ? HAlign_Center : HAlign_Left;
+	// The scorch: outline-only layers of dark brown, widest and faintest first (Slate text cannot blur).
+	const float Grow[] = { 0.22f, 0.13f, 0.06f };
+	const float Alpha[] = { 0.07f, 0.11f, 0.16f };
+	for (int32 I = 0; I < 4; ++I)
+	{
+		UTextBlock* T = FaceText(Tree, Value, Face, Size, FLinearColor::White, Justify);
+		FSlateFontInfo F = T->GetFont();
+		if (I < 3)
+		{
+			F.OutlineSettings.OutlineSize = FMath::Max(1, FMath::RoundToInt(Size * Grow[I]));
+			F.OutlineSettings.OutlineColor = SRGB(60, 25, 5, Alpha[I]);
+			F.OutlineSettings.bSeparateFillAlpha = true;
+			T->SetColorAndOpacity(FSlateColor(FLinearColor(0.f, 0.f, 0.f, 0.f)));
+		}
+		else
+		{
+			// The letters (rgba 36/16/6 at 82 %), their edge a little blurred.
+			F.OutlineSettings.OutlineSize = 1;
+			F.OutlineSettings.OutlineColor = SRGB(40, 18, 6, 0.35f);
+			T->SetColorAndOpacity(FSlateColor(SRGB(36, 16, 6, 0.82f)));
+		}
+		T->SetFont(F);
+		UOverlaySlot* S = O->AddChildToOverlay(T);
+		S->SetHorizontalAlignment(HAlign);
+		S->SetVerticalAlignment(VAlign_Center);
+	}
+	return O;
+}
+
+void SaltUI::SetLayeredText(UOverlay* Layers, const FText& Value)
+{
+	for (int32 I = 0; Layers && I < Layers->GetChildrenCount(); ++I)
+	{
+		if (UTextBlock* T = Cast<UTextBlock>(Layers->GetChildAt(I)))
+		{
+			T->SetText(Value);
+		}
+	}
+}
+
+UCanvasPanelSlot* SaltUI::At(UCanvasPanel* Canvas, UWidget* W, FVector2D Design, FVector2D Size, FVector2D Alignment)
+{
+	UCanvasPanelSlot* S = Canvas->AddChildToCanvas(W);
+	S->SetAnchors(FAnchors(0.5f, 0.5f));
+	S->SetAlignment(Alignment);
+	S->SetPosition(Design - FVector2D(960.f, 540.f));
+	if (Size.X > 0.f)
+	{
+		S->SetSize(Size);
+	}
+	else
+	{
+		S->SetAutoSize(true);
+	}
+	return S;
+}
+
+UTexture2D* SaltUI::ItemIcon(const FSaltItemDef* Item)
+{
+	return Item && Item->Icon ? LoadObject<UTexture2D>(nullptr, Item->Icon) : nullptr;
+}
+
+UTexture2D* SaltUI::ItemIconShadow(const FSaltItemDef* Item)
+{
+	if (!Item || !Item->Icon)
+	{
+		return nullptr;
+	}
+	const FString Path = FString(Item->Icon).Replace(TEXT("T_Icon_"), TEXT("T_UI_IconShadow_"));
+	return LoadObject<UTexture2D>(nullptr, *Path);
 }

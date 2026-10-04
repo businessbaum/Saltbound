@@ -1141,5 +1141,26 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   ascent): the layout uses them so baselines land where the design puts them.
 - **The design pictures** were taken from the design page with its dark border: the frame sits ~9 px in and is 0.990 x
   0.997 the size. `Tools/ui_capture.py` undoes that, so the A/B sheets compare true 1080p positions.
-- **Next (spec order):** the stores (crate, then the round barrel), the landfall banner, the item icons from an icon booth,
+- **Stores (section 6):** the satchel beside the store on one screen (blurred world behind). Left, the satchel as a
+  leather panel with "SATCHEL" and its count debossed and 24 dishes (radius 44, 6 x 4); right, the store:
+  - **Crate:** the design's open chest, painted by its own code: the lid propped open behind with iron straps, hinges and
+    "CRATE" burned in, the box with its rim, iron L-plates, far and side walls, floor planks and dividers into 5 x 2
+    compartments. Its count ("2 / 10") is burned in under the name (a layered scorch: Slate text cannot blur).
+  - **Barrel (round, owner):** the design has no picture of it, so it is drawn in the same toolkit after the crate: an open
+    barrel seen from above (the opening an ellipse 0.7 of the circle) with bulging staves, two iron hoops and the staves'
+    tops, its head leaning behind with "BARREL" and the count burned in; inside, on a planked false bottom, a ring divider
+    and radial dividers make **3 compartments in the middle and 7 around**. Its items lie at 88 px (96 in the crate) so the
+    middle three fit their wedges.
+  - **Moving:** click moves the stack, Shift-click one (`USaltInventoryComponent::MoveStack` takes a most-count and says which
+    slot took it). The item flies on a quadratic arc in 0.25 s (eased out), growing as if lifted, with its shadow and its
+    coin; a dotted path (70 %, fading after the landing) and a dashed warm outline on the slot it goes to (the crate's
+    compartment, a ring for the barrel and the satchel). The side it flies to shows its old contents until the item
+    lands, which settles with a small drop. Arrows / d-pad move a cursor to the nearest slot in that direction (across
+    both sides), Enter / A move the stack, X one; E / Esc close ("Click: move the stack . Shift-click: move one . E close
+    the lid").
+  - The lids are part of the boat's merged mesh, so nothing swings open in the world (the spec asks only for a separate
+    lid).
+  - `sb.Dev.Store crate|barrel [demo [t]] | off` (demo: the design picture's contents with the floats in flight, held at t);
+    tests `StoreShiftMovesOne`, `StoreCounts`, `StoreCursor`, `StoreFlightLands`. Inventory 21/21.
+- **Next (spec order):** the landfall banner, the item icons from an icon booth,
   the tool wheel (hold Q) with the held tools.

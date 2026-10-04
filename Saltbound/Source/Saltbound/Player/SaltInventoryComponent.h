@@ -23,11 +23,13 @@ public:
 	FName GetStorageId() const { return StorageId; }
 	const FText& GetDisplayName() const { return DisplayName; }
 	int32 GetCapacity() const { return Slots.Num(); }
-	/** Moves as much of the stack in slot Index as fits into To; returns how many moved. */
-	int32 MoveStack(int32 Index, USaltInventoryComponent* To);
+	/** Moves as much of the stack in slot Index as fits into To (at most MaxCount: 1 for Shift-click); returns how many
+	 *  moved. OutToSlot: the first slot in To that took some (INDEX_NONE if none). */
+	int32 MoveStack(int32 Index, USaltInventoryComponent* To, int32 MaxCount = MAX_int32, int32* OutToSlot = nullptr);
 
-	/** Adds up to Count (filling stacks of the same item first); returns how many fitted. */
-	int32 Add(FName Id, int32 Count);
+	/** Adds up to Count (filling stacks of the same item first); returns how many fitted. OutFirstSlot: the first slot that
+	 *  took some (INDEX_NONE if none). */
+	int32 Add(FName Id, int32 Count, int32* OutFirstSlot = nullptr);
 	/** Removes up to Count; returns how many were removed. */
 	int32 Remove(FName Id, int32 Count);
 	int32 CountOf(FName Id) const;

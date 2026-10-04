@@ -44,6 +44,8 @@ namespace
 			bool bFlag = false;
 			FString OwnSlot;
 			ESaltBoatHold OwnHold = ESaltBoatHold::Moored;
+			TArray<FSaltItemStack> OwnSatchel;
+			TArray<FSaltItemStack> OwnCrate;
 		};
 		TSharedRef<FState> S = MakeShared<FState>();
 		S->World = World;
@@ -163,6 +165,28 @@ namespace
 					UGameplayStatics::DeleteGameInSlot(Saves->Slot, 0);
 					Saves->Slot = S->OwnSlot;
 					Boat->SetHold(S->OwnHold);
+					// A flight into the crate: under way at once, landed after its ~0.25 s.
+					S->OwnSatchel = P->GetInventory()->GetSlots();
+					S->OwnCrate = Boat->GetStore(true)->GetSlots();
+					P->GetInventory()->SetSlots({ { TEXT("GlassFloat"), 3 } });
+					Boat->GetStore(true)->SetSlots({ { TEXT("Driftwood"), 4 }, { TEXT("RopeCoil"), 1 } });
+					PC->OpenStore(Boat->GetStore(true));
+					USaltStoreWidget* SW = PC->GetStoreWidget();
+					S->bFlag = SW && SW->IsCrate() && SW->ClickSatchelSlot(0) == 3 && SW->IsFlying() && SW->GetFlightTargetSlot() == 2;
+					Next();
+				}
+				break;
+			case 7:
+				if (T > 0.4f)
+				{
+					USaltStoreWidget* SW = PC->GetStoreWidget();
+					const bool bLanded = SW && !SW->IsFlying();
+					const int32 InCrate = Boat->GetStore(true)->GetSlots().IsValidIndex(2) ? Boat->GetStore(true)->GetSlots()[2].Count : 0;
+					Report(TEXT("StoreFlightLands"), S->bFlag && bLanded && InCrate == 3,
+						FString::Printf(TEXT("flew to compartment 2=%d landed after 0.4 s=%d floats there=%d"), S->bFlag ? 1 : 0, bLanded ? 1 : 0, InCrate));
+					PC->CloseStore();
+					P->GetInventory()->SetSlots(S->OwnSatchel);
+					Boat->GetStore(true)->SetSlots(S->OwnCrate);
 					UE_LOG(LogSaltbound, Display, TEXT("SB_TEST InventorySuite DONE passed=%d failed=%d"), S->Passed, S->Failed);
 					return false;
 				}
@@ -315,6 +339,42 @@ namespace
 				&& Satchel->CountOf(TEXT("GlassFloat")) == 1 && Barrel->CountOf(TEXT("GlassFloat")) == 0,
 				FString::Printf(TEXT("open=%d intoBarrel=%d satchelThen=%d back=%d"), bStoreOpen ? 1 : 0, InBarrel, LeftInSatchel,
 					Satchel->CountOf(TEXT("GlassFloat"))));
+			// D55: Shift-click moves one, a click the rest of the stack (into the same compartment); it flies there, and the
+			// counts read "N / 24" and "M / 10".
+			if (SW)
+			{
+				Satchel->Add(TEXT("Seashell"), 5);
+				const int32 ShellSlot = Satchel->GetSlots().IndexOfByPredicate([](const FSaltItemStack& St) { return St.Id == TEXT("Seashell"); });
+				const int32 One = SW->ClickSatchelSlot(ShellSlot, true);
+				const int32 OneTarget = SW->GetFlightTargetSlot();
+				const bool bFlies = SW->IsFlying() && SW->IsFlyingToStore();
+				const int32 AfterOne = Barrel->CountOf(TEXT("Seashell"));
+				const int32 Rest = SW->ClickSatchelSlot(ShellSlot);
+				const int32 RestTarget = SW->GetFlightTargetSlot();
+				const int32 Back = SW->ClickStoreSlot(RestTarget, true);
+				const bool bBackFlies = SW->IsFlying() && !SW->IsFlyingToStore();
+				Report(TEXT("StoreShiftMovesOne"), One == 1 && AfterOne == 1 && Rest == 4 && RestTarget == OneTarget && Back == 1 && bFlies && bBackFlies
+					&& Satchel->CountOf(TEXT("Seashell")) == 1 && Barrel->CountOf(TEXT("Seashell")) == 4,
+					FString::Printf(TEXT("one=%d (barrel %d) rest=%d same compartment=%d back one=%d satchel=%d barrel=%d flies=%d/%d"), One, AfterOne, Rest,
+						RestTarget == OneTarget ? 1 : 0, Back, Satchel->CountOf(TEXT("Seashell")), Barrel->CountOf(TEXT("Seashell")), bFlies ? 1 : 0, bBackFlies ? 1 : 0));
+				int32 Pockets = 0;
+				for (const FSaltItemStack& St : Satchel->GetSlots())
+				{
+					Pockets += St.IsEmpty() ? 0 : 1;
+				}
+				const FString SatchelCount = SW->GetSatchelCountText().ToString(), StoreCount = SW->GetStoreCountText().ToString();
+				Report(TEXT("StoreCounts"), SatchelCount == FString::Printf(TEXT("%d / 24"), Pockets) && StoreCount == TEXT("1 / 10"),
+					FString::Printf(TEXT("satchel='%s' store='%s'"), *SatchelCount, *StoreCount));
+				Satchel->Remove(TEXT("Seashell"), 1);
+				Barrel->SetSlots({});
+				// The cursor crosses from the satchel's right column to the barrel and back.
+				SW->SetCursor(false, 5);
+				SW->MoveCursor(FVector2D(1.f, 0.f));
+				const bool bOnStore = SW->IsCursorOnStore();
+				SW->MoveCursor(FVector2D(-1.f, 0.f));
+				Report(TEXT("StoreCursor"), bOnStore && !SW->IsCursorOnStore(), FString::Printf(TEXT("right of dish 5 -> store=%d, back left -> satchel slot %d"),
+					bOnStore ? 1 : 0, SW->GetCursorSlot()));
+			}
 			PC->CloseStore();
 			Report(TEXT("StoreCloses"), !PC->IsStoreOpen() && !PC->bShowMouseCursor, FString::Printf(TEXT("open=%d"), PC->IsStoreOpen() ? 1 : 0));
 			Barrel->Add(TEXT("Seashell"), 2);
@@ -403,6 +463,43 @@ namespace
 			if (USaltSatchelWidget* W = PC->GetSatchel())
 			{
 				W->SelectSlot(6);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdStore(
+		TEXT("sb.Dev.Store"),
+		TEXT("Open a boat store: sb.Dev.Store crate|barrel [demo [t]] | off. demo fills the satchel and the store as in the design's ")
+		TEXT("picture and sends the three glass floats on their way (held at t of the arc, 0..1, when given; the design shows 0.4)."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ASaltPlayerController* PC = World ? Cast<ASaltPlayerController>(UGameplayStatics::GetPlayerController(World, 0)) : nullptr;
+			ASaltPlayerCharacter* P = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr;
+			ASaltBoat* Boat = nullptr;
+			for (TActorIterator<ASaltBoat> It(World); World && It; ++It) { Boat = *It; break; }
+			if (!PC || !P || !Boat)
+			{
+				return;
+			}
+			PC->CloseStore();
+			if (Args.Num() > 0 && Args[0] == TEXT("off"))
+			{
+				return;
+			}
+			PC->SetSatchelOpen(false);
+			USaltInventoryComponent* Store = Boat->GetStore(Args.Num() == 0 || Args[0] != TEXT("barrel"));
+			const bool bDemo = Args.Num() > 1 && Args[1] == TEXT("demo");
+			if (bDemo)
+			{
+				P->GetInventory()->SetSlots({ { TEXT("Driftwood"), 20 }, { TEXT("Driftwood"), 7 }, { TEXT("Seashell"), 30 }, { TEXT("Seashell"), 12 },
+					{ TEXT("RopeCoil"), 2 }, { TEXT("GlassFloat"), 3 }, { TEXT("AncientShard"), 1 } });
+				Store->SetSlots({ { TEXT("Driftwood"), 4 }, { TEXT("RopeCoil"), 1 } });
+			}
+			PC->OpenStore(Store);
+			USaltStoreWidget* W = PC->GetStoreWidget();
+			if (W && bDemo)
+			{
+				W->HoldFlightAt(Args.Num() > 2 ? FCString::Atof(*Args[2]) : -1.f);
+				W->ClickSatchelSlot(5);
 			}
 		}));
 

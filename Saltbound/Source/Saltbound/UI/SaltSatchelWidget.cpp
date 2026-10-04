@@ -70,40 +70,6 @@ namespace
 		return nullptr;
 	}
 
-	/** Places a child of a centre-anchored full-screen canvas at 1080p design coordinates (the screen centre is 960, 540). */
-	UCanvasPanelSlot* At(UCanvasPanel* Canvas, UWidget* W, FVector2D Design, FVector2D Size, FVector2D Alignment = FVector2D::ZeroVector)
-	{
-		UCanvasPanelSlot* S = Canvas->AddChildToCanvas(W);
-		S->SetAnchors(FAnchors(0.5f, 0.5f));
-		S->SetAlignment(Alignment);
-		S->SetPosition(Design - FVector2D(960.f, 540.f));
-		if (Size.X > 0.f)
-		{
-			S->SetSize(Size);
-		}
-		else
-		{
-			S->SetAutoSize(true);
-		}
-		return S;
-	}
-
-	UTexture2D* IconOf(const FSaltItemDef* Item)
-	{
-		return Item && Item->Icon ? LoadObject<UTexture2D>(nullptr, Item->Icon) : nullptr;
-	}
-
-	/** The blurred shadow made from the icon (Tools/textures/gen_ui_parts.py): T_Icon_X -> T_UI_IconShadow_X. */
-	UTexture2D* ShadowOf(const FSaltItemDef* Item)
-	{
-		if (!Item || !Item->Icon)
-		{
-			return nullptr;
-		}
-		const FString Path = FString(Item->Icon).Replace(TEXT("T_Icon_"), TEXT("T_UI_IconShadow_"));
-		return LoadObject<UTexture2D>(nullptr, *Path);
-	}
-
 	// Pocket layout at 1080p (section 5): 8 x 3, centres x = 401 + 124 col, y = 616 + 140 row; the tag's hole at (1498, 540).
 	FVector2D PocketCentre(int32 I) { return FVector2D(401.f + 124.f * (I % 8), 616.f + 140.f * (I / 8)); }
 	const FVector2D TagHole(1498.f, 540.f);
@@ -199,10 +165,10 @@ void USaltItemSlotWidget::Show(const FSaltItemDef* Item, int32 Count, bool bInSe
 	bSelected = bInSelected;
 	bHasItem = Item != nullptr;
 	bAncient = Item && Item->Id == TEXT("AncientShard");
-	if (UTexture2D* Icon = IconOf(Item))
+	if (UTexture2D* Icon = ItemIcon(Item))
 	{
 		IconImage->SetBrush(ImageBrush(Icon, FVector2D(96.f, 96.f)));
-		UTexture2D* Shadow = ShadowOf(Item);
+		UTexture2D* Shadow = ItemIconShadow(Item);
 		IconShadow->SetBrush(ImageBrush(Shadow, FVector2D(96.f, 96.f)));
 		IconShadow->SetVisibility(Shadow ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 		IconImage->SetVisibility(ESlateVisibility::HitTestInvisible);
