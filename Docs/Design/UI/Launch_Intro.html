@@ -26,9 +26,9 @@ body.solo .wrap>*:not(canvas){display:none}
 body.solo canvas{width:1920px;border-radius:0}
 </style>
 <div class="wrap">
-  <header><h1>The knot becomes the name</h1><p class="lede">The launch intro, 8 seconds. The knotted ring inks in and finds north. Its compass points fly out and burst into the letters, ink from the knot becomes the S, and the knot's rope ends grow on into the underline.</p></header>
+  <header><h1>The knot becomes the name</h1><p class="lede">The launch intro, 8.5 seconds. The knotted ring inks in and finds north. Its compass points burst into the letters, the ring's big rope grows into the underline, and the finished title glides up into its place in the start menu.</p></header>
   <canvas id="c-intro" width="1920" height="1080"></canvas>
-  <div class="ctl"><button type="button" id="replay">Replay</button><input type="range" id="scrub" min="0" max="800" value="0" aria-label="Scrub through the intro"><output id="tlabel">0.00 s</output></div>
+  <div class="ctl"><button type="button" id="replay">Replay</button><input type="range" id="scrub" min="0" max="850" value="0" aria-label="Scrub through the intro"><output id="tlabel">0.00 s</output></div>
   <ol id="story"></ol>
 </div>
 <script>
@@ -460,9 +460,9 @@ function knotLayer(size,R,o={}){const cv=canvas(size,size),c=cv.getContext('2d')
     const n=Math.round((a1-a0)/TAU*84),st=(a1-a0)/n,f=((phase%1)+1)%1;inkS(2.4);
     for(let i=-1;i<=n;i++){const a=a0+(i+f)*st;if(a<a0||a+.07>a1)continue;if(!((a+.07<=a0+sp)||(a>=a1-sp)))continue;c.beginPath();c.moveTo(x+Math.cos(a)*(r-t),y+Math.sin(a)*(r-t));c.lineTo(x+Math.cos(a+.07)*r,y+Math.sin(a+.07)*r);c.stroke()}}
   // the knot: whipped ends and the crossing below the gap
-  if(knotA>0){c.save();c.globalAlpha=knotA;const mid=r-t/2,slide=pull*3*k;
-    [[a0,1],[a1,-1]].forEach(([a,d])=>{c.save();c.translate(x+Math.cos(a)*mid,y+Math.sin(a)*mid);c.rotate(d>0?-.5:.5);c.translate(0,slide);const bw=(o.ringW||1);const band=rr(-7.5*k*bw,-3*k,15*k*bw,22*k,3*k);erase(band);inkS(2.4);c.stroke(band);c.beginPath();[4,9,14].forEach(v=>{c.moveTo(-7.5*k*bw,v*k);c.lineTo(7.5*k*bw,v*k)});c.stroke();c.restore()});
-    inkS(7);const cy2=y+R*(1.02-.05*pull);c.beginPath();c.moveTo(x-R*.32,y+R*.84);c.quadraticCurveTo(x,cy2,x+R*(.2+.03*pull),y+R*.74);c.moveTo(x+R*.32,y+R*.84);c.quadraticCurveTo(x,cy2,x-R*(.2+.03*pull),y+R*.74);c.stroke();c.restore()}
+  if(knotA>0){c.save();const mid=r-t/2,slide=pull*3*k;c.globalAlpha=knotA*(o.bands??1);
+    [[a0,1],[a1,-1]].forEach(([a,d])=>{if((o.bands??1)<=0)return;c.save();c.translate(x+Math.cos(a)*mid,y+Math.sin(a)*mid);c.rotate(d>0?-.5:.5);c.translate(0,slide);const bw=(o.ringW||1);const band=rr(-7.5*k*bw,-3*k,15*k*bw,22*k,3*k);erase(band);inkS(2.4);c.stroke(band);c.beginPath();[4,9,14].forEach(v=>{c.moveTo(-7.5*k*bw,v*k);c.lineTo(7.5*k*bw,v*k)});c.stroke();c.restore()});
+    c.globalAlpha=knotA*(o.cross??1);inkS(7);const cy2=y+R*(1.02-.05*pull);c.beginPath();c.moveTo(x-R*.32,y+R*.84);c.quadraticCurveTo(x,cy2,x+R*(.2+.03*pull),y+R*.74);c.moveTo(x+R*.32,y+R*.84);c.quadraticCurveTo(x,cy2,x-R*(.2+.03*pull),y+R*.74);c.stroke();c.restore()}
   // the rose (turned by angle); ink fills in point by point when rose < 1: the shard first, then clockwise
   if(roseT>0){const s=(110-30)/150*k,cx=x,cy=y-4*k;c.save();c.translate(cx,cy);c.rotate(ang);
     const order=[0,1,2,3,4,5,6,7],part=i=>clamp(roseT*8-i);
@@ -502,7 +502,7 @@ function drawSign(c,x,y,d,t,alpha=1){const P=.7,kk=Math.floor(t/P),u=(t%P)/P,e=1
 const SX=1832,SY=992,SD=96; /* 1080p: centre 88 px from the right, 88 px from the bottom; drawn 96 px (ring about 72 px across) */
 function checker(c,x,y,w,h,n=16){for(let j=0;j<h/n;j++)for(let i=0;i<w/n;i++){c.fillStyle=(i+j)%2?'#2a3238':'#3a444b';c.fillRect(x+i*n,y+j*n,n,n)}}
 /* ===== launch intro: the knotted ring becomes the O of SALTBOUND ===== */
-const DUR=8.0,FPS=30;
+const DUR=8.5,FPS=30;
 const E={out3:u=>1-(1-u)**3,io3:u=>u<.5?4*u*u*u:1-(-2*u+2)**3/2,back:u=>{const c1=1.70158,c3=c1+1;return 1+c3*(u-1)**3+c1*(u-1)**2}};
 const seg=(t,a,b)=>clamp((t-a)/(b-a));
 const lerp=(a,b,u)=>a+(b-a)*u;
@@ -588,14 +588,20 @@ function knotExtPath(cx,cy,R,d,endX){const p0=[cx+d*.32*R,cy+.84*R],ux=d*.872,uy
 function extPass(c,pts,w,k,dark){if(pts.length<2)return;c.save();c.lineCap='round';c.lineJoin='round';c.beginPath();pts.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));
   if(dark){const rim=Math.max(.9,1.6*k);c.lineWidth=w+rim*2;c.strokeStyle='rgba(18,10,4,.72)';c.shadowBlur=Math.max(5,10*k);c.shadowColor='rgba(0,0,0,.85)'}else{c.lineWidth=w;c.strokeStyle=EXTCOL}c.stroke();c.restore()}
 let EXTCOL='#d8bb83';
+/* the ring's big rope grows on from its whipped ends: it dips inward, curves down and flares out into the underline (an omega's feet) */
+function omegaPath(cx,cy,R,t,d,endX){const a=d<0?Math.PI*.62:Math.PI*.38,rc=R-t/2,p0=[cx+Math.cos(a)*rc,cy+Math.sin(a)*rc],T=d<0?[Math.sin(a),-Math.cos(a)]:[-Math.sin(a),Math.cos(a)];
+  const ry=cy+1.42*R,c1=[p0[0]+T[0]*.14*R,p0[1]+T[1]*.14*R],c2=[p0[0]-d*.02*R,ry],p3=[p0[0]+d*.32*R,ry],pts=[];
+  for(let i=0;i<=24;i++){const u=i/24,m=1-u;pts.push([m*m*m*p0[0]+3*m*m*u*c1[0]+3*m*u*u*c2[0]+u*u*u*p3[0],m*m*m*p0[1]+3*m*m*u*c1[1]+3*m*u*u*c2[1]+u*u*u*p3[1]])}pts.push([endX,ry]);return pts}
+/* where the title ends: its place in the start menu (1080p) */
+const MENU={x:115,y:252,s:.56};let NOBG=false;
 /* one frame at time t */
-function introFrame(c,fg,t){background(c,t);const f=fg.getContext('2d');f.clearRect(0,0,W,H);const Wd=WORD,{tr,R,cx,cy,k}=roseState(t);
+function introFrame(c,fg,t){if(NOBG)c.clearRect(0,0,W,H);else background(c,t);const f=fg.getContext('2d');f.clearRect(0,0,W,H);const Wd=WORD,{tr,R,cx,cy,k}=roseState(t);
   const spinU=seg(t,1.9,3.0),ang=t<1.9?0:(1-E.back(spinU))*-4*Math.PI;
   const flash=t<3.0?0:Math.exp(-(t-3.0)*3.2)*(t<3.06?(t-3.0)/.06:1),turq=E.out3(seg(t,3.0,3.4)),breathe=t>6.2?.18+.12*Math.sin((t-6.2)*2.4):0;
   const gone=new Set(LAUNCH.filter(kk=>t>=LAUNCH_T(kk)));
-  const o={knot:seg(t,.35,.6),ring:seg(t,.45,1.45),rose:seg(t,1.2,1.9),angle:ang,noShard:true,roseAtCenter:true,col:'#fff',weight:lerp(1,2.1,tr),ringW:lerp(1,1.75,tr),skip:gone};
-  const pay=E.out3(seg(t,4.0,4.95)),armW=7*k*lerp(1,2.1,tr),ext=pay>0?[[-1,Wd.left-34],[1,Wd.right+34]].map(([d,end])=>partial(knotExtPath(cx,cy,R,d,end),pay)):[];ext.forEach(p=>extPass(f,p,armW,k,true));
-  const size=Math.ceil(R*2.7+40),Lr=knotLayer(size,R,o),P=paint(Lr,k);f.drawImage(P,cx-size/2,cy-size/2-4*k);ext.forEach(p=>extPass(f,p,armW,k,false));
+  const o={knot:seg(t,.35,.6),cross:1-seg(t,3.9,4.15),bands:t<4.08?1:0,ring:seg(t,.45,1.45),rose:seg(t,1.2,1.9),angle:ang,noShard:true,roseAtCenter:true,col:'#fff',weight:lerp(1,2.1,tr),ringW:lerp(1,1.75,tr),skip:gone};
+  const pay=E.out3(seg(t,4.08,5.0)),ringT=15*k*lerp(1,1.75,tr),ropeLW=Math.max(1.2,2.4*k*lerp(1,2.1,tr)),ext=t>=4.08?[[-1,Wd.left-34],[1,Wd.right+34]].map(([d,end])=>partial(omegaPath(cx,cy,R,ringT,d,end),Math.max(pay,.004))):[];
+  const size=Math.ceil(R*2.7+40),Lr=knotLayer(size,R,o),P=paint(Lr,k);f.drawImage(P,cx-size/2,cy-size/2-4*k);ext.forEach(p=>ropeExt(f,p,ringT,ropeLW,Math.max(k,.5)));
   const sp=seg(t,1.2,1.2+1/8*.7);if(sp>0){const col=mixCol([243,226,191],[110,240,222],turq);f.save();f.globalAlpha=sp;drawShard(f,cx,cy-4*k,R,ang,col,Math.max(flash,breathe,turq*.35));f.restore();
     if(gone.size){f.save();f.globalAlpha=seg(t,3.6,4.0);f.fillStyle='#120a04';f.beginPath();f.arc(cx,cy-4*k,Math.max(3,5*k),0,TAU);f.fill();f.fillStyle='#f2e2bf';f.beginPath();f.arc(cx,cy-4*k,Math.max(2,3.4*k),0,TAU);f.fill();f.restore()}}
   if(flash>0&&t<4){const rr2=230+(t-3.0)*560;f.save();f.globalAlpha=flash*.55;f.strokeStyle='#8ff7e8';f.lineWidth=2.5;f.shadowBlur=18;f.shadowColor='rgba(90,230,210,.9)';f.beginPath();f.arc(960,460,rr2,0,TAU);f.stroke();f.restore()}
@@ -605,12 +611,12 @@ function introFrame(c,fg,t){background(c,t);const f=fg.getContext('2d');f.clearR
   // the rope's end curls into the S
   {const m=seg(t,4.12,4.12+.88);if(m>0&&m<1)particles(f,0,PSRC[0],m,300);const la=sstep(.62,1,m);if(la>0){f.save();f.globalAlpha=la;titleLetter(f,'S',Wd.L[0].cx,Wd.base,Wd.S);f.restore()}}
   const sh=seg(t,5.5,6.4);if(sh>0&&sh<1){const x=lerp(Wd.left-300,Wd.right+300,E.io3(sh));f.save();f.globalCompositeOperation='source-atop';const g=f.createLinearGradient(x-160,0,x+160,0);g.addColorStop(0,'rgba(255,250,235,0)');g.addColorStop(.5,'rgba(255,250,235,.55)');g.addColorStop(1,'rgba(255,250,235,0)');f.fillStyle=g;f.fillRect(0,0,W,H);f.restore()}
-  c.drawImage(fg,0,0);
-  const fade=seg(t,0,.6);if(fade<1){c.fillStyle=`rgba(0,0,0,${1-fade})`;c.fillRect(0,0,W,H)}}
+  const mv=E.io3(seg(t,6.6,7.6)),p0x=Wd.left-34,p0y=Wd.base,sc=lerp(1,MENU.s,mv);c.save();c.translate(lerp(p0x,MENU.x,mv),lerp(p0y,MENU.y,mv));c.scale(sc,sc);c.translate(-p0x,-p0y);c.drawImage(fg,0,0);c.restore();
+  if(NOBG)return;const fade=seg(t,0,.6);if(fade<1){c.fillStyle=`rgba(0,0,0,${1-fade})`;c.fillRect(0,0,W,H)}}
 const STORY=[[0,.6,'Fade up from black: a deep sea-night, drifting mist, salt specks rising'],[.35,1.45,'The knot inks in, then the rope ring draws itself up from both ends'],[1.2,1.9,'The rose inks in, the shard first, then point by point'],
   [1.9,3.0,'The rose spins two turns and settles on north with an overshoot'],[3.0,3.4,'The shard flashes and stays turquoise; a ring of light runs out'],[3.3,4.4,'The ring shrinks and glides into place as the O'],
   [3.55,4.85,'Seven compass points break off one by one and fly out in arcs, turning upright and growing'],[4.0,5.1,'Each point bursts into ink that swirls into its letter: B U, T N, L D, A'],
-  [4.0,4.95,'The knot\'s two free rope ends grow on, seamlessly, curving down and out into the underline'],[4.12,5.0,'Ink flows off the knot and flies left to become the S (the knot stays tied)'],[5.5,6.4,'A sheen of light sweeps across the word'],[6.4,8.0,'Hold; the shard breathes softly. Then the game.']];
+  [3.9,5.0,'The small crossing rope fades; the ring\'s big rope grows on from its whipped ends, dips, and flares out into the underline'],[4.12,5.0,'Ink flows off the knot and flies left to become the S (the knot stays tied)'],[5.5,6.4,'A sheen of light sweeps across the word'],[6.4,6.6,'A short hold'],[6.6,7.6,'The title glides up and shrinks into its place in the start menu'],[7.6,8.5,'Held at the menu position; the menu can appear around it']];
 (async()=>{
   const solo=location.hash.slice(1),fm=/^f(\d+)$/.exec(solo);
   await new Promise(r=>{const l=document.querySelector('link[rel=stylesheet]');if(!l||l.sheet)return r();l.addEventListener('load',r);l.addEventListener('error',r);setTimeout(r,4000)});
@@ -621,6 +627,7 @@ const STORY=[[0,.6,'Fade up from black: a deep sea-night, drifting mist, salt sp
   [0,1,2,3,4,6,7,8].forEach(li=>GLYPH[li]=sampleGlyph(WORD.L[li].ch,WORD.S,NP,40+li));
   LAUNCH.forEach(kk=>PSRC[POINT_TO_LETTER[kk]]=kiteSource(kk));PSRC[0]=knotSource();
   if(fm){document.body.classList.add('solo');introFrame(c,fg,+fm[1]/FPS);document.body.dataset.ready='1';return}
+  if(solo==='title'){document.body.classList.add('solo');document.body.style.background='transparent';cv.style.background='transparent';NOBG=true;introFrame(c,fg,DUR);document.body.dataset.ready='1';return}
   const sb=document.getElementById('scrub'),out=document.getElementById('tlabel'),list=document.getElementById('story');sb.max=Math.round(DUR*100);
   list.innerHTML=STORY.map(([a,b,s])=>`<li><span>${a.toFixed(2)}–${b.toFixed(2)} s</span>${s}</li>`).join('');
   let t0=performance.now(),playing=!matchMedia('(prefers-reduced-motion: reduce)').matches&&solo!=='still';
