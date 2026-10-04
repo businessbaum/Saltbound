@@ -112,12 +112,14 @@ ASaltLightingRig::ASaltLightingRig()
 	Day.SkyLightTint = FLinearColor(0.8f, 0.92f, 1.15f);
 	Day.RayleighScale = 0.045f;
 	Day.MieScale = 0.0018f;
-	// Low-lying haze: thin near sea level (keeps the sky blue overhead), fades far islands into the horizon.
-	Day.FogDensity = 0.01f;
+	// Sea haze (D49, owner: "add fog, so you cant look infinite in the distance"): the horizon dissolves into a pale band,
+	// the spire 420 m out is softened, Ruin Isle (1.7 km) shows faintly and comes out of the haze as you sail closer, the
+	// far islands are ghosts. The sky atmosphere lights the fog (its colours here are small luminances on top).
+	Day.FogDensity = 0.035f;
 	Day.FogHeightFalloff = 0.2f;
 	Day.FogInscattering = FLinearColor(0.35f, 0.55f, 0.85f);
 	Day.FogDirectionalInscattering = FLinearColor(0.75f, 0.62f, 0.42f);
-	Day.FogStartDistance = 4000.f;
+	Day.FogStartDistance = 3000.f;
 	Day.Saturation = 1.12f;
 	Day.Contrast = 1.08f;
 	Day.ShadowGain = FLinearColor(0.9f, 0.96f, 1.1f);
@@ -132,7 +134,7 @@ ASaltLightingRig::ASaltLightingRig()
 	Evening.SunYaw = 160.f;
 	Evening.SunTemperature = 5600.f;
 	Evening.SkyLightIntensity = 0.8f;
-	Evening.FogDensity = 0.025f;
+	Evening.FogDensity = 0.05f;
 	Evening.FogHeightFalloff = 0.09f;
 	Evening.FogInscattering = FLinearColor(0.16f, 0.19f, 0.26f);
 	Evening.FogDirectionalInscattering = FLinearColor(0.9f, 0.48f, 0.28f);
@@ -157,7 +159,7 @@ ASaltLightingRig::ASaltLightingRig()
 	Dusk.SunYaw = 160.f;
 	Dusk.SunTemperature = 6000.f;
 	Dusk.SkyLightIntensity = 1.0f;
-	Dusk.FogDensity = 0.012f;
+	Dusk.FogDensity = 0.035f;
 	Dusk.FogHeightFalloff = 0.1f;
 	Dusk.FogInscattering = FLinearColor(0.08f, 0.1f, 0.16f);
 	Dusk.FogDirectionalInscattering = FLinearColor(0.12f, 0.08f, 0.07f);

@@ -1311,7 +1311,7 @@ void ASaltBoat::PushOceanMask(bool bEnable)
 	FVector2D P[16];
 	float S[16];
 	P[0] = FVector2D(GetActorTransform().TransformPosition(FVector(-470.0, 0.0, 0.0)));
-	S[0] = bEnable ? FMath::Clamp((float)V.Size2D() / 2.5f, 0.f, 1.f) * WakeStrength : 0.f;
+	S[0] = bEnable ? TrailStrengthAt((float)V.Size2D()) * WakeStrength : 0.f;
 	for (int32 K = 1; K < 16; ++K)
 	{
 		const bool bHas = TrailPoints.IsValidIndex(K - 1);
@@ -1359,13 +1359,20 @@ void ASaltBoat::UpdateTrail(float DeltaSeconds)
 	{
 		TrailClock = TrailPoints.Num() == 0 ? 0.f : FMath::Fmod(TrailClock, 1.f);
 		TrailPoints.Insert(FVector2D(GetActorTransform().TransformPosition(FVector(-470.0, 0.0, 0.0))), 0);
-		TrailStrength.Insert(FMath::Clamp((float)V.Size2D() / 2.5f, 0.f, 1.f), 0);
+		TrailStrength.Insert(TrailStrengthAt((float)V.Size2D()), 0);
 		TrailPoints.SetNum(FMath::Min(TrailPoints.Num(), 15));
 		TrailStrength.SetNum(TrailPoints.Num());
 	}
 	// The wake's reach eases (it would otherwise step back by one sample spacing each second) and stops at 40 m, where
 	// the Kelvin wake has faded anyway.
 	WakeExtentShown = FMath::FInterpTo(WakeExtentShown, FMath::Min(GetWakeExtent(), 40.f), DeltaSeconds, 3.f);
+}
+
+float ASaltBoat::TrailStrengthAt(float SpeedMs)
+{
+	// 0 at rest .. 1 at about top speed (4 m/s, 7.8 kn): a slow boat leaves a thin, sparse trail, a fast one a broad
+	// dense one (D49).
+	return FMath::Clamp(SpeedMs / 4.f, 0.f, 1.f);
 }
 
 void ASaltBoat::ClearTrail()

@@ -952,3 +952,16 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   thinning foam fades instead of losing lace cells.
 - **Tests:** `Tools/swim_test.py` 5/5 (new: hover at depth); `sb.Dev.RunBoatTests` (new: the wake starts at the boat,
   1.5 m after 0.5 s; reach 35-40 m after a long straight run).
+
+### D49 · Sea haze; the wake follows the speed (Adopted)
+- **Owner (2026-10-04):** "trail waves and particle count should be based on speed." / "add fog in the vision, so you
+  cant look infinite in the distance."
+- **Haze:** day fog density 0.01 -> 0.035 (starting at 30 m), evening 0.025 -> 0.05, dusk 0.012 -> 0.035. The horizon
+  dissolves into a pale band, the spire 420 m out is softened, Ruin Isle (1.7 km) shows faintly from the cove and comes
+  out of the haze on the way, the far islands are ghosts. Finding: the fog's colour values hardly matter, because the
+  sky atmosphere lights the height fog (they are small luminances on top); the old blue fog read as more sea and sky.
+  The engine's extinction is weaker than its formula suggests (20x density still left the spire faintly visible), so
+  the densities were set by A/B captures.
+- **Wake by speed:** the trail's strength is the boat's speed over its top speed (4 m/s), no longer full from 2.5 m/s:
+  it sets the trail's density (how many foam patches), its starting width (0.4 m slow, 1 m at top speed) and the slick.
+  The bow's white water and all wave heights already grow with the square of the speed.

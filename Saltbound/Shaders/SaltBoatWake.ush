@@ -160,7 +160,8 @@ struct FSaltBoatWake
 		return k == 0 ? 0.0 : (float)(k - 1) + Frac;
 	}
 
-	// Trail coverage at XY (cm): a band behind the stern, about 1 m either side at first, widening by 0.2 m a second.
+	// Trail coverage at XY (cm): a band behind the stern, widening by 0.2 m a second; its strength (the boat's speed
+	// there, 0..1 at top speed) sets how dense it is and how wide it starts (0.4 m slow .. 1 m at top speed, D49).
 	// It fades out smoothly from 5 s and is gone by 13.5 s, before the oldest sample (14-15 s) is dropped: the end of
 	// the trail never vanishes a segment at a time (owner, D48).
 	float Trail(float2 XY)
@@ -177,8 +178,9 @@ struct FSaltBoatWake
 			const float t = saturate(dot(XY - A, AB) / max(dot(AB, AB), 1.0));
 			const float d = length(XY - (A + AB * t)) * 0.01;
 			const float Age = lerp(TrailAge(k), TrailAge(k + 1), t);
-			const float W = 0.9 + 0.2 * Age;
-			Cov = max(Cov, lerp(Ts[k], Ts[k + 1], t) * exp(-(d / W) * (d / W)) * (1.0 - smoothstep(5.0, 13.5, Age)));
+			const float S = lerp(Ts[k], Ts[k + 1], t);
+			const float W = (0.4 + 0.6 * S) * (1.0 + 0.22 * Age);
+			Cov = max(Cov, S * exp(-(d / W) * (d / W)) * (1.0 - smoothstep(5.0, 13.5, Age)));
 		}
 		return Cov;
 	}

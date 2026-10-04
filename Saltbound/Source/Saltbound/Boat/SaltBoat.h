@@ -315,6 +315,7 @@ private:
 	FVector RudderFoilPoint() const;
 	void UpdateTrail(float DeltaSeconds);
 	void ClearTrail();
+	static float TrailStrengthAt(float SpeedMs);
 	void UpdateBoomCapsule();
 	void UpdateRopes(float DeltaSeconds);
 	void UpdateAnchor(float DeltaSeconds);
