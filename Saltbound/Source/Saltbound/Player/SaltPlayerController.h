@@ -9,6 +9,7 @@
 class USaltInputConfig;
 class USaltHUDWidget;
 class USaltMenuWidget;
+class USaltSatchelWidget;
 
 UCLASS()
 class SALTBOUND_API ASaltPlayerController : public APlayerController
@@ -33,6 +34,11 @@ public:
 	bool IsMenuOpen() const;
 	USaltMenuWidget* GetMenu() const { return MenuWidget; }
 
+	/** The satchel (D50): inventory and map. The world goes on while it is open. Page: 0 inventory, 1 map. */
+	void SetSatchelOpen(bool bOpen, int32 Page = 0);
+	bool IsSatchelOpen() const;
+	USaltSatchelWidget* GetSatchel() const { return SatchelWidget; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -40,6 +46,12 @@ protected:
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<USaltMenuWidget> MenuWidget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USaltSatchelWidget> SatchelWidget;
+
+	void OpenInventory() { SetSatchelOpen(true, 0); }
+	void OpenMap() { SetSatchelOpen(true, 1); }
 
 	UPROPERTY(Transient)
 	TObjectPtr<USaltInputConfig> InputConfig;

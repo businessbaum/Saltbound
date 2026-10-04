@@ -1,0 +1,88 @@
+// Saltbound - the player's satchel (D50): a fixed number of slots holding item stacks.
+
+#include "Player/SaltInventoryComponent.h"
+
+USaltInventoryComponent::USaltInventoryComponent()
+{
+	PrimaryComponentTick.bCanEverTick = false;
+	Slots.SetNum(Capacity);
+	// Starting gear: two coils of rope.
+	Slots[0] = { TEXT("RopeCoil"), 2 };
+}
+
+int32 USaltInventoryComponent::Add(FName Id, int32 Count)
+{
+	const FSaltItemDef* Def = SaltItems::Find(Id);
+	if (!Def || Count <= 0)
+	{
+		return 0;
+	}
+	int32 Left = Count;
+	// Top up stacks of the same item, then fill empty slots.
+	for (FSaltItemStack& S : Slots)
+	{
+		if (Left > 0 && S.Id == Id && S.Count < Def->MaxStack)
+		{
+			const int32 N = FMath::Min(Left, Def->MaxStack - S.Count);
+			S.Count += N;
+			Left -= N;
+		}
+	}
+	for (FSaltItemStack& S : Slots)
+	{
+		if (Left > 0 && S.IsEmpty())
+		{
+			const int32 N = FMath::Min(Left, Def->MaxStack);
+			S = { Id, N };
+			Left -= N;
+		}
+	}
+	const int32 Added = Count - Left;
+	if (Added > 0)
+	{
+		OnChanged.Broadcast();
+	}
+	return Added;
+}
+
+int32 USaltInventoryComponent::Remove(FName Id, int32 Count)
+{
+	int32 Left = Count;
+	for (int32 I = Slots.Num() - 1; I >= 0 && Left > 0; --I)
+	{
+		FSaltItemStack& S = Slots[I];
+		if (S.Id == Id && S.Count > 0)
+		{
+			const int32 N = FMath::Min(Left, S.Count);
+			S.Count -= N;
+			Left -= N;
+			if (S.Count <= 0)
+			{
+				S = FSaltItemStack();
+			}
+		}
+	}
+	const int32 Removed = Count - Left;
+	if (Removed > 0)
+	{
+		OnChanged.Broadcast();
+	}
+	return Removed;
+}
+
+int32 USaltInventoryComponent::CountOf(FName Id) const
+{
+	int32 N = 0;
+	for (const FSaltItemStack& S : Slots)
+	{
+		N += S.Id == Id ? S.Count : 0;
+	}
+	return N;
+}
+
+void USaltInventoryComponent::SetSlots(const TArray<FSaltItemStack>& InSlots)
+{
+	Slots = InSlots;
+	Slots.SetNum(Capacity);
+	OnChanged.Broadcast();
+}

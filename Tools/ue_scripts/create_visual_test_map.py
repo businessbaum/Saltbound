@@ -177,6 +177,29 @@ gulls_isle = spawn(unreal.SaltBirds, (ISLE[0], ISLE[1], 0), label="Gulls_RuinIsl
 gulls_isle.set_editor_property("count", 6)
 gulls_isle.set_editor_property("seed", 33)
 gulls_isle.set_editor_property("area_radius", 6000.0)
+# --- Pickups (D50): driftwood, shells and a glass float on the cove's beach, more on Ruin Isle, and the ancient shard in
+# front of the gateway. Each lies on the sand (traced); its mesh is set here too (the editor does not re-run the
+# actor's construction after its item is set).
+P = "/Game/Saltbound/Props/Pickups/SM_Pickup_"
+dx, dy = math.cos(math.radians(200)), math.sin(math.radians(200))
+PICKUPS = [
+    ("Cove_Driftwood_1", "Driftwood", (-2400, -900), 30), ("Cove_Driftwood_2", "Driftwood", (-2700, 1500), 110),
+    ("Cove_Seashell_1", "Seashell", (-1900, -300), 10), ("Cove_Seashell_2", "Seashell", (-2100, 600), 140),
+    ("Cove_Seashell_3", "Seashell", (-2600, -1700), 250), ("Cove_GlassFloat_1", "GlassFloat", (-2000, 2200), 0),
+    ("Isle_Driftwood_1", "Driftwood", (ISLE[0] - 3900, ISLE[1] + 900), 75), ("Isle_Driftwood_2", "Driftwood", (ISLE[0] + 2000, ISLE[1] + 4300), 160),
+    ("Isle_Seashell_1", "Seashell", (ISLE[0] - 4100, ISLE[1] - 500), 40), ("Isle_Seashell_2", "Seashell", (ISLE[0] - 3600, ISLE[1] + 2200), 200),
+    ("Isle_Seashell_3", "Seashell", (ISLE[0] + 1500, ISLE[1] - 4200), 300), ("Isle_RopeCoil_1", "RopeCoil", (ISLE[0] - 3300, ISLE[1] - 1800), 20),
+    ("Isle_AncientShard", "AncientShard", (kx + dx * 160, ky + dy * 160), 200),
+]
+for pid, item, (px, py), yaw in PICKUPS:
+    pz, _ = ground(px, py, top=2500.0)
+    if pz is None or pz < 20.0:
+        print("SB_PICKUP_SKIPPED", pid, pz)
+        continue
+    pick = spawn(unreal.SaltPickup, (px, py, pz - 2.0), (0, yaw, 0), "Pickup_" + pid)
+    pick.set_editor_property("item_id", item)
+    pick.set_editor_property("pickup_id", pid)
+    pick.get_component_by_class(unreal.StaticMeshComponent).set_static_mesh(unreal.load_asset(P + item))
 # Island masses 4-7 km out: the haze fades them into the sky.
 for label, name, loc, yaw in (("FarIsland_A", "SM_Island_Far_A", (550000, 250000), 20),
                               ("FarIsland_B", "SM_Island_Far_B", (700000, -150000), 140),

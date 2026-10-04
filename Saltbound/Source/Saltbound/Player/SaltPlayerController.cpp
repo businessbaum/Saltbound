@@ -11,6 +11,7 @@
 #include "Player/SaltPlayerCharacter.h"
 #include "UI/SaltHUDWidget.h"
 #include "UI/SaltMenuWidget.h"
+#include "UI/SaltSatchelWidget.h"
 
 ASaltPlayerController::ASaltPlayerController()
 {
@@ -83,12 +84,61 @@ void ASaltPlayerController::SetMenuOpen(bool bOpen)
 	}
 }
 
+bool ASaltPlayerController::IsSatchelOpen() const
+{
+	return SatchelWidget && SatchelWidget->IsInViewport();
+}
+
+void ASaltPlayerController::SetSatchelOpen(bool bOpen, int32 Page)
+{
+	if (!IsLocalController() || (bOpen && IsMenuOpen()))
+	{
+		return;
+	}
+	if (bOpen && IsSatchelOpen())
+	{
+		SatchelWidget->SetPage(Page);
+		return;
+	}
+	if (!bOpen && !IsSatchelOpen())
+	{
+		return;
+	}
+	FlushPressedKeys();
+	if (ASaltPlayerCharacter* SaltCharacter = Cast<ASaltPlayerCharacter>(GetPawn()))
+	{
+		SaltCharacter->ResetHeldInput();
+	}
+	if (bOpen)
+	{
+		if (!SatchelWidget)
+		{
+			SatchelWidget = CreateWidget<USaltSatchelWidget>(this, USaltSatchelWidget::StaticClass(), TEXT("SaltSatchel"));
+		}
+		SatchelWidget->AddToViewport(8);
+		SatchelWidget->SetPage(Page);
+		bShowMouseCursor = true;
+		FInputModeUIOnly Mode;
+		Mode.SetWidgetToFocus(SatchelWidget->TakeWidget());
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(Mode);
+	}
+	else
+	{
+		SatchelWidget->RemoveFromParent();
+		bShowMouseCursor = false;
+		SetInputMode(FInputModeGameOnly());
+	}
+}
+
 void ASaltPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	if (UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(InputComponent))
 	{
 		Input->BindAction(GetInputConfig()->Menu, ETriggerEvent::Started, this, &ASaltPlayerController::ToggleMenu);
+		Input->BindAction(GetInputConfig()->Inventory, ETriggerEvent::Started, this, &ASaltPlayerController::OpenInventory);
+		Input->BindAction(GetInputConfig()->Map, ETriggerEvent::Started, this, &ASaltPlayerController::OpenMap);
 	}
 }
 

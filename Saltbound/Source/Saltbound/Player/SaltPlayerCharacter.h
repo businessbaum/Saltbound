@@ -7,6 +7,7 @@
 #include "SaltPlayerCharacter.generated.h"
 
 class UCameraComponent;
+class USaltInventoryComponent;
 class USaltInteractableComponent;
 class USaltStationComponent;
 struct FInputActionValue;
@@ -86,6 +87,9 @@ public:
 	void StartScriptedClimb(USceneComponent* Base, const TArray<FVector>& LocalPoints, const TArray<bool>& Stepped, bool bEndInWater);
 	bool IsClimbing() const { return bClimbing; }
 
+	/** The satchel (D50). */
+	USaltInventoryComponent* GetInventory() const { return Inventory; }
+
 	/** Applies the look settings (field of view, mouse sensitivity, invert look) from USaltGameUserSettings. */
 	void ApplyUserSettings();
 	/** Forgets held movement keys (the pause menu takes the input away while they are down). */
@@ -129,6 +133,9 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCameraComponent> Camera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USaltInventoryComponent> Inventory;
 
 private:
 	void HandleMove(const FInputActionValue& Value);

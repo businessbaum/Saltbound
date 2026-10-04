@@ -37,6 +37,9 @@ public:
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Interact;
 	/** Opens the pause menu (Esc; F10 also works in the editor, where Esc ends the play session). */
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Menu;
+	/** Opens the satchel on its inventory page (Tab, I, gamepad Back) or its map page (M). D50. */
+	UPROPERTY(Transient) TObjectPtr<UInputAction> Inventory;
+	UPROPERTY(Transient) TObjectPtr<UInputAction> Map;
 
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> DefaultContext;
 };

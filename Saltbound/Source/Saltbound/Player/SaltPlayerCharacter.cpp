@@ -17,6 +17,7 @@
 #include "Interaction/SaltStationComponent.h"
 #include "Player/SaltCharacterMovementComponent.h"
 #include "Player/SaltInputConfig.h"
+#include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerController.h"
 #include "Saltbound.h"
 
@@ -44,6 +45,7 @@ ASaltPlayerCharacter::ASaltPlayerCharacter(const FObjectInitializer& ObjectIniti
 	GetCapsuleComponent()->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+	Inventory = CreateDefaultSubobject<USaltInventoryComponent>(TEXT("Inventory"));
 	Camera->SetupAttachment(GetCapsuleComponent());
 	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - CapsuleHalfHeight));
 	Camera->bUsePawnControlRotation = true;

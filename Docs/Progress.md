@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48).
+Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50).
 
 ## Milestone status
 
@@ -223,6 +223,9 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D49 / D50 (awaiting the owner's check):** sea haze limits the view; the trail's density and width follow the speed;
+  a satchel (Tab / I) with 24 slots, pickups on the beaches and the ancient shard at the ruin, and a map tab (M) with
+  two parchment charts and markers for you and your boat.
 - **D47 / D48 (awaiting the owner's check):** Ruin Isle 1.7 km out (beach, dunes, a broken stone gateway and wall),
   three island masses on the horizon; swimmers hover under water (no auto rise); the wake only reaches where the boat
   has been and the trail fades out smoothly.
@@ -271,6 +274,7 @@ the sail and cast off.
 | Interact / leave station | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
 | Pause menu / settings | Esc (in the editor: F10) | Start |
+| Satchel: inventory / map | Tab or I / M (Q / E switch pages, Tab / Esc close) | Back |
 | On the boat | Steering oar (starboard quarter, E at its handle): A / D steer. Ropes by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Ladders (both sides, midship): E climbs up from the water or down into the sea | |
 
 Developer console (`~`, non-shipping builds):
@@ -283,7 +287,8 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.RunMovementTests [motion speed turn]`, `sb.Dev.Platform <motion> [speed turn]`
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`, `sb.Dev.RunMenuTests`,
-  `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched)
+  `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched), `sb.Dev.RunInventoryTests`,
+  `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel 0|1 [chart]|off`
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`
   (SB_BOAT state line), `sb.Boat.Place X Y Yaw [Speed m/s]`, `sb.Boat.Hold Free|Moored|Anchored`,

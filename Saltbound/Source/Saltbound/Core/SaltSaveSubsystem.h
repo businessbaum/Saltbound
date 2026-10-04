@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Boat/SaltBoat.h"
+#include "Core/SaltItems.h"
 #include "GameFramework/SaveGame.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "SaltSaveSubsystem.generated.h"
@@ -15,7 +16,7 @@ class SALTBOUND_API USaltSaveGame : public USaveGame
 	GENERATED_BODY()
 
 public:
-	UPROPERTY() int32 Version = 1;
+	UPROPERTY() int32 Version = 2;
 	UPROPERTY() FDateTime SavedAt;
 	UPROPERTY() FString Map;
 
@@ -35,6 +36,11 @@ public:
 	UPROPERTY() FName Weather;
 	UPROPERTY() FName SeaState;
 	UPROPERTY() FVector Wind = FVector::ZeroVector;            // from (deg), speed (cm/s), gustiness
+
+	// D50: the satchel and the pickups already taken (by PickupId).
+	UPROPERTY() bool bHasInventory = false;
+	UPROPERTY() TArray<FSaltItemStack> Inventory;
+	UPROPERTY() TArray<FName> Collected;
 };
 
 /**
@@ -62,6 +68,13 @@ public:
 	/** The slot in use: "Main", or a test slot while automated tests run. */
 	FString Slot = TEXT("Main");
 
+	/** Pickups taken this game (saved with it; pickups hide themselves when listed). */
+	void MarkCollected(FName PickupId) { if (!PickupId.IsNone()) { Collected.Add(PickupId); } }
+	bool IsCollected(FName PickupId) const { return !PickupId.IsNone() && Collected.Contains(PickupId); }
+	void ClearCollected() { Collected.Reset(); }
+
 private:
 	void Notify(UWorld* World, const FText& Text) const;
+
+	TSet<FName> Collected;
 };

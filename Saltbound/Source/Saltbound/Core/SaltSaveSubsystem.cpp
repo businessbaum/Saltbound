@@ -8,10 +8,12 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
+#include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
 #include "Saltbound.h"
 #include "World/SaltLightingRig.h"
+#include "World/SaltPickup.h"
 #include "World/SaltWindSubsystem.h"
 
 namespace
@@ -77,6 +79,11 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 		const FRotator View = PC->GetControlRotation();
 		Save->PlayerFeet = Feet;
 		Save->PlayerYaw = View.Yaw;
+		if (const USaltInventoryComponent* Satchel = Player->GetInventory())
+		{
+			Save->bHasInventory = true;
+			Save->Inventory = Satchel->GetSlots();
+		}
 		Save->PlayerPitch = FRotator::NormalizeAxis(View.Pitch);
 		if (Boat)
 		{
@@ -103,6 +110,7 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 	{
 		Save->Wind = FVector(Wind->GetBaseFromDeg(), Wind->GetBaseSpeed(), Wind->GetGustiness());
 	}
+	Save->Collected = Collected.Array();
 
 	const bool bOk = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
 	UE_LOG(LogSaltbound, Display, TEXT("SB_SAVE saved=%d slot=%s reason=%s boat=(%.0f, %.0f) hold=%d sail=%d aboard=%d sea=%s"),
@@ -171,6 +179,19 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 		}
 		Player->TeleportFeetTo(Feet, Yaw);
 		PC->SetControlRotation(FRotator(Save->PlayerPitch, Yaw, 0.f));
+		if (USaltInventoryComponent* Satchel = Player->GetInventory())
+		{
+			if (Save->bHasInventory)
+			{
+				Satchel->SetSlots(Save->Inventory);
+			}
+		}
+	}
+	// Pickups taken in that game stay gone; the others are back.
+	Collected = TSet<FName>(Save->Collected);
+	for (TActorIterator<ASaltPickup> It(World); It; ++It)
+	{
+		It->SetCollected(IsCollected(It->PickupId));
 	}
 	UE_LOG(LogSaltbound, Display, TEXT("SB_SAVE loaded slot=%s from=%s boat=(%.0f, %.0f) hold=%d aboard=%d"),
 		*Slot, *Save->SavedAt.ToString(), Save->BoatLocation.X, Save->BoatLocation.Y, (int32)Save->BoatHold, Save->bPlayerAboard ? 1 : 0);

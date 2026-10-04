@@ -43,6 +43,8 @@ void USaltInputConfig::Build()
 	Interact = MakeAction(this, TEXT("IA_Interact"), EInputActionValueType::Boolean);
 	Menu = MakeAction(this, TEXT("IA_Menu"), EInputActionValueType::Boolean);
 	Menu->bTriggerWhenPaused = true;
+	Inventory = MakeAction(this, TEXT("IA_Inventory"), EInputActionValueType::Boolean);
+	Map = MakeAction(this, TEXT("IA_Map"), EInputActionValueType::Boolean);
 
 	DefaultContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Default"));
 	UInputMappingContext* C = DefaultContext;
@@ -74,4 +76,8 @@ void USaltInputConfig::Build()
 	C->MapKey(Menu, EKeys::Escape);
 	C->MapKey(Menu, EKeys::F10);
 	C->MapKey(Menu, EKeys::Gamepad_Special_Right);
+	C->MapKey(Inventory, EKeys::Tab);
+	C->MapKey(Inventory, EKeys::I);
+	C->MapKey(Inventory, EKeys::Gamepad_Special_Left);
+	C->MapKey(Map, EKeys::M);
 }

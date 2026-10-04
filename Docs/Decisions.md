@@ -965,3 +965,26 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Wake by speed:** the trail's strength is the boat's speed over its top speed (4 m/s), no longer full from 2.5 m/s:
   it sets the trail's density (how many foam patches), its starting width (0.4 m slow, 1 m at top speed) and the slick.
   The bow's white water and all wave heights already grow with the square of the speed.
+
+### D50 · The satchel: inventory, pickups and a map, in a hand-crafted UI (Adopted, first pass)
+- **Owner (2026-10-04):** "create a simple inventory with fitting gui to the theme. Add a map tab."
+- **Items** (`Core/SaltItems.cpp`): driftwood (stacks of 20), seashell (30), coil of rope (10), glass float (10), ancient
+  shard (5), each with a name, a description, a painted icon and a pickup mesh. The satchel holds 24 stacks and starts
+  with two coils of rope (`USaltInventoryComponent` on the player).
+- **Pickups** (`ASaltPickup`, `build_pickups.py`): E picks them up ("+1 Seashell"); taken ones are gone for good (the
+  save remembers them by PickupId). Six on the cove's beach, six on Ruin Isle's beach and the ancient shard glowing in
+  front of the gateway.
+- **The satchel screen** (`USaltSatchelWidget`, built in code): a dark wooden frame with iron corner plates around
+  parchment, wooden tabs (the open one parchment), inked slots with the icons and counts, the selected item's name and
+  description in ink. Tab or I opens the inventory, M the map, Q / E switch, Tab / Esc close; mouse and gamepad (Back
+  opens, B closes). The world goes on while it is open (no pause).
+- **Map tab:** two parchment charts generated from the world's shapes (`Tools/textures/gen_ui.py`): home waters (3 km)
+  and the open sea (12 km), with ink coastlines, hatched storm waters, a compass rose and a ruin mark; place names,
+  your marker and the boat's (turned to their headings, held at the edge when off the chart), the distance to the boat
+  and a scale bar are drawn by the UI. North (up) is world +X.
+- **UI textures** are generated (frame, parchment, slots, tabs, icons, charts, markers; original content) and imported
+  as UI textures without mips. Labels use the engine's Roboto (no font asset).
+- **Saved:** the satchel's contents and the taken pickups are part of the save (version 2).
+- **Tests:** `sb.Dev.RunInventoryTests` 7/7 (stacking, a full satchel, a pickup, the screen, the map marker exactly
+  where the player is, saving). Dev commands: `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel 0|1 [chart]|off`.
+- **Open:** items have no use yet (repairs, trade or the ancient shards' story come later).

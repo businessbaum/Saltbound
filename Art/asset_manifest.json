@@ -255,5 +255,40 @@
     "nanite": true,
     "collision": "complex",
     "_note": "Island mass on the horizon, 4-7 km out (D47)."
+  },
+  "SM_Pickup_Driftwood": {
+    "fbx": "Pickups/SM_Pickup_Driftwood.fbx",
+    "dest": "/Game/Saltbound/Props/Pickups",
+    "nanite": false,
+    "collision": "none",
+    "_note": "Pickup (D50, build_pickups.py)."
+  },
+  "SM_Pickup_Seashell": {
+    "fbx": "Pickups/SM_Pickup_Seashell.fbx",
+    "dest": "/Game/Saltbound/Props/Pickups",
+    "nanite": false,
+    "collision": "none",
+    "_note": "Pickup (D50, build_pickups.py)."
+  },
+  "SM_Pickup_RopeCoil": {
+    "fbx": "Pickups/SM_Pickup_RopeCoil.fbx",
+    "dest": "/Game/Saltbound/Props/Pickups",
+    "nanite": false,
+    "collision": "none",
+    "_note": "Pickup (D50, build_pickups.py)."
+  },
+  "SM_Pickup_GlassFloat": {
+    "fbx": "Pickups/SM_Pickup_GlassFloat.fbx",
+    "dest": "/Game/Saltbound/Props/Pickups",
+    "nanite": false,
+    "collision": "none",
+    "_note": "Pickup (D50, build_pickups.py)."
+  },
+  "SM_Pickup_AncientShard": {
+    "fbx": "Pickups/SM_Pickup_AncientShard.fbx",
+    "dest": "/Game/Saltbound/Props/Pickups",
+    "nanite": false,
+    "collision": "none",
+    "_note": "Pickup (D50, build_pickups.py)."
   }
 }
