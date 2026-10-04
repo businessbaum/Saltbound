@@ -225,7 +225,7 @@ for a higher screen percentage (for example 75 %) and more content.
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
 - **D55 (in progress, awaiting the owner's check):** the new UI from the approved design. Done: the fonts, the shared parts,
   the key-scrap prompt with painted lettering, the hold (raising the anchor) with the ink soaking up through the key's
-  scrap, the save sign in the corner, the satchel (leather bag, pressed pockets, the tag on twine); the camera at 1.2 m.
+  scrap, the save sign in the corner, the launch intro (startup movie, any key skips), the satchel (leather bag, pressed pockets, the tag on twine); the camera at 1.2 m.
   Next: stores, landfall, icons, tool wheel (hold Q).
 - **D54 (awaiting the owner's check):** calm flags (a slow wave, no side-to-side swing with the boat's roll); the player
   1.4 m and slimmer; ladders climbed with W / S after taking hold with E, E lets go, off the bottom into the sea, over

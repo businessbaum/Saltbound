@@ -1119,6 +1119,11 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   bottom, 96 px) while the game saves: fades in 0.2 s, the rose turns 45 degrees every 0.7 s with a damped overshoot, stays
   at least 1.4 s, finishes its step and fades out in 0.3 s. `USaltSaveSubsystem::OnSaveStarted / OnSaveFinished`. The old
   "Game saved" notice is gone (the sign says it).
+- **Launch intro (section 15):** `Saltbound_Intro.mp4` (8 s, the owner's updated cut: ink from the knot becomes the S,
+  the knot's rope ends grow on into the underline) plays as the startup movie (`Saltbound/Content/Movies`, 
+  `[/Script/MoviePlayer.MoviePlayerSettings]` in `DefaultGame.ini`), skippable with any key. *Wait for Movies to Complete*
+  is **on**, unlike the spec: with it off the engine ends the movie as soon as loading is done (`bAutoCompleteWhenLoadingCompletes`),
+  which cut it after ~3 s in a standalone test; on, it plays its 8 s (the map is loaded underneath).
 - **Captures:** `Tools/ui_capture.py` takes `shot showui` in a floating 1920 x 1080 PIE window (Editor > Play In window
   size; the editor viewport would capture the whole editor) and puts it on top of its reference picture. Dev cvars
   `sb.Dev.Prompt <text>`, `sb.Dev.Hold <0..1>`, `sb.Dev.SaveSign 1`.

@@ -20,7 +20,7 @@ motion); section 11 says where.
 | Not decided | The look of pickup notices ("+1 Seashell"): keep today's | – |
 | Not in scope | Chart/map redesign, logbook, other landfall moods (ancient place, home, danger), other HUD changes | – |
 | Logo | **The knotted ring** (variant 8): a compass rose with the shard as north, in a rope ring tied off at the bottom, flat ink | `Logo_variants.png` (no. 8) |
-| Launch intro | **The knot becomes the name**: the logo inks in and finds north; its compass points fly out and burst into the letters, the rope's end becomes the S, the ring stays as the O (8 s) | `Saltbound_Intro.mp4`, `UI_intro_lockup.png` |
+| Launch intro | **The knot becomes the name**: the logo inks in and finds north; its compass points fly out and burst into the letters, ink from the knot becomes the S, the ring stays as the O and the knot's rope ends grow into the underline (8 s) | `Saltbound_Intro.mp4`, `UI_intro_lockup.png` |
 
 ## 2. Files
 
@@ -361,8 +361,8 @@ fancier. A lockup with the name and the menu or splash use are not designed yet.
 
 An 8 s intro when the game starts. The logo does not just give way to the word; it **turns into** it:
 - the compass points become the letters;
-- the rope becomes the S and the rule under the word;
-- the ring with its shard becomes the O.
+- ink from the knot becomes the S;
+- the ring with its shard becomes the O, and the knot's two rope ends grow on, seamlessly, into the underline.
 
 `Launch_Intro.html` plays it live (replay and scrub); `Saltbound_Intro.mp4` is the finished video.
 
@@ -376,17 +376,17 @@ An 8 s intro when the game starts. The logo does not just give way to the word; 
 | 3.3 – 4.4 | The ring shrinks (radius 230 → 52 px) and glides into place as the **O**; its lines thicken to match the letters |
 | 3.55 – 4.85 | The **seven compass points break off** one by one (every 0.08 s, nearest letters first). Each flies 0.8 s along an outward arc, spinning, turning upright and growing to the cap height. Mapping: NE→U, E→N, SE→D, S→B, SW→T, W→L, NW→A. |
 | 4.0 – 5.1 | 55 % into its flight, each point **bursts into ~340 ink particles** that swirl (a sideways swing up to ±45 px) into its letter's shape over 0.62 s. The painted letter fades in as the particles settle. |
-| 4.05 – 5.0 | The knot pays out its rope left and right into the **rule under the word**, with whipped ends |
-| 4.9 – 5.6 | The rope's left end **frays into particles that swirl into the S** |
-| 5.9 – 6.8 | A sheen of light sweeps across the word |
-| 6.8 – 8.0 | Hold; the shard breathes softly. Then the game. |
+| 4.0 – 4.95 | The knot stays tied. **Its two free rope ends grow on** from where they end in the logo, in the same width, paint and colour, so there is no seam. They curve down and outward and run left and right as the underline. |
+| 4.12 – 5.0 | **Ink flows off the knot and flies left to become the S**, at the same time as L and D (not after the others) |
+| 5.5 – 6.4 | A sheen of light sweeps across the word |
+| 6.4 – 8.0 | Hold; the shard breathes softly. Then the game. |
 
 - **Lockup:**
   - "SALTBOUND" in IM Fell English SC 150 px, letter spacing 0.16 em, painted salt-white with a fine dark rim
     (6 % of the size) and a soft halo. The baseline is at y 569 (1080p), centred.
   - The O is the knotted ring (radius ≈ 0.34 × the size). The **turquoise shard is its needle**; the other points left
     to become letters, and a small pin sits at the centre.
-  - The rope rule runs from the knot to 34 px beyond the S and the D, 1.5 × the ring's radius below the O's centre.
+  - The underline is the knot's own rope: its two free ends continue from the tips of the knot (≈ 7 px wide, the knot's paint and colour), curve down and run 1.42 × the ring's radius below the O's centre to 34 px beyond the S and the D, with plain rounded ends. The knot under the O stays as in the logo.
 - **In Unreal (simplest):**
   - Play the video as a **startup movie**: copy it to `Saltbound/Content/Movies/Saltbound_Intro.mp4`.
   - Under *Project Settings → Movies*, add it to *Startup Movies*, turn on *Movies Are Skippable*, and turn off
@@ -397,4 +397,5 @@ An 8 s intro when the game starts. The logo does not just give way to the word; 
   samples the letter's glyph texture) is possible but not needed.
 - **Skip:** any key or button skips it.
 - **Sound (optional, CC0 only):** a quill scratch for the ink, a rope creak on the spin, a soft bell on the shard's
-  flash, a rush of small ticks as the points burst into ink, a low swell of sea under the word.
+  flash, a rush of small ticks as the points burst into ink, a rope running out as the underline grows,
+  a low swell of sea under the word.
