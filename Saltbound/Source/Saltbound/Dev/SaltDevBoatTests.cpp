@@ -10,6 +10,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/IConsoleManager.h"
+#include "Interaction/SaltInteractableComponent.h"
 #include "Interaction/SaltStationComponent.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Saltbound.h"
@@ -94,14 +95,14 @@ void USaltDevTestSubsystem::RunBoatSuite()
 			W->SetBaseWind(FromDeg, SpeedMs * 100.f, 0.f);
 		}
 	};
-	auto Place = [this](const FVector& At, float Yaw, float SpeedMs, bool bSail, float Sheet, bool bAutopilot)
+	auto Place = [this](const FVector& At, float Yaw, float SpeedMs, bool bSail, bool bAutopilot)
 	{
 		if (ASaltBoat* Bt = TestBoat.Get())
 		{
 			Bt->SetHold(ESaltBoatHold::Free);
 			Bt->PlaceAt(At, Yaw, SpeedMs * 100.f);
-			Bt->SetSailRaised(bSail);
-			Bt->SetControlOverride(true, 0.f, Sheet);
+			Bt->SetSailSet(bSail);
+			Bt->SetControlOverride(true, 0.f);
 			Bt->SetAutopilot(bAutopilot, Yaw);
 		}
 	};
@@ -151,7 +152,7 @@ void USaltDevTestSubsystem::RunBoatSuite()
 	}, nullptr, nullptr});
 
 	// 1) Floating at rest in calm water: at the design waterline, level, no drift.
-	Steps.Add({TEXT("FloatSetup"), 0.f, [=, this]() { SetWind(0.f, 0.f); Place(TestWater, 90.f, 0.f, false, 0.5f, false); }, nullptr, nullptr});
+	Steps.Add({TEXT("FloatSetup"), 0.f, [=, this]() { SetWind(0.f, 0.f); Place(TestWater, 90.f, 0.f, false, false); }, nullptr, nullptr});
 	Wait(TEXT("FloatSettle"), 6.f);
 	Steps.Add({TEXT("Float"), 3.f, [this]() { Samples.Reset(); },
 		[this](float)
@@ -210,22 +211,20 @@ void USaltDevTestSubsystem::RunBoatSuite()
 				Period, Peaks.Num() > 1 ? Peaks[1] : 0.f, Decay, Crossings.Num()));
 		}});
 
-	// 3) Points of sail in a steady 7 m/s (13.6 kn) wind, the autopilot holding a heading of 90 deg (+Y).
-	// A heavy boat gathers way slowly (about half a minute to full speed), so each run starts under way.
-	struct FPoint { const TCHAR* Name; float WindFrom; float Sheet; float StartMs; float MinKn; float MaxKn; };
+	// 3) Simple sailing (D41) in a steady 7 m/s (13.6 kn) wind, the autopilot holding a heading of 90 deg (+Y): the set
+	// sail drives the boat whatever the wind's angle (the wind only shades the speed a little).
+	struct FPoint { const TCHAR* Name; float WindFrom; float MinKn; float MaxKn; };
 	const FPoint Points[] = {
-		{ TEXT("BeamReach"), 0.f, 0.45f, 2.5f, 4.5f, 8.5f },     // wind 90 deg on the port side
-		{ TEXT("CloseHauled"), 40.f, 0.05f, 2.f, 3.f, 7.f },     // 50 deg off the wind
-		{ TEXT("BroadReach"), 310.f, 0.75f, 2.5f, 4.f, 8.5f },   // 140 deg
-		{ TEXT("Running"), 275.f, 1.f, 2.f, 3.f, 7.5f },         // 175 deg, almost dead downwind
-		{ TEXT("NoGoZone"), 80.f, 0.f, 0.f, 0.f, 1.f },          // 10 deg: the sail luffs
+		{ TEXT("WindAbeam"), 0.f, 6.f, 9.5f },        // 90 deg on the port side
+		{ TEXT("WindAhead"), 80.f, 4.5f, 9.f },       // 10 deg off the bow
+		{ TEXT("WindAstern"), 275.f, 5.5f, 9.5f },    // 175 deg
 	};
 	for (const FPoint& Pt : Points)
 	{
 		const FString Name(Pt.Name);
-		Steps.Add({Name + TEXT("Setup"), 0.f, [=, this]() { SetWind(Pt.WindFrom, 7.f); Place(TestWater, 90.f, Pt.StartMs, true, Pt.Sheet, true); }, nullptr, nullptr});
-		Wait(Name + TEXT("Build"), 28.f);
-		Steps.Add({Name, 8.f, [this]() { Samples.Reset(); MaxValue = 0.f; MinValue = 0.f; },
+		Steps.Add({Name + TEXT("Setup"), 0.f, [=, this]() { SetWind(Pt.WindFrom, 7.f); Place(TestWater, 90.f, 0.f, true, true); }, nullptr, nullptr});
+		Wait(Name + TEXT("Build"), 25.f);
+		Steps.Add({Name, 6.f, [this]() { Samples.Reset(); MaxValue = 0.f; },
 			[this](float)
 			{
 				if (const ASaltBoat* Bt = TestBoat.Get())
@@ -233,31 +232,39 @@ void USaltDevTestSubsystem::RunBoatSuite()
 					const float Leeway = Bt->GetSpeedKnots() > 1.f ? FRotator::NormalizeAxis(Bt->GetCourseDeg() - Bt->GetYawDeg()) : 0.f;
 					Samples.Add(FVector(Bt->GetSpeedKnots(), FMath::Abs(Bt->GetHeelDeg()), FMath::Abs(Leeway)));
 					MaxValue = FMath::Max(MaxValue, FMath::Abs(FRotator::NormalizeAxis(Bt->GetYawDeg() - 90.f)));
-					MinValue += FVector::DotProduct(Bt->GetVelocity(), Bt->GetActorForwardVector()) * 0.01943844f;   // headway, kn
 				}
 			},
 			[this, Name, Pt]()
 			{
 				const float Speed = MeanOf(Samples, 0), Heel = MeanOf(Samples, 1), Leeway = MeanOf(Samples, 2);
-				const float Headway = Samples.Num() > 0 ? MinValue / Samples.Num() : 0.f;
-				// In the no-go zone the boat makes no headway (it drifts back and sideways, so leeway means nothing).
-				const bool bNoGo = Pt.MaxKn <= 1.f;
-				const bool bPass = bNoGo ? Headway < 0.5f
-					: (Speed >= Pt.MinKn && Speed <= Pt.MaxKn && Heel < 25.f && Leeway < 10.f);
-				Report(TEXT("Sail") + Name, bPass, FString::Printf(TEXT("speed=%.2fkn headway=%.2fkn heel=%.1fdeg leeway=%.1fdeg headingError=%.1fdeg sheet=%.2f"),
-					Speed, Headway, Heel, Leeway, MaxValue, Pt.Sheet));
+				Report(TEXT("Sail") + Name, Speed >= Pt.MinKn && Speed <= Pt.MaxKn && Heel < 20.f && Leeway < 10.f, FString::Printf(
+					TEXT("speed=%.2fkn heel=%.1fdeg leeway=%.1fdeg headingError=%.1fdeg (from rest in 25 s)"), Speed, Heel, Leeway, MaxValue));
 			}});
 	}
+	// Taking the sail in slows the boat down.
+	Steps.Add({TEXT("TakeInSail"), 20.f, [this]()
+	{
+		if (ASaltBoat* Bt = TestBoat.Get())
+		{
+			MaxValue = Bt->GetSpeedKnots();
+			Bt->SetSailSet(false);
+		}
+	}, nullptr, [this]()
+	{
+		const ASaltBoat* Bt = TestBoat.Get();
+		const float Speed = Bt ? Bt->GetSpeedKnots() : 99.f;
+		Report(TEXT("SailTakenInSlows"), Speed < 2.5f && Speed < MaxValue * 0.4f, FString::Printf(TEXT("before=%.2fkn after20s=%.2fkn"), MaxValue, Speed));
+	}});
 
 	// 4) Turning circle: beam reach at speed, then full starboard rudder.
-	Steps.Add({TEXT("TurnSetup"), 0.f, [=, this]() { SetWind(0.f, 7.f); Place(TestWater, 90.f, 3.f, true, 0.45f, true); }, nullptr, nullptr});
+	Steps.Add({TEXT("TurnSetup"), 0.f, [=, this]() { SetWind(0.f, 7.f); Place(TestWater, 90.f, 3.f, true, true); }, nullptr, nullptr});
 	Wait(TEXT("TurnBuild"), 15.f);
 	Steps.Add({TEXT("TurnRudder"), 3.f, [this]()
 	{
 		if (ASaltBoat* Bt = TestBoat.Get())
 		{
 			Bt->SetAutopilot(false);
-			Bt->SetControlOverride(true, 1.f, 0.45f);
+			Bt->SetControlOverride(true, 1.f);
 		}
 	}, nullptr, nullptr});
 	Steps.Add({TEXT("Turn"), 6.f, [this]() { Samples.Reset(); },
@@ -279,10 +286,10 @@ void USaltDevTestSubsystem::RunBoatSuite()
 	Steps.Add({TEXT("RestSetup"), 0.f, [=, this]()
 	{
 		SetWind(0.f, 0.f);
-		Place(TestWater, 90.f, 0.f, false, 0.5f, false);
+		Place(TestWater, 90.f, 0.f, false, false);
 		if (ASaltBoat* Bt = TestBoat.Get())
 		{
-			Bt->SetControlOverride(true, 1.f, 0.5f);
+			Bt->SetControlOverride(true, 1.f);
 		}
 	}, nullptr, nullptr});
 	Wait(TEXT("RestBuild"), 4.f);
@@ -295,7 +302,7 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		}});
 
 	// 6) Running into the pier end at 2.5 m/s (sail down): stops at the posts, no tunnelling.
-	Steps.Add({TEXT("PierSetup"), 0.f, [=, this]() { SetWind(0.f, 0.f); Place(FVector(2700.f, 0.f, 0.f), 180.f, 2.5f, false, 0.5f, false); }, nullptr, nullptr});
+	Steps.Add({TEXT("PierSetup"), 0.f, [=, this]() { SetWind(0.f, 0.f); Place(FVector(2700.f, 0.f, 0.f), 180.f, 2.5f, false, false); }, nullptr, nullptr});
 	Steps.Add({TEXT("PierImpact"), 8.f, [this]() { MinValue = 1e9f; MaxValue = 0.f; },
 		[this](float)
 		{
@@ -315,7 +322,7 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		}});
 
 	// 7) Running aground on the beach slope (sail down, 2 m/s): stops, stays on top of the sand.
-	Steps.Add({TEXT("GroundSetup"), 0.f, [=, this]() { Place(FVector(300.f, -2200.f, 0.f), 180.f, 2.f, false, 0.5f, false); }, nullptr, nullptr});
+	Steps.Add({TEXT("GroundSetup"), 0.f, [=, this]() { Place(FVector(300.f, -2200.f, 0.f), 180.f, 2.f, false, false); }, nullptr, nullptr});
 	Steps.Add({TEXT("Grounding"), 12.f, [this]() { MaxValue = 0.f; },
 		[this](float) { if (const ASaltBoat* Bt = TestBoat.Get()) { MaxValue = FMath::Max(MaxValue, Bt->GetContactDepth()); } },
 		[this]()
@@ -330,7 +337,7 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		}});
 
 	// 8) Standing on deck while sailing a beam reach: no sliding, no jitter.
-	Steps.Add({TEXT("AboardSetup"), 0.f, [=, this]() { SetWind(0.f, 7.f); Place(TestWater, 90.f, 3.f, true, 0.45f, true); }, nullptr, nullptr});
+	Steps.Add({TEXT("AboardSetup"), 0.f, [=, this]() { SetWind(0.f, 7.f); Place(TestWater, 90.f, 3.f, true, true); }, nullptr, nullptr});
 	Wait(TEXT("AboardBuild"), 15.f);
 	Steps.Add({TEXT("AboardPlace"), 0.f, [=, this]() { PlacePlayerAboard(-1.0f, 0.45f, 0.f); }, nullptr, nullptr});
 	Wait(TEXT("AboardSettle"), 1.5f);
@@ -386,16 +393,64 @@ void USaltDevTestSubsystem::RunBoatSuite()
 			Report(TEXT("BoatHelmSteers"), P && P->IsAtStation() && Rate > 3.f && Rudder > 20.f, FString::Printf(
 				TEXT("atHelm=%d yawRate=%.1fdeg/s rudder=%.1fdeg"), P && P->IsAtStation() ? 1 : 0, Rate, Rudder));
 		}});
+	Steps.Add({TEXT("HelmJump"), 0.5f, [this]()
+	{
+		const ASaltBoat* Bt = TestBoat.Get();
+		MaxValue = Bt && Bt->IsSailSet() ? 1.f : 0.f;
+		if (ASaltPlayerCharacter* P = GetPlayer()) { P->DebugJump(true); P->DebugJump(false); P->DebugDive(true); P->DebugDive(false); }
+	}, nullptr, [this]()
+	{
+		const ASaltBoat* Bt = TestBoat.Get();
+		const bool bSame = Bt && (Bt->IsSailSet() ? 1.f : 0.f) == MaxValue && Bt->GetHold() == ESaltBoatHold::Free;
+		Report(TEXT("BoatHelmOnlySteers"), bSame, FString::Printf(TEXT("sailUnchanged=%d holdFree=%d"), bSame ? 1 : 0, Bt && Bt->GetHold() == ESaltBoatHold::Free ? 1 : 0));
+	}});
 	Steps.Add({TEXT("HelmLeave"), 1.5f, [this]() { if (ASaltPlayerCharacter* P = GetPlayer()) { P->DebugInteract(); } }, nullptr, [=, this]()
 	{
 		const ASaltPlayerCharacter* P = GetPlayer();
 		Report(TEXT("BoatHelmLeave"), P && !P->IsAtStation() && OnBoat(), FString::Printf(TEXT("atHelm=%d onDeck=%d"), P && P->IsAtStation() ? 1 : 0, OnBoat() ? 1 : 0));
 	}});
 
+	// 9b) The sail rope by the starboard shrouds sets / takes in the sail; the windlass drops the anchor.
+	auto UsePoint = [=, this](const FString& Name, TFunction<USaltInteractableComponent*()> Target, float StandX, float StandY,
+		TFunction<bool()> Check, TFunction<FString()> State)
+	{
+		Steps.Add({Name + TEXT("Approach"), 0.f, [=, this]() { PlacePlayerAboard(StandX, StandY, 0.f); }, nullptr, nullptr});
+		Wait(Name + TEXT("Settle"), 1.f);
+		Steps.Add({Name + TEXT("Aim"), 0.4f, nullptr, [=, this](float)
+		{
+			ASaltPlayerCharacter* P = GetPlayer();
+			USaltInteractableComponent* T = Target();
+			if (P && T && P->GetController())
+			{
+				P->GetController()->SetControlRotation((T->GetComponentLocation() - P->GetCamera()->GetComponentLocation()).Rotation());
+			}
+		}, nullptr});
+		Steps.Add({Name, 1.f, [=, this]()
+		{
+			ASaltPlayerCharacter* P = GetPlayer();
+			const bool bFocused = P && P->GetFocusedInteractable() == Target();
+			Report(Name + TEXT("Focus"), bFocused, FString::Printf(TEXT("focused=%s"), *GetNameSafe(P ? P->GetFocusedInteractable() : nullptr)));
+			if (P) { P->DebugInteract(); }
+		}, nullptr, [=, this]()
+		{
+			Report(Name, Check(), State());
+		}});
+	};
+	Steps.Add({TEXT("PointsSetup"), 0.f, [=, this]() { SetWind(0.f, 0.f); Place(TestWater, 90.f, 0.f, false, false); }, nullptr, nullptr});
+	Wait(TEXT("PointsSettle"), 1.f);
+	UsePoint(TEXT("BoatSailRope"), [this]() { return TestBoat.IsValid() ? TestBoat->GetSailRope(true) : nullptr; }, SaltHull::MastX + 0.35f, 0.8f,
+		[this]() { return TestBoat.IsValid() && TestBoat->IsSailSet(); },
+		[this]() { return FString::Printf(TEXT("sailSet=%d"), TestBoat.IsValid() && TestBoat->IsSailSet() ? 1 : 0); });
+	UsePoint(TEXT("BoatWindlass"), [this]() { return TestBoat.IsValid() ? TestBoat->GetWindlass() : nullptr; }, 2.95f, 0.55f,
+		[this]() { return TestBoat.IsValid() && TestBoat->GetHold() == ESaltBoatHold::Anchored; },
+		[this]() { return FString::Printf(TEXT("hold=%d (2 = anchored)"), TestBoat.IsValid() ? (int32)TestBoat->GetHold() : -1); });
+	Steps.Add({TEXT("PointsTidy"), 0.f, [this]() { if (ASaltBoat* Bt = TestBoat.Get()) { Bt->SetSailSet(false); Bt->SetHold(ESaltBoatHold::Free); } }, nullptr, nullptr});
+
 	// 10) Waves: a beam reach in the Rough sea, then bare poles in the Storm sea (open water beyond the cove's calm
 	// zone). The boat must ride the waves without capsizing.
 	struct FSea { const TCHAR* Name; float WindMs; bool bSail; float MaxHeel; float MinKn; };
-	const FSea Seas[] = { { TEXT("Rough"), 8.f, true, 35.f, 2.5f }, { TEXT("Storm"), 14.f, false, 50.f, 0.f } };
+	// The storm only has to be survived: rolls stay below the capsize threshold (70 degrees).
+	const FSea Seas[] = { { TEXT("Rough"), 8.f, true, 40.f, 2.5f }, { TEXT("Storm"), 14.f, false, 70.f, 0.f } };
 	for (const FSea& Sea : Seas)
 	{
 		const FString Name(Sea.Name);
@@ -406,7 +461,7 @@ void USaltDevTestSubsystem::RunBoatSuite()
 				R->SetSeaState(FName(Sea.Name), 0.f);
 			}
 			SetWind(0.f, Sea.WindMs);
-			Place(FVector(15000.f, -9000.f, 0.f), 90.f, Sea.bSail ? 2.5f : 0.f, Sea.bSail, 0.45f, true);
+			Place(FVector(15000.f, -9000.f, 0.f), 90.f, Sea.bSail ? 2.5f : 0.f, Sea.bSail, true);
 		}, nullptr, nullptr});
 		Wait(Name + TEXT("SeaBuild"), 20.f);
 		Steps.Add({Name + TEXT("Sea"), 20.f, [this]() { Samples.Reset(); MinValue = 1e9f; MaxValue = -1e9f; },

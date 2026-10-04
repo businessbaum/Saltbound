@@ -810,3 +810,39 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Gear:** a pin rail with belaying pins and hanging coils at the mast, a lashed water barrel and crate (staved,
   iron hoops), a bucket by the wheel, two oars on the side deck, fenders over the pier side, horn cleats fore and
   aft (with collision for barrel, crate and pin rail).
+
+### D41 · Simple sailing, interaction points, living sail, physics ropes, an old boat in shape (Adopted, awaiting owner review)
+- **Owner (2026-10-04):** "don't make the sailing too complicated. Later there will be electric motors. Sail down
+  speed, sail up slow down. The sail has no animation for catching wind. Raise and lower the sail at the right
+  points (the ropes by the shrouds). Fix the physics of the ropes. Add an anchor point. The wheel is ONLY for
+  direction." And: "the boat looks too new, too fresh ... that needs to be represented in shape. Look at the mast."
+- **Sailing model:** the set sail pushes the boat forward along its centreline (7800 N, about 7.4 kn in a 7 m/s
+  breeze, reached in about 20 s); the wind shades it only a little (`WindInfluence` 0.35: wind from ahead 6.7 kn,
+  abeam 7.4 kn) and its sideways share heels the boat to leeward (about 6 degrees). Taking the sail in slows the
+  boat to under 1 kn within 20 s (`CoastDrag`). No sheet, no no-go zone; the boom trims itself to the wind. Engines
+  can drive the same way later.
+- **Controls:** the wheel only steers. The sail is let down / raised at the rope points by the shrouds (both
+  sides); the windlass on the foredeck casts off, moors near the pier, or drops / raises the anchor.
+- **Sail:** brailed up to the gaff when taken in, falling to the boom when set. `M_SB_Sail` (the surface master
+  plus vertex animation) moves cloth, boltrope and hoops together: Furl, Fill (a spring that pops full when the
+  sail catches the wind and breathes with the gusts), Side (belly to leeward), Flutter (shiver along the leech
+  with the wind from ahead).
+- **Ropes:** the mainsheet, mooring lines (to the pier while moored) and anchor rode are Cable components (verlet
+  physics: they sag, swing and go slack). Deadeyes are laced properly: the shroud turns round the upper deadeye and is
+  seized to itself, the lanyard runs through three holes in each deadeye on alternating faces, and the lower deadeye
+  sits in an iron strap on the chainplate.
+- **Anchor:** a fisherman's anchor hangs at a cathead on the starboard bow; dropped, it sinks to the seabed below
+  (traced) and stays there while the boat swings on its rode; raised, it comes back up.
+- **Age in shape:** spars hewn into eight flats with sharp corners, seasoning cracks, dents and knots; planks more
+  warped and worn with split ends; nails on deck planks and hull frames; a weathered repair board on the hull and a
+  replaced grey deck board; two patches sewn on the sail; the wood grain reads again (it had become too faint).
+- **Tests:** `sb.Dev.RunBoatTests` rewritten for the simple model, 22/22 pass (speed at every wind angle, slowing
+  with the sail in, turning, pier and beach collisions, standing aboard at 7.4 kn and 6 degrees heel, wheel only
+  steers, rope points and windlass work, Rough sea max roll 31 degrees, Storm 24 degrees, mooring holds).
+
+### D42 · The sea makes room for the boat (Adopted)
+- **Owner (2026-10-04):** "the water needs to make space for the boat."
+- **Change:** the ocean material is masked: inside the player boat's hull volume (the `SaltHullShape.h` formula, up
+  to the bulwark top) the sea is not drawn, so waves never show inside the hull or on the deck. `ASaltBoat` writes
+  its pose to `MPC_Ocean` (`BoatPos`, w = on, and its three axes) every frame; existing MPC entries are kept.
+- **Cost:** masked rendering of the ocean (depth pre-pass with the mask). To be measured in the packaged benchmark.

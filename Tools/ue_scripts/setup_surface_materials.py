@@ -82,8 +82,28 @@ return Base;
 """
 
 
-def build_surface():
-    m = sb_ue.reset_material("M_SB_Surface", MASTER)
+# Sail motion (M_SB_Sail, D41): the sail mesh's local space (cm): -X aft along the boom, +Z up from the boom, +Y the
+# belly. ASaltBoat drives Furl (1 = brailed up to the gaff), Fill (belly, with a pop when the sail catches the wind),
+# Side (+-1, the leeward side) and Flutter (shiver along the leech) through dynamic instances.
+SAIL_WPO_CODE = """
+float3 P = LocalPos;
+float Aft = max(-LocalPos.x, 0.0);
+float F = saturate(Furl);
+// Taken in: the cloth is brailed up to the gaff (its height at this distance aft), and drawn in a little.
+float GaffZ = ThroatHeight + Aft * GaffTan;
+P.z = lerp(LocalPos.z, GaffZ - 6.0, F);
+P.x = LocalPos.x * (1.0 - 0.12 * F);
+// Belly to leeward, filled; a slow breath and a shiver running aft along the leech.
+float U = saturate(Aft / max(Chord, 1.0));
+float Breath = sin(Time * 1.6 + LocalPos.z * 0.012) * 0.06 * Fill;
+float Shiver = sin(Aft * 0.05 - Time * 9.0 + LocalPos.z * 0.03) * Flutter * U * U * 5.0;
+P.y = (LocalPos.y * Side * (Fill + Breath) + Shiver) * (1.0 - 0.85 * F);
+return P - LocalPos;
+"""
+
+
+def build_surface(name="M_SB_Surface", sail=False):
+    m = sb_ue.reset_material(name, MASTER)
     uv0 = sb_ue.expr(m, unreal.MaterialExpressionTextureCoordinate, -2200, 0)
     uv_scale = sb_ue.scalar_param(m, "UVScale", 1.0, -2200, 100, "Textures")
     uv = sb_ue.expr(m, unreal.MaterialExpressionMultiply, -2000, 50)
@@ -157,6 +177,22 @@ def build_surface():
     sb_ue.to_prop(nl, "", unreal.MaterialProperty.MP_NORMAL)
     emissive = sb_ue.vector_param(m, "EmissiveColor", (0, 0, 0, 1), -1000, 1100, "Emissive")
     sb_ue.to_prop(emissive, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    if sail:
+        m.set_editor_property("two_sided", True)
+        lp = sb_ue.expr(m, unreal.MaterialExpressionLocalPosition, -1300, 1300)
+        time = sb_ue.expr(m, unreal.MaterialExpressionTime, -1300, 1380)
+        sp = {"Furl": 1.0, "Fill": 0.0, "Side": 1.0, "Flutter": 0.15, "ThroatHeight": 475.0, "GaffTan": 0.7, "Chord": 485.0}
+        sail_nodes = {k: sb_ue.scalar_param(m, k, v, -1300, 1460 + i * 70, "Sail") for i, (k, v) in enumerate(sp.items())}
+        w = custom(m, -900, 1400, "Sail furl / fill / flutter (local cm)", SAIL_WPO_CODE, ["LocalPos", "Time"] + list(sp), F3)
+        sb_ue.connect(lp, "", w, "LocalPos")
+        sb_ue.connect(time, "", w, "Time")
+        for k in sp:
+            sb_ue.connect(sail_nodes[k], "", w, k)
+        to_world = sb_ue.expr(m, unreal.MaterialExpressionTransform, -600, 1400,
+                              transform_source_type=unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_LOCAL,
+                              transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
+        sb_ue.connect(w, "", to_world, "")
+        sb_ue.to_prop(to_world, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
     mel.recompile_material(m)
     sb_ue.eal.save_loaded_asset(m)
     return m
@@ -469,6 +505,7 @@ def wood_textures():
 
 def main():
     surf = build_surface()
+    sail = build_surface("M_SB_Sail", sail=True)
     rock = build_rock()
     glow = build_glow()
     grass = build_seagrass()
@@ -534,6 +571,9 @@ def main():
     }
     for name, kw in lib.items():
         sb_ue.make_mi(name, MI, surf, **kw)
+    # The sail's parts on the animated sail master (they must move together): cloth, boltrope and reef ties, hoops.
+    for name, base in (("MI_SailCloth", "MI_Canvas"), ("MI_SailRope", "MI_Rope_Hemp"), ("MI_SailHoop", "MI_Wood_Varnish")):
+        sb_ue.make_mi(name, MI, sail, **lib[base])
     # No lichen on the coastal rocks (owner: "remove the yellow marks at the top of the stones").
     sb_ue.make_mi("MI_Rock_Coast", MI, rock, scalars={"LichenCoverage": 0.0})
     sb_ue.make_mi("MI_Stone_Ruin", MI, rock, vectors={"Tint": (0.42, 0.4, 0.36, 1), "LichenColor": (0.4, 0.46, 0.28, 1)},

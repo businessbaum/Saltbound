@@ -112,7 +112,9 @@ def nseed():
 def mats():
     for n, c in {"MI_Paint_Hull": (0.45, 0.12, 0.08), "MI_Paint_Cream": (0.9, 0.85, 0.7), "MI_Paint_Boottop": (0.1, 0.1, 0.1),
                  "MI_Wood_Teak": (0.55, 0.35, 0.18), "MI_Wood_Varnish": (0.4, 0.2, 0.08), "MI_Metal_Iron": (0.1, 0.1, 0.1),
-                 "MI_Caulk_Dark": (0.05, 0.05, 0.05), "MI_Canvas": (0.85, 0.8, 0.7), "MI_Rope_Hemp": (0.6, 0.5, 0.3)}.items():
+                 "MI_Caulk_Dark": (0.05, 0.05, 0.05), "MI_Canvas": (0.85, 0.8, 0.7), "MI_Rope_Hemp": (0.6, 0.5, 0.3),
+                 "MI_Wood_DockWeathered": (0.5, 0.45, 0.4), "MI_SailCloth": (0.85, 0.8, 0.7), "MI_SailRope": (0.6, 0.5, 0.3),
+                 "MI_SailHoop": (0.4, 0.2, 0.08)}.items():
         M[n] = sb.get_material(n, (*c, 1))
 
 
@@ -127,10 +129,10 @@ def mesh_object(name, bm, materials):
 
 
 # --- generic pieces ------------------------------------------------------------------------------------------
-def laid_board(name, length, width, thick, frame, mat, wear=0.25, grooves=(1, 2), bevel=0.8):
+def laid_board(name, length, width, thick, frame, mat, wear=0.25, grooves=(1, 2), bevel=0.8, split=0.0):
     """A rough_plank laid along frame(s) -> (P, A, N, width_scale), all in Unreal coordinates (see bend_board)."""
     b = tb.rough_plank(name, length, width, thick, (0, 0, 0), (0, 0, 0), M[mat], nseed(), wear=wear, grooves=grooves,
-                       split_chance=0.0, bevel=bevel)
+                       split_chance=split, bevel=bevel)
 
     def blender_frame(s):
         p, a, n, w = frame(s)
@@ -180,6 +182,31 @@ def rod(name, a, b, radius, mat, segments=10):
     for p in obj.data.polygons:
         p.use_smooth = True
     return obj
+
+
+def oriented(obj, center, axis):
+    """Rotates a mesh built around the origin along +Z so +Z follows `axis`, then moves it to `center` (Unreal)."""
+    rot = Vector((0, 0, 1)).rotation_difference(U(tuple(axis)).normalized()).to_matrix().to_4x4()
+    obj.data.transform(Matrix.Translation(U(tuple(center))) @ rot)
+    return obj
+
+
+def disc(name, radius, thick, center, axis, mat, segments=16, bevel=0.0):
+    obj = sb.add_cylinder(name, radius, thick, (0, 0, 0), "Z", segments, M[mat])
+    if bevel > 0:
+        sb.soften(obj, bevel, 2)
+    return oriented(obj, center, axis)
+
+
+def ring(name, major, minor, center, axis, mat, segments=24):
+    obj = sb.add_torus(name, major, minor, (0, 0, 0), (0, 0, 0), segments, 8, M[mat])
+    return oriented(obj, center, axis)
+
+
+def nail(center, normal):
+    """A dark iron nail head flush with a surface (center on the surface, normal outward)."""
+    n = Vector(normal).normalized()
+    return disc("nail", 0.009, 0.006, tuple(Vector(center) + n * 0.002), tuple(n), "MI_Metal_Iron", 8)
 
 
 def rope(name, pts, radius=0.02, mat="MI_Rope_Hemp"):
@@ -298,7 +325,15 @@ def planking():
             for xa, xb in zip(xs[:-1], xs[1:]):
                 frame = strake_frame(side, ta, tb_, xa + 0.004, xb - 0.004, w0)
                 b = laid_board("strake", path_length(frame), w0 - 0.01, PLANK_T, frame,
-                               "MI_Paint_Cream" if top else "MI_Paint_Hull", wear=0.25, grooves=(0, 1), bevel=0.9)
+                               "MI_Paint_Cream" if top else "MI_Paint_Hull", wear=0.55, grooves=(0, 1), bevel=0.9, split=0.15)
+                # Nails into the frames, about every 0.6 m, and two at each butt end.
+                xn = [xa + 0.06, xb - 0.06] + [x for x in [-4.2 + 0.6 * i for i in range(15)] if xa + 0.15 < x < xb - 0.15]
+                for x_n in xn:
+                    sfrac = (x_n - xa) / max(xb - xa, 1e-3)
+                    pm, am, nm, wm = frame(clamp(sfrac))
+                    if wm * w0 > 0.08:
+                        for off in ((-0.25, 0.25) if x_n in (xa + 0.06, xb - 0.06) else (0.0,)):
+                            parts.append(nail(tuple(pm + nm * (PLANK_T * 0.5) + am * (off * wm * w0)), tuple(nm)))
                 if not top:
                     paint_below(b, BOOTTOP, "MI_Paint_Boottop")
                 parts.append(b)
@@ -334,10 +369,10 @@ def bulwarks():
             for zc, h in ((0.115, 0.2), (0.325, 0.2)):
                 parts.append(sheer_board(side, xa, xb, h, 0.035,
                                          lambda x, out, zc=zc: (Vector((x, side * half_beam(x), sheer_z(x) + zc)) - out * 0.0175, up, out),
-                                         "MI_Paint_Hull", wear=0.3, grooves=(0, 1)))
+                                         "MI_Paint_Hull", wear=0.5, grooves=(0, 1)))
                 parts.append(sheer_board(side, xa, xb, h, 0.03,
                                          lambda x, out, zc=zc: (Vector((x, side * half_beam(x), sheer_z(x) + zc)) - out * (BULWARK_T - 0.015), up, out),
-                                         "MI_Paint_Cream", wear=0.25, grooves=(0, 1)))
+                                         "MI_Paint_Cream", wear=0.45, grooves=(0, 1)))
             parts.append(sheer_board(side, xa - (0.0 if xa < 0 else 0.03), xb + (0.03 if xb < 0 else 0.0), 0.18, 0.065,
                                      lambda x, out: (Vector((x, side * half_beam(x), sheer_z(x) + BULWARK_H + 0.03)) - out * 0.045, out, up),
                                      "MI_Wood_Varnish", wear=0.5))
@@ -374,11 +409,17 @@ def deck_planks():
             continue
         x0, x1 = xs[0] + 0.02, xs[-1] - 0.02
         cut = rng.uniform(x0 + 0.3 * (x1 - x0), x0 + 0.7 * (x1 - x0))
-        for xa, xb in ((x0, cut), (cut, x1)):
-            def f(s, xa=xa, xb=xb, y=y):
+        for j, (xa, xb) in enumerate(((x0, cut), (cut, x1))):
+            dz = rng.uniform(-0.005, 0.004)
+            def f(s, xa=xa, xb=xb, y=y, dz=dz):
                 x = xa + (xb - xa) * s
-                return Vector((x, y, deck_z(x, y) - DECK_T * 0.5)), across, up, 1.0
-            parts.append(laid_board("deck", xb - xa - 0.006, DECK_W - 0.008, DECK_T, f, "MI_Wood_Teak", wear=0.3, grooves=(1, 2)))
+                return Vector((x, y, deck_z(x, y) - DECK_T * 0.5 + dz)), across, up, 1.0
+            replaced = (i, j) in ((7, 0), (15, 1))
+            parts.append(laid_board("deck", xb - xa - 0.006, DECK_W - 0.008, DECK_T, f,
+                                    "MI_Wood_DockWeathered" if replaced else "MI_Wood_Teak", wear=0.55, grooves=(1, 2), split=0.25))
+            for xe in (xa + 0.05, xb - 0.05):
+                for yo in (-0.035, 0.035):
+                    parts.append(nail((xe, y + yo, deck_z(xe, y) + dz), (0, 0, 1)))
     return parts
 
 
@@ -447,13 +488,16 @@ def rig_and_fittings():
     pedestal, bitts, a hatch and a coiled rope."""
     parts = []
     deck_m = sheer_z(MAST_X)
-    mast = tb.spar("mast", MAST_H + 0.1, 0.13, 0.085, M["MI_Wood_Varnish"], nseed(), sides=16, sweep=0.04, axis=(0, 0, 1))
+    mast = tb.spar("mast", MAST_H + 0.1, 0.13, 0.085, M["MI_Wood_Varnish"], nseed(), sides=36, sweep=0.05, axis=(0, 0, 1), facets=8)
     mast.data.transform(Matrix.Translation(U((MAST_X, 0, deck_m - 0.1))))
     parts.append(mast)
     top = deck_m + MAST_H
     parts.append(block("mast_cap", (0.32, 0.26, 0.12), (MAST_X, 0, top - 0.02), "MI_Wood_Varnish", 0.03))
-    for z, r in ((deck_m + BOOM_H, 0.135), (deck_m + THROAT_H + 0.45, 0.115), (top - 0.25, 0.1)):
-        parts.append(sb.add_torus("band", r, 0.022, U((MAST_X, 0, z)), (0, 0, 0), 24, 8, M["MI_Metal_Iron"]))
+    def mast_r(z):
+        t = clamp((z - deck_m + 0.1) / (MAST_H + 0.1))
+        return 0.13 + (0.085 - 0.13) * t ** 1.3
+    for z in (deck_m + BOOM_H, deck_m + THROAT_H + 0.45, top - 0.25):
+        parts.append(sb.add_torus("band", mast_r(z) + 0.004, 0.02, U((MAST_X, 0, z)), (0, 0, 0), 24, 8, M["MI_Metal_Iron"]))
     parts.append(sb.add_torus("partners", 0.16, 0.05, U((MAST_X, 0, deck_m + 0.03)), (0, 0, 0), 24, 10, M["MI_Wood_Varnish"]))
     # Shrouds on deadeyes over chain wales (forward of the mast: the boom swings aft of them).
     hounds = (MAST_X, 0, deck_m + THROAT_H + 0.45)
@@ -464,19 +508,37 @@ def rig_and_fittings():
         parts.append(block("chainwale", (1.1, 0.2, 0.07), tuple(wale_p), "MI_Wood_Varnish", 0.02))
         for dx in (0.12, 0.55):
             x = MAST_X + dx
-            _, out = sheer_dirs(x, side)
+            along, out = sheer_dirs(x, side)
+            upv = Vector((0.0, 0.0, 1.0))
             edge = Vector((x, side * half_beam(x), 0.0)) + out * 0.18
-            low = (edge.x, edge.y, sheer_z(x) + 0.55)
-            high = (edge.x, edge.y, sheer_z(x) + 0.95)
-            parts += rope("shroud", sagging(hounds, high, 0.04, 8), 0.02)
+            low = Vector((edge.x, edge.y, sheer_z(x) + 0.55))
+            high = Vector((edge.x, edge.y, sheer_z(x) + 0.95))
+            r_de, t_de = 0.075, 0.06
             for c in (low, high):
-                de = sb.add_cylinder("deadeye", 0.075, 0.06, U(c), "Y", 16, M["MI_Wood_Varnish"])
-                sb.transform_obj(de, (0, 0, 0))
-                sb.soften(de, 0.012, 2)
-                parts.append(de)
-            for k in (-0.035, 0.0, 0.035):
-                parts.append(rod("lanyard", (low[0] + k, low[1], low[2] + 0.06), (high[0] + k, high[1], high[2] - 0.06), 0.009, "MI_Rope_Hemp"))
-            parts.append(block("chainplate", (0.06, 0.03, 0.9), (edge.x, edge.y, sheer_z(x) + 0.1), "MI_Metal_Iron", 0.008))
+                parts.append(disc("deadeye", r_de, t_de, tuple(c), tuple(out), "MI_Wood_Varnish", 16, 0.012))
+            # Three holes per deadeye (dark, both faces) and the lanyard laced through them, alternating faces.
+            hu = [high + along * -0.032 + upv * 0.018, high + along * 0.032 + upv * 0.018, high + upv * -0.034]
+            hl = [low + along * -0.032 + upv * -0.018, low + along * 0.032 + upv * -0.018, low + upv * 0.034]
+            for h in hu + hl:
+                for f_side in (-1, 1):
+                    parts.append(disc("hole", 0.013, 0.004, tuple(h + out * (f_side * (t_de * 0.5 + 0.001))), tuple(out), "MI_Caulk_Dark", 8))
+            face = t_de * 0.5 + 0.012
+            runs = [(hu[0], hl[0], 1), (hl[0], hu[1], -1), (hu[1], hl[1], 1), (hl[1], hu[2], -1), (hu[2], hl[2], 1)]
+            for a_p, b_p, f_side in runs:
+                parts.append(rod("lanyard", tuple(a_p + out * (f_side * face)), tuple(b_p + out * (f_side * face)), 0.009, "MI_Rope_Hemp", 8))
+            for h in hu + hl:
+                parts.append(rod("lanyard", tuple(h - out * face), tuple(h + out * face), 0.009, "MI_Rope_Hemp", 8))
+            # The shroud, taut, turns round the upper deadeye's rim and is seized to itself above it.
+            parts.append(ring("shroud_eye", r_de + 0.017, 0.019, tuple(high), tuple(out), "MI_Rope_Hemp"))
+            seize = high + upv * 0.36
+            for s_side in (-1, 1):
+                parts.append(rod("shroud_leg", tuple(high + along * (s_side * 0.05) + upv * 0.075), tuple(seize), 0.019, "MI_Rope_Hemp"))
+            for k in range(3):
+                parts.append(ring("seizing", 0.028, 0.009, tuple(seize + upv * (0.05 + k * 0.05)), (0, 0, 1), "MI_Rope_Hemp", 12))
+            parts.append(rod("shroud", tuple(seize), hounds, 0.02, "MI_Rope_Hemp"))
+            # The lower deadeye sits in an iron strap on the chainplate.
+            parts.append(ring("strap", r_de + 0.012, 0.011, tuple(low), tuple(out), "MI_Metal_Iron"))
+            parts.append(block("chainplate", (0.06, 0.03, 0.8), (edge.x - out.x * 0.01, edge.y - out.y * 0.01, sheer_z(x) + 0.07), "MI_Metal_Iron", 0.008))
     parts += rope("forestay", sagging((MAST_X, 0, top - 0.3), (HALF_LENGTH + 0.02, 0, sheer_z(HALF_LENGTH) + 0.55), 0.12, 10), 0.022)
     # Wheel pedestal: a chunky square post with a head block.
     hub_z = sheer_z(WHEEL_X) + WHEEL_H
@@ -574,7 +636,7 @@ def deck_gear():
     for k, y in enumerate((-1.08, -0.96)):
         x0, x1 = 0.7 + k * 0.1, 3.3 + k * 0.05
         z = deck_z((x0 + x1) / 2, y) + 0.04 + k * 0.035
-        loom = tb.spar("oar", x1 - x0, 0.03, 0.026, M["MI_Wood_Varnish"], nseed(), sides=10, sweep=0.01, axis=(1, 0, 0))
+        loom = tb.spar("oar", x1 - x0, 0.03, 0.026, M["MI_Wood_Varnish"], nseed(), sides=16, sweep=0.012, axis=(1, 0, 0), facets=6, checks=0)
         loom.data.transform(Matrix.Translation(U((x0, y, z))))
         parts.append(loom)
         parts.append(tb.rough_plank("oar_blade", 0.7, 0.14, 0.022, U((x1 + 0.3, y, z)), (0, 0, 0), M["MI_Wood_Varnish"], nseed(),
@@ -591,6 +653,44 @@ def deck_gear():
         sb.soften(fender, 0.04, 3)
         parts.append(fender)
         parts += rope("fender_line", [(fx, fy, fz + 0.22), (fx, bs + 0.1, sheer_z(fx) + 0.3), top], 0.012)
+    # Windlass on the foredeck: a hewn drum between two cheek posts, rope wound on it, iron crank handles.
+    wx = 3.55
+    wz = deck_z(wx, 0.0)
+    for y in (-0.5, 0.5):
+        parts.append(post("windlass_cheek", 0.07, 0.62, (wx, y, wz - 0.03), "MI_Wood_Varnish", 4, 0.9))
+    drum = tb.spar("windlass_drum", 0.86, 0.12, 0.12, M["MI_Wood_Varnish"], nseed(), sides=24, sweep=0.0, axis=(0, 1, 0), facets=8, checks=1)
+    drum.data.transform(Matrix.Translation(U((wx, 0.43, wz + 0.34))))      # spar axes are Blender space: +Y = Unreal -Y
+    parts.append(drum)
+    for k in range(5):
+        parts.append(ring("windlass_rope", 0.135, 0.02, (wx, -0.16 + k * 0.07, wz + 0.34), (0, 1, 0), "MI_Rope_Hemp"))
+    for y in (-0.6, 0.6):
+        parts.append(rod("crank", (wx, y * 0.95, wz + 0.34), (wx, y * 1.08, wz + 0.34), 0.02, "MI_Metal_Iron"))
+        parts.append(rod("crank_arm", (wx, y * 1.08, wz + 0.34), (wx - 0.05, y * 1.08, wz + 0.08), 0.018, "MI_Metal_Iron"))
+        parts.append(rod("crank_grip", (wx - 0.05, y * 1.08, wz + 0.08), (wx - 0.05, y * 1.2, wz + 0.08), 0.022, "MI_Wood_Varnish"))
+    # Cathead: a stout timber out over the starboard bow, where the anchor hangs (ASaltBoat's Cathead point).
+    ca, cb = Vector((4.25, 0.32, sheer_z(4.25) + 0.2)), Vector((4.6, 0.98, sheer_z(4.6) + 0.27))
+    d = cb - ca
+    parts.append(tb.rough_plank("cathead", d.length + 0.08, 0.15, 0.13, tuple(U(tuple((ca + cb) * 0.5))),
+                                (0, 0, math.atan2(-d.y, d.x)), M["MI_Wood_Varnish"], nseed(), wear=0.6, grooves=(1, 1), split_chance=0.0))
+    parts.append(disc("cathead_sheave", 0.06, 0.16, tuple(cb + Vector((0.0, 0.0, -0.02))), (d.x, d.y, 0.0), "MI_Metal_Iron", 12))
+    # Repair: a weathered board nailed over the starboard planking aft, just above the waterline.
+    th = strake_bounds()
+    pa_r, pb_r = th[4], th[5]
+
+    def patch_frame(sfrac):
+        x = -2.55 + 0.6 * sfrac
+        pa, pb = Vector(section_point(x, pa_r, 1)), Vector(section_point(x, pb_r, 1))
+        a = (pb - pa).normalized()
+        n = Vector((0.0, a.z, -a.y))
+        if n.y < 0.0:
+            n = -n
+        return (pa + pb) * 0.5 + n * (PLANK_T + 0.012), a, n, 1.0
+    parts.append(laid_board("repair", 0.6, 0.2, 0.022, patch_frame, "MI_Wood_DockWeathered", wear=0.9, grooves=(1, 2), split=0.5))
+    for sf in (0.08, 0.92):
+        pm, am, nm, _ = patch_frame(sf)
+        for off in (-0.07, 0.07):
+            parts.append(nail(tuple(pm + nm * 0.011 + am * off), tuple(nm)))
+
     # Horn cleats on the covering boards fore and aft.
     for cxx in (3.55, -3.55):
         for side in (-1, 1):
@@ -678,6 +778,8 @@ def hull_collision(mesh_name):
     add([(cx + dx, cy + dy, z) for dx in (-0.27, 0.27) for dy in (-0.2, 0.2) for z in (deck_z(cx, cy) - 0.03, deck_z(cx, cy) + 0.39)])
     px = MAST_X - 0.42
     add([(px + dx, dy, z) for dx in (-0.07, 0.07) for dy in (-0.5, 0.5) for z in (deck_z(px, 0) - 0.03, deck_z(px, 0) + 0.66)])
+    wx = 3.55
+    add([(wx + dx, dy, z) for dx in (-0.14, 0.14) for dy in (-0.58, 0.58) for z in (deck_z(wx, 0) - 0.03, deck_z(wx, 0) + 0.6)])
     return cols
 
 
@@ -774,7 +876,7 @@ def build_hull():
 # --- moving parts -------------------------------------------------------------------------------------------
 def build_spar(name, length, radius, end_radius, jaw_gap):
     """Hewn spar along -X from the pivot with forked jaws around the mast and an iron band at the outer end."""
-    parts = [tb.spar("spar", length, radius, end_radius, M["MI_Wood_Varnish"], nseed(), sides=14, sweep=0.03)]
+    parts = [tb.spar("spar", length, radius, end_radius, M["MI_Wood_Varnish"], nseed(), sides=28, sweep=0.035, facets=8)]
     for s in (-1, 1):
         parts.append(tb.rough_plank("jaw", 0.42, 0.07, 0.16, (0.06, s * (jaw_gap + 0.035), 0.0), (math.pi / 2, 0, 0),
                                     M["MI_Wood_Varnish"], nseed(), wear=0.4, grooves=(0, 1), split_chance=0.0))
@@ -817,7 +919,23 @@ def build_sail():
         for i in range(len(us) - 1):
             f = bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
             f.smooth = True
-    sail = mesh_object("cloth", bm, ["MI_Canvas"])
+    # Two patches sewn on where the cloth wore through (both sides), a little offset from the cloth.
+    for (u0, u1, v0, v1) in ((0.56, 0.68, 0.34, 0.44), (0.2, 0.3, 0.62, 0.7)):
+        for f_side in (-1, 1):
+            n_u, n_v = 4, 4
+            pg = []
+            for j in range(n_v + 1):
+                row = []
+                for i in range(n_u + 1):
+                    q = point(u0 + (u1 - u0) * i / n_u, v0 + (v1 - v0) * j / n_v)
+                    row.append(bm.verts.new(U((q[0], q[1] + f_side * 0.011, q[2]))))
+                pg.append(row)
+            for j in range(n_v):
+                for i in range(n_u):
+                    face = (pg[j][i], pg[j][i + 1], pg[j + 1][i + 1], pg[j + 1][i])
+                    fc = bm.faces.new(face if f_side > 0 else tuple(reversed(face)))
+                    fc.smooth = True
+    sail = mesh_object("cloth", bm, ["MI_SailCloth"])
     solid = sail.modifiers.new("Solidify", "SOLIDIFY")
     solid.thickness = 0.016
     solid.offset = 0.0
@@ -826,17 +944,17 @@ def build_sail():
     # Boltrope round the edges.
     edge = [point(0.0, j / nv) for j in range(nv + 1)] + [point(u, 1.0) for u in us[1:]] + \
            [point(1.0, j / nv) for j in range(nv - 1, -1, -1)] + [point(u, 0.0) for u in reversed(us[:-1])]
-    parts += rope("boltrope", edge, 0.024)
+    parts += rope("boltrope", edge, 0.024, "MI_SailRope")
     # Reef points: short ties through the cloth along a line a fifth of the way up.
     for k in range(panels):
         u = (k + 0.5) / panels
         p = Vector(point(u, 0.2))
-        parts.append(rod("reef", tuple(p - Vector((0, 0.07, 0.0))), tuple(p + Vector((0, 0.07, -0.08))), 0.01, "MI_Rope_Hemp", 6))
+        parts.append(rod("reef", tuple(p - Vector((0, 0.07, 0.0))), tuple(p + Vector((0, 0.07, -0.08))), 0.01, "MI_SailRope", 6))
     # Mast hoops (centred on the mast axis at the sail's luff).
     n_hoops = int(rise / 0.55)
     for k in range(n_hoops):
         z = 0.35 + (rise - 0.5) * k / max(n_hoops - 1, 1)
-        hoop = sb.add_torus("hoop", 0.175, 0.026, U((0.0, 0.0, z)), (0, 0, 0), 24, 8, M["MI_Wood_Varnish"])
+        hoop = sb.add_torus("hoop", 0.175, 0.026, U((0.0, 0.0, z)), (0, 0, 0), 24, 8, M["MI_SailHoop"])
         parts.append(hoop)
     obj = finish(parts, "SM_Boat_Sail", wear=0.0, chips=0.0)
     export(obj)
@@ -902,12 +1020,39 @@ def build_gangway():
     export(obj, cols)
 
 
+def build_anchor():
+    """Fisherman's anchor, hanging from its ring (pivot at the ring, shank down -Z): iron shank, crown and arms with
+    flukes, a wooden stock with iron bands across the top."""
+    parts = [ring("ring", 0.075, 0.018, (0, 0, 0), (0, 1, 0), "MI_Metal_Iron"),
+             rod("shank", (0, 0, -0.06), (0, 0, -1.02), 0.034, "MI_Metal_Iron", 10)]
+    for p in parts:
+        for f in p.data.polygons:
+            f.use_smooth = True
+    # Arms: an arc up from the crown to both sides, flukes on their ends.
+    c = Vector((0.0, 0.0, -0.62))
+    for side in (-1, 1):
+        pts = [tuple(c + Vector((side * 0.4 * math.sin(math.radians(a)), 0.0, -0.4 * math.cos(math.radians(a))))) for a in range(0, 66, 11)]
+        for a_p, b_p in zip(pts[:-1], pts[1:]):
+            parts.append(rod("arm", a_p, b_p, 0.032, "MI_Metal_Iron", 10))
+        tip = Vector(pts[-1])
+        fl = block("fluke", (0.17, 0.035, 0.2), tuple(tip + Vector((side * 0.02, 0.0, -0.06))), "MI_Metal_Iron", 0.01)
+        sb.transform_obj(fl, (0, side * 0.6, 0), tuple(U(tuple(tip))))
+        parts.append(fl)
+    parts.append(tb.rough_plank("stock", 0.85, 0.085, 0.085, (0.0, 0.0, -0.17), (0, 0, math.pi / 2), M["MI_Wood_Varnish"], nseed(),
+                                wear=0.7, grooves=(1, 1), split_chance=0.0))
+    for y in (-0.33, 0.33):
+        parts.append(ring("stock_band", 0.06, 0.012, (0, y, -0.17), (0, 1, 0), "MI_Metal_Iron", 16))
+    obj = finish(parts, "SM_Boat_Anchor", wear=0.8, chips=0.0)
+    export(obj)
+
+
 def main():
-    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway"]
+    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway", "anchor"]
     builds = [("hull", build_hull),
               ("spars", lambda: build_spar("SM_Boat_Boom", BOOM_L, 0.085, 0.068, 0.14)),
               ("spars", lambda: build_spar("SM_Boat_Gaff", GAFF_L, 0.075, 0.06, 0.13)),
-              ("sail", build_sail), ("rudder", build_rudder), ("wheel", build_wheel), ("gangway", build_gangway)]
+              ("sail", build_sail), ("rudder", build_rudder), ("wheel", build_wheel), ("gangway", build_gangway),
+              ("anchor", build_anchor)]
     for part, fn in builds:
         if part in args:
             sb.reset_scene()

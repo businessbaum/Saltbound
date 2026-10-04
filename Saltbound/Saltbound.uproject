@@ -50,6 +50,10 @@
 		{
 			"Name": "AutomationTestToolset",
 			"Enabled": true
+		},
+		{
+			"Name": "CableComponent",
+			"Enabled": true
 		}
 	]
 }

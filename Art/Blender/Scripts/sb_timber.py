@@ -226,17 +226,26 @@ def bend_board(obj, length, frame):
     return obj
 
 
-def spar(name, length, radius, end_radius, material=None, seed=0, sides=14, sweep=0.03, axis=(-1.0, 0.0, 0.0)):
-    """Hand-shaped round spar (mast, boom, gaff): tapered, faceted from the adze, gently crooked along its length,
-    with shallow dents and a few knot bumps, so no two stretches look alike.
+def spar(name, length, radius, end_radius, material=None, seed=0, sides=36, sweep=0.03, axis=(-1.0, 0.0, 0.0),
+         facets=8, checks=None):
+    """Old, hand-shaped spar (mast, boom, gaff, oar): hewn with the adze into `facets` flats with soft corners,
+    tapered, gently crooked, with dents, knot bumps and long seasoning cracks along the grain, so it reads as
+    weathered timber rather than a turned cylinder (owner: "the mast is pixel perfect").
     Built from the origin along `axis`; returns the object."""
     from mathutils import noise as mnoise
     rng = random.Random(seed)
-    rings = max(8, int(length / 0.12))
+    rings = max(8, int(length / 0.1))
     bow_y, bow_z = Wave1D(rng, 2, 0.5), Wave1D(rng, 2, 0.5)
-    radii = [rng.uniform(0.94, 1.05) for _ in range(sides)]
-    knots = [(rng.uniform(0.05, 0.95), rng.uniform(0, 2 * math.pi), rng.uniform(0.04, 0.07)) for _ in range(max(2, int(length / 2.5)))]
+    facet_phase = rng.uniform(0, 2 * math.pi)
+    facet_depth = [rng.uniform(0.85, 1.15) for _ in range(facets)]
+    knots = [(rng.uniform(0.05, 0.95), rng.uniform(0, 2 * math.pi), rng.uniform(0.05, 0.1)) for _ in range(max(2, int(length / 1.5)))]
+    n_checks = checks if checks is not None else max(2, int(length / 0.9))
+    cracks = []
+    for _ in range(n_checks):
+        t0 = rng.uniform(0.02, 0.85)
+        cracks.append((t0, min(t0 + rng.uniform(0.5, 2.2) / length, 0.98), rng.randrange(sides), rng.uniform(0.1, 0.17)))
     offset = Vector((rng.uniform(0, 50), rng.uniform(0, 50), rng.uniform(0, 50)))
+    step = 2 * math.pi / facets
     bm = bmesh.new()
     rows = []
     for r in range(rings + 1):
@@ -247,13 +256,23 @@ def spar(name, length, radius, end_radius, material=None, seed=0, sides=14, swee
         row = []
         for i in range(sides):
             a = 2 * math.pi * i / sides
-            # Dents (adze and wear) and knot bumps.
-            dent = 0.03 * mnoise.noise(Vector((t * length * 2.2, math.cos(a) * 1.5, math.sin(a) * 1.5)) + offset)
+            # Hewn flats: a polygon section blended with the round log (soft corners).
+            k = int(((a - facet_phase) % (2 * math.pi)) / step)
+            local = ((a - facet_phase) % step) - step / 2
+            flat = math.cos(step / 2) / math.cos(local)
+            shape = 0.3 + 0.7 * flat * (1.0 + 0.06 * (facet_depth[k % facets] - 1.0))
+            # Dents (adze strokes and knocks) and knot bumps.
+            dent = 0.06 * mnoise.noise(Vector((t * length * 2.4, math.cos(a) * 1.8, math.sin(a) * 1.8)) + offset)
             bump = 0.0
             for kt, ka, kh in knots:
                 da = math.atan2(math.sin(a - ka), math.cos(a - ka))
-                bump += kh * math.exp(-((t - kt) * length / 0.07) ** 2 - (da / 0.35) ** 2)
-            r_i = rad * radii[i] * (1.0 + dent + bump)
+                bump += kh * math.exp(-((t - kt) * length / 0.07) ** 2 - (da / 0.3) ** 2)
+            # Seasoning checks: narrow cracks along the grain, tapering at their ends.
+            crack = 0.0
+            for c0, c1, ci, cd in cracks:
+                if c0 <= t <= c1 and i == ci:
+                    crack = max(crack, cd * min((t - c0) * length / 0.15, (c1 - t) * length / 0.15, 1.0))
+            r_i = rad * shape * (1.0 + dent + bump - crack)
             row.append(bm.verts.new((t * length, cy + math.cos(a) * r_i, cz + math.sin(a) * r_i)))
         rows.append(row)
     for r in range(rings):
@@ -264,13 +283,25 @@ def spar(name, length, radius, end_radius, material=None, seed=0, sides=14, swee
     for row, rev in ((rows[0], True), (rows[-1], False)):
         f = bm.faces.new(list(reversed(row)) if rev else row)
         f.smooth = False
+    # Sharp corners between the adze flats, so each flat catches the light on its own.
+    def facet_of(i):
+        return int(((2 * math.pi * i / sides - facet_phase) % (2 * math.pi)) / step)
+    corners = [i for i in range(sides) if facet_of(i) != facet_of(i - 1)]
+    for r in range(rings):
+        for i in corners:
+            e = bm.edges.get((rows[r][i], rows[r + 1][i]))
+            if e:
+                e.smooth = False
     bm.normal_update()
     uv = bm.loops.layers.uv.verify()
     du = rng.uniform(0, 1)
     for f in bm.faces:
-        for loop in f.loops:
-            c = loop.vert.co
-            loop[uv].uv = (c.x + du, math.atan2(c.z, c.y) * radius)      # grain along the spar
+        angs = [math.atan2(l.vert.co.z, l.vert.co.y) for l in f.loops]
+        wrap = max(angs) - min(angs) > math.pi
+        for loop, ang in zip(f.loops, angs):
+            if wrap and ang < 0.0:
+                ang += 2 * math.pi
+            loop[uv].uv = (loop.vert.co.x + du, ang * radius)      # grain along the spar, no seam squash
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()

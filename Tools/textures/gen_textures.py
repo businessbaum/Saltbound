@@ -236,11 +236,12 @@ def wood_grain():
     apart), rare stretched arches, no fibre noise; the board shapes carry the rest."""
     size = 2048
     latewood, knot_dark, band, fibers, broad = wood_field(size, seed=4, rings=18.0, line_w=0.16)
-    albedo = 0.6 + 0.09 * broad + 0.05 * (band - 0.5) - 0.07 * latewood - 0.18 * knot_dark
+    # D41: the grain reads again (owner: "the mast has no texture"), still broad and calm.
+    albedo = 0.6 + 0.1 * broad + 0.07 * (band - 0.5) - 0.13 * latewood - 0.2 * knot_dark
     rgb = np.stack([albedo * 1.00, albedo * 0.93, albedo * 0.84], -1)
-    height = -latewood * 0.8 + band * 0.12 - knot_dark * 0.4
+    height = -latewood * 1.0 + band * 0.15 - knot_dark * 0.4
     save_rgb(os.path.join(OUT, "Wood", "T_WoodGrain_D.png"), rgb)
-    save_normal(os.path.join(OUT, "Wood", "T_WoodGrain_N.png"), height_to_normal(height, 2.2))
+    save_normal(os.path.join(OUT, "Wood", "T_WoodGrain_N.png"), height_to_normal(height, 3.2))
     ao = 1.0 - 0.08 * latewood - 0.15 * knot_dark
     rough = np.clip(0.66 + 0.08 * latewood - 0.04 * broad, 0, 1)
     save_rgb(os.path.join(OUT, "Wood", "T_WoodGrain_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))

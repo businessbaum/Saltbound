@@ -52,6 +52,8 @@ LOOK_PARAMS = ["LookAbsorption", "LookScattering", "LookCrest"]
 #   UnderwaterColor = (stylised in-scatter colour rgb, share replacing the physical albedo) - turquoise like the
 #                     owner's Sea of Thieves references, while extinction still follows the region's water
 UNDER_PARAMS = ["UnderwaterFog", "UnderwaterSky", "UnderwaterColor"]
+# The player boat's pose (ASaltBoat, D42): position (w = 1 enables the hull cut-out) and its forward / right / up axes.
+BOAT_PARAMS = ["BoatPos", "BoatAxisX", "BoatAxisY", "BoatAxisZ"]
 PS_EXTRA = ["RippleOffsets", "LookCrest"]
 
 
@@ -67,6 +69,7 @@ MPC_DEFAULTS = {
     "CalmMin": (1, 1, 1, 1), "Chop": (1, 0, 3, 250),
     "Cascade0": cascade_default(0), "Cascade1": cascade_default(1), "Cascade2": cascade_default(2),
     "LookAbsorption": (1.35, 0.26, 0.15, 1), "LookScattering": (0.01, 0.065, 0.1, 1),
+    "BoatPos": (0, 0, -1.0e9, 0), "BoatAxisX": (1, 0, 0, 0), "BoatAxisY": (0, 1, 0, 0), "BoatAxisZ": (0, 0, 1, 0),
     "LookCrest": (0.1, 0.95, 0.9, 1),
     "UnderwaterFog": (0.12, 1.0, 0.3, 0.3), "UnderwaterSky": (0.25, 0.06, 0.3, 0.6), "UnderwaterColor": (0.12, 0.48, 0.62, 1.0),
 }
@@ -76,7 +79,7 @@ MPC_DEFAULTS = {
 def make_mpc():
     mpc = sb_ue.get_or_create_asset("MPC_Ocean", DIR, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
     names = (WAVE_PARAMS + PHASE_PARAMS + PREV_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals", "RippleOffsets"]
-             + CASCADE_PARAMS + LOOK_PARAMS + UNDER_PARAMS)
+             + CASCADE_PARAMS + LOOK_PARAMS + UNDER_PARAMS + BOAT_PARAMS)
     # Keep existing entries: each has an ID that materials reference. Recreated entries get new IDs and every
     # material not rebuilt in the same run fails to compile ("invalid parameter") and renders the default material.
     existing = {str(p.get_editor_property("parameter_name")): p for p in mpc.get_editor_property("vector_parameters")}
@@ -580,10 +583,36 @@ def sun_nodes(m, x, y, position=None):
     return sun_dir, sun_illum
 
 
+# Hull cut-out (D42): the sea is not drawn inside the player boat's hull, up to its bulwark top, so waves never show
+# inside the boat or wash over its deck. The shape mirrors Saltbound/Source/Saltbound/Boat/SaltHullShape.h (metres).
+BOAT_MASK_CODE = """
+if (BoatPos.w < 0.5) return 1.0;
+float3 D = WorldPos - BoatPos.xyz;
+float x = dot(D, BoatAxisX.xyz) * 0.01;
+float y = abs(dot(D, BoatAxisY.xyz)) * 0.01;
+float z = dot(D, BoatAxisZ.xyz) * 0.01;
+if (abs(x) > 4.98) return 1.0;
+float t = x / 5.0;
+float Zs = 0.75 + 0.3 * t * t;
+float Bs = 1.7 * pow(max(1.0 - pow(abs(t), 2.2), 0.0), 0.55);
+float s = saturate((abs(x) - 3.0) / 2.0);
+float Zb = -0.65 + 1.7 * s * s * s;
+if (z > Zs + 0.45 || z < Zb) return 1.0;
+float Half = Bs;
+if (z < Zs)
+{
+    float CosT = saturate((Zs - z) / max(Zs - Zb, 1e-4));
+    Half = Bs * pow(sqrt(1.0 - CosT * CosT), 0.8);
+}
+return y < Half - 0.02 ? 0.0 : 1.0;
+"""
+
+
 def make_material(mpc, ush, rts):
     m = sb_ue.reset_material("M_Ocean", DIR)
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
-    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+    # Masked (D42): the boat's hull is cut out of the sea (opacity mask), including in the depth pre-pass.
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
     m.set_editor_property("tangent_space_normal", False)
     m.set_editor_property("used_with_instanced_static_meshes", True)
     ctx = ocean_inputs(m, mpc, rts, VS_TEXTURES + PS_TEXTURES, SCALARS)
@@ -615,6 +644,12 @@ def make_material(mpc, ush, rts):
     sb_ue.to_prop(ps, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
     sb_ue.to_prop(ps, "EmissiveOut", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     sb_ue.to_prop(ps, "SpecularOut", unreal.MaterialProperty.MP_SPECULAR)
+    boat = {n: mpc_param(m, mpc, n, -1200, 1500 + i * 60) for i, n in enumerate(BOAT_PARAMS)}
+    mask = custom(m, -700, 1500, "Boat hull cut-out (D42)", BOAT_MASK_CODE, ["WorldPos"] + BOAT_PARAMS, F1)
+    link(wp_ps, "", mask, "WorldPos")
+    for n in BOAT_PARAMS:
+        link(boat[n], "", mask, n)
+    sb_ue.to_prop(mask, "", unreal.MaterialProperty.MP_OPACITY_MASK)
 
     # --- water volume (Single Layer Water output): absorption and scattering per region (MPC Look*).
     nodes = ctx["nodes"]

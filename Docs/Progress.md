@@ -220,6 +220,9 @@ for a higher screen percentage (for example 75 %) and more content.
 - **Beach with shape (D37, awaiting the owner's check):** the dry beach has sculpted wind ripples, soft mounds and
   swash ridges (Nanite sand mesh); the sea floor keeps its earlier look.
 - **D39:** player 1.5 m; no lichen on the coastal rocks; gulls over the cove and at sea; a gangway to the boat.
+- **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
+  points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
+  old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
 - **D40 (awaiting the owner's check):** the boat weathered (tone patches, paint chips, grime, rain streaks), hewn
   spars with dents and knots, and lived-in gear (pin rail, barrel, crate, bucket, oars, fenders, cleats).
 
@@ -252,7 +255,7 @@ the sail and cast off.
 | Dive (while swimming) | Left Ctrl / C | B / Circle |
 | Interact / leave station | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
-| At the boat's wheel | A / D steer, W / S sheet in / out, Space raise / lower the sail, C cast off / moor / anchor | Left stick, A, B |
+| On the boat | Wheel: A / D steer. Ropes by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor | |
 
 Developer console (`~`, non-shipping builds):
 - `sb.Lighting Day|Evening|Dusk`

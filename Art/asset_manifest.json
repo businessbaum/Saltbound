@@ -176,5 +176,11 @@
     "dest": "/Game/Saltbound/Boat",
     "nanite": false,
     "collision": "ucx"
+  },
+  "SM_Boat_Anchor": {
+    "fbx": "Boat/SM_Boat_Anchor.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
   }
 }
