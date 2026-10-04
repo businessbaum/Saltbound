@@ -262,10 +262,11 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		const float Speed = Bt->GetSpeedKnots() / 1.943844f;
 		// Trail points 1 and 2 are consecutive samples, one second apart.
 		const float Spacing = (float)FVector2D::Distance(FVector2D(P0.B, P0.A), FVector2D(P1.R, P1.G)) * 0.01f;
+		const float Extent = Get(TEXT("BoatWakeExtent")).R;
 		Report(TEXT("BoatWakeTrail"), Wake.A > 0.5f && FMath::Abs(Wake.R - Speed) < 0.5f && S0.R > 0.9f && S0.G > 0.9f
-			&& FMath::Abs(Spacing - Speed) < Speed * 0.25f, FString::Printf(
-			TEXT("wakeSpeed=%.2fm/s boatSpeed=%.2fm/s on=%.0f strengthNow=%.2f strength1=%.2f sampleSpacing=%.2fm"),
-			Wake.R, Speed, Wake.A, S0.R, S0.G, Spacing));
+			&& FMath::Abs(Spacing - Speed) < Speed * 0.25f && Extent > 35.f && Extent <= 40.f, FString::Printf(
+			TEXT("wakeSpeed=%.2fm/s boatSpeed=%.2fm/s on=%.0f strengthNow=%.2f strength1=%.2f sampleSpacing=%.2fm wakeExtent=%.1fm"),
+			Wake.R, Speed, Wake.A, S0.R, S0.G, Spacing, Extent));
 	}, nullptr, nullptr});
 	// Taking the sail in slows the boat down.
 	Steps.Add({TEXT("TakeInSail"), 20.f, [this]()
@@ -335,6 +336,13 @@ void USaltDevTestSubsystem::RunBoatSuite()
 
 	// 4) Turning circle: beam reach at speed, then full starboard rudder.
 	Steps.Add({TEXT("TurnSetup"), 0.f, [=, this]() { SetWind(0.f, 7.f); Place(TestWater, 90.f, 3.f, true, true); }, nullptr, nullptr});
+	// A boat that has just set off has no wake behind the point it started from (owner, D48).
+	Steps.Add({TEXT("WakeFresh"), 0.5f, nullptr, nullptr, [this]()
+	{
+		const ASaltBoat* Bt = TestBoat.Get();
+		const float Extent = Bt ? Bt->GetWakeExtent() : 99.f;
+		Report(TEXT("BoatWakeStartsAtBoat"), Extent < 3.f, FString::Printf(TEXT("wakeExtent=%.2fm after 0.5 s at 3 m/s"), Extent));
+	}});
 	Wait(TEXT("TurnBuild"), 15.f);
 	Steps.Add({TEXT("TurnRudder"), 3.f, [this]()
 	{
@@ -661,6 +669,24 @@ void USaltDevTestSubsystem::RunBoatSuite()
 			}});
 	}
 	Steps.Add({TEXT("FlatAgain"), 0.f, [WeakRig]() { if (ASaltLightingRig* R = WeakRig.Get()) { R->SetSeaState(TEXT("Flat"), 0.f); } }, nullptr, nullptr});
+
+	// 10b) Sailing onto Ruin Isle (D47) from the west: the boat runs aground on the beach shelf (the coast is about
+	// 47 m west of the island's centre at X = 1600 m), stays on top of the sand, and stops once the sail is in.
+	Steps.Add({TEXT("IsleSetup"), 0.f, [=, this]() { SetWind(0.f, 7.f); Place(FVector(146000.f, 60000.f, 0.f), 0.f, 3.f, true, true); }, nullptr, nullptr});
+	Steps.Add({TEXT("IsleApproach"), 45.f, [this]() { MaxValue = 0.f; },
+		[this](float) { if (const ASaltBoat* Bt = TestBoat.Get()) { MaxValue = FMath::Max(MaxValue, Bt->GetContactDepth()); } }, nullptr});
+	Steps.Add({TEXT("IsleLanding"), 12.f, [this]() { if (ASaltBoat* Bt = TestBoat.Get()) { Bt->SetSailSet(false); } },
+		[this](float) { if (const ASaltBoat* Bt = TestBoat.Get()) { MaxValue = FMath::Max(MaxValue, Bt->GetContactDepth()); } },
+		[this]()
+		{
+			const ASaltBoat* Bt = TestBoat.Get();
+			const float Speed = Bt ? Bt->GetSpeedKnots() / 1.943844f : 99.f;
+			const float X = Bt ? (float)Bt->GetActorLocation().X : 0.f;
+			const int32 Contacts = Bt ? Bt->GetContactCount() : 0;
+			Report(TEXT("BoatLandsOnRuinIsle"), Speed < 0.3f && Contacts > 0 && MaxValue < 15.f && X > 150000.f && X < 155800.f, FString::Printf(
+				TEXT("finalSpeed=%.2fm/s contacts=%d maxPenetration=%.1fcm originX=%.0fcm heel=%.1fdeg pitch=%.1fdeg"),
+				Speed, Contacts, MaxValue, X, Bt ? Bt->GetHeelDeg() : 0.f, Bt ? Bt->GetPitchDeg() : 0.f));
+		}});
 
 	// 11) Reset to the mooring; the lines hold the boat in a fresh breeze.
 	Steps.Add({TEXT("MooringSetup"), 0.f, [=, this]()

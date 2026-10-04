@@ -43,6 +43,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0", ClampMax = "1"))
 	float StopSwimImmersion = 0.45f;
 
+	/** Buoyancy while the head is at the surface (the body floats with the eyes just above the water). Fully under
+	 *  water the swimmer is neutral and hovers where they stop: no drifting up or down without input (owner, D48). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "1"))
+	float SurfaceBuoyancy = 1.2f;
+
 private:
 	void UpdateWater(float DeltaTime);
 

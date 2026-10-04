@@ -206,5 +206,54 @@
     "dest": "/Game/Saltbound/Boat",
     "nanite": false,
     "collision": "none"
+  },
+  "SM_Island_Ruin": {
+    "fbx": "Islands/SM_Island_Ruin.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": true,
+    "collision": "none",
+    "_note": "Ruin Isle (D47, build_islands.py): visible sand with sculpted ripples and vertex colours; SM_Island_Ruin_Col collides."
+  },
+  "SM_Island_Ruin_Col": {
+    "fbx": "Islands/SM_Island_Ruin_Col.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": false,
+    "collision": "complex",
+    "_note": "Ruin Isle collision (2 m cells), hidden in the map. Not Nanite: complex collision."
+  },
+  "SM_Ruin_Arch": {
+    "fbx": "Islands/SM_Ruin_Arch.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": true,
+    "collision": "complex",
+    "_note": "Broken stone gateway on Ruin Isle (D47)."
+  },
+  "SM_Ruin_Wall": {
+    "fbx": "Islands/SM_Ruin_Wall.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": true,
+    "collision": "complex",
+    "_note": "Low broken wall corner on Ruin Isle (D47)."
+  },
+  "SM_Island_Far_A": {
+    "fbx": "Islands/SM_Island_Far_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": true,
+    "collision": "complex",
+    "_note": "Island mass on the horizon, 4-7 km out (D47)."
+  },
+  "SM_Island_Far_B": {
+    "fbx": "Islands/SM_Island_Far_B.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": true,
+    "collision": "complex",
+    "_note": "Island mass on the horizon, 4-7 km out (D47)."
+  },
+  "SM_Island_Far_C": {
+    "fbx": "Islands/SM_Island_Far_C.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": true,
+    "collision": "complex",
+    "_note": "Island mass on the horizon, 4-7 km out (D47)."
   }
 }

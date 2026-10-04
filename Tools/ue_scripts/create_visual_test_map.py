@@ -73,7 +73,14 @@ zone.set_editor_property("center", unreal.Vector2D(500, 300))
 zone.set_editor_property("inner_radius", 2500.0)
 zone.set_editor_property("outer_radius", 15000.0)
 zone.set_editor_property("min_factor", 0.15)  # sheltered cove; the open sea keeps the full swell
-ocean.set_editor_property("calm_zones", [zone])
+# Ruin Isle (D47): the swell settles around the island, so its beach is not overrun.
+ISLE = (160000, 60000)
+isle_zone = unreal.SaltCalmZone()
+isle_zone.set_editor_property("center", unreal.Vector2D(*ISLE))
+isle_zone.set_editor_property("inner_radius", 8000.0)
+isle_zone.set_editor_property("outer_radius", 30000.0)
+isle_zone.set_editor_property("min_factor", 0.3)
+ocean.set_editor_property("calm_zones", [zone, isle_zone])
 # Wave height comes from the rig's sea state (StartSeaState below), not from the ocean actor.
 
 # --- seabed --------------------------------------------------------------------------------------------
@@ -142,6 +149,39 @@ for label, m, loc, yaw, s in rocks:
 # No small scatter rocks around the big ones (owner: "we dont need those", D30).
 import random  # noqa: E402
 mesh("Landmark_Spire", R + "SM_Landmark_Spire", (42000, 15000, -600), (0, 35, 0), 2.0)
+
+# --- Ruin Isle (D47): the first destination, 1.7 km out towards the Ancient Isles, and island masses on the horizon -
+I = "/Game/Saltbound/Environment/Islands/"
+isle_col = mesh("RuinIsle_Collision", I + "SM_Island_Ruin_Col", (ISLE[0], ISLE[1], 0))
+isle_col.static_mesh_component.set_editor_property("visible", False)
+isle_col.set_actor_hidden_in_game(True)
+isle = mesh("RuinIsle", I + "SM_Island_Ruin", (ISLE[0], ISLE[1], 0))
+isle.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+
+
+def isle_coast(a):
+    """Coast radius (cm) of Ruin Isle at the angle a: build_islands.coast_radius."""
+    return 5500.0 * (1.0 + 0.16 * math.sin(3 * a + 0.7) + 0.09 * math.sin(5 * a + 2.1) + 0.05 * math.sin(9 * a + 4.0))
+
+
+# The broken gateway on the knoll faces the cove; a wall corner beside it; rocks along the windward shore.
+kx, ky = ISLE[0] + 1400, ISLE[1] - 800
+kz, _ = ground(kx, ky, top=2500.0)
+mesh("RuinIsle_Arch", I + "SM_Ruin_Arch", (kx, ky, (kz or 800.0) - 15.0), (0, 200, 0))
+wz, _ = ground(kx + 700, ky + 900, top=2500.0)
+mesh("RuinIsle_Wall", I + "SM_Ruin_Wall", (kx + 700, ky + 900, (wz or 700.0) - 10.0), (0, 30, 0))
+for k, (a, rock, scale, yaw) in enumerate(((0.9, "A", 2.4, 30), (2.6, "B", 2.0, 110), (4.4, "C", 2.8, 250), (5.6, "A", 1.8, 300))):
+    r = isle_coast(a) * 0.97
+    mesh("RuinIsle_Rock%d" % k, R + "SM_Rock_Coast_" + rock, (ISLE[0] + r * math.cos(a), ISLE[1] + r * math.sin(a), -120), (0, yaw, 0), scale)
+gulls_isle = spawn(unreal.SaltBirds, (ISLE[0], ISLE[1], 0), label="Gulls_RuinIsle")
+gulls_isle.set_editor_property("count", 6)
+gulls_isle.set_editor_property("seed", 33)
+gulls_isle.set_editor_property("area_radius", 6000.0)
+# Island masses 4-7 km out: the haze fades them into the sky.
+for label, name, loc, yaw in (("FarIsland_A", "SM_Island_Far_A", (550000, 250000), 20),
+                              ("FarIsland_B", "SM_Island_Far_B", (700000, -150000), 140),
+                              ("FarIsland_C", "SM_Island_Far_C", (420000, -480000), 75)):
+    mesh(label, I + name, (loc[0], loc[1], -300), (0, yaw, 0))
 
 # --- pier --------------------------------------------------------------------------------------------
 H = "/Game/Saltbound/Environment/Harbor/"

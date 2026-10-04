@@ -165,7 +165,7 @@ void ASaltPlayerCharacter::Tick(float DeltaSeconds)
 		Move->MaxSwimSpeed = bSprinting ? SwimSprintSpeed : SwimSpeed;
 		if (IsSwimming())
 		{
-			// Space rises (or climbs out at a ledge), Dive sinks; buoyancy holds the head at the surface.
+			// Space rises (or climbs out at a ledge), Dive sinks; under water the swimmer hovers, at the surface floats.
 			if (bSwimUpHeld && TryClimbOutOfWater())
 			{
 				bSwimUpHeld = false;

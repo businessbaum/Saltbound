@@ -4,7 +4,9 @@
 // Boat frame in metres: x forward from the boat's origin, y to starboard. The hull is the one of
 // Source/Saltbound/Boat/SaltHullShape.h (half length 5 m, half beam 1.7 m), as in the ocean's hull cut-out.
 // Inputs (MPC_Ocean): BoatPos (cm, w = 1 when the boat masks the sea), BoatAxisX, BoatWake (x = forward speed in
-// m/s, y = trail sample fraction, z = strength, w = 1 when on). Speed U sets the shape: the transverse wavelength
+// m/s, y = trail sample fraction, z = strength, w = 1 when on), BoatWakeExtent (x = how far the boat has come on its
+// recent straight course, m: the wake behind the bow reaches no further than the boat has been, D48). Speed U sets
+// the shape: the transverse wavelength
 // 2 pi U^2 / g (9 m at 7 kn) and the height (0.022 U^2 m, 0.32 m at 7 kn).
 // White water (D45): along the bow wave's crest and in a collar against the hull, and the trail: BoatTrailP0..7 hold
 // 16 stern positions (cm, two per vector, newest first; point 0 is the stern now, point k >= 1 the stern
@@ -20,14 +22,16 @@ struct FSaltBoatWake
 	float U;
 	float A;
 	float K;
+	float Extent;
 	bool bOn;
 	float2 Tp[16];
 	float Ts[16];
 	float Frac;
 	bool bTrail;
 
-	void Init(float4 BoatPos, float4 BoatAxisX, float4 BoatWake)
+	void Init(float4 BoatPos, float4 BoatAxisX, float4 BoatWake, float4 BoatWakeExtent)
 	{
+		Extent = 10.0 + max(BoatWakeExtent.x, 0.0);   // the hull's own length, plus the way it has come
 		Pos = BoatPos.xy;
 		Ax = normalize(BoatAxisX.xy + float2(1e-5, 0.0));
 		U = max(BoatWake.x, 0.0);
@@ -69,6 +73,8 @@ struct FSaltBoatWake
 		const float ay = abs(y);
 		const float s = 4.95 - x;                       // distance aft of the stem
 		const float Hb = HalfBreadth(clamp(x, -4.95, 4.95));
+		// Only where the boat has been: the wake ends a little behind the point it set off from (or turned).
+		const float Reach = 1.0 - smoothstep(Extent - 6.0, Extent + 2.0, s);
 		float H = 0.0;
 
 		// Water piled up at the stem.
@@ -90,7 +96,7 @@ struct FSaltBoatWake
 			const float Yr = max(Hb + 0.25, s * 0.4);
 			const float W = 0.45 + 0.05 * s;
 			const float q = (ay - Yr) / W;
-			const float Env = smoothstep(0.0, 1.0, s) * rsqrt(1.0 + s / 3.0) * exp(-s / 30.0);
+			const float Env = smoothstep(0.0, 1.0, s) * rsqrt(1.0 + s / 3.0) * exp(-s / 30.0) * Reach;
 			H += A * Env * (exp(-q * q) - 0.5 * exp(-(q + 1.7) * (q + 1.7)));
 		}
 
@@ -98,7 +104,7 @@ struct FSaltBoatWake
 		// (the two wave directions with tan(a) = tan(t) / (1 + 2 tan^2(t)) at polar angle a), strongest along the
 		// cusp lines and fading just outside them. The square root is softened at the cusp (a real cusp is smooth,
 		// not a crease); the divergent waves fade near the track, where they get too short to draw.
-		if (s > 6.0)
+		if (s > 6.0 && Reach > 0.0)
 		{
 			const float TanA = max(ay / s, 1e-3);
 			const float Disc = 1.0 - 8.0 * TanA * TanA;
@@ -112,7 +118,7 @@ struct FSaltBoatWake
 			const float Pt = K * (s + ay * Tt) * sqrt(1.0 + Tt * Tt);
 			const float Pd = K * (s + ay * Td) * sqrt(1.0 + Td * Td);
 			const float Wd = 1.0 - smoothstep(1.5, 3.0, Td);
-			H += Amp * (cos(Pt) + Wd * cos(Pd));
+			H += Amp * Reach * (cos(Pt) + Wd * cos(Pd));
 		}
 
 		// A shallow hollow down the middle of the track behind the stern.
@@ -120,7 +126,7 @@ struct FSaltBoatWake
 		if (Aft > 0.0)
 		{
 			const float Wt = 1.0 + 0.06 * Aft;
-			H -= 0.25 * A * exp(-(y / Wt) * (y / Wt)) * exp(-Aft / 20.0) * smoothstep(0.0, 2.0, Aft);
+			H -= 0.25 * A * exp(-(y / Wt) * (y / Wt)) * exp(-Aft / 20.0) * smoothstep(0.0, 2.0, Aft) * Reach;
 		}
 		return H * 100.0;
 	}
@@ -154,8 +160,9 @@ struct FSaltBoatWake
 		return k == 0 ? 0.0 : (float)(k - 1) + Frac;
 	}
 
-	// Trail coverage at XY (cm): a band behind the stern, about 1 m either side at first, widening by 0.2 m a second
-	// and fading over about 12 s.
+	// Trail coverage at XY (cm): a band behind the stern, about 1 m either side at first, widening by 0.2 m a second.
+	// It fades out smoothly from 5 s and is gone by 13.5 s, before the oldest sample (14-15 s) is dropped: the end of
+	// the trail never vanishes a segment at a time (owner, D48).
 	float Trail(float2 XY)
 	{
 		if (!bTrail || dot(XY - Tp[0], XY - Tp[0]) > 12000.0 * 12000.0)
@@ -171,7 +178,7 @@ struct FSaltBoatWake
 			const float d = length(XY - (A + AB * t)) * 0.01;
 			const float Age = lerp(TrailAge(k), TrailAge(k + 1), t);
 			const float W = 0.9 + 0.2 * Age;
-			Cov = max(Cov, lerp(Ts[k], Ts[k + 1], t) * exp(-(d / W) * (d / W)) * exp(-Age / 12.0));
+			Cov = max(Cov, lerp(Ts[k], Ts[k + 1], t) * exp(-(d / W) * (d / W)) * (1.0 - smoothstep(5.0, 13.5, Age)));
 		}
 		return Cov;
 	}
@@ -198,7 +205,7 @@ struct FSaltBoatWake
 		float Cov = exp(-Off * Off) * smoothstep(-0.6, 0.2, s) * (1.0 - smoothstep(2.0, 10.0, s)) * 0.9;
 		const float Yr = max(Hb + 0.25, s * 0.4);
 		const float q = (ay - Yr) / (0.45 + 0.05 * s);
-		Cov = max(Cov, exp(-2.0 * q * q) * smoothstep(0.0, 0.8, s) * exp(-s / 6.0));
+		Cov = max(Cov, exp(-2.0 * q * q) * smoothstep(0.0, 0.8, s) * exp(-s / 6.0) * (1.0 - smoothstep(Extent - 6.0, Extent + 2.0, s)));
 		return Cov * saturate(A / 0.3);
 	}
 

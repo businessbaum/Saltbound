@@ -124,6 +124,8 @@ public:
 	void GetLadderPath(bool bStarboard, bool bUp, float CapsuleHalfHeight, TArray<FVector>& OutPoints, TArray<bool>& OutStepped) const;
 	/** 0 = anchor up .. 1 = anchor holding the boat (smooth stop, no turning). */
 	float GetAnchorHold() const { return AnchorHold; }
+	/** How far (m) the bow wave and Kelvin wake reach behind the stern: the boat's recent straight course (D48). */
+	float GetWakeExtent() const;
 	/** One line for logs and tests (SB_BOAT). */
 	FString Describe() const;
 
@@ -373,6 +375,7 @@ private:
 	TArray<FVector2D> TrailPoints;
 	TArray<float> TrailStrength;
 	float TrailClock = 0.f;
+	float WakeExtentShown = 0.f;               // eased and capped GetWakeExtent() for the sea (m)
 	FVector AnchorGround = FVector::ZeroVector;   // world, cm
 	bool bAutopilot = false;
 	float AutopilotYaw = 0.f;

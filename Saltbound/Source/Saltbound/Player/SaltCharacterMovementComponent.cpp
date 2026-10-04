@@ -13,12 +13,12 @@
 
 USaltCharacterMovementComponent::USaltCharacterMovementComponent()
 {
-	// Swimming: the eyes float just above the surface (equilibrium immersion = 1 / Buoyancy ~ 0.83 of the
-	// capsule) and the body rides the waves; fully submerged, the player drifts slowly upwards.
+	// Swimming: at the surface the eyes float just above the water (equilibrium immersion = 1 / Buoyancy ~ 0.83 of
+	// the capsule) and the body rides the waves; fully under water the swimmer is neutral and hovers (D48).
 	MaxSwimSpeed = 300.f;
-	Buoyancy = 1.2f;
-	// No constant braking: it would cancel the buoyant lift (0.2 g when submerged) every frame. The sea volume's
-	// fluid friction damps instead (proportional to speed): the swimmer stops and settles at the surface.
+	Buoyancy = SurfaceBuoyancy;
+	// No constant braking: it would cancel the buoyant lift at the surface every frame. The sea volume's fluid
+	// friction damps instead (proportional to speed): the swimmer stops and hovers, or settles at the surface.
 	BrakingDecelerationSwimming = 0.f;
 	GetNavAgentPropertiesRef().bCanSwim = true;
 }
@@ -73,6 +73,8 @@ void USaltCharacterMovementComponent::UpdateWater(float DeltaTime)
 		WaterSurfaceZ = -1.0e6f;
 		Immersion = 0.f;
 	}
+	// Neutral once fully under water (no auto rise: the swimmer hovers), buoyant as the head breaks the surface.
+	Buoyancy = FMath::Lerp(SurfaceBuoyancy, 1.f, FMath::SmoothStep(0.97f, 1.f, Immersion));
 	const bool bWant = SuppressTime <= 0.f && (bInWater ? Immersion > StopSwimImmersion : Immersion > StartSwimImmersion);
 	if (bWant != bInWater)
 	{

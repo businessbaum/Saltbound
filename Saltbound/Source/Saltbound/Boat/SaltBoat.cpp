@@ -1326,6 +1326,29 @@ void ASaltBoat::PushOceanMask(bool bEnable)
 	{
 		UKismetMaterialLibrary::SetVectorParameterValue(this, OceanCollection, TrailS[I], FLinearColor(S[4 * I], S[4 * I + 1], S[4 * I + 2], S[4 * I + 3]));
 	}
+	// How far the bow wave and Kelvin wake reach (D48): the way the boat has come on its recent straight course. They
+	// are drawn along the boat's heading, so they must not reach back past where it set off from or turned.
+	UKismetMaterialLibrary::SetVectorParameterValue(this, OceanCollection, TEXT("BoatWakeExtent"), FLinearColor(WakeExtentShown, 0.f, 0.f, 0.f));
+}
+
+float ASaltBoat::GetWakeExtent() const
+{
+	const FVector2D Heading = FVector2D(Q.GetForwardVector()).GetSafeNormal();
+	FVector2D Ahead(GetActorTransform().TransformPosition(FVector(-470.0, 0.0, 0.0)));
+	float Length = 0.f;
+	for (int32 K = 0; K < TrailPoints.Num(); ++K)
+	{
+		const FVector2D Step = Ahead - TrailPoints[K];
+		const double Len = Step.Size();
+		// Stop where the boat was (nearly) still or headed more than 25 degrees off its present course.
+		if (TrailStrength[K] < 0.05f || (Len > 50.0 && FVector2D::DotProduct(Step / Len, Heading) < 0.906))
+		{
+			break;
+		}
+		Length += (float)Len * 0.01f;
+		Ahead = TrailPoints[K];
+	}
+	return Length;
 }
 
 void ASaltBoat::UpdateTrail(float DeltaSeconds)
@@ -1340,6 +1363,9 @@ void ASaltBoat::UpdateTrail(float DeltaSeconds)
 		TrailPoints.SetNum(FMath::Min(TrailPoints.Num(), 15));
 		TrailStrength.SetNum(TrailPoints.Num());
 	}
+	// The wake's reach eases (it would otherwise step back by one sample spacing each second) and stops at 40 m, where
+	// the Kelvin wake has faded anyway.
+	WakeExtentShown = FMath::FInterpTo(WakeExtentShown, FMath::Min(GetWakeExtent(), 40.f), DeltaSeconds, 3.f);
 }
 
 void ASaltBoat::ClearTrail()
@@ -1347,6 +1373,7 @@ void ASaltBoat::ClearTrail()
 	TrailPoints.Reset();
 	TrailStrength.Reset();
 	TrailClock = 0.f;
+	WakeExtentShown = 0.f;
 }
 
 void ASaltBoat::ApplySteeringLayout()

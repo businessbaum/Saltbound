@@ -920,3 +920,35 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   another map is ignored. Restoring puts a moored boat at its mooring and an anchored one with the anchor down.
 - **Tests:** `sb.Dev.RunSaveTests` 5/5 (in a test slot: anchored boat with the sail set, player aboard, sea and wind
   restored exactly; mooring saves).
+
+### D47 · Ruin Isle and islands on the horizon (Adopted, first pass)
+- **Why:** something to sail to (the README's "sea of islands, ruins and traces of a lost civilization"); the art
+  direction's haze toward distant islands.
+- **Ruin Isle** (`build_islands.py`), 1.7 km out towards the Ancient Isles region, about 110 m across: an irregular
+  coast, a gentle beach all round (1.6 m over 14 m) with the cove's sculpted wind ripples and sand material, soft
+  dunes, a knoll, a turquoise shelf about 3 m deep and a skirt down to 60 m. Visible mesh (Nanite, 0.5 m cells inside,
+  4 m beyond, overlapping so no seam shows) plus a hidden 2 m collision mesh. A calm zone settles the swell round it.
+- **Ruins** of chunky bevelled blocks (the landmark tower's masonry): a broken gateway on the knoll facing the cove
+  (one pier broken, half the arch standing, the ancient glow in the keystone, fallen arch stones) and a low broken
+  wall corner. Coastal rocks on the shore; a few gulls.
+- **Horizon:** three big chiselled island masses 4-7 km out (`SM_Island_Far_A/B/C`, rock material); the haze fades them.
+- **Tests:** `sb.Dev.RunBoatTests` includes sailing onto Ruin Isle: the boat runs aground on the beach shelf, 10 cm
+  deepest contact, and lies still once the sail is in.
+- **Open:** the islands are sand and rock only (no vegetation yet); the far masses are rock silhouettes.
+
+### D48 · Hovering in the water; the wake only where the boat has been, fading smoothly (Adopted)
+- **Owner (2026-10-04):** "remove the auto swim up when in water. hovering is perfect. so you dont go up nor down when
+  not pressing any key." / "when the ship starts you can see a trail way behind the ship. but the ship was never
+  there." / "the fade away of the trail is not smooth. its hard and it fades in blocks."
+- **Swimming:** fully under water the swimmer is neutral and hovers where they stop (0.0 cm drift in 3 s); Space rises,
+  Ctrl / C dives. Buoyancy (1.2) only acts as the head breaks the surface, so a surfaced swimmer floats there with the
+  eyes above the water. A fall into the sea ends hovering where the momentum stops.
+- **Wake reach:** the bow wave and the Kelvin wake are drawn along the boat's heading, so they now reach back only as
+  far as the boat has come on its recent straight course (from the trail: until a sample where it was still or headed
+  more than 25 degrees off), eased and capped at 40 m. Setting off, the wake grows from the hull; in a turn it shortens
+  and the foam trail (which follows the real path) carries the curve.
+- **Trail fade:** the trail fades out smoothly from 5 s and is gone by 13.5 s, before its oldest sample is dropped (it
+  used to vanish a one-second segment at a time); the foam's opacity follows its coverage with a softer threshold, so
+  thinning foam fades instead of losing lace cells.
+- **Tests:** `Tools/swim_test.py` 5/5 (new: hover at depth); `sb.Dev.RunBoatTests` (new: the wake starts at the boat,
+  1.5 m after 0.5 s; reach 35-40 m after a long straight run).

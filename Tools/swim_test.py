@@ -1,4 +1,5 @@
-"""Swimming check in PIE (D28): enter the sea beside the pier, float, dive, rise and climb out onto the pier.
+"""Swimming check in PIE (D28, D48): enter the sea beside the pier and settle, dive, hover at depth without input
+(no drifting up), rise and climb out onto the pier, walk off the pier end into the sea.
 
 Usage (editor running, L_VisualTest open):  python Tools/swim_test.py [--keep-pie]
 Prints the SB_WATER state after each step and PASS / FAIL per expectation; exit code 0 when all pass.
@@ -47,20 +48,24 @@ def main():
         pie.pie_console("sb.Dev.Teleport 440 190 -60 -90 0")
         time.sleep(5.0)
         s = state()
-        check("enter_and_float", s["mode"] == "Swimming" and 0.7 < s["immersion"] < 0.97 and s["cam_above"] > 0.0, s)
+        check("enter_and_settle", s["mode"] == "Swimming" and abs(s["vz"]) < 15.0, s)
         # 2. Dive for 1.5 s: fully submerged, camera under water.
         pie.pie_console("sb.Dev.Input 0 0 0 1")
         time.sleep(1.5)
         s = state()
         check("dive", s["mode"] == "Swimming" and s["immersion"] > 0.99 and s["cam_above"] < -20.0, s)
-        # 3. Release: buoyancy brings the head back above the surface.
+        # 3. Release: the swimmer hovers where they stopped (neutral under water, D48): no rising, no sinking.
         pie.pie_console("sb.Dev.Input 0 0 0 0")
-        time.sleep(5.0)
-        s = state()
-        check("rise", s["mode"] == "Swimming" and s["immersion"] < 0.97 and s["cam_above"] > 0.0, s)
-        # 4. Hold Up facing the pier: climb out onto the deck (top 110 cm above the water).
-        pie.pie_console("sb.Dev.Input 0 0 1 0")
         time.sleep(1.5)
+        s0 = state()
+        time.sleep(3.0)
+        s = state()
+        drift = s["feet"][2] - s0["feet"][2]
+        print("   hover drift over 3 s: %.1f cm" % drift)
+        check("hover_at_depth", s["mode"] == "Swimming" and s["immersion"] > 0.99 and abs(drift) < 10.0, s)
+        # 4. Hold Up facing the pier: rise to the surface and climb out onto the deck (top 110 cm above the water).
+        pie.pie_console("sb.Dev.Input 0 0 1 0")
+        time.sleep(3.0)
         pie.pie_console("sb.Dev.Input 0 0 0 0")
         time.sleep(1.0)
         s = state()

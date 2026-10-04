@@ -56,7 +56,7 @@ UNDER_PARAMS = ["UnderwaterFog", "UnderwaterSky", "UnderwaterColor"]
 # The player boat's pose (ASaltBoat, D42): position (w = 1 enables the hull cut-out) and its forward / right / up axes.
 BOAT_PARAMS = ["BoatPos", "BoatAxisX", "BoatAxisY", "BoatAxisZ"]
 # The player boat's bow wave and wake (D44, SaltBoatWake.ush): BoatWake = (forward speed m/s, -, strength, on).
-WAKE_PARAMS = ["BoatPos", "BoatAxisX", "BoatWake"]
+WAKE_PARAMS = ["BoatPos", "BoatAxisX", "BoatWake", "BoatWakeExtent"]
 # Its trail (D45): 16 stern positions, two per vector, and how fast the boat went there (SaltBoatWake.ush).
 TRAIL_PARAMS = ["BoatTrailP%d" % i for i in range(8)] + ["BoatTrailS%d" % i for i in range(4)]
 PS_EXTRA = ["RippleOffsets", "LookCrest"]
@@ -85,7 +85,7 @@ MPC_DEFAULTS = {
 def make_mpc():
     mpc = sb_ue.get_or_create_asset("MPC_Ocean", DIR, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
     names = (WAVE_PARAMS + PHASE_PARAMS + PREV_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals", "RippleOffsets"]
-             + CASCADE_PARAMS + LOOK_PARAMS + UNDER_PARAMS + BOAT_PARAMS + ["BoatWake"] + TRAIL_PARAMS)
+             + CASCADE_PARAMS + LOOK_PARAMS + UNDER_PARAMS + BOAT_PARAMS + ["BoatWake", "BoatWakeExtent"] + TRAIL_PARAMS)
     # Keep existing entries: each has an ID that materials reference. Recreated entries get new IDs and every
     # material not rebuilt in the same run fails to compile ("invalid parameter") and renders the default material.
     existing = {str(p.get_editor_property("parameter_name")): p for p in mpc.get_editor_property("vector_parameters")}
@@ -187,7 +187,7 @@ else
 }
 // The player boat's bow wave and wake (D44): its height here; slope, white water and slick for the pixel shader.
 FSaltBoatWake Wk;
-Wk.Init(BoatPos, BoatAxisX, BoatWake);
+Wk.Init(BoatPos, BoatAxisX, BoatWake, BoatWakeExtent);
 Wk.InitTrail(BoatTrailP0, BoatTrailP1, BoatTrailP2, BoatTrailP3, BoatTrailP4, BoatTrailP5, BoatTrailP6, BoatTrailP7,
     BoatTrailS0, BoatTrailS1, BoatTrailS2, BoatTrailS3, BoatWake.y);
 D.z += Wk.Height(XY);
@@ -353,11 +353,12 @@ float FreshFoam = smoothstep(1.0 - FreshCov, 1.12 - FreshCov, FoamTex.r) * lerp(
 float ResidueFoam = smoothstep(1.0 - ResidueCov, 1.1 - ResidueCov, FineLace * 0.6 + FoamTex.r * 0.4) * 0.45;
 float Foam = max(FreshFoam, ResidueFoam);
 // The boat's white water and trail (D45): two scales of the lace pattern in world space, filled by the coverage
-// (dense and white at the hull and the stern, breaking into streaks and patches as the trail ages).
+// (dense and white at the hull and the stern, breaking into streaks and patches as the trail ages). The opacity
+// follows the coverage too and the threshold is soft, so thinning foam fades instead of losing cells (D48).
 float WakeCov = saturate(WakeIn.z * WakeFoamAmount);
 float WakeLace = Texture2DSample(QuietTex, QuietTexSampler, XY / (FoamTile * 0.5) + float2(0.21, 0.66)).r * 0.55
     + Texture2DSample(QuietTex, QuietTexSampler, XY / FoamTile + float2(0.58, 0.12)).r * 0.45;
-Foam = max(Foam, smoothstep(1.0 - WakeCov, 1.15 - WakeCov, WakeLace) * lerp(0.55, 0.95, WakeCov));
+Foam = max(Foam, smoothstep(1.0 - WakeCov, 1.3 - WakeCov, WakeLace) * 0.95 * sqrt(WakeCov));
 Foam *= saturate(1.0 - Dist / max(FoamFadeDistance, 1.0));
 FoamOut = Foam;
 RoughOut = lerp(Rough, 0.85, Foam);
