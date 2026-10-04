@@ -68,6 +68,16 @@ public:
 	void SetDebugMoveInput(const FVector2D& Input) { DebugMoveInput = Input; }
 	/** Programmatic interaction for automated tests (same path as the key press). */
 	void DebugInteract() { HandleInteract(); }
+	/** Programmatic release of the interact key for automated tests (ends a hold). */
+	void DebugInteractRelease() { HandleInteractReleased(); }
+
+	// Hold interactions (D55) ----------------------------------------------------
+	/** 0..1 while a hold action fills (and drains after letting go early). */
+	float GetHoldProgress() const { return HoldProgress; }
+	/** The interactable being held, or null. */
+	USaltInteractableComponent* GetHoldTarget() const { return HoldTarget.Get(); }
+	/** Seconds since a hold action fired (the prompt hides for a moment then). */
+	float GetTimeSinceHoldFired() const { return TimeSinceHoldFired; }
 	/** Programmatic jump press/release for automated tests. */
 	void DebugJump(bool bPressed) { bPressed ? HandleJumpStarted() : HandleJumpCompleted(); }
 	/** Programmatic dive press/release for automated tests. */
@@ -128,7 +138,7 @@ public:
 
 	/** Camera height above the feet (capsule height is 140 cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "100", ClampMax = "180", Units = "cm"))
-	float EyeHeight = 130.f;
+	float EyeHeight = 120.f;   // D55: lower (owner: "camera perspective is too high"; was 130 cm)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "60", ClampMax = "110"))
 	float FieldOfView = 80.f;
@@ -173,6 +183,8 @@ private:
 	void HandleDiveStarted();
 	void HandleDiveCompleted();
 	void HandleInteract();
+	void HandleInteractReleased();
+	void TickHold(float DeltaSeconds);
 	/** Starts climbing onto a walkable ledge in front when swimming at the surface. */
 	bool TryClimbOutOfWater();
 	void TickClimb(float DeltaSeconds);
@@ -199,6 +211,11 @@ private:
 	float StationTime = 0.f;
 	float StationLookYaw = 0.f;
 	float StationLookPitch = 0.f;
+
+	TWeakObjectPtr<USaltInteractableComponent> HoldTarget;
+	bool bInteractHeld = false;
+	float HoldProgress = 0.f;
+	float TimeSinceHoldFired = 100.f;
 
 	FVector2D MoveInput = FVector2D::ZeroVector;
 	FVector2D DebugMoveInput = FVector2D::ZeroVector;

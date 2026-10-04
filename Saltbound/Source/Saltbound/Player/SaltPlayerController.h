@@ -26,6 +26,7 @@ public:
 
 	/** Shows or hides the in-game HUD (development captures and recordings). */
 	void SetHUDVisible(bool bVisible);
+	USaltHUDWidget* GetHUDWidget() const { return HUDWidget; }
 
 	/** A short notice at the top of the screen ("Game saved"). */
 	void ShowNotice(const FText& Text);

@@ -141,6 +141,7 @@ void ASaltPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 	Input->BindAction(Cfg->Dive, ETriggerEvent::Started, this, &ASaltPlayerCharacter::HandleDiveStarted);
 	Input->BindAction(Cfg->Dive, ETriggerEvent::Completed, this, &ASaltPlayerCharacter::HandleDiveCompleted);
 	Input->BindAction(Cfg->Interact, ETriggerEvent::Started, this, &ASaltPlayerCharacter::HandleInteract);
+	Input->BindAction(Cfg->Interact, ETriggerEvent::Completed, this, &ASaltPlayerCharacter::HandleInteractReleased);
 }
 
 void ASaltPlayerCharacter::Tick(float DeltaSeconds)
@@ -185,6 +186,7 @@ void ASaltPlayerCharacter::Tick(float DeltaSeconds)
 	}
 
 	UpdateInteractionFocus();
+	TickHold(DeltaSeconds);
 }
 
 // --- Input -------------------------------------------------------------------
@@ -605,8 +607,52 @@ void ASaltPlayerCharacter::HandleInteract()
 	{
 		if (Focus->CanInteract(this))
 		{
+			if (Focus->IsHold())
+			{
+				// A hold: the ink fills while the key stays down (TickHold); the action runs when it is full.
+				HoldTarget = Focus;
+				bInteractHeld = true;
+				return;
+			}
 			Focus->Interact(this);
 		}
+	}
+}
+
+void ASaltPlayerCharacter::HandleInteractReleased()
+{
+	bInteractHeld = false;
+}
+
+void ASaltPlayerCharacter::TickHold(float DeltaSeconds)
+{
+	TimeSinceHoldFired += DeltaSeconds;
+	USaltInteractableComponent* Target = HoldTarget.Get();
+	if (!Target)
+	{
+		HoldProgress = 0.f;
+		return;
+	}
+	const bool bStillHolding = bInteractHeld && FocusedInteractable.Get() == Target && Target->IsHold() && Target->CanInteract(this);
+	if (bStillHolding)
+	{
+		HoldProgress += DeltaSeconds / FMath::Max(Target->HoldTime, 0.05f);
+		if (HoldProgress >= 1.f)
+		{
+			HoldProgress = 0.f;
+			HoldTarget = nullptr;
+			bInteractHeld = false;
+			TimeSinceHoldFired = 0.f;
+			Target->Interact(this);
+		}
+		return;
+	}
+	// Let go early (or looked away): the ink drains back in about 0.25 s.
+	bInteractHeld = false;
+	HoldProgress = FMath::Max(HoldProgress - DeltaSeconds / 0.25f, 0.f);
+	if (HoldProgress <= 0.f)
+	{
+		HoldTarget = nullptr;
 	}
 }
 

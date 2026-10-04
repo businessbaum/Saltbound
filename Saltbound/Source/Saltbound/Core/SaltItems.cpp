@@ -26,7 +26,8 @@ namespace SaltItems
 			{ TEXT("AncientShard"), NSLOCTEXT("SaltItems", "AncientShardName", "Ancient shard"),
 				NSLOCTEXT("SaltItems", "AncientShardDesc", "A sliver of carved stone that glows blue-green, like the band on the old tower. Someone shaped it, long ago."),
 				TEXT("/Game/Saltbound/UI/Textures/T_Icon_AncientShard.T_Icon_AncientShard"),
-				TEXT("/Game/Saltbound/Props/Pickups/SM_Pickup_AncientShard.SM_Pickup_AncientShard"), 5 },
+				TEXT("/Game/Saltbound/Props/Pickups/SM_Pickup_AncientShard.SM_Pickup_AncientShard"), 5,
+				NSLOCTEXT("SaltItems", "AncientShardUse", "Hold it up to the light") },
 		};
 		return Items;
 	}

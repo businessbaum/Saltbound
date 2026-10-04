@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54).
+Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55).
 
 ## Milestone status
 
@@ -223,6 +223,9 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D55 (in progress, awaiting the owner's check):** the new UI from the approved design. Done: the fonts, the shared parts,
+  the key-scrap prompt with painted lettering, the hold (raising the anchor) with the ink soaking up through the key's
+  scrap, the save sign in the corner; the camera at 1.2 m. Next: satchel, stores, landfall, icons, tool wheel (hold Q).
 - **D54 (awaiting the owner's check):** calm flags (a slow wave, no side-to-side swing with the boat's roll); the player
   1.4 m and slimmer; ladders climbed with W / S after taking hold with E, E lets go, off the bottom into the sea, over
   the top on board.
@@ -285,7 +288,7 @@ the sail and cast off.
 | Sprint | Left Shift (hold) | Left stick click |
 | Jump / swim up / climb out of the water (under water you hover when no key is pressed) | Space | A / Cross |
 | Dive (while swimming) | Left Ctrl / C | B / Circle |
-| Interact / leave station | E | X / Square |
+| Interact / leave station (raising the anchor: hold E) | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
 | Pause menu / settings | Esc (in the editor: F10) | Start |
 | Satchel: inventory / map | Tab or I / M (Q / E switch pages, Tab / Esc close) | Back |

@@ -25,7 +25,9 @@ def dest_for(group):
 
 def configure(tex, name, group=""):
     if group == "UI":
-        tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_EDITOR_ICON)
+        # Small parts stay uncompressed (crisp); the big painted screens (the bag, the crate) are BC7 (D55).
+        big = max(tex.blueprint_get_size_x(), tex.blueprint_get_size_y()) > 700
+        tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_BC7 if big else unreal.TextureCompressionSettings.TC_EDITOR_ICON)
         tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_UI)
         tex.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
         tex.set_editor_property("never_stream", True)

@@ -60,6 +60,9 @@ public:
 	static USaltSaveSubsystem* Get(const UObject* WorldContext);
 
 	bool SaveGame(UWorld* World, const TCHAR* Reason);
+	/** A save begins / has been written (the HUD shows the save sign in between, D55). */
+	FSimpleMulticastDelegate OnSaveStarted;
+	FSimpleMulticastDelegate OnSaveFinished;
 	bool LoadGame(UWorld* World);
 	bool HasSave() const;
 	/** When the slot was last written (FDateTime() when there is none). */

@@ -1084,3 +1084,45 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   slipping without keys, climb up on board, climb down into the sea, let go half way.
 - **Climbing out of the water** now reaches up to an arm's length ahead regardless of the body's width (the slimmer
   capsule fell short of the pier's edge). Tests: boat 44/44, swim 5/5, movement 10/10.
+
+### D55 · The new Saltbound UI (in progress): fonts and shared parts, the key-scrap prompt and hold, the save sign (Adopted)
+- **Owner (2026-10-04):** "Camera perspektive is too high, make it a bit lower." Build the new UI from
+  `Docs/Design/UI/UI_Design.md` exactly (UI only; the agent prompt `UI_Agent_Prompt.md`), asking the questions first.
+- **Owner's answers (spec section 13):** the tool wheel opens by **holding Q** (not Tab; Tab and I keep opening the
+  satchel); the player owns the **compass, lantern and spyglass** from the start; the **barrel is round**; **only raising
+  the anchor** is a hold; an island is found **within 300 m of its shore**.
+- **Camera:** eyes at 1.2 m (were 1.3 m).
+- **Fonts:** IM Fell English (Regular, Italic), IM Fell English SC and Alegreya (Regular, Italic, Bold; static faces cut
+  from the variable font), SIL OFL, fetched by `Tools/fonts/get_fonts.py` into `Art/Fonts` (`Docs/ThirdParty.md`), imported
+  as font faces under `/Game/Saltbound/UI/Fonts` (`Tools/ue_scripts/import_fonts.py`). The families are put together at
+  runtime (`SaltUI::Font`, resolved lazily): a composite font's entries cannot be set from Python. `/Game/Saltbound/UI` is
+  now always cooked (UI content is loaded by path).
+- **Painted parts from the approved drawing code:** `Tools/textures/gen_ui_parts.py` pulls the design pages' canvas
+  toolkit and drawing functions verbatim, adds the part list `Tools/textures/ui_parts.js`, renders it in headless Chrome
+  with the UI fonts and writes each part as a transparent PNG to `Art/Textures/UI` (key scrap and its paper mask, inked
+  and light key letters, keycap, count coin, the paint speck). So the parts look exactly like the approved pictures; the
+  3D pieces (brass, rope, wax, crate) will be Blender renders.
+- **UI materials** (`Tools/ue_scripts/setup_ui_materials.py`): `M_UI_PaintedText`, a font material for painted lettering
+  (cream graded down the line through the font material's second UV channel, the brown speck at 40 %; the rim is the
+  letters' outline at 13 % of the size, the soft halo three fainter outline-only copies behind: Slate text cannot blur);
+  `M_UI_KeySoak`, the key scrap with its letter and the hold's ink rising from the bottom with a moving wavy surface,
+  the letter turning parchment-light under it.
+- **Shared widgets** (`UI/SaltUIStyle`, `UI/SaltPaintedText`): fonts, ink text with bleed, debossed text, keycap, count coin,
+  painted lettering.
+- **Prompt (section 7):** fixed 66 px under the screen centre: the key on its torn scrap (tilted -3 degrees), 18 px, then
+  the action in painted IM Fell English 36 px; fades in and rises 6 px in 0.15 s while the scrap settles from -6 degrees,
+  fades out in 0.1 s, a new target cross-fades. Replaces the old `[E] ...` text.
+- **Hold (section 8):** `USaltInteractableComponent::HoldTime`; the windlass's "Hold to raise the anchor" takes 0.8 s. The
+  ink fills while E is held, drains in 0.25 s when let go early, and when full the scrap pulses (1.06 to 1 in 0.15 s), the
+  action runs and the prompt hides for a moment.
+- **Save sign (section 14):** the knotted-ring layers in the bottom-right corner (centre 88 px from the right and the
+  bottom, 96 px) while the game saves: fades in 0.2 s, the rose turns 45 degrees every 0.7 s with a damped overshoot, stays
+  at least 1.4 s, finishes its step and fades out in 0.3 s. `USaltSaveSubsystem::OnSaveStarted / OnSaveFinished`. The old
+  "Game saved" notice is gone (the sign says it).
+- **Captures:** `Tools/ui_capture.py` takes `shot showui` in a floating 1920 x 1080 PIE window (Editor > Play In window
+  size; the editor viewport would capture the whole editor) and puts it on top of its reference picture. Dev cvars
+  `sb.Dev.Prompt <text>`, `sb.Dev.Hold <0..1>`, `sb.Dev.SaveSign 1`.
+- **Tests:** `sb.Dev.RunInventoryTests` 15/15, new: `HoldFills`, `HoldDrains`, `HoldFires` (the anchor rises after 0.8 s),
+  `SaveSignShows`, `SaveSignHides`.
+- **Next (spec order):** the satchel, the stores (crate, then the round barrel), the landfall banner, the item icons from an
+  icon booth, the tool wheel (hold Q) with the held tools.

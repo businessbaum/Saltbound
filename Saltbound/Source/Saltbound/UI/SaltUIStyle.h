@@ -1,4 +1,5 @@
-// Saltbound - the hand-crafted UI style (D50): ink and parchment colours, the generated UI textures as brushes, text.
+// Saltbound - the hand-crafted UI style (D50, D55): fonts, ink and paint colours, the generated UI textures as brushes,
+// and the small reusable pieces of the design (Docs/Design/UI/UI_Design.md section 3).
 
 #pragma once
 
@@ -8,19 +9,49 @@
 #include "Engine/Texture2D.h"
 #include "Styling/CoreStyle.h"
 
+class UMaterialInterface;
+class UOverlay;
+class UWidget;
+
+/** The UI typefaces (SIL OFL, Tools/fonts/get_fonts.py): IM Fell English for names, titles, prompts and labels,
+ *  Alegreya for descriptions, hints and counts. */
+enum class ESaltFace : uint8
+{
+	Fell,
+	FellItalic,
+	FellSC,
+	Alegreya,
+	AlegreyaItalic,
+	AlegreyaBold,
+};
+
 namespace SaltUI
 {
 	inline const FLinearColor Ink(0.2f, 0.13f, 0.075f, 1.f);
 	inline const FLinearColor InkSoft(0.32f, 0.23f, 0.15f, 1.f);
 	inline const FLinearColor ParchmentText(0.95f, 0.88f, 0.72f, 1.f);
 
-	/** A UI texture from /Game/Saltbound/UI/Textures (Tools/textures/gen_ui.py). */
+	/** A colour from the spec's sRGB value. */
+	inline FLinearColor SRGB(uint8 R, uint8 G, uint8 B, float A = 1.f)
+	{
+		FLinearColor C = FLinearColor::FromSRGBColor(FColor(R, G, B));
+		C.A = A;
+		return C;
+	}
+
+	/** A UI font at a size in 1080p pixels (UMG DPI 1.0); the faces load on first use. */
+	SALTBOUND_API FSlateFontInfo Font(ESaltFace Face, float Size);
+
+	/** A UI texture from /Game/Saltbound/UI/Textures (Tools/textures/gen_ui.py, gen_ui_parts.py, Blender renders). */
 	inline UTexture2D* Tex(const TCHAR* Name)
 	{
 		return LoadObject<UTexture2D>(nullptr, *FString::Printf(TEXT("/Game/Saltbound/UI/Textures/%s.%s"), Name, Name));
 	}
 
-	/** A 9-slice brush (frames, slots, tabs). */
+	/** A UI material from /Game/Saltbound/UI/Materials (Tools/ue_scripts/setup_ui_materials.py). */
+	SALTBOUND_API UMaterialInterface* Material(const TCHAR* Name);
+
+	/** A 9-slice brush (frames, slots, tabs, keycaps). */
 	inline FSlateBrush BoxBrush(UTexture2D* T, FVector2D Size, float Margin = 0.3f)
 	{
 		FSlateBrush B;
@@ -31,7 +62,7 @@ namespace SaltUI
 		return B;
 	}
 
-	inline FSlateBrush ImageBrush(UTexture2D* T, FVector2D Size, bool bTile = false)
+	inline FSlateBrush ImageBrush(UObject* T, FVector2D Size, bool bTile = false)
 	{
 		FSlateBrush B;
 		B.SetResourceObject(T);
@@ -49,4 +80,24 @@ namespace SaltUI
 		T->SetText(Value);
 		return T;
 	}
+
+	/** Text in a UI face. */
+	SALTBOUND_API UTextBlock* FaceText(UWidgetTree* Tree, const FText& Value, ESaltFace Face, float Size, const FLinearColor& Color,
+		ETextJustify::Type Justify = ETextJustify::Left);
+
+	/** Ink on paper (#3A2616 at 94 %, its edge a little bled). */
+	SALTBOUND_API UTextBlock* InkText(UWidgetTree* Tree, const FText& Value, ESaltFace Face, float Size,
+		ETextJustify::Type Justify = ETextJustify::Left, float Alpha = 0.94f);
+
+	/** Pressed into leather: dark letters with a light lip 1-2 px below. Returns the overlay and the two texts. */
+	SALTBOUND_API UOverlay* Deboss(UWidgetTree* Tree, const FText& Value, ESaltFace Face, float Size, float LetterSpacing,
+		ETextJustify::Type Justify, UTextBlock** OutDark = nullptr, UTextBlock** OutLip = nullptr);
+
+	/** A small leather key with a brass rim and a cream Alegreya Bold letter (on leather screens). It widens for words. */
+	SALTBOUND_API UWidget* Keycap(UWidgetTree* Tree, const FText& Key, float Size = 34.f);
+
+	/** A stack count on a dark-leather coin with a brass rim (shown for 2 or more). Returns the overlay; OutText takes the
+	 *  number. */
+	SALTBOUND_API UOverlay* CountCoin(UWidgetTree* Tree, UTextBlock** OutText, float Radius = 17.f);
+	SALTBOUND_API void SetCoinCount(UWidget* Coin, UTextBlock* Text, int32 Count);
 }

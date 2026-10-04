@@ -1393,13 +1393,15 @@ void ASaltBoat::UpdateHints()
 	switch (Hold)
 	{
 	case ESaltBoatHold::Moored: WindlassText = NSLOCTEXT("Saltbound", "BoatCastOff", "Cast off"); break;
-	case ESaltBoatHold::Anchored: WindlassText = NSLOCTEXT("Saltbound", "BoatRaiseAnchor", "Raise the anchor"); break;
+	case ESaltBoatHold::Anchored: WindlassText = NSLOCTEXT("Saltbound", "BoatRaiseAnchor", "Hold to raise the anchor"); break;
 	default:
 		WindlassText = Speed < 1.5 && ToMooring < MooringRadius ? NSLOCTEXT("Saltbound", "BoatMoor", "Moor the boat")
 			: NSLOCTEXT("Saltbound", "BoatDropAnchor", "Drop the anchor");
 		break;
 	}
 	Windlass->PromptText = WindlassText;
+	// D55: raising the anchor is a hold (the owner's choice); everything else is a short press.
+	Windlass->HoldTime = Hold == ESaltBoatHold::Anchored ? 0.8f : 0.f;
 	const FText RopeText = bSailSet ? NSLOCTEXT("Saltbound", "BoatRaiseSail", "Raise the sail") : NSLOCTEXT("Saltbound", "BoatLowerSail", "Lower the sail");
 	SailRopePort->PromptText = RopeText;
 	SailRopeStarboard->PromptText = RopeText;

@@ -30,6 +30,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction")
 	bool bInteractionEnabled = true;
 
+	/** Seconds to hold the key before the action runs (0 = a short press). Holds are the owner's call (D55): only
+	 *  raising the anchor. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction", meta = (ClampMin = "0", Units = "s"))
+	float HoldTime = 0.f;
+
+	bool IsHold() const { return HoldTime > 0.f; }
+
 	UPROPERTY(BlueprintAssignable, Category = "Interaction")
 	FSaltInteractSignature OnInteract;
 

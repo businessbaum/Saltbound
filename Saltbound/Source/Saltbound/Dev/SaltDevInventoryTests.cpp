@@ -2,6 +2,9 @@
 // saving the satchel (in a test slot; the player's own satchel and save are restored afterwards).
 
 #include "Boat/SaltBoat.h"
+#include "Boat/SaltHullShape.h"
+#include "Camera/CameraComponent.h"
+#include "Containers/Ticker.h"
 #include "Components/CapsuleComponent.h"
 #include "Core/SaltItems.h"
 #include "Core/SaltSaveSubsystem.h"
@@ -14,6 +17,7 @@
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
 #include "Saltbound.h"
+#include "UI/SaltHUDWidget.h"
 #include "UI/SaltSatchelWidget.h"
 #include "UI/SaltStoreWidget.h"
 #include "World/SaltPickup.h"
@@ -21,6 +25,155 @@
 #if !UE_BUILD_SHIPPING
 namespace
 {
+	/**
+	 * The UI checks that need time (D55): a hold fills, drains when let go early and fires when full (raising the anchor at
+	 * the windlass); the save sign shows for a save, stays at least 1.4 s and hides after it. They run on a ticker after the
+	 * instant checks and log the suite's DONE line at the end.
+	 */
+	void RunTimedUIChecks(UWorld* World, int32 PassedSoFar, int32 FailedSoFar)
+	{
+		struct FState
+		{
+			TWeakObjectPtr<UWorld> World;
+			int32 Passed = 0;
+			int32 Failed = 0;
+			float Clock = 0.f;
+			int32 Step = 0;
+			float StepAt = 0.f;
+			float Value = 0.f;
+			bool bFlag = false;
+			FString OwnSlot;
+			ESaltBoatHold OwnHold = ESaltBoatHold::Moored;
+		};
+		TSharedRef<FState> S = MakeShared<FState>();
+		S->World = World;
+		S->Passed = PassedSoFar;
+		S->Failed = FailedSoFar;
+		auto Report = [S](const TCHAR* Name, bool bPass, const FString& Details)
+		{
+			(bPass ? S->Passed : S->Failed)++;
+			UE_LOG(LogSaltbound, Display, TEXT("SB_TEST %s %s %s"), Name, bPass ? TEXT("PASS") : TEXT("FAIL"), *Details);
+		};
+		FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S, Report](float Dt) -> bool
+		{
+			UWorld* W = S->World.Get();
+			ASaltPlayerController* PC = W ? Cast<ASaltPlayerController>(UGameplayStatics::GetPlayerController(W, 0)) : nullptr;
+			ASaltPlayerCharacter* P = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr;
+			ASaltBoat* Boat = nullptr;
+			for (TActorIterator<ASaltBoat> It(W); W && It; ++It) { Boat = *It; break; }
+			USaltHUDWidget* Hud = PC ? PC->GetHUDWidget() : nullptr;
+			USaltSaveSubsystem* Saves = W ? USaltSaveSubsystem::Get(W) : nullptr;
+			if (!PC || !P || !Boat || !Hud || !Saves)
+			{
+				Report(TEXT("UITimedChecks"), false, TEXT("no world, player, boat, HUD or saves"));
+				UE_LOG(LogSaltbound, Display, TEXT("SB_TEST InventorySuite DONE passed=%d failed=%d"), S->Passed, S->Failed);
+				return false;
+			}
+			S->Clock += Dt;
+			const float T = S->Clock - S->StepAt;
+			auto Next = [&]() { ++S->Step; S->StepAt = S->Clock; };
+			auto Aim = [&]()
+			{
+				const FVector Target = Boat->GetWindlass()->GetComponentLocation();
+				PC->SetControlRotation((Target - P->GetCamera()->GetComponentLocation()).Rotation());
+			};
+			switch (S->Step)
+			{
+			case 0:
+			{
+				// Anchor the boat where it lies and stand at the windlass, looking at it.
+				S->OwnHold = Boat->GetHold();
+				Boat->SetHold(ESaltBoatHold::Anchored);
+				const FVector Local(2.95f * 100.f, 0.55f * 100.f, (SaltHull::SheerZ(2.95f) + 0.05f) * 100.f);
+				P->TeleportFeetTo(Boat->GetActorTransform().TransformPosition(Local), Boat->GetYawDeg());
+				Next();
+				break;
+			}
+			case 1:
+				Aim();
+				if (T > 1.2f)
+				{
+					P->DebugInteract();
+					Next();
+				}
+				break;
+			case 2:
+				Aim();
+				S->Value = FMath::Max(S->Value, Hud->GetShownHoldProgress());
+				if (T > 0.4f)
+				{
+					const float Prog = P->GetHoldProgress();
+					Report(TEXT("HoldFills"), Prog > 0.3f && Prog < 0.75f && S->Value > 0.2f && Boat->GetHold() == ESaltBoatHold::Anchored,
+						FString::Printf(TEXT("after 0.4 s of 0.8: progress=%.2f inkShown=%.2f stillAnchored=%d prompt=%s"), Prog, S->Value,
+							Boat->GetHold() == ESaltBoatHold::Anchored ? 1 : 0, *Hud->GetShownPrompt().ToString()));
+					P->DebugInteractRelease();
+					Next();
+				}
+				break;
+			case 3:
+				Aim();
+				if (T > 0.35f)
+				{
+					Report(TEXT("HoldDrains"), P->GetHoldProgress() < 0.01f && Boat->GetHold() == ESaltBoatHold::Anchored,
+						FString::Printf(TEXT("0.35 s after letting go: progress=%.2f stillAnchored=%d"), P->GetHoldProgress(),
+							Boat->GetHold() == ESaltBoatHold::Anchored ? 1 : 0));
+					P->DebugInteract();
+					Next();
+				}
+				break;
+			case 4:
+				Aim();
+				if (Boat->GetHold() != ESaltBoatHold::Anchored && !S->bFlag)
+				{
+					S->bFlag = true;
+					S->Value = T;
+				}
+				if (T > 1.4f)
+				{
+					P->DebugInteractRelease();
+					Report(TEXT("HoldFires"), S->bFlag && S->Value > 0.7f && S->Value < 1.0f,
+						FString::Printf(TEXT("anchor raised=%d after %.2f s of holding (0.8 s)"), S->bFlag ? 1 : 0, S->Value));
+					// A save in the test slot: the sign shows.
+					S->OwnSlot = Saves->Slot;
+					Saves->Slot = TEXT("SaltDevTest");
+					Saves->SaveGame(W, TEXT("UITest"));
+					S->Value = 0.f;
+					S->bFlag = false;
+					Next();
+				}
+				break;
+			case 5:
+				if (T > 0.3f && !S->bFlag)
+				{
+					S->bFlag = true;
+					S->Value = Hud->GetSaveSignOpacity();
+				}
+				if (T > 1.3f)
+				{
+					const float Mid = Hud->GetSaveSignOpacity();
+					Report(TEXT("SaveSignShows"), S->Value > 0.9f && Mid > 0.9f, FString::Printf(TEXT("opacity at 0.3 s=%.2f, at 1.3 s=%.2f"), S->Value, Mid));
+					Next();
+				}
+				break;
+			case 6:
+				if (T > 1.6f)
+				{
+					Report(TEXT("SaveSignHides"), Hud->GetSaveSignOpacity() < 0.05f, FString::Printf(TEXT("opacity 2.9 s after the save=%.2f"),
+						Hud->GetSaveSignOpacity()));
+					UGameplayStatics::DeleteGameInSlot(Saves->Slot, 0);
+					Saves->Slot = S->OwnSlot;
+					Boat->SetHold(S->OwnHold);
+					UE_LOG(LogSaltbound, Display, TEXT("SB_TEST InventorySuite DONE passed=%d failed=%d"), S->Passed, S->Failed);
+					return false;
+				}
+				break;
+			default:
+				return false;
+			}
+			return true;
+		}));
+	}
+
 	void RunInventoryTests(const TArray<FString>& Args, UWorld* World)
 	{
 		int32 Passed = 0;
@@ -172,7 +325,7 @@ namespace
 		Saves->ClearCollected();
 		Pickup->Destroy();
 		Satchel->SetSlots(Own);
-		UE_LOG(LogSaltbound, Display, TEXT("SB_TEST InventorySuite DONE passed=%d failed=%d"), Passed, Failed);
+		RunTimedUIChecks(World, Passed, Failed);
 	}
 
 	FAutoConsoleCommandWithWorldAndArgs CmdSatchel(

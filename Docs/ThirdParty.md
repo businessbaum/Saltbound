@@ -7,6 +7,8 @@ Each entry records the source, license, attribution requirement and where the co
 |---|---|---|---|---|
 | Unreal Engine 5.8 and engine/plugin content | Epic Games | Unreal Engine EULA (royalty terms apply only above the revenue threshold) | No (UE splash/credit rules apply for commercial release) | Whole project |
 | First Person template content (temporary) | Epic Games, UE 5.8 template | Unreal Engine EULA | No | `/Game/FirstPerson`, `/Game/LevelPrototyping`, `/Game/Characters`, `/Game/Input` (to be removed) |
+| IM Fell English, IM Fell English SC (fonts; the Fell types digitally reproduced by Igino Marini) | Google Fonts repository (`ofl/imfellenglish`, `ofl/imfellenglishsc`), fetched by `Tools/fonts/get_fonts.py` | SIL Open Font License 1.1 (`Art/Fonts/*/OFL.txt`) | Keep the licence with the fonts; no in-game credit required | UI names, titles, prompts, labels (`/Game/Saltbound/UI/Fonts`, D55) |
+| Alegreya (font, Huerta Tipográfica; static Regular, Italic and Bold cut from the variable font) | Google Fonts repository (`ofl/alegreya`), fetched by `Tools/fonts/get_fonts.py` | SIL Open Font License 1.1 (`Art/Fonts/Alegreya/OFL.txt`) | Keep the licence with the fonts; no in-game credit required | UI descriptions, hints, counts (`/Game/Saltbound/UI/Fonts`, D55) |
 
-No other external assets are used yet. Preferred sources: Poly Haven and ambientCG (CC0), and
+No other external assets are used yet (besides the fonts above). Preferred sources: Poly Haven and ambientCG (CC0), and
 freesound.org restricted to CC0.

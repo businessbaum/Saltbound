@@ -36,6 +36,8 @@ struct FSaltItemDef
 	const TCHAR* Icon = nullptr;    // texture object path
 	const TCHAR* Mesh = nullptr;    // pickup mesh object path
 	int32 MaxStack = 1;
+	/** What E does with it in the satchel (D55); none has a use yet, the tag shows it greyed. */
+	FText UseText;
 };
 
 namespace SaltItems

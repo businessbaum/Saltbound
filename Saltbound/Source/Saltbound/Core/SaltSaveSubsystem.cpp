@@ -59,6 +59,7 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 	{
 		return false;
 	}
+	OnSaveStarted.Broadcast();
 	USaltSaveGame* Save = Cast<USaltSaveGame>(UGameplayStatics::CreateSaveGameObject(USaltSaveGame::StaticClass()));
 	Save->SavedAt = FDateTime::Now();
 	Save->Map = MapOf(World);
@@ -124,10 +125,8 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 	UE_LOG(LogSaltbound, Display, TEXT("SB_SAVE saved=%d slot=%s reason=%s boat=(%.0f, %.0f) hold=%d sail=%d aboard=%d sea=%s"),
 		bOk ? 1 : 0, *Slot, Reason, Save->BoatLocation.X, Save->BoatLocation.Y, (int32)Save->BoatHold, Save->bBoatSail ? 1 : 0,
 		Save->bPlayerAboard ? 1 : 0, *Save->SeaState.ToString());
-	if (bOk)
-	{
-		Notify(World, NSLOCTEXT("Saltbound", "GameSaved", "Game saved"));
-	}
+	// The save sign in the corner shows it (D55); no notice.
+	OnSaveFinished.Broadcast();
 	return bOk;
 }
 
