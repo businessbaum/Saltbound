@@ -217,8 +217,9 @@ for a higher screen percentage (for example 75 %) and more content.
   fresh foam vs residue, varied crest spacing (D33); the coloured specks on distant crests fixed at the
   cause, an overflow in the underside's underwater light (D35; D34 was a wrong guess and is reverted).
 
-- **Sand with shape (D37, awaiting the owner's check):** the ripples are sculpted geometry now (Nanite sand mesh,
-  crests about 1.6 m apart and up to 20 cm high), lit on the crests; the sand texture only adds broad colour.
+- **Beach with shape (D37, awaiting the owner's check):** the dry beach has sculpted wind ripples, soft mounds and
+  swash ridges (Nanite sand mesh); the sea floor keeps its earlier look.
+- **D39:** player 1.5 m; no lichen on the coastal rocks; gulls over the cove and at sea; a gangway to the boat.
 
 - **Hand-crafted boat and materials (D38, awaiting the owner's check):** the boat rebuilt from individual hand-made
   boards, spars, ropes and a paneled sail; wood golden-brown and matte with simplified grain, paint muted, metal dark.

@@ -399,10 +399,47 @@ def rock():
 
 
 def sand():
-    """Stylised sand for the seabed and beach, neutral grey (the material tints it); triplanar, tile ~5.5 m.
+    """Stylised sand for the seabed and beach (D29), neutral grey (the material tints it); triplanar, tile ~4 m:
 
-    Since D37 the ripples are sculpted geometry (SM_Seabed_Sand) and the mesh's vertex colours light their crests,
-    so the texture only adds broad, calm colour: soft warm and cool tone patches with crisp-but-soft edges, a few
+    painted ripple bands (lit crest, mid, shaded trough with soft edges; wavy and fading in patches), soft tone
+    patches, crisp light and dark grains at two sizes and a few pale shell flecks. Comic, not realistic: few
+    clear shapes, calm areas in between. The normal map carries the ripples and a fine grain."""
+    size = 1024
+    y, x = np.mgrid[0:size, 0:size] / size
+    w1 = spectral_noise(size, 1, 4, -2.0, seed=201)
+    w2 = spectral_noise(size, 2, 6, -1.8, seed=202)
+    # 1. Ripples: 9 crests per tile along U, warped (all terms periodic, so the tile repeats seamlessly).
+    # Strong warp: crest spacing and direction wander, so the tile does not read as regular stripes (D30).
+    phase = 2 * np.pi * (9 * x + 1.5 * w1 + 0.18 * np.sin(2 * np.pi * (2 * y + 0.5 * w2)) + 0.25 * w2)
+    ripple = 0.5 + 0.5 * np.sin(phase + 0.35 * np.sin(phase))          # slightly asymmetric crests
+    show = crisp(n01(spectral_noise(size, 1, 4, -1.9, seed=203)), 0.32, 0.25)
+    crest = crisp(ripple, 0.78, 0.08) * show
+    trough = crisp(1.0 - ripple, 0.8, 0.08) * show
+    # 2. Tone patches (soft), warm/cool.
+    tone = sum(crisp(n01(spectral_noise(size, 2, 9, -1.9, seed=204)), t, 0.05) for t in (0.4, 0.62)) / 2.0
+    warm = crisp(n01(spectral_noise(size, 2, 7, -1.8, seed=205)), 0.58, 0.05)
+    # 3. Grains and shell flecks.
+    g_l = crisp(n01(spectral_noise(size, 120, 400, -0.9, seed=206)), 0.88, 0.012)
+    g_d = crisp(n01(spectral_noise(size, 120, 400, -0.9, seed=207)), 0.9, 0.012)
+    g_big = crisp(n01(spectral_noise(size, 40, 120, -1.0, seed=208)), 0.93, 0.01)
+    shell = crisp(n01(spectral_noise(size, 30, 90, -1.0, seed=209)), 0.955, 0.008)
+    v = (0.5 + 0.05 * crest - 0.06 * trough + 0.05 * (tone - 0.5) + 0.04 * g_l - 0.05 * g_d - 0.04 * g_big
+         + 0.09 * shell)
+    rgb = np.stack([v * (1.0 + 0.03 * warm), v, v * (1.0 - 0.04 * warm)], -1)
+    save_rgb(os.path.join(OUT, "Sand", "T_Sand_D.png"), rgb)
+    height = (ripple - 0.5) * show * 0.6 + spectral_noise(size, 2, 10, -1.8, seed=210) * 0.15 \
+        + spectral_noise(size, 150, 450, -0.8, seed=211) * 0.012
+    save_normal(os.path.join(OUT, "Sand", "T_Sand_N.png"), height_to_normal(height, 3.0))
+    ao = 1.0 - 0.12 * trough
+    rough = np.clip(0.9 - 0.08 * shell, 0, 1)
+    save_rgb(os.path.join(OUT, "Sand", "T_Sand_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
+
+
+def sand_beach():
+    """Stylised dry beach sand (D37), neutral grey (the material tints it); triplanar, tile ~5.5 m.
+
+    The beach's ripples, mounds and swash ridges are sculpted geometry (SM_Seabed_Sand) and the mesh's vertex
+    colours light their crests, so the texture only adds broad, calm colour: soft warm and cool tone patches with crisp-but-soft edges, a few
     sparse clusters of darker grains and pale shell flecks. No fine photographic grain. The normal map carries
     only a gentle undulation and the flecks."""
     size = 1024
@@ -415,12 +452,12 @@ def sand():
     shell = crisp(n01(spectral_noise(size, 25, 70, -1.0, seed=209)), 0.965, 0.01)
     v = 0.5 + 0.07 * (tone - 0.5) - 0.06 * g_d + 0.1 * shell
     rgb = np.stack([v * (1.0 + 0.035 * warm), v, v * (1.0 - 0.045 * warm)], -1)
-    save_rgb(os.path.join(OUT, "Sand", "T_Sand_D.png"), rgb)
+    save_rgb(os.path.join(OUT, "Sand", "T_SandBeach_D.png"), rgb)
     height = spectral_noise(size, 2, 10, -1.8, seed=210) * 0.25 + shell * 0.25 - g_d * 0.1
-    save_normal(os.path.join(OUT, "Sand", "T_Sand_N.png"), height_to_normal(height, 2.0))
+    save_normal(os.path.join(OUT, "Sand", "T_SandBeach_N.png"), height_to_normal(height, 2.0))
     ao = 1.0 - 0.1 * g_d
     rough = np.clip(0.9 - 0.08 * shell, 0, 1)
-    save_rgb(os.path.join(OUT, "Sand", "T_Sand_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
+    save_rgb(os.path.join(OUT, "Sand", "T_SandBeach_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
 
 
 def rock_detail():
@@ -526,6 +563,7 @@ GENERATORS = {
     "rope": rope,
     "rock": rock,
     "sand": sand,
+    "sand_beach": sand_beach,
     "rock_detail": rock_detail,
     "macro_noise": macro_noise,
     "paint_surface": paint_surface,

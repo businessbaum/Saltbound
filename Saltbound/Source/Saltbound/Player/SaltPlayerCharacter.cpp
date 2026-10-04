@@ -32,7 +32,7 @@ namespace
 		ECVF_Cheat);
 
 	constexpr float CapsuleRadius = 34.f;
-	constexpr float CapsuleHalfHeight = 80.f;   // 1.6 m: owner feedback, 1.76 m felt too tall
+	constexpr float CapsuleHalfHeight = 75.f;   // 1.5 m: owner feedback (1.76 m, then 1.6 m felt too tall)
 }
 
 ASaltPlayerCharacter::ASaltPlayerCharacter(const FObjectInitializer& ObjectInitializer)

@@ -2,8 +2,10 @@
 
   SM_Seabed           collision floor: 180 x 140 m, 1 m cells, the broad shape only (hidden in the map). Pivot =
                       world origin at the water level (placed at 0,0,0).
-  SM_Seabed_Sand      the visible sand (Nanite, D37): the same floor at 0.2 m cells with sculpted ripples about 1 m
-                      apart, and vertex colours for lit crests, shaded troughs and tone patches.
+  SM_Seabed_Sand      the visible sand (Nanite, D37): the same floor at 0.2 m cells. The dry beach is sculpted (wind
+                      ripples, mounds, swash ridges) with vertex colours for lit crests and shaded troughs and its calm
+                      beach texture (vertex alpha blends MI_Sand's second texture set in); the sea floor below keeps
+                      the broad shape and the painted sand.
                       Shapes: seabed_shape.py (shared with the map script). The broad shape:
                       Beach behind the coastal rocks (wadeable shallows), about 2.3 m under the pier (its posts
                       reach 2.5 m down), a drop-off past the pier end to the 17.5 m floor of the open water,
@@ -26,7 +28,7 @@ from mathutils import Vector
 sys.path.insert(0, os.path.dirname(__file__))
 import sb_blender as sb  # noqa: E402
 
-from seabed_shape import FLOOR, SANDBANK, X_RANGE, Y_RANGE, base, detail  # noqa: E402
+from seabed_shape import FLOOR, SANDBANK, X_RANGE, Y_RANGE, base, beach_weight, detail  # noqa: E402
 
 COLLISION_CELL = 1.0
 SAND_CELL = 0.2
@@ -90,7 +92,9 @@ def seabed_sand():
             zb = base(x, y)
             dz, crest, trough, tone = detail(x, y, zb)
             verts.append((x, -y, zb + dz))
-            cols.extend((crest, trough, tone, 1.0))
+            # Alpha 1 = sea-floor sand, 0 = beach sand (blended over the last 40 cm below the water level).
+            w = beach_weight(zb)
+            cols.extend((crest, trough, 0.5 + (tone - 0.5) * w, 1.0 - w))
     obj = make_mesh("SM_Seabed_Sand", verts, faces, SAND_CELL)
     attr = obj.data.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
     attr.data.foreach_set("color", cols)

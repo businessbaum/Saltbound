@@ -738,7 +738,7 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   slab hit at the bulwark's height can flip the contact normal upward (the bow rides up). The boat does
   not push a swimmer; the swimmer's movement resolves the overlap.
 
-### D37 · Sand with sculpted ripples (Adopted, awaiting owner review)
+### D37 · Sand with sculpted ripples (Revised: beach only, see the correction below)
 - **Owner (2026-10-04):** "make the texture you added on the sand visible not only through color. Shape is the
   keyword. The sand itself as an object is completely flat."
 - **Change:** the ripples moved from the texture into the geometry.
@@ -753,6 +753,12 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - The sandbank and headland shoals blend smoothly (a hard max showed as a saw-toothed edge on the fine grid).
 - **Lesson:** never import assets while a play session runs: the static mesh build fails ("Bad MeshDescription")
   and nothing saves.
+- **Correction (owner, 2026-10-04):** "undo the edits on the sea sand. I meant the beach sand." The sea floor is back
+  to its broad shape and painted texture (`T_Sand`, as in D30). The sculpting moved to the dry beach: wind ripples
+  about 0.95 m apart and up to 9 cm high (mostly covering it), soft mounds on the upper beach and three swash ridges
+  along the waterline. One material (`MI_Sand`) does both: `M_SB_Rock` gained an optional second texture set that
+  the vertex alpha blends in over the last 40 cm below the water level (the calm `T_SandBeach`), so there is no
+  seam; under water the vertex colours are neutral.
 
 ### D38 · Boat and materials restyled to the owner's hand-crafted style brief (Adopted, awaiting owner review)
 - **Owner (2026-10-04):** "The ship and new added stuff again doesn't match our graphic style. Hand crafted, no
@@ -777,3 +783,14 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   up); hull paint muted brick-oxblood, cream muted; iron darker and less metallic; hemp rope muted and its UVs
   run along the rope.
 - **Unchanged:** the sailing physics and tests (18/18 pass after the restyle).
+
+### D39 · Owner round: smaller player, no rock lichen, gulls, gangway (Adopted)
+- **Player:** 1.5 m (capsule half height 75 cm, eyes at 1.4 m); the swim test still passes 5/5.
+- **Rocks:** "remove the yellow marks at the top of the stones": `MI_Rock_Coast` has no lichen (the ruin keeps its
+  green lichen).
+- **Birds:** `ASaltBirds` flies stylised gulls (`build_birds.py`: chunky white body, grey wings with dark tips,
+  yellow beak) as instanced body and wing meshes. Each bird soars in wide circles round a drifting centre, banks
+  into the turn, rises and sinks slowly, and alternates long glides with short flapping bursts (wings rotate at the
+  shoulder). Nine circle over the cove at 14–45 m, five further out at sea.
+- **Boarding:** a hand-made gangway from the pier down to the boat's gap in the bulwark (WorldDynamic, so the
+  boat's collision ignores it).

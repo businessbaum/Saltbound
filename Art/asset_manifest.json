@@ -152,5 +152,29 @@
     "dest": "/Game/Saltbound/Boat",
     "nanite": false,
     "collision": "none"
+  },
+  "SM_Gull_Body": {
+    "fbx": "Birds/SM_Gull_Body.fbx",
+    "dest": "/Game/Saltbound/Environment/Birds",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Gull_WingL": {
+    "fbx": "Birds/SM_Gull_WingL.fbx",
+    "dest": "/Game/Saltbound/Environment/Birds",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Gull_WingR": {
+    "fbx": "Birds/SM_Gull_WingR.fbx",
+    "dest": "/Game/Saltbound/Environment/Birds",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Boat_Gangway": {
+    "fbx": "Boat/SM_Boat_Gangway.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "ucx"
   }
 }

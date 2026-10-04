@@ -172,6 +172,16 @@ spawn(unreal.SaltLantern, (1310, -70, 110), (0, -30, 0), "Lantern_Dock")
 
 # --- the sailing boat (M4, D36): greybox, moored on the pier's south side with the bow to the sea --------------
 spawn(unreal.SaltBoat, (900, -350, 0), (0, 0, 0), "Boat")
+# Gangway from the pier edge down to the boat's boarding gap (WorldDynamic, so the boat's collision ignores it).
+gangway = mesh("Gangway", "/Game/Saltbound/Boat/SM_Boat_Gangway", (900, -95, 110), (-14, -90, 0))
+gangway.static_mesh_component.set_collision_profile_name("BlockAllDynamic")
+
+# --- seagulls (ambient): a flock circling over the cove and a few birds out at sea -----------------------------
+spawn(unreal.SaltBirds, (1500, 0, 0), label="Gulls_Cove")
+gulls_sea = spawn(unreal.SaltBirds, (16000, -7000, 0), label="Gulls_Sea")
+gulls_sea.set_editor_property("count", 5)
+gulls_sea.set_editor_property("seed", 21)
+gulls_sea.set_editor_property("area_radius", 9000.0)
 mesh("Crate_Dock", "/Game/Saltbound/Props/SM_Crate_Small", (1180, -60, 110), (0, 25, 0))
 mesh("Crate_Dock2", "/Game/Saltbound/Props/SM_Crate_Small", (1185, -62, 150.5), (0, 12, 0), 0.85)
 

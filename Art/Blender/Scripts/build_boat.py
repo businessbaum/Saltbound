@@ -716,12 +716,27 @@ def build_wheel():
     export(obj)
 
 
+def build_gangway():
+    """Boarding plank from the pier to the boat's gap in the bulwark: two thick boards on cross battens, a little
+    worn. Pivot at the pier end on the walking surface, lying along +X (1.3 m); the map tilts it down to the deck."""
+    parts = []
+    for y in (-0.15, 0.15):
+        parts.append(tb.rough_plank("board", 1.3, 0.29, 0.05, (0.65, y, -0.025), (0, 0, 0), M["MI_Wood_Varnish"], nseed(),
+                                    wear=0.6, grooves=(1, 2), split_chance=0.2))
+    for x in (0.12, 0.5, 0.85, 1.2):
+        parts.append(tb.rough_plank("batten", 0.62, 0.07, 0.04, (x, 0.0, -0.07), (0, 0, math.pi / 2), M["MI_Wood_Varnish"], nseed(),
+                                    wear=0.5, grooves=(0, 1), split_chance=0.0))
+    obj = finish(parts, "SM_Boat_Gangway")
+    cols = [sb.add_ucx_box("SM_Boat_Gangway", 1, (1.3, 0.6, 0.06), (0.65, 0.0, -0.03))]
+    export(obj, cols)
+
+
 def main():
-    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel"]
+    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway"]
     builds = [("hull", build_hull),
               ("spars", lambda: build_spar("SM_Boat_Boom", BOOM_L, 0.085, 0.068, 0.14)),
               ("spars", lambda: build_spar("SM_Boat_Gaff", GAFF_L, 0.075, 0.06, 0.13)),
-              ("sail", build_sail), ("rudder", build_rudder), ("wheel", build_wheel)]
+              ("sail", build_sail), ("rudder", build_rudder), ("wheel", build_wheel), ("gangway", build_gangway)]
     for part, fn in builds:
         if part in args:
             sb.reset_scene()

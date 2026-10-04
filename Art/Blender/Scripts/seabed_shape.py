@@ -5,9 +5,10 @@ Coordinates are Unreal metres (X towards the sea along the pier, Y across), z re
 
   base(x, y)    the broad shape: beach, pier ridge, drop-off, sandbank, headland shoals, soft mounds and long sand
                 waves. The collision floor uses it (1 m cells).
-  detail(x, y)  sculpted sand ripples on top (D37): about 1 m apart, rounded crests and wider troughs, gently
-                crooked, in patches with calm sand between. Returns (dz, crest, trough, tone): the height offset
-                and the 0..1 masks the sand material tints (lit crests, shaded troughs, broad tone patches).
+  detail(x, y)  sculpted beach sand on top (D37, beach only since the owner's correction): wind ripples about
+                1 m apart on the dry sand, soft mounds on the upper beach and swash ridges along the waterline.
+                Under water the floor keeps the broad shape (and the painted texture). Returns (dz, crest, trough,
+                tone): the height offset and the 0..1 masks the beach material tints.
 """
 import math
 
@@ -22,8 +23,8 @@ PROFILE = [(-75, FLOOR), (-58, -7.0), (-45, -1.6), (-34, 0.4), (-24, 0.6), (-16,
 HEADLANDS = [(9.0, 39.0), (20.0, 33.0), (34.0, 43.0)]   # rock positions (m)
 SANDBANK = (32.0, 18.0, 25.0)   # centre x, y (m) and orientation (deg): light ground about 2 m deep (region looks)
 
-RIPPLE_SPACING = 1.6    # m between crests
-RIPPLE_HEIGHT = 0.2     # m crest to trough
+RIPPLE_SPACING = 0.95   # m between wind-ripple crests on the dry beach
+RIPPLE_HEIGHT = 0.09    # m crest to trough
 
 
 def smooth(t):
@@ -89,32 +90,46 @@ def base(x, y):
     wet = smooth((0.2 - z) / 0.8)
     mounds = 0.55 * noise(x, y, 7.0, 1) + 0.25 * noise(x, y, 3.1, 2)
     phase = (x + 1.8 * math.sin(y / 7.0) + 0.9 * math.sin(y / 3.3)) / 3.4 * 2.0 * math.pi
-    sandwave = 0.08 * (math.sin(phase) + 0.25 * math.sin(2.0 * phase + 0.6)) * (0.6 + 0.4 * noise(x, y, 9.0, 3))
+    sandwave = 0.11 * (math.sin(phase) + 0.25 * math.sin(2.0 * phase + 0.6)) * (0.6 + 0.4 * noise(x, y, 9.0, 3))
     z += calm(x, y) * (mounds * (0.4 + 0.6 * wet) + sandwave * wet)
     return z + (FLOOR - z) * edge(x, y)
 
 
+def beach_weight(z):
+    """0 on the sea floor, 1 on the beach: the sand material blends to the beach texture set (just below the water)."""
+    return smooth((z + 0.35) / 0.4)
+
+
 def detail(x, y, z_base=None):
-    """Sculpted ripples on top of base(): (dz, crest, trough, tone)."""
+    """Sculpted beach on top of base(): (dz, crest, trough, tone). Zero under water."""
     z = base(x, y) if z_base is None else z_base
     tone = 0.5 + 0.5 * noise(x, y, 4.5, 7)
-    # Under water only (fading in over the wet beach), calm under the pier, none on the far floor.
-    amount = smooth((0.15 - z) / 0.6) * calm(x, y) * (1.0 - edge(x, y))
-    # Patches: mostly rippled, with occasional small calm spots (soft but readable borders).
-    patch = smooth((0.5 + 0.5 * noise(x, y, 10.0, 11) + 0.25 * noise(x, y, 4.0, 12) - 0.02) / 0.22)
-    amount *= patch
-    if amount <= 1e-3:
+    beach = smooth((z + 0.15) / 0.3) * (1.0 - edge(x, y))
+    if beach <= 1e-3:
         return 0.0, 0.0, 0.0, tone
-    # Crests run roughly along Y (parallel to the shore), wandering in direction and gently crooked.
-    theta = 0.45 * noise(x, y, 22.0, 13)
+    # Wind ripples on the dry sand: crests roughly along the shore, wandering and gently crooked, steep lee side.
+    dry = smooth((z - 0.05) / 0.2)
+    patch = smooth((0.5 + 0.5 * noise(x, y, 9.0, 11) + 0.25 * noise(x, y, 3.5, 12) + 0.12) / 0.25)
+    theta = 0.35 * noise(x, y, 18.0, 13)
     u = x * math.cos(theta) + y * math.sin(theta)
-    warp = 3.6 * noise(x, y, 8.0, 14) + 1.4 * noise(x, y, 3.1, 15)
-    phi = 2.0 * math.pi * u / RIPPLE_SPACING + warp
-    phi += 0.4 * math.sin(phi)                                   # steeper lee side, gentler stoss side
-    p = (0.5 + 0.5 * math.cos(phi)) ** 2.0                       # rounded crests, wide soft troughs
-    dz = RIPPLE_HEIGHT * amount * (0.75 + 0.25 * noise(x, y, 3.3, 16)) * (p - 0.375)
-    crest = smooth((p - 0.55) / 0.35) * amount
-    trough = smooth((0.18 - p) / 0.18) * amount
+    phi = 2.0 * math.pi * u / RIPPLE_SPACING + 3.2 * noise(x, y, 6.0, 14) + 1.3 * noise(x, y, 2.4, 15)
+    phi += 0.5 * math.sin(phi)
+    p = (0.5 + 0.5 * math.cos(phi)) ** 2.0
+    ripple_amt = dry * patch * (0.7 + 0.3 * noise(x, y, 3.0, 16))
+    dz = RIPPLE_HEIGHT * ripple_amt * (p - 0.375)
+    # Soft mounds on the upper beach (wind-blown sand), chunky and rounded.
+    upper = smooth((z - 0.3) / 0.25)
+    n = 0.7 * noise(x, y, 3.2, 21) + 0.3 * noise(x, y, 1.5, 22)
+    mound = 0.3 * max(n - 0.1, 0.0) ** 1.4 * upper
+    dz += mound
+    # Swash ridges: low lines left by the waves, following the shore's contours.
+    swash = 0.0
+    for k, zk in enumerate((-0.02, 0.07, 0.16)):
+        swash += math.exp(-((z - zk) / 0.03) ** 2) * (0.55 + 0.45 * noise(x, y, 5.0, 30 + k))
+    dz += 0.03 * swash * smooth((z + 0.1) / 0.1)
+    dz *= beach
+    crest = max(smooth((p - 0.55) / 0.35) * ripple_amt, smooth(mound / 0.12), min(swash, 1.0) * 0.6) * beach
+    trough = smooth((0.18 - p) / 0.18) * ripple_amt * beach
     return dz, crest, trough, tone
 
 

@@ -192,6 +192,17 @@ if (AntiTile > 0.0)
     NZ = lerp(NZ, float2(C * NR.x + S * NR.y, -S * NR.x + C * NR.y) * 0.71, Mix);
     Alb = AX * W.x + AY * W.y + AZ * W.z;
 }
+// Second texture set (sand, D37): where the vertex alpha drops below 1 (the dry beach), the top projection blends
+// towards AlbedoTex2 / NormalTex2 / ORMTex2. Off (SecondSetAmount 0) for rocks.
+float Second = saturate((1.0 - VA) * SecondSetAmount) * W.z;
+if (Second > 0.001)
+{
+    AZ = lerp(AZ, Texture2DSample(AlbedoTex2, AlbedoTex2Sampler, UVZ).rgb, Second);
+    NZ = lerp(NZ, Texture2DSample(NormalTex2, NormalTex2Sampler, UVZ).xy * 2 - 1, Second);
+    OZ = lerp(OZ, Texture2DSample(ORMTex2, ORMTex2Sampler, UVZ).rg, Second);
+    Alb = AX * W.x + AY * W.y + AZ * W.z;
+    O = OX * W.x + OY * W.y + OZ * W.z;
+}
 // Pattern strength: 1 = as painted, lower = the texture fades towards a flat tone.
 Alb = lerp(0.5, Alb, PatternContrast);
 float3 WN = normalize(N + float3(0, NX.x, NX.y) * W.x * NormalStrength +
@@ -250,6 +261,9 @@ def build_rock():
         "ORMTex": (TEX + "/Rock/T_Rock_ORM", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR),
         "MacroTex": (TEX + "/Common/T_MacroNoise_M", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR),
         "DetailTex": (TEX + "/Rock/T_RockDetail_M", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR),
+        "AlbedoTex2": (TEX + "/Rock/T_Rock_D", unreal.MaterialSamplerType.SAMPLERTYPE_COLOR),
+        "NormalTex2": (TEX + "/Rock/T_Rock_N", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL),
+        "ORMTex2": (TEX + "/Rock/T_Rock_ORM", unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR),
     }
     tnodes = {}
     for i, (n, (p, st)) in enumerate(texobj.items()):
@@ -271,15 +285,17 @@ def build_rock():
         "WetHeight": ("s", 80.0, "Wet"), "WetDarken": ("s", 0.5, "Wet"),
         "WetRoughness": ("s", 0.3, "Wet"), "RoughScale": ("s", 1.0, "Surface"),
         "AntiTile": ("s", 0.0, "Textures"), "AntiTileScale": ("s", 6000.0, "Textures"), "PatternContrast": ("s", 1.0, "Textures"),
+        "SecondSetAmount": ("s", 0.0, "Textures"),
     }
     nodes = {}
     for i, (name, (kind, val, group)) in enumerate(params.items()):
         nodes[name] = (sb_ue.vector_param if kind == "v" else sb_ue.scalar_param)(m, name, val, -1300, -400 + i * 70, group)
-    inputs = ["P", "N", "VC"] + list(texobj) + list(params)
+    inputs = ["P", "N", "VC", "VA"] + list(texobj) + list(params)
     c = custom(m, -800, 200, "SB rock triplanar", ROCK_CODE, inputs, F3, [("RoughOut", F1), ("AOOut", F1), ("NormalOut", F3)])
     sb_ue.connect(wp, "", c, "P")
     sb_ue.connect(wn, "", c, "N")
     sb_ue.connect(vc, "", c, "VC")
+    sb_ue.connect(vc, "A", c, "VA")      # the default output is RGB only
     for n in texobj:
         sb_ue.connect(tnodes[n], "", c, n)
     for n in params:
@@ -485,6 +501,11 @@ def main():
                               scalars={"TexNormalize": 1.0, "NormalStrength": 0.0, "RoughScale": 0.0, "RoughOffset": 0.06, "WearStrength": 0.0, "GrimeAmount": 0.0},
                               textures={"BaseTexture": "/Engine/EngineResources/WhiteSquareTexture"}),
         "MI_Canvas": dict(vectors={"Tint": (0.53, 0.5, 0.43, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.5, "RoughScale": 1.6, "WearStrength": 0.0, "UVScale": 1.0}, textures=canvas_textures()),
+        # Seagulls (ambient birds): plain, calm surfaces, no wear.
+        "MI_Bird_White": dict(vectors={"Tint": (0.62, 0.62, 0.6, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.2, "RoughScale": 1.3, "WearStrength": 0.0, "GrimeAmount": 0.0, "VarAmount": 0.0}, textures=paint_textures()),
+        "MI_Bird_Grey": dict(vectors={"Tint": (0.24, 0.27, 0.3, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.2, "RoughScale": 1.3, "WearStrength": 0.0, "GrimeAmount": 0.0, "VarAmount": 0.0}, textures=paint_textures()),
+        "MI_Bird_Dark": dict(vectors={"Tint": (0.025, 0.025, 0.028, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.2, "RoughScale": 1.2, "WearStrength": 0.0, "GrimeAmount": 0.0, "VarAmount": 0.0}, textures=paint_textures()),
+        "MI_Bird_Beak": dict(vectors={"Tint": (0.55, 0.38, 0.06, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.2, "RoughScale": 1.0, "WearStrength": 0.0, "GrimeAmount": 0.0, "VarAmount": 0.0}, textures=paint_textures()),
         # Harbour: weathered, cooler
         # Weathered dock timber (D20): desaturated grey-brown, olive-brown board variation, matte, broad grain;
         # edge accents only where the wear mask breaks through (no continuous pale outlines).
@@ -503,16 +524,19 @@ def main():
     }
     for name, kw in lib.items():
         sb_ue.make_mi(name, MI, surf, **kw)
-    sb_ue.make_mi("MI_Rock_Coast", MI, rock)
+    # No lichen on the coastal rocks (owner: "remove the yellow marks at the top of the stones").
+    sb_ue.make_mi("MI_Rock_Coast", MI, rock, scalars={"LichenCoverage": 0.0})
     sb_ue.make_mi("MI_Stone_Ruin", MI, rock, vectors={"Tint": (0.42, 0.4, 0.36, 1), "LichenColor": (0.4, 0.46, 0.28, 1)},
                   scalars={"Scale": 250.0, "LichenCoverage": 0.35, "NormalStrength": 0.6, "StrataScale": 1.0e6})
-    # Engine primitives carry no vertex colours (they read as white): switch the masks off.
-    # Sand (D37): the ripples are sculpted geometry; its vertex colours light the crests (R), shade the troughs (G)
-    # and vary the tone (B). The texture adds only broad colour and sparse flecks.
+    # Sand: the sea floor keeps its painted texture set (ripple bands, grains; D29). The dry beach (vertex alpha < 1,
+    # D37) blends to the calm beach set; its ripples, mounds and swash ridges are sculpted geometry whose vertex
+    # colours light the crests (R), shade the troughs (G) and vary the tone (B); neutral under water. The far floor
+    # cube (an engine primitive) reads white vertex colours: alpha 1 keeps it sea-floor sand.
     sb_ue.make_mi("MI_Sand", MI, rock, vectors={"Tint": (0.62, 0.55, 0.42, 1), "LichenColor": (0.5, 0.48, 0.36, 1)},
-                  textures={"AlbedoTex": TEX + "/Sand/T_Sand_D", "NormalTex": TEX + "/Sand/T_Sand_N", "ORMTex": TEX + "/Sand/T_Sand_ORM"},
-                  scalars={"Scale": 550.0, "AntiTile": 1.0, "PatternContrast": 1.0, "LichenCoverage": 0.0, "NormalStrength": 0.35, "MacroAmount": 0.2, "WetDarken": 0.7,
-                           "VertexMaskAmount": 1.0, "EdgeLighten": 1.2, "CavityDarken": 0.78, "PlateVar": 0.1, "TopLighten": 0.12,
+                  textures={"AlbedoTex": TEX + "/Sand/T_Sand_D", "NormalTex": TEX + "/Sand/T_Sand_N", "ORMTex": TEX + "/Sand/T_Sand_ORM",
+                            "AlbedoTex2": TEX + "/Sand/T_SandBeach_D", "NormalTex2": TEX + "/Sand/T_SandBeach_N", "ORMTex2": TEX + "/Sand/T_SandBeach_ORM"},
+                  scalars={"Scale": 550.0, "AntiTile": 1.0, "PatternContrast": 0.6, "LichenCoverage": 0.0, "NormalStrength": 0.5, "MacroAmount": 0.25, "WetDarken": 0.7,
+                           "VertexMaskAmount": 1.0, "EdgeLighten": 1.18, "CavityDarken": 0.8, "PlateVar": 0.1, "SecondSetAmount": 1.0,
                            "AlgaeAmount": 0.0, "BarnacleAmount": 0.0, "StrataScale": 1.0e6})
     sb_ue.make_mi("MI_SeaGrass", MI, grass)
     sb_ue.make_mi("MI_LanternGlass", MI, glow, vectors={"BaseColor": (0.35, 0.25, 0.14, 1), "GlowColor": (1.0, 0.52, 0.2, 1)}, scalars={"GlowIntensity": 80.0, "Roughness": 0.1})
