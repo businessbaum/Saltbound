@@ -179,6 +179,25 @@ P0 = float3(XY, D.z);
 return float3(XY - WorldPos.xy, 0.0) + D;
 """
 
+# Underside tiles only (D35): draw only while the camera is under the surface at its own position (the same GPU
+# surface the underwater pass uses). From above, slivers of the underside showed through folded crests at grazing
+# angles as bright cyan / red specks; collapsing every vertex to one point leaves no pixels.
+UNDER_VS_GUARD = """
+float2 PC = CamPos.xy;
+float3 DC = 0;
+[unroll] for (int k = 0; k < 4; k++)
+{
+    DC = O.SurfaceDisplacement(PC, CameraCellSize * 4.0, CameraCellSize, Cascade0, Cascade1, VSMipBias, Disp0, Disp0Sampler,
+        Disp1, Disp1Sampler, QuietTex, QuietTexSampler, QuietTile, RippleOffsets.w, TroughCalm, QuietAmount, WindSeaVS1);
+    PC = CamPos.xy - DC.xy;
+}
+if (Globals.y + DC.z - CamPos.z < -2.0)
+{
+    P0 = float3(WorldPos.xy, 0.0);
+    return CamPos - float3(0.0, 0.0, 100000.0) - WorldPos;
+}
+"""
+
 PS_CODE = INIT + """
 float Dist = distance(CamPos, WorldPos);
 float Height = P0.z;
@@ -251,12 +270,6 @@ float Alpha2 = BaseRough * BaseRough * BaseRough * BaseRough + min(Variance, Spe
 // water (D32). No added microdetail; the small sun highlights keep their shape outside the patches.
 float ReflPatch = Texture2DSampleLevel(QuietTex, QuietTexSampler, XY / ReflBreakTile + float2(0.41, 0.17), 0.0).b;
 Alpha2 *= lerp(1.0, ReflBreak, smoothstep(0.4, 0.8, ReflPatch));
-// Overflow guard (D34): seen at grazing angles far away, the sun's specular peak (GGX distribution x visibility)
-// on near-mirror water exceeds the half-float scene colour; single pixels then saturate per channel into red /
-// green / cyan "rainbow" specks. A small roughness floor at grazing angles in the distance bounds the peak;
-// highlights near the camera keep their size.
-float NoVg = saturate(dot(N, normalize(CamPos - WorldPos)));
-Alpha2 = max(Alpha2, FarMinAlpha2 * FarK * (1.0 - smoothstep(0.03, 0.35, NoVg)));
 // The cap keeps near highlights crisp (D27); far away a crest is smaller than a pixel, so the cap rises and the
 // sun spreads over the pixel instead of sparking in single pixels (owner: "pixel errors at the top of the
 // waves in the distance", D31).
@@ -338,7 +351,7 @@ SCALARS = {
     # surface
     "WaterRoughness": (0.025, "Surface"), "FarRoughness": (0.08, "Surface"), "FarRoughnessDistance": (15000.0, "Surface"),
     "SpecAAVariance": (0.03, "Surface"), "SpecAAMax": (0.004, "Surface"), "SlopeVarScale": (0.25, "Surface"),
-    "MaxAlpha2": (0.004, "Surface"), "FarMaxAlpha2": (0.03, "Surface"), "FarMinAlpha2": (0.004, "Surface"),
+    "MaxAlpha2": (0.004, "Surface"), "FarMaxAlpha2": (0.03, "Surface"),
     "Specular": (0.24, "Surface"), "HorizonOcclusion": (1.0, "Surface"), "HorizonOccTop": (0.08, "Surface"),
     "HorizonOccBottom": (0.0, "Surface"), "HorizonOccFloor": (0.2, "Surface"), "DebugView": (0.0, "Diagnostics"),
     # crest light (CrestStart / CrestRange are fractions of the sea height)
@@ -403,7 +416,11 @@ N *= (dot(I, N) < 0.0) ? -1.0 : 1.0;
 float CosI = saturate(dot(I, N));
 const float Eta = 1.333;
 float Sin2T = Eta * Eta * (1.0 - CosI * CosI);
-float3 Deep = U.InScatterRay(reflect(I, N), 0.0, 100000.0);
+// The reflected ray goes down into the water body; strongly tilted normals (folds, sub-pixel crests) could turn it
+// upward, so it is kept pointing down (D35).
+float3 RDir = reflect(I, N);
+RDir = normalize(float3(RDir.xy, min(RDir.z, -0.05)));
+float3 Deep = U.InScatterRay(RDir, 0.0, 100000.0);
 float3 Color = Deep;
 if (Sin2T < 1.0)
 {
@@ -414,6 +431,10 @@ if (Sin2T < 1.0)
     float R = saturate(0.5 * (Rs * Rs + Rp * Rp));
     Color = lerp(U.SkyThrough(T), Deep, R);
 }
+// Far away the surface is seen at grazing angles; sub-pixel wave normals would open the window in single pixels
+// and catch the sun glint (an orange speckled line along the distant underside, D35). Beyond WindowFadeDistance
+// only the total internal reflection remains.
+Color = lerp(Color, Deep, smoothstep(0.5, 1.0, Dist / max(WindowFadeDistance, 1.0)));
 // Comic wave shading: faces turned towards the sun pass more light, the others less, so the moving surface
 // reads as rippled light instead of a flat ceiling (WaveShading = strength, WaveShadingSlope = contrast).
 float Tilt = dot(N, U.Lw) - U.Lw.z;
@@ -421,7 +442,8 @@ return Color * (1.0 + WaveShading * clamp(Tilt * WaveShadingSlope, -1.0, 1.0));
 """
 
 UNDER_SCALARS = dict({n: SCALARS[n] for n in VS_SCALARS + ["RippleFloor", "RippleFadeDistance"]},
-                     WaveShading=(0.35, "Underwater"), WaveShadingSlope=(6.0, "Underwater"))
+                     WaveShading=(0.35, "Underwater"), WaveShadingSlope=(6.0, "Underwater"), CameraCellSize=(25.0, "Underwater"),
+                     WindowFadeDistance=(4000.0, "Underwater"))
 
 # --- underwater post-process (M_PP_Underwater) --------------------------------------------------------
 # Surface height above the camera from the same displacement as the vertex shader at the finest LOD (the
@@ -500,7 +522,7 @@ def link_inputs(ctx, node, names):
         link(src, "", node, n)
 
 
-def ocean_vertex(m, mpc, ush, ctx):
+def ocean_vertex(m, mpc, ush, ctx, under=False):
     """Vertex shader of the surface materials: CDLOD morph, swells and FFT wind sea, plus last frame's
     displacement for the velocity pass. Returns the interpolated Lagrangian position P0 (xy) and height (z)."""
     nodes = ctx["nodes"]
@@ -510,8 +532,9 @@ def ocean_vertex(m, mpc, ush, ctx):
     cd = [sb_ue.expr(m, unreal.MaterialExpressionPerInstanceCustomData, -2000, 400 + i * 80, data_index=i) for i in range(3)]
     fade_vs = sb_ue.scalar_param(m, "WaveFadeVS", 0.03, -2000, 650, "Waves")
     vs_inputs = (["WorldPos", "LocalPos", "CamPos", "CellSize", "MorphStart", "MorphEnd", "FadeScale", "IsPrev", "QuietTex", "RippleOffsets"]
-                 + VS_SCALARS + VS_TEXTURES + WAVE_PARAMS + FIELD_PARAMS)
-    vs = custom(m, -1500, 300, "SaltOcean VS (morph + swells + FFT wind sea)", ush + "\n" + VS_CODE, vs_inputs, F3, [("P0", F3)])
+                 + VS_SCALARS + VS_TEXTURES + WAVE_PARAMS + FIELD_PARAMS + (["CameraCellSize"] if under else []))
+    code = VS_CODE.replace("float Dist = distance(CamPos, WorldPos);", UNDER_VS_GUARD + "float Dist = distance(CamPos, WorldPos);", 1) if under else VS_CODE
+    vs = custom(m, -1500, 300, "SaltOcean VS (morph + swells + FFT wind sea)", ush + "\n" + code, vs_inputs, F3, [("P0", F3)])
     link(wp_vs, "", vs, "WorldPos")
     link(lp, "", vs, "LocalPos")
     link(ctx["cam"], "", vs, "CamPos")
@@ -521,7 +544,7 @@ def ocean_vertex(m, mpc, ush, ctx):
     link(fade_vs, "", vs, "FadeScale")
     link(ctx["quiet_tex"], "", vs, "QuietTex")
     link(nodes["RippleOffsets"], "", vs, "RippleOffsets")
-    link_inputs(ctx, vs, VS_TEXTURES + VS_SCALARS)
+    link_inputs(ctx, vs, VS_TEXTURES + VS_SCALARS + (["CameraCellSize"] if under else []))
     # Last frame's displacement for the velocity pass: PreviousFrameSwitch picks PrevPhase* for the swells
     # and IsPrev = 1 (last frame's FFT textures). Without it the waves get zero motion vectors and TSR
     # reprojects history onto moving water (D23). UsePrevFramePhases = 0 restores that for A/B tests.
@@ -640,11 +663,12 @@ def make_under_material(mpc, ush, under_ush, rts):
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
     m.set_editor_property("used_with_instanced_static_meshes", True)
     ctx = ocean_inputs(m, mpc, rts, VS_TEXTURES + UNDER_TEXTURES, UNDER_SCALARS)
-    interp = ocean_vertex(m, mpc, ush, ctx)
+    interp = ocean_vertex(m, mpc, ush, ctx, under=True)
     wp_ps = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -1200, 700)
     fade_ps = sb_ue.scalar_param(m, "WaveFadePS", 0.002, -1200, 800, "Waves")
     sun_dir, sun_illum = sun_nodes(m, -1500, 2000, above_water_position(m, ctx, -1800, 2100))
-    ps_scalars = ["TroughCalm", "QuietAmount", "QuietTile", "RippleFloor", "RippleFadeDistance", "WaveShading", "WaveShadingSlope"]
+    ps_scalars = ["TroughCalm", "QuietAmount", "QuietTile", "RippleFloor", "RippleFadeDistance", "WaveShading", "WaveShadingSlope",
+                  "WindowFadeDistance"]
     ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "QuietTex", "SunDir", "SunIllum", "RippleOffsets"]
                  + UNDER_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + LOOK_PARAMS + UNDER_PARAMS)
     ps = custom(m, -700, 900, "SaltOcean underside (Snell's window, total internal reflection)",

@@ -68,6 +68,12 @@ struct FSaltUnderwaterLight
 	// loss * Dir.z (closed form: looking down, the water darkens with distance; looking up, it brightens).
 	float3 InScatterRay(float3 Dir, float Depth, float Dist)
 	{
+		// An upward ray leaves the water at the surface: integrating further (through air, at "negative depth")
+		// makes the exponential grow without bound and overflowed single pixels into bright specks (D35).
+		if (Dir.z > 1e-4)
+		{
+			Dist = min(Dist, max(Depth, 0.0) / Dir.z);
+		}
 		const float3 SigV = SigT * Fog.x;
 		const float3 A = SigV - DepthLoss() * Dir.z;
 		const float3 SafeA = max(abs(A), 1e-7) * (step(0.0, A) * 2.0 - 1.0);

@@ -644,7 +644,7 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Cost:** `M_Ocean` 1715 pixel-shader instructions (was 1500), mostly the residue samples. A packaged
   benchmark of the ocean is still outstanding.
 
-### D34 · Rainbow specks on distant crests: half-float overflow of the sun specular (Adopted, awaiting owner check)
+### D34 · Rainbow specks on distant crests: half-float overflow of the sun specular (Rejected: wrong diagnosis, see D35)
 - **Owner (2026-10-04):** red, orange, green, cyan and white specks on far wave tops ("looks like a rainbow
   reflection"). They first appeared after D30; D31 (distance roughness cap) did not fix them.
 - **Cause (by analysis, not measured):**
@@ -658,3 +658,28 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Fix:** a roughness floor `FarMinAlpha2` 0.004, only at grazing angles (NoV < 0.35) and growing with
   distance (full from 150 m). The peak there drops below about 5000; highlights near the camera are
   unchanged. D31's cap only limited roughness from above, so it could not catch smooth spots.
+
+### D35 · Rainbow specks: unbounded in-scatter in the underside, leaking through folded crests (Adopted)
+- **Owner (2026-10-04):** the specks were still there after D34, only when looking low over the sea, not
+  from high above.
+- **Isolation:** sea frozen, identical camera, one switch at a time.
+  - Lumen reflections off: still there.
+  - Underside tiles off: gone.
+  - From below, the same source showed as a bright line with bloom halos along the far underside.
+  - Lens flares off: still there. Underwater fog terms off: gone.
+- **Cause:**
+  - `FSaltUnderwaterLight::InScatterRay` integrated light along the ray as if it stayed under water. In
+    the underside material, strongly tilted normals (folds, sub-pixel crests) can turn the reflected ray
+    upward. Traced 1 km "under water" through air (negative depth), the exponential grew without bound
+    and single pixels overflowed.
+  - From above they were visible through the slivers of the underside that show behind folded crests
+    while the camera is within 5 m of the surface (the underside tiles are switched on then).
+  - That explains "only low": high above, the underside is off.
+- **Fix:**
+  - An upward ray only integrates up to the surface (distance ≤ depth / Dir.z). The reflected ray in
+    `M_OceanUnder` is kept pointing down.
+  - The underside's vertex shader also checks the GPU surface above the camera (as the underwater pass
+    does) and collapses every vertex when the camera is above the water. No underside slivers show from
+    above.
+  - The D34 roughness floor is removed (it had no effect).
+  - The Snell window fades into total internal reflection beyond 40 m (`WindowFadeDistance`).
