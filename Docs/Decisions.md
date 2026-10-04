@@ -643,3 +643,18 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   off for an A/B check.
 - **Cost:** `M_Ocean` 1715 pixel-shader instructions (was 1500), mostly the residue samples. A packaged
   benchmark of the ocean is still outstanding.
+
+### D34 · Rainbow specks on distant crests: half-float overflow of the sun specular (Adopted, awaiting owner check)
+- **Owner (2026-10-04):** red, orange, green, cyan and white specks on far wave tops ("looks like a rainbow
+  reflection"). They first appeared after D30; D31 (distance roughness cap) did not fix them.
+- **Cause (by analysis, not measured):**
+  - At grazing angles far away, near-mirror water (α² ≈ 4·10⁻⁵ where neighbouring normals agree, so
+    specular anti-aliasing adds nothing) gives a sun peak of GGX distribution × visibility ≈ 8000 × 130 per
+    unit illuminance.
+  - With 90 klx and pre-exposure ≈ 5·10⁻⁵ that is about 10⁶ in the half-float scene colour (max 65504).
+  - Channels saturate separately (red first in warm sunlight), and TSR and bloom spread them into coloured
+    blocks.
+  - The smaller sun disc of D30 (1.3° instead of 2.2°) raised the peak about 3×.
+- **Fix:** a roughness floor `FarMinAlpha2` 0.004, only at grazing angles (NoV < 0.35) and growing with
+  distance (full from 150 m). The peak there drops below about 5000; highlights near the camera are
+  unchanged. D31's cap only limited roughness from above, so it could not catch smooth spots.

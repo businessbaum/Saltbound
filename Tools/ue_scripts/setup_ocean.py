@@ -251,6 +251,12 @@ float Alpha2 = BaseRough * BaseRough * BaseRough * BaseRough + min(Variance, Spe
 // water (D32). No added microdetail; the small sun highlights keep their shape outside the patches.
 float ReflPatch = Texture2DSampleLevel(QuietTex, QuietTexSampler, XY / ReflBreakTile + float2(0.41, 0.17), 0.0).b;
 Alpha2 *= lerp(1.0, ReflBreak, smoothstep(0.4, 0.8, ReflPatch));
+// Overflow guard (D34): seen at grazing angles far away, the sun's specular peak (GGX distribution x visibility)
+// on near-mirror water exceeds the half-float scene colour; single pixels then saturate per channel into red /
+// green / cyan "rainbow" specks. A small roughness floor at grazing angles in the distance bounds the peak;
+// highlights near the camera keep their size.
+float NoVg = saturate(dot(N, normalize(CamPos - WorldPos)));
+Alpha2 = max(Alpha2, FarMinAlpha2 * FarK * (1.0 - smoothstep(0.03, 0.35, NoVg)));
 // The cap keeps near highlights crisp (D27); far away a crest is smaller than a pixel, so the cap rises and the
 // sun spreads over the pixel instead of sparking in single pixels (owner: "pixel errors at the top of the
 // waves in the distance", D31).
@@ -332,7 +338,7 @@ SCALARS = {
     # surface
     "WaterRoughness": (0.025, "Surface"), "FarRoughness": (0.08, "Surface"), "FarRoughnessDistance": (15000.0, "Surface"),
     "SpecAAVariance": (0.03, "Surface"), "SpecAAMax": (0.004, "Surface"), "SlopeVarScale": (0.25, "Surface"),
-    "MaxAlpha2": (0.004, "Surface"), "FarMaxAlpha2": (0.03, "Surface"),
+    "MaxAlpha2": (0.004, "Surface"), "FarMaxAlpha2": (0.03, "Surface"), "FarMinAlpha2": (0.004, "Surface"),
     "Specular": (0.24, "Surface"), "HorizonOcclusion": (1.0, "Surface"), "HorizonOccTop": (0.08, "Surface"),
     "HorizonOccBottom": (0.0, "Surface"), "HorizonOccFloor": (0.2, "Surface"), "DebugView": (0.0, "Diagnostics"),
     # crest light (CrestStart / CrestRange are fractions of the sea height)
