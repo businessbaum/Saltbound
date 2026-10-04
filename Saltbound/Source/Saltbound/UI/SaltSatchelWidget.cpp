@@ -27,48 +27,12 @@
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
 #include "Styling/CoreStyle.h"
+#include "UI/SaltUIStyle.h"
+
+using namespace SaltUI;
 
 namespace
 {
-	const FLinearColor Ink(0.2f, 0.13f, 0.075f, 1.f);
-	const FLinearColor InkSoft(0.32f, 0.23f, 0.15f, 1.f);
-	const FLinearColor ParchmentText(0.95f, 0.88f, 0.72f, 1.f);
-	const TCHAR* UI = TEXT("/Game/Saltbound/UI/Textures/");
-
-	UTexture2D* Tex(const TCHAR* Name)
-	{
-		return LoadObject<UTexture2D>(nullptr, *FString::Printf(TEXT("%s%s.%s"), UI, Name, Name));
-	}
-
-	FSlateBrush BoxBrush(UTexture2D* T, FVector2D Size, float Margin = 0.3f)
-	{
-		FSlateBrush B;
-		B.SetResourceObject(T);
-		B.ImageSize = Size;
-		B.DrawAs = ESlateBrushDrawType::Box;
-		B.Margin = FMargin(Margin);
-		return B;
-	}
-
-	FSlateBrush ImageBrush(UTexture2D* T, FVector2D Size, bool bTile = false)
-	{
-		FSlateBrush B;
-		B.SetResourceObject(T);
-		B.ImageSize = Size;
-		B.DrawAs = ESlateBrushDrawType::Image;
-		B.Tiling = bTile ? ESlateBrushTileType::Both : ESlateBrushTileType::NoTile;
-		return B;
-	}
-
-	UTextBlock* Text(UWidgetTree* Tree, const FText& Value, int32 Size, const FLinearColor& Color, bool bBold = false)
-	{
-		UTextBlock* T = Tree->ConstructWidget<UTextBlock>();
-		T->SetFont(FCoreStyle::GetDefaultFontStyle(bBold ? "Bold" : "Regular", Size));
-		T->SetColorAndOpacity(FSlateColor(Color));
-		T->SetText(Value);
-		return T;
-	}
-
 	/** The charts (keep in sync with MAPS in Tools/textures/gen_ui.py): centre X / Y and size in metres. */
 	struct FChart { const TCHAR* Texture; FVector2D Centre; float Size; const TCHAR* Scale; float ScaleM; FText Name; };
 	const FChart& Chart(int32 Index)
@@ -108,10 +72,11 @@ namespace
 
 // --- Slot ---------------------------------------------------------------------------------------------------------
 
-void USaltItemSlotWidget::Setup(USaltSatchelWidget* InOwner, int32 InIndex)
+void USaltItemSlotWidget::Setup(int32 InIndex, TFunction<void(int32)> InOnClicked, TFunction<void(int32)> InOnHovered)
 {
-	Owner = InOwner;
 	Index = InIndex;
+	OnClickedFn = MoveTemp(InOnClicked);
+	OnHoveredFn = MoveTemp(InOnHovered);
 }
 
 TSharedRef<SWidget> USaltItemSlotWidget::RebuildWidget()
@@ -170,17 +135,17 @@ void USaltItemSlotWidget::Show(UTexture2D* Icon, int32 Count, bool bSelected)
 
 void USaltItemSlotWidget::HandleClicked()
 {
-	if (USaltSatchelWidget* O = Owner.Get())
+	if (OnClickedFn)
 	{
-		O->SelectSlot(Index);
+		OnClickedFn(Index);
 	}
 }
 
 void USaltItemSlotWidget::HandleHovered()
 {
-	if (USaltSatchelWidget* O = Owner.Get())
+	if (OnHoveredFn)
 	{
-		O->SelectSlot(Index);
+		OnHoveredFn(Index);
 	}
 }
 
@@ -309,7 +274,7 @@ UWidget* USaltSatchelWidget::BuildInventoryPage()
 	for (int32 I = 0; I < USaltInventoryComponent::Capacity; ++I)
 	{
 		USaltItemSlotWidget* W = CreateWidget<USaltItemSlotWidget>(this, USaltItemSlotWidget::StaticClass());
-		W->Setup(this, I);
+		W->Setup(I, [this](int32 SlotIndex) { SelectSlot(SlotIndex); }, [this](int32 SlotIndex) { SelectSlot(SlotIndex); });
 		SlotWidgets.Add(W);
 		Grid->AddChildToUniformGrid(W, I / 6, I % 6);
 	}

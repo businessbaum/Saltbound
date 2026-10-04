@@ -23,7 +23,8 @@ class SALTBOUND_API USaltItemSlotWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	void Setup(USaltSatchelWidget* InOwner, int32 InIndex);
+	/** Index of the slot, and what a click and a hover do with it (the satchel selects, a store moves the stack). */
+	void Setup(int32 InIndex, TFunction<void(int32)> InOnClicked, TFunction<void(int32)> InOnHovered);
 	void Show(UTexture2D* Icon, int32 Count, bool bSelected);
 
 protected:
@@ -36,7 +37,8 @@ private:
 	UPROPERTY(Transient) TObjectPtr<USaltMenuButton> Button;
 	UPROPERTY(Transient) TObjectPtr<UImage> IconImage;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> CountText;
-	TWeakObjectPtr<USaltSatchelWidget> Owner;
+	TFunction<void(int32)> OnClickedFn;
+	TFunction<void(int32)> OnHoveredFn;
 	int32 Index = 0;
 	bool bShownSelected = false;
 };

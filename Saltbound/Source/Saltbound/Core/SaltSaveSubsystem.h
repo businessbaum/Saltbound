@@ -16,7 +16,7 @@ class SALTBOUND_API USaltSaveGame : public USaveGame
 	GENERATED_BODY()
 
 public:
-	UPROPERTY() int32 Version = 2;
+	UPROPERTY() int32 Version = 3;
 	UPROPERTY() FDateTime SavedAt;
 	UPROPERTY() FString Map;
 
@@ -41,6 +41,9 @@ public:
 	UPROPERTY() bool bHasInventory = false;
 	UPROPERTY() TArray<FSaltItemStack> Inventory;
 	UPROPERTY() TArray<FName> Collected;
+
+	// D52: the stores (the boat's barrel and crate) by their ids.
+	UPROPERTY() TArray<FSaltSavedStore> Stores;
 };
 
 /**

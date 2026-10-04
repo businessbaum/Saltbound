@@ -17,6 +17,16 @@ struct SALTBOUND_API FSaltItemStack
 	bool IsEmpty() const { return Id.IsNone() || Count <= 0; }
 };
 
+/** A store's contents in the save (D52). */
+USTRUCT()
+struct SALTBOUND_API FSaltSavedStore
+{
+	GENERATED_BODY()
+
+	UPROPERTY() FName Id;
+	UPROPERTY() TArray<FSaltItemStack> Slots;
+};
+
 /** What an item is: its name and description, satchel icon, the mesh it lies about as, and how many stack. */
 struct FSaltItemDef
 {

@@ -15,7 +15,16 @@ class SALTBOUND_API USaltInventoryComponent : public UActorComponent
 public:
 	USaltInventoryComponent();
 
+	/** The player's satchel holds this many stacks; a store sets its own (InitStore). */
 	static constexpr int32 Capacity = 24;
+
+	/** Makes this a store (D52): saved by Id, shown as Name, with its own number of slots (starts empty). */
+	void InitStore(FName InStorageId, const FText& InName, int32 InCapacity);
+	FName GetStorageId() const { return StorageId; }
+	const FText& GetDisplayName() const { return DisplayName; }
+	int32 GetCapacity() const { return Slots.Num(); }
+	/** Moves as much of the stack in slot Index as fits into To; returns how many moved. */
+	int32 MoveStack(int32 Index, USaltInventoryComponent* To);
 
 	/** Adds up to Count (filling stacks of the same item first); returns how many fitted. */
 	int32 Add(FName Id, int32 Count);
@@ -33,4 +42,11 @@ public:
 private:
 	UPROPERTY(EditAnywhere, Category = "Inventory")
 	TArray<FSaltItemStack> Slots;
+
+	/** None for the player's satchel; a store's id in the save. */
+	UPROPERTY(EditAnywhere, Category = "Inventory")
+	FName StorageId;
+
+	UPROPERTY(EditAnywhere, Category = "Inventory")
+	FText DisplayName;
 };

@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50).
+Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52).
 
 ## Milestone status
 
@@ -223,6 +223,9 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D52 (awaiting the owner's check):** the boat's planks each a bit different, more on deck (lobster pots, net, chest,
+  tarp, bell, lantern, trailboards, ensign), the barrel and crate open as 10-slot stores, the anchor rope through a
+  hawse hole (the anchor is never seen), no mainsheet, bucket or cathead.
 - **D51 (proposal):** the second boat, a 14 m gaff cutter with a top deck and a lower deck: `Docs/Design/Boat2.md` and its
   plan sheet; waiting for the owner's answers before the blockout.
 - **D49 / D50 (awaiting the owner's check):** sea haze limits the view; the trail's density and width follow the speed;

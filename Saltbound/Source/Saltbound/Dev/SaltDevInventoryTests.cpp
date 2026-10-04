@@ -1,17 +1,21 @@
 // Saltbound - satchel checks (sb.Dev.RunInventoryTests, D50): stacking, a pickup, the satchel screen and its map, and
 // saving the satchel (in a test slot; the player's own satchel and save are restored afterwards).
 
+#include "Boat/SaltBoat.h"
 #include "Components/CapsuleComponent.h"
 #include "Core/SaltItems.h"
 #include "Core/SaltSaveSubsystem.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
+#include "Interaction/SaltInteractableComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
 #include "Saltbound.h"
 #include "UI/SaltSatchelWidget.h"
+#include "UI/SaltStoreWidget.h"
 #include "World/SaltPickup.h"
 
 #if !UE_BUILD_SHIPPING
@@ -95,6 +99,50 @@ namespace
 		Report(TEXT("SatchelCloses"), !PC->IsSatchelOpen() && !PC->bShowMouseCursor, FString::Printf(TEXT("open=%d cursor=%d"),
 			PC->IsSatchelOpen() ? 1 : 0, PC->bShowMouseCursor ? 1 : 0));
 
+		// The boat's stores (D52): the barrel's lid opens the store screen; a click moves a stack across and back.
+		ASaltBoat* Boat = nullptr;
+		for (TActorIterator<ASaltBoat> It(World); It; ++It)
+		{
+			Boat = *It;
+			break;
+		}
+		USaltInventoryComponent* Barrel = Boat ? Boat->GetStore(false) : nullptr;
+		USaltInventoryComponent* Crate = Boat ? Boat->GetStore(true) : nullptr;
+		const TArray<FSaltItemStack> OwnBarrel = Barrel ? Barrel->GetSlots() : TArray<FSaltItemStack>();
+		const TArray<FSaltItemStack> OwnCrate = Crate ? Crate->GetSlots() : TArray<FSaltItemStack>();
+		if (Boat && Barrel && Crate)
+		{
+			Report(TEXT("BoatStores"), Barrel->GetCapacity() == 10 && Crate->GetCapacity() == 10 && Crate->CountOf(TEXT("Driftwood")) >= 4
+				&& Barrel->GetStorageId() == TEXT("Boat_Barrel"), FString::Printf(TEXT("barrelSlots=%d crateSlots=%d crateWood=%d"),
+				Barrel->GetCapacity(), Crate->GetCapacity(), Crate->CountOf(TEXT("Driftwood"))));
+			Barrel->SetSlots({});
+			Boat->GetStoreLid(false)->Interact(Player);
+			USaltStoreWidget* SW = PC->GetStoreWidget();
+			const bool bStoreOpen = PC->IsStoreOpen() && PC->bShowMouseCursor && SW && SW->GetStore() == Barrel;
+			const int32 FloatsBefore = Satchel->CountOf(TEXT("GlassFloat"));
+			if (SW)
+			{
+				SW->ClickSatchelSlot(0);
+			}
+			const int32 InBarrel = Barrel->CountOf(TEXT("GlassFloat"));
+			const int32 LeftInSatchel = Satchel->CountOf(TEXT("GlassFloat"));
+			if (SW)
+			{
+				SW->ClickStoreSlot(0);
+			}
+			Report(TEXT("StoreMovesItems"), bStoreOpen && FloatsBefore == 1 && InBarrel == 1 && LeftInSatchel == 0
+				&& Satchel->CountOf(TEXT("GlassFloat")) == 1 && Barrel->CountOf(TEXT("GlassFloat")) == 0,
+				FString::Printf(TEXT("open=%d intoBarrel=%d satchelThen=%d back=%d"), bStoreOpen ? 1 : 0, InBarrel, LeftInSatchel,
+					Satchel->CountOf(TEXT("GlassFloat"))));
+			PC->CloseStore();
+			Report(TEXT("StoreCloses"), !PC->IsStoreOpen() && !PC->bShowMouseCursor, FString::Printf(TEXT("open=%d"), PC->IsStoreOpen() ? 1 : 0));
+			Barrel->Add(TEXT("Seashell"), 2);
+		}
+		else
+		{
+			Report(TEXT("BoatStores"), false, TEXT("no boat or stores"));
+		}
+
 		// Saved and loaded: the satchel's contents and the taken pickup.
 		const FString OwnSlot = Saves->Slot;
 		Saves->Slot = TEXT("SaltDevTest");
@@ -103,10 +151,20 @@ namespace
 		Satchel->SetSlots({});
 		Pickup->SetCollected(false);
 		Saves->ClearCollected();
+		if (Barrel)
+		{
+			Barrel->SetSlots({});
+		}
 		Saves->LoadGame(World);
-		Report(TEXT("SatchelSaved"), Satchel->CountOf(TEXT("Seashell")) == 3 && Satchel->CountOf(TEXT("GlassFloat")) == 1 && Pickup->IsCollected(),
-			FString::Printf(TEXT("shells=%d floats=%d pickupGone=%d"), Satchel->CountOf(TEXT("Seashell")), Satchel->CountOf(TEXT("GlassFloat")),
-				Pickup->IsCollected() ? 1 : 0));
+		Report(TEXT("SatchelSaved"), Satchel->CountOf(TEXT("Seashell")) == 3 && Satchel->CountOf(TEXT("GlassFloat")) == 1 && Pickup->IsCollected()
+			&& (!Barrel || Barrel->CountOf(TEXT("Seashell")) == 2), FString::Printf(TEXT("shells=%d floats=%d pickupGone=%d barrelShells=%d"),
+				Satchel->CountOf(TEXT("Seashell")), Satchel->CountOf(TEXT("GlassFloat")), Pickup->IsCollected() ? 1 : 0,
+				Barrel ? Barrel->CountOf(TEXT("Seashell")) : -1));
+		if (Barrel && Crate)
+		{
+			Barrel->SetSlots(OwnBarrel);
+			Crate->SetSlots(OwnCrate);
+		}
 
 		// Leave things as they were.
 		UGameplayStatics::DeleteGameInSlot(Saves->Slot, 0);

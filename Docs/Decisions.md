@@ -998,3 +998,27 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Technical plan:** a hull shape per boat (physics, collision, the sea's cut-out from MPC_Ocean), no underwater look
   and no swimming inside the hull, walkable interior collision, light below deck.
 - **Next:** the owner's answers (rig, stern, helm, size, how the player gets it), then a walkable blockout.
+
+### D52 · A more lived-in boat: boards of their own, stores, the anchor rope through a hawse, more on deck (Adopted)
+- **Owner (2026-10-04):** the harbour's planks are interesting because every plank is a bit different, the boat's are
+  not; remove the rope hanging from the sail, the bucket and the small platform in front of the anchor; make the wooden
+  box and the barrel accessible (normal inventory, 10 slots; the UI design comes later); the anchor rope should go into
+  the boat and the anchor never be seen from outside (the effect remains), the rope more to the side; more decorations.
+- **Boards:** deck planks of 11-17 cm, two to four boards each with scattered butt joints, each a few millimetres proud
+  or sunk, slightly rolled and crooked, gaps of 4-9 mm, its own wear and grain and one of three teak shades or (6 %) a
+  grey replaced board. Hull boards a little proud or sunk with one, two or three butts per strake, in the hull red, a
+  faded red or a darker red; the top strake cream or aged cream. New MIs: TeakLight/Dark, Paint_HullFaded/Dark,
+  Paint_CreamAged.
+- **Removed:** the mainsheet (the physics rope from the boom that hung and swung while the sail was in), the bucket,
+  and the cathead (the timber out over the bow where the anchor hung).
+- **Anchor:** the rope runs from the windlass along the starboard side into a hawse pipe in the deck and comes out of a
+  hawse hole with an iron ring in the starboard bow planking; dropped, it goes from there into the water. The anchor
+  mesh is always hidden; dropping, holding and raising work as before.
+- **Stores:** the barrel and the crate open (E) as 10-slot stores beside the satchel; a click moves a stack across. The
+  crate starts with four driftwood and a coil of rope. Their contents are saved (save version 3).
+- **Decorations:** two lobster pots, a heap of net with glass and cork floats, rope coils on deck, a sea chest, a
+  lashed tarp bundle, a boat hook along the starboard bulwark, a brass bell and a lantern on the mast, carved
+  trailboards with rosettes on both bows, and an oxblood-and-cream ensign on a staff at the stern that turns and
+  flutters with the pennant.
+- **Tests:** `sb.Dev.RunInventoryTests` 10/10 (new: the boat's stores, moving items, saving them); boat suite 30/30;
+  swim 5/5; save 5/5; menu 7/7.

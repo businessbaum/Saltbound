@@ -32,6 +32,13 @@ namespace SaltHull
 	constexpr float MastX = 1.2f;
 	constexpr float MastHeight = 10.5f;
 	constexpr float PennantHeight = 0.42f;    // the wind pennant's swivel above the mast top
+
+	/** D52: the anchor rope leaves through a hawse hole in the starboard bow planking (the anchor itself is never seen),
+	 *  and the ensign flies from a staff on the stern deck (build_boat.py HAWSE_HULL, ENSIGN_X / ENSIGN_H). */
+	constexpr float HawseX = 4.2f;
+	constexpr float HawseZ = 0.66f;
+	constexpr float EnsignX = -4.62f;
+	constexpr float EnsignHeight = 1.45f;     // staff above the deck
 	constexpr float BoomHeight = 2.05f;
 	constexpr float BoomLength = 5.0f;
 	constexpr float ThroatHeight = 6.8f;

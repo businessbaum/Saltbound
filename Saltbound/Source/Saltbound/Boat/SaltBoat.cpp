@@ -19,7 +19,9 @@
 #include "Materials/MaterialParameterCollection.h"
 #include "Ocean/SaltOcean.h"
 #include "Ocean/SaltOceanSubsystem.h"
+#include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerCharacter.h"
+#include "Player/SaltPlayerController.h"
 #include "Saltbound.h"
 #include "World/SaltWindSubsystem.h"
 
@@ -220,6 +222,9 @@ ASaltBoat::ASaltBoat()
 	PennantPivot = Pivot(TEXT("PennantPivot"), Hull, FVector(MastX, 0.f, SheerZ(MastX) + MastHeight + PennantHeight));
 	Pennant = Part(TEXT("Pennant"), PennantPivot);
 	Pennant->SetBoundsScale(3.f);   // its vertex animation moves it beyond the mesh bounds
+	EnsignPivot = Pivot(TEXT("EnsignPivot"), Hull, FVector(EnsignX, 0.f, SheerZ(EnsignX) + DeckCamber + EnsignHeight - 0.02f));
+	Ensign = Part(TEXT("Ensign"), EnsignPivot);
+	Ensign->SetBoundsScale(3.f);
 
 	Helm = CreateDefaultSubobject<USaltStationComponent>(TEXT("Helm"));
 	Helm->SetupAttachment(Hull);
@@ -257,6 +262,16 @@ ASaltBoat::ASaltBoat()
 	LadderStarboard = Interaction(TEXT("LadderStarboard"), FVector(LadderX, LadderY, 0.4f), FVector(32.f, 28.f, 70.f));
 	LadderPort->PromptText = LadderStarboard->PromptText = NSLOCTEXT("Saltbound", "BoatClimbLadder", "Climb the ladder");
 	ApplySteeringLayout();
+	// Stores (D52): the lashed water barrel and crate on the port side aft (build_boat.py deck_gear).
+	BarrelLid = Interaction(TEXT("BarrelLid"), FVector(-1.65f, -1.0f, SheerZ(-1.65f) + 0.38f), FVector(30.f, 30.f, 38.f));
+	CrateLid = Interaction(TEXT("CrateLid"), FVector(-2.25f, -0.95f, SheerZ(-2.25f) + 0.24f), FVector(32.f, 26.f, 26.f));
+	BarrelLid->PromptText = NSLOCTEXT("Saltbound", "OpenBarrel", "Open the barrel");
+	CrateLid->PromptText = NSLOCTEXT("Saltbound", "OpenCrate", "Open the crate");
+	BarrelStore = CreateDefaultSubobject<USaltInventoryComponent>(TEXT("BarrelStore"));
+	CrateStore = CreateDefaultSubobject<USaltInventoryComponent>(TEXT("CrateStore"));
+	BarrelStore->InitStore(TEXT("Boat_Barrel"), NSLOCTEXT("Saltbound", "Barrel", "Barrel"), 10);
+	CrateStore->InitStore(TEXT("Boat_Crate"), NSLOCTEXT("Saltbound", "Crate", "Crate"), 10);
+	CrateStore->SetSlots({ { TEXT("Driftwood"), 4 }, { TEXT("RopeCoil"), 1 } });
 	// Gangway to the pier while moored (placed every frame; the player walks on it).
 	Gangway = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Gangway"));
 	Gangway->SetupAttachment(Hull);
@@ -267,9 +282,13 @@ ASaltBoat::ASaltBoat()
 	Gangway->SetCanEverAffectNavigation(false);
 
 	// Anchor at the cathead (starboard bow), its rode, the mainsheet and the mooring lines (physics ropes).
-	Cathead = Pivot(TEXT("Cathead"), Hull, FVector(4.55f, 0.85f, SheerZ(4.55f) + 0.27f));
-	Anchor = Part(TEXT("Anchor"), Cathead);
+	// The anchor rope leaves through a hawse hole in the starboard bow (D52); the anchor itself is never seen (it still
+	// goes down and holds the boat).
+	Hawse = Pivot(TEXT("Hawse"), Hull, FVector(HawseX, HalfBreadthAt(HawseX, HawseZ) + 0.06f, HawseZ));
+	Anchor = Part(TEXT("Anchor"), Hawse);
 	Anchor->SetRelativeLocation(FVector(0.f, 0.f, -4.f));
+	Anchor->SetVisibility(false);
+	Anchor->SetHiddenInGame(true);
 	auto Rope = [this](FName Name, USceneComponent* Start)
 	{
 		UCableComponent* C = CreateDefaultSubobject<UCableComponent>(Name);
@@ -285,11 +304,7 @@ ASaltBoat::ASaltBoat()
 		C->SetCanEverAffectNavigation(false);
 		return C;
 	};
-	AnchorLine = Rope(TEXT("AnchorLine"), Cathead);
-	BoomSheetPoint = Pivot(TEXT("BoomSheetPoint"), BoomPivot, FVector(-3.7f, 0.f, -0.08f));
-	SheetBlock = Pivot(TEXT("SheetBlock"), Hull, FVector(MastX - 3.7f, 0.f, SheerZ(MastX - 3.7f) + 0.12f));
-	MainSheet = Rope(TEXT("MainSheet"), BoomSheetPoint);
-	MainSheet->CableWidth = 2.2f;
+	AnchorLine = Rope(TEXT("AnchorLine"), Hawse);
 	MooringPierFore = Pivot(TEXT("MooringPierFore"), Hull, FVector::ZeroVector);
 	MooringPierAft = Pivot(TEXT("MooringPierAft"), Hull, FVector::ZeroVector);
 	MooringPierFore->SetUsingAbsoluteLocation(true);
@@ -329,9 +344,10 @@ void ASaltBoat::ResolveContent()
 	Resolve(WindlassRope, TEXT("WindlassRope"));
 	Resolve(Gangway, TEXT("Gangway"));
 	Resolve(Pennant, TEXT("Pennant"));
+	Resolve(Ensign, TEXT("Ensign"));
 	Resolve(SteeringOar, TEXT("SteeringOar"));
 	UMaterialInterface* RopeMaterial = LoadObject<UMaterialInterface>(nullptr, SaltContent::RopeMaterial);
-	for (UCableComponent* C : { AnchorLine.Get(), MainSheet.Get(), MooringLineFore.Get(), MooringLineAft.Get() })
+	for (UCableComponent* C : { AnchorLine.Get(), MooringLineFore.Get(), MooringLineAft.Get() })
 	{
 		if (C && RopeMaterial && C->GetMaterial(0) != RopeMaterial)
 		{
@@ -359,6 +375,14 @@ void ASaltBoat::SetupSailMaterials()
 		SailMaterials.Add(Mid);
 	}
 	PennantMaterial = Pennant->GetMaterial(0) ? Pennant->CreateAndSetMaterialInstanceDynamic(0) : nullptr;
+	EnsignMaterials.Reset();
+	for (int32 I = 0; I < Ensign->GetNumMaterials(); ++I)
+	{
+		if (Ensign->GetMaterial(I))
+		{
+			EnsignMaterials.Add(Ensign->CreateAndSetMaterialInstanceDynamic(I));
+		}
+	}
 }
 
 void ASaltBoat::BeginPlay()
@@ -374,6 +398,8 @@ void ASaltBoat::BeginPlay()
 	Windlass->OnInteract.AddDynamic(this, &ASaltBoat::HandleWindlass);
 	LadderPort->OnInteract.AddDynamic(this, &ASaltBoat::HandleLadder);
 	LadderStarboard->OnInteract.AddDynamic(this, &ASaltBoat::HandleLadder);
+	BarrelLid->OnInteract.AddDynamic(this, &ASaltBoat::HandleStore);
+	CrateLid->OnInteract.AddDynamic(this, &ASaltBoat::HandleStore);
 	SetupSailMaterials();
 	SetHold(StartHold);
 	bInitialised = true;
@@ -527,7 +553,6 @@ void ASaltBoat::BuildHullModel()
 	// Everything that stands out collides too (D43: "the boat is one thing"): stem head, cathead with the stowed
 	// anchor, rudder blade and head, chain wales and deadeyes, fenders, ladders, and the boom wherever it swings.
 	Capsules.Add({FVector(4.92f, 0.f, 1.0f), FVector(5.0f, 0.f, 1.62f), 0.1f});
-	Capsules.Add({FVector(4.5f, 0.88f, SheerZ(4.5f) + 0.25f), FVector(4.5f, 0.88f, SheerZ(4.5f) - 0.75f), 0.2f});
 	if (Steering == ESaltSteering::Wheel)
 	{
 		Capsules.Add({FVector(RudderHeelX - 0.3f, 0.f, RudderHeelZ + 0.1f), FVector(RudderHeadX - 0.25f, 0.f, RudderBladeTopZ - 0.05f), 0.28f});
@@ -690,7 +715,7 @@ void ASaltBoat::SetHold(ESaltBoatHold NewHold)
 	{
 		// The anchor goes down from the cathead to the seabed below; the rode lets the boat fall back and swing
 		// to the wind.
-		const FVector Fair = Cathead->GetComponentLocation();
+		const FVector Fair = Hawse->GetComponentLocation();
 		AnchorGround = Fair - FVector(0.0, 0.0, 1500.0);
 		if (UWorld* World = GetWorld())
 		{
@@ -735,6 +760,14 @@ void ASaltBoat::HandleWindlass(USaltInteractableComponent* Interactable, ASaltPl
 		{
 			Saves->Autosave(GetWorld(), TEXT("moored"));
 		}
+	}
+}
+
+void ASaltBoat::HandleStore(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
+{
+	if (ASaltPlayerController* PC = Player ? Cast<ASaltPlayerController>(Player->GetController()) : nullptr)
+	{
+		PC->OpenStore(Interactable == CrateLid ? CrateStore : BarrelStore);
 	}
 }
 
@@ -1232,9 +1265,14 @@ void ASaltBoat::UpdateVisuals(float DeltaSeconds)
 	}
 	PennantWind = FMath::FInterpTo(PennantWind, FMath::Clamp((float)AppSpeed / 9.f, 0.f, 1.f), DeltaSeconds, 1.5f);
 	PennantPivot->SetRelativeRotation(FRotator(0.f, PennantYaw, 0.f));
+	EnsignPivot->SetRelativeRotation(FRotator(0.f, PennantYaw, 0.f));
 	if (PennantMaterial)
 	{
 		PennantMaterial->SetScalarParameterValue(TEXT("Wind"), PennantWind);
+	}
+	for (UMaterialInstanceDynamic* Mid : EnsignMaterials)
+	{
+		Mid->SetScalarParameterValue(TEXT("Wind"), PennantWind);
 	}
 }
 
@@ -1431,8 +1469,6 @@ void ASaltBoat::UpdateRopes(float DeltaSeconds)
 		C->TileMaterial = FMath::Max(C->CableLength / 100.f, 0.5f);
 		C->SetVisibility(bVisible);
 	};
-	// Mainsheet: nearly taut while sailing, hanging slack when the sail is up.
-	Fit(MainSheet, SheetBlock, 1.02f + 0.25f * (1.f - Hoist), true);
 	// Mooring lines to the pier (their pier ends stay where the boat was moored).
 	using namespace SaltHull;
 	const FVector Reach = StartTransform.GetRotation().RotateVector(FVector(0.0, MooringReach, 0.0));
@@ -1488,7 +1524,7 @@ void ASaltBoat::UpdateAnchor(float DeltaSeconds)
 		return;
 	}
 	// Down to the seabed (and back up), lying over as it settles; it stays put while the boat swings around it.
-	const FVector Fair = Cathead->GetComponentLocation();
+	const FVector Fair = Hawse->GetComponentLocation();
 	const float A = FMath::InterpEaseInOut(0.f, 1.f, AnchorAlpha, 2.f);
 	const FVector P = FMath::Lerp(Fair - FVector(0.0, 0.0, 4.0), AnchorGround, A);
 	const float Yaw = (float)Q.Rotator().Yaw;

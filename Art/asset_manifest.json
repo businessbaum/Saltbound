@@ -290,5 +290,11 @@
     "nanite": false,
     "collision": "none",
     "_note": "Pickup (D50, build_pickups.py)."
+  },
+  "SM_Boat_Ensign": {
+    "fbx": "Boat/SM_Boat_Ensign.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
   }
 }

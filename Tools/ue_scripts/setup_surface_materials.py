@@ -595,6 +595,24 @@ def main():
     # The sail's parts on the animated sail master (they must move together): cloth, boltrope and reef ties, hoops.
     for name, base in (("MI_SailCloth", "MI_Canvas"), ("MI_SailRope", "MI_Rope_Hemp"), ("MI_SailHoop", "MI_Wood_Varnish")):
         sb_ue.make_mi(name, MI, sail, **lib[base])
+    # D52, every board a bit different (owner: like the pier's planks): shades of the teak and the hull paint that the
+    # boat's boards pick from at random, and an aged cream for the top strake and the trailboards.
+    def variant(base, **tints):
+        kw = dict(lib[base])
+        kw["vectors"] = dict(kw.get("vectors", {}), **tints)
+        return kw
+    for name, base, tint in (("MI_Wood_TeakLight", "MI_Wood_Teak", (0.205, 0.142, 0.08, 1)),
+                             ("MI_Wood_TeakDark", "MI_Wood_Teak", (0.118, 0.074, 0.042, 1)),
+                             ("MI_Paint_HullFaded", "MI_Paint_Hull", (0.175, 0.072, 0.056, 1)),
+                             ("MI_Paint_HullDark", "MI_Paint_Hull", (0.098, 0.032, 0.026, 1)),
+                             ("MI_Paint_CreamAged", "MI_Paint_Cream", (0.5, 0.43, 0.3, 1))):
+        sb_ue.make_mi(name, MI, surf, **variant(base, Tint=tint))
+    # The ensign (D52): oxblood and cream canvas on the flag master, 90 cm long.
+    for name, tint in (("MI_EnsignRed", (0.3, 0.055, 0.04, 1)), ("MI_EnsignCream", (0.6, 0.53, 0.4, 1))):
+        ens = dict(lib["MI_Canvas"])
+        ens["vectors"] = {"Tint": tint}
+        ens["scalars"] = dict(ens.get("scalars", {}), Length=90.0)
+        sb_ue.make_mi(name, MI, flag, **ens)
     # The wind pennant: the sail's canvas dyed a faded oxblood red, like the hull.
     pennant = dict(lib["MI_Canvas"])
     pennant["vectors"] = {"Tint": (0.36, 0.075, 0.05, 1)}

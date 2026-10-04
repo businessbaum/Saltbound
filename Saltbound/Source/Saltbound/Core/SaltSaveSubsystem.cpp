@@ -12,6 +12,7 @@
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
 #include "Saltbound.h"
+#include "UObject/UObjectIterator.h"
 #include "World/SaltLightingRig.h"
 #include "World/SaltPickup.h"
 #include "World/SaltWindSubsystem.h"
@@ -111,6 +112,13 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 		Save->Wind = FVector(Wind->GetBaseFromDeg(), Wind->GetBaseSpeed(), Wind->GetGustiness());
 	}
 	Save->Collected = Collected.Array();
+	for (TObjectIterator<USaltInventoryComponent> It; It; ++It)
+	{
+		if (It->GetWorld() == World && !It->GetStorageId().IsNone())
+		{
+			Save->Stores.Add({ It->GetStorageId(), It->GetSlots() });
+		}
+	}
 
 	const bool bOk = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
 	UE_LOG(LogSaltbound, Display, TEXT("SB_SAVE saved=%d slot=%s reason=%s boat=(%.0f, %.0f) hold=%d sail=%d aboard=%d sea=%s"),
@@ -185,6 +193,18 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 			{
 				Satchel->SetSlots(Save->Inventory);
 			}
+		}
+	}
+	// The stores' contents.
+	for (TObjectIterator<USaltInventoryComponent> It; It; ++It)
+	{
+		if (It->GetWorld() != World || It->GetStorageId().IsNone())
+		{
+			continue;
+		}
+		if (const FSaltSavedStore* Saved = Save->Stores.FindByPredicate([&It](const FSaltSavedStore& S) { return S.Id == It->GetStorageId(); }))
+		{
+			It->SetSlots(Saved->Slots);
 		}
 	}
 	// Pickups taken in that game stay gone; the others are back.

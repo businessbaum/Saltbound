@@ -10,6 +10,7 @@
 class UCableComponent;
 class UMaterialParameterCollection;
 class UMaterialInstanceDynamic;
+class USaltInventoryComponent;
 class UStaticMeshComponent;
 class USaltInteractableComponent;
 class USaltStationComponent;
@@ -120,6 +121,8 @@ public:
 	USaltInteractableComponent* GetSailRope(bool bStarboard) const { return bStarboard ? SailRopeStarboard : SailRopePort; }
 	USaltInteractableComponent* GetWindlass() const { return Windlass; }
 	USaltInteractableComponent* GetLadder(bool bStarboard) const { return bStarboard ? LadderStarboard : LadderPort; }
+	USaltInteractableComponent* GetStoreLid(bool bCrate) const { return bCrate ? CrateLid : BarrelLid; }
+	USaltInventoryComponent* GetStore(bool bCrate) const { return bCrate ? CrateStore : BarrelStore; }
 	/** Climb path (capsule centre, in the hull component's space, cm) up from the water or down from the deck. */
 	void GetLadderPath(bool bStarboard, bool bUp, float CapsuleHalfHeight, TArray<FVector>& OutPoints, TArray<bool>& OutStepped) const;
 	/** 0 = anchor up .. 1 = anchor holding the boat (smooth stop, no turning). */
@@ -145,6 +148,14 @@ public:
 	/** Wind pennant at the masthead: swings to the apparent wind and streams out with its strength (D44). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> PennantPivot;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Pennant;
+	/** The ensign on its staff at the stern (D52): turns and flutters with the pennant. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> EnsignPivot;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Ensign;
+	/** Stores (D52): the lashed barrel and crate open as 10-slot stores. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> BarrelLid;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> CrateLid;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInventoryComponent> BarrelStore;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInventoryComponent> CrateStore;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltStationComponent> Helm;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> SailRopePort;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> SailRopeStarboard;
@@ -159,12 +170,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Gangway;
 	/** The anchor: hangs at the cathead, goes down to the seabed when dropped. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Anchor;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> Cathead;
+	/** Where the anchor rope leaves the hull (a hawse hole in the starboard bow, D52). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> Hawse;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> AnchorLine;
 	/** Mainsheet from the boom to a block on deck (slack when the sail is taken in). */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> BoomSheetPoint;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> SheetBlock;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> MainSheet;
 	/** Mooring lines from the bitts to the pier while moored (their pier ends stay fixed in the world). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> MooringPierFore;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> MooringPierAft;
@@ -308,6 +317,7 @@ private:
 	UFUNCTION() void HandleSailRope(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleWindlass(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleLadder(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
+	UFUNCTION() void HandleStore(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	void UpdateGangway();
 	/** Shows the steering oar or the wheel and rudder, and puts the helm station at its handle or wheel. */
 	void ApplySteeringLayout();
@@ -355,6 +365,7 @@ private:
 	float PennantYaw = 180.f;                  // deg in the hull's frame (streaming aft)
 	float PennantWind = 0.f;                   // 0 = hanging .. 1 = streaming out
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> PennantMaterial;
+	UPROPERTY(Transient) TArray<TObjectPtr<UMaterialInstanceDynamic>> EnsignMaterials;
 	float Fill = 0.f;                        // belly fill (spring: pops when the sail catches the wind)
 	float FillVel = 0.f;
 	float Luff = 0.f;                        // 0..1, wind from ahead: the sail shivers

@@ -45,6 +45,9 @@ KEEL_AFT_X, KEEL_AFT_Z, KEEL_FORE_X, KEEL_HALF_T = -4.3, -1.45, 3.6, 0.14
 BULWARK_H, GATE_HALF = 0.45, 0.5
 MAST_X, MAST_H, BOOM_H, BOOM_L, THROAT_H, GAFF_L, GAFF_ANGLE = 1.2, 10.5, 2.05, 5.0, 6.8, 4.6, 35.0
 WHEEL_X, WHEEL_H = -3.2, 0.68
+# Anchor rope (D52): the hawse pipe in the deck (x, y) and the hawse hole in the starboard bow planking (x, z).
+HAWSE_DECK, HAWSE_HULL = (4.1, 0.55), (4.2, 0.66)
+ENSIGN_X, ENSIGN_H = -4.62, 1.45          # flag staff on the stern deck and its height
 # Steering (D45): the first boat steers with a big oar on the starboard quarter (SaltHullShape.h Oar*). "wheel" builds
 # the pedestal for the wheel and sternpost rudder of D36-D43 instead (kept for later boats, ESaltSteering::Wheel).
 STEERING = "oar"
@@ -125,7 +128,12 @@ def mats():
                  "MI_Wood_Teak": (0.55, 0.35, 0.18), "MI_Wood_Varnish": (0.4, 0.2, 0.08), "MI_Metal_Iron": (0.1, 0.1, 0.1),
                  "MI_Caulk_Dark": (0.05, 0.05, 0.05), "MI_Canvas": (0.85, 0.8, 0.7), "MI_Rope_Hemp": (0.6, 0.5, 0.3),
                  "MI_Wood_DockWeathered": (0.5, 0.45, 0.4), "MI_SailCloth": (0.85, 0.8, 0.7), "MI_SailRope": (0.6, 0.5, 0.3),
-                 "MI_SailHoop": (0.4, 0.2, 0.08), "MI_Pennant": (0.5, 0.1, 0.07)}.items():
+                 "MI_SailHoop": (0.4, 0.2, 0.08), "MI_Pennant": (0.5, 0.1, 0.07),
+                 # D52: every board a bit different (two more teaks, faded and dark hull paint, aged cream).
+                 "MI_Wood_TeakLight": (0.62, 0.42, 0.22), "MI_Wood_TeakDark": (0.42, 0.26, 0.13),
+                 "MI_Paint_HullFaded": (0.55, 0.2, 0.14), "MI_Paint_HullDark": (0.35, 0.08, 0.06),
+                 "MI_Paint_CreamAged": (0.82, 0.74, 0.56), "MI_EnsignRed": (0.5, 0.1, 0.07), "MI_EnsignCream": (0.85, 0.78, 0.6),
+                 "MI_Glass_Dark": (0.2, 0.3, 0.3), "MI_Metal_Brass": (0.6, 0.45, 0.2), "MI_Canvas": (0.7, 0.66, 0.56)}.items():
         M[n] = sb.get_material(n, (*c, 1))
 
 
@@ -330,13 +338,25 @@ def planking():
         for k in range(STRAKES):
             ta, tb_ = th[k], th[k + 1]
             w0 = (Vector(section_point(0.0, tb_, 1)) - Vector(section_point(0.0, ta, 1))).length
-            cuts = sorted(rng.uniform(-3.2, 3.2) for _ in range(rng.choice((1, 2))))
+            cuts = sorted(rng.uniform(-3.4, 3.4) for _ in range(rng.choice((1, 2, 2, 3))))
             xs = [-HALF_LENGTH + 0.02] + cuts + [HALF_LENGTH - 0.02]
             top = k == STRAKES - 1
             for xa, xb in zip(xs[:-1], xs[1:]):
-                frame = strake_frame(side, ta, tb_, xa + 0.004, xb - 0.004, w0)
-                b = laid_board("strake", path_length(frame), w0 - 0.01, PLANK_T, frame,
-                               "MI_Paint_Cream" if top else "MI_Paint_Hull", wear=0.55, grooves=(0, 1), bevel=0.9, split=0.15)
+                # Each board of its own (D52): a few millimetres proud or sunk, its own shade of paint (repainted,
+                # faded or darkened boards), its own wear.
+                off = rng.uniform(-0.003, 0.005)
+                base = strake_frame(side, ta, tb_, xa + 0.004, xb - 0.004, w0)
+
+                def frame(sf, base=base, off=off):
+                    pm, am, nm, wm = base(sf)
+                    return pm + nm * off, am, nm, wm
+                r = rng.random()
+                if top:
+                    mat = "MI_Paint_CreamAged" if r < 0.3 else "MI_Paint_Cream"
+                else:
+                    mat = "MI_Paint_HullFaded" if r < 0.2 else "MI_Paint_HullDark" if r < 0.34 else "MI_Paint_Hull"
+                b = laid_board("strake", path_length(frame), w0 - rng.uniform(0.008, 0.016), PLANK_T, frame, mat,
+                               wear=rng.uniform(0.4, 0.75), grooves=(0, rng.randint(1, 2)), bevel=0.9, split=0.15)
                 # Nails into the frames, about every 0.6 m, and two at each butt end.
                 xn = [xa + 0.06, xb - 0.06] + [x for x in [-4.2 + 0.6 * i for i in range(15)] if xa + 0.15 < x < xb - 0.15]
                 for x_n in xn:
@@ -404,32 +424,51 @@ def bulwarks():
 
 
 def deck_planks():
-    """Teak planks fore and aft (tops at the walkable deck height), each in two boards, ending at the covering
-    board. Narrow gaps show the dark caulking below."""
+    """Teak planks fore and aft (tops at the walkable deck height), every one a bit different, like the pier's boards
+    (owner, D52): widths from 11 to 17 cm, two to four boards per plank with the butt joints scattered, each a few
+    millimetres proud or sunk, slightly rolled and crooked, with its own shade (three teaks, now and then a grey
+    replaced board), wear and grain; gaps of 4-9 mm show the dark caulking below."""
     parts = []
     rng = random.Random(53)
     inner = HALF_BEAM - BULWARK_T - MARGIN_W + 0.01
-    n = int(2 * inner / DECK_W)
-    up = Vector((0.0, 0.0, 1.0))
-    across = Vector((0.0, 1.0, 0.0))
-    for i in range(n):
-        y = -inner + (i + 0.5) * (2 * inner / n)
-        need = abs(y) + DECK_W * 0.5 + BULWARK_T + MARGIN_W - 0.02
+    widths, total = [], 0.0
+    while total < 2 * inner - 0.11:
+        w = rng.uniform(0.11, 0.17)
+        widths.append(w)
+        total += w
+    widths = [w * 2 * inner / total for w in widths]
+    edge = -inner
+    for w in widths:
+        y = edge + w / 2
+        edge += w
+        gap = rng.uniform(0.004, 0.009)
+        need = abs(y) + w * 0.5 + BULWARK_T + MARGIN_W - 0.02
         xs = [x * 0.02 for x in range(-250, 251) if half_beam(x * 0.02) >= need]
         if len(xs) < 10:
             continue
         x0, x1 = xs[0] + 0.02, xs[-1] - 0.02
-        cut = rng.uniform(x0 + 0.3 * (x1 - x0), x0 + 0.7 * (x1 - x0))
-        for j, (xa, xb) in enumerate(((x0, cut), (cut, x1))):
-            dz = rng.uniform(-0.005, 0.004)
-            def f(s, xa=xa, xb=xb, y=y, dz=dz):
+        boards = rng.choice((2, 3, 3, 4)) if x1 - x0 > 2.5 else 1
+        cuts = sorted(rng.uniform(x0 + 0.5, x1 - 0.5) for _ in range(boards - 1))
+        ends = [x0] + [c for k, c in enumerate(cuts) if k == 0 or c - cuts[k - 1] > 0.6] + [x1]
+        for xa, xb in zip(ends[:-1], ends[1:]):
+            dz = rng.uniform(-0.006, 0.004)
+            roll = math.radians(rng.uniform(-1.3, 1.3))
+            drift = rng.uniform(-0.012, 0.012)
+            across = Vector((0.0, math.cos(roll), math.sin(roll)))
+            normal = Vector((0.0, -math.sin(roll), math.cos(roll)))
+
+            def f(s, xa=xa, xb=xb, y=y, dz=dz, drift=drift, across=across, normal=normal):
                 x = xa + (xb - xa) * s
-                return Vector((x, y, deck_z(x, y) - DECK_T * 0.5 + dz)), across, up, 1.0
-            replaced = (i, j) in ((7, 0), (15, 1))
-            parts.append(laid_board("deck", xb - xa - 0.006, DECK_W - 0.008, DECK_T, f,
-                                    "MI_Wood_DockWeathered" if replaced else "MI_Wood_Teak", wear=0.55, grooves=(1, 2), split=0.25))
+                yy = y + drift * (2.0 * s - 1.0)                     # a gently crooked board
+                return Vector((x, yy, deck_z(x, yy) - DECK_T * 0.5 + dz)), across, normal, 1.0
+            r = rng.random()
+            mat = ("MI_Wood_DockWeathered" if r < 0.06 else "MI_Wood_TeakDark" if r < 0.3 else
+                   "MI_Wood_TeakLight" if r < 0.52 else "MI_Wood_Teak")
+            parts.append(laid_board("deck", xb - xa - rng.uniform(0.005, 0.014), w - gap, DECK_T, f, mat,
+                                    wear=rng.uniform(0.4, 0.8), grooves=(rng.randint(0, 1), rng.randint(1, 3)),
+                                    split=rng.uniform(0.1, 0.4)))
             for xe in (xa + 0.05, xb - 0.05):
-                for yo in (-0.035, 0.035):
+                for yo in (-w * 0.25, w * 0.25):
                     parts.append(nail((xe, y + yo, deck_z(xe, y) + dz), (0, 0, 1)))
     return parts
 
@@ -618,8 +657,8 @@ def staved(name, radius_at, height, staves, base, mat, hoops=(), hoop_mat="MI_Me
 
 
 def deck_gear():
-    """Pin rail with belaying pins and hanging coils at the mast, a lashed water barrel and crate, a bucket by the
-    wheel, oars on the side deck, fenders over the pier side and horn cleats fore and aft."""
+    """Pin rail with belaying pins and hanging coils at the mast, a lashed water barrel and crate (both open as stores,
+    D52), oars on the side deck, fenders over the pier side and horn cleats fore and aft."""
     parts = []
     # Pin rail aft of the mast.
     px = MAST_X - 0.42
@@ -653,10 +692,6 @@ def deck_gear():
                                     wear=0.6, grooves=(0, 1), split_chance=0.2))
     parts += rope("lashing", [(bx + 0.24, by - 0.08, deck_z(bx, by) + 0.35), (bx + 0.1, by - 0.3, deck_z(bx, by) + 0.4),
                               (cx + 0.1, cy - 0.3, cz + 0.3), (cx - 0.26, cy - 0.12, cz + 0.3)], 0.014)
-    # Bucket by the wheel, with a rope handle.
-    ux, uy = WHEEL_X + 0.15, 0.75
-    parts += staved("bucket", lambda s: 0.12 + 0.035 * s, 0.3, 10, (ux, uy, deck_z(ux, uy) - 0.01), "MI_Wood_Teak", hoops=(0.2, 0.8))
-    parts.append(sb.add_torus("bucket_handle", 0.15, 0.012, U((ux, uy, deck_z(ux, uy) + 0.29)), (math.pi / 2, 0, 0.3), 24, 6, M["MI_Rope_Hemp"]))
     # Oars lying along the port side deck.
     for k, y in enumerate((-1.08, -0.96)):
         x0, x1 = 0.7 + k * 0.1, 3.3 + k * 0.05
@@ -679,15 +714,27 @@ def deck_gear():
         parts.append(fender)
         parts += rope("fender_line", [(fx, fy, fz + 0.22), (fx, bs + 0.1, sheer_z(fx) + 0.3), top], 0.012)
     # Windlass on the foredeck: two cheek posts (the drum, its rope and the cranks are SM_Boat_WindlassDrum /
-    # SM_Boat_WindlassRope, turned by ASaltBoat), and the rope's lead from the drum to the cathead.
+    # SM_Boat_WindlassRope, turned by ASaltBoat). The anchor rope runs from the drum along the starboard side into a
+    # hawse pipe in the deck, and comes out of a hawse hole in the bow planking (ASaltBoat's Hawse point, D52); the anchor
+    # itself is never seen.
     wx = WINDLASS_X
     wz = deck_z(wx, 0.0)
     for y in (-0.5, 0.5):
         parts.append(post("windlass_cheek", 0.07, 0.62, (wx, y, wz - 0.03), "MI_Wood_Varnish", 4, 0.9))
         parts.append(ring("windlass_bearing", 0.05, 0.016, (wx, y * 0.9, wz + WINDLASS_DRUM_H), (0, 1, 0), "MI_Metal_Iron", 12))
-    lead_a = (wx + 0.1, 0.32, wz + WINDLASS_DRUM_H + 0.12)
-    lead_b = (4.58, 0.95, sheer_z(4.58) + 0.3)
-    parts += rope("anchor_lead", sagging(lead_a, lead_b, 0.03, 6), 0.022)
+    hx, hy = HAWSE_DECK
+    hz = deck_z(hx, hy)
+    lead_a = (wx + 0.08, 0.36, wz + WINDLASS_DRUM_H + 0.1)
+    parts += rope("anchor_lead", sagging(lead_a, (hx - 0.04, hy, hz + 0.03), 0.04, 6) + [(hx, hy, hz - 0.06)], 0.022)
+    parts.append(ring("hawse_pipe", 0.05, 0.016, (hx, hy, hz + 0.005), (0, 0, 1), "MI_Metal_Iron", 14))
+    parts.append(disc("hawse_hole", 0.045, 0.012, (hx, hy, hz - 0.001), (0, 0, 1), "MI_Caulk_Dark", 14))
+    ox, oz = HAWSE_HULL
+    out = Vector((0.35, 1.0, 0.0)).normalized()
+    zs_, zb_ = sheer_z(ox), bottom_z(ox)
+    th_ = math.acos(clamp((zs_ - oz) / (zs_ - zb_)))
+    hp = (ox, half_beam(ox) * math.sin(th_) ** BILGE_EXP + PLANK_T + 0.008, oz)     # on the planking
+    parts.append(ring("hawse_ring", 0.06, 0.018, hp, tuple(out), "MI_Metal_Iron", 16))
+    parts.append(disc("hawse_hole", 0.05, 0.02, tuple(Vector(hp) - out * 0.006), tuple(out), "MI_Caulk_Dark", 14))
     # Boarding ladders hanging over both sides at the gap: two stiles, rungs every 0.3 m, iron hooks over the edge.
     for side in (-1, 1):
         y = side * (half_beam(LADDER_X) + LADDER_OUT)
@@ -704,12 +751,6 @@ def deck_gear():
         while z > LADDER_BOTTOM_Z + 0.08:
             parts.append(rod("ladder_rung", (LADDER_X - 0.2, y, z), (LADDER_X + 0.2, y, z), 0.022, "MI_Wood_Varnish"))
             z -= RUNG_STEP
-    # Cathead: a stout timber out over the starboard bow, where the anchor hangs (ASaltBoat's Cathead point).
-    ca, cb = Vector((4.25, 0.32, sheer_z(4.25) + 0.2)), Vector((4.6, 0.98, sheer_z(4.6) + 0.27))
-    d = cb - ca
-    parts.append(tb.rough_plank("cathead", d.length + 0.08, 0.15, 0.13, tuple(U(tuple((ca + cb) * 0.5))),
-                                (0, 0, math.atan2(-d.y, d.x)), M["MI_Wood_Varnish"], nseed(), wear=0.6, grooves=(1, 1), split_chance=0.0))
-    parts.append(disc("cathead_sheave", 0.06, 0.16, tuple(cb + Vector((0.0, 0.0, -0.02))), (d.x, d.y, 0.0), "MI_Metal_Iron", 12))
     # Repair: a weathered board nailed over the starboard planking aft, just above the waterline.
     th = strake_bounds()
     pa_r, pb_r = th[4], th[5]
@@ -818,6 +859,10 @@ def hull_collision(mesh_name):
     add([(px + dx, dy, z) for dx in (-0.07, 0.07) for dy in (-0.5, 0.5) for z in (deck_z(px, 0) - 0.03, deck_z(px, 0) + 0.66)])
     wx = WINDLASS_X
     add([(wx + dx, dy, z) for dx in (-0.14, 0.14) for dy in (-0.58, 0.58) for z in (deck_z(wx, 0) - 0.03, deck_z(wx, 0) + 0.6)])
+    # Decorations (D52): lobster pots, net heap, sea chest, tarp bundle, ensign staff.
+    for (cx_, cy_, hx_, hy_, h_) in ((2.61, 0.71, 0.32, 0.23, 0.68), (-2.3, 0.85, 0.46, 0.32, 0.3), (-2.95, -0.78, 0.34, 0.23, 0.42),
+                                     (3.0, -0.66, 0.3, 0.22, 0.32), (ENSIGN_X, 0.0, 0.07, 0.07, ENSIGN_H)):
+        add([(cx_ + dx, cy_ + dy, z) for dx in (-hx_, hx_) for dy in (-hy_, hy_) for z in (deck_z(cx_, cy_) - 0.03, deck_z(cx_, cy_) + h_)])
     # Ladders: thin slabs, so a swimmer or a walker does not pass through them.
     for side in (-1, 1):
         y = side * (half_beam(LADDER_X) + LADDER_OUT)
@@ -907,8 +952,122 @@ def export(obj, cols=()):
     sb.export_fbx([obj] + list(cols), os.path.join("Boat", obj.name + ".fbx"))
 
 
+def boat_decor():
+    """Things that make a boat lived on (owner, D52): lobster pots, a heap of net with floats, rope coils on deck, a
+    sea chest, a tarp-covered bundle, a boat hook along the bulwark, a bell and a lantern on the mast, the ensign's
+    staff at the stern and carved trailboards with rosettes on both bows."""
+    parts = []
+    rng = random.Random(97)
+    # Two lobster pots, one on the other: slatted floors, bent hoops, slats along, a net mouth.
+    for k, (px, py, pz_off, yaw) in enumerate(((2.6, 0.72, 0.0, 0.08), (2.62, 0.7, 0.36, -0.12))):
+        pz = deck_z(px, py) + pz_off
+        c, s_ = math.cos(yaw), math.sin(yaw)
+        def P(lx, ly, lz):
+            return (px + lx * c - ly * s_, py + lx * s_ + ly * c, pz + lz)
+        for ly in (-0.17, -0.06, 0.06, 0.17):
+            parts.append(rod("pot_floor", P(-0.3, ly, 0.02), P(0.3, ly, 0.02), 0.014, "MI_Wood_DockWeathered", 6))
+        for lx in (-0.27, 0.0, 0.27):
+            for j in range(7):
+                a0, a1 = math.pi * j / 7, math.pi * (j + 1) / 7
+                parts.append(rod("pot_hoop", P(lx, 0.2 * math.cos(a0), 0.02 + 0.3 * math.sin(a0)),
+                                 P(lx, 0.2 * math.cos(a1), 0.02 + 0.3 * math.sin(a1)), 0.012, "MI_Wood_Varnish", 6))
+        for a in (0.4, 0.95, 1.57, 2.2, 2.75):
+            parts.append(rod("pot_slat", P(-0.3, 0.2 * math.cos(a), 0.02 + 0.3 * math.sin(a)),
+                             P(0.3, 0.2 * math.cos(a), 0.02 + 0.3 * math.sin(a)), 0.01, "MI_Wood_DockWeathered", 6))
+        parts.append(ring("pot_mouth", 0.08, 0.012, P(0.3, 0.0, 0.16), (c, s_, 0.0), "MI_Rope_Hemp", 12))
+    # A heap of net with floats, aft on the starboard side.
+    nx, ny = -2.3, 0.85
+    nz = deck_z(nx, ny)
+    heap = sb.add_box("net_heap", (0.9, 0.62, 0.26), (0, 0, 0), M["MI_Rope_Hemp"])
+    sb.soften(heap, 0.12, 4)
+    for v in heap.data.vertices:
+        v.co.z += 0.05 * math.sin(v.co.x * 9.0) * math.cos(v.co.y * 7.0)
+        v.co.z *= 0.8 + 0.3 * max(0.0, 1.0 - abs(v.co.x) * 1.6)
+    heap.data.transform(Matrix.Translation(U((nx, ny, nz + 0.11))))
+    parts.append(heap)
+    for k in range(5):
+        fx, fy = nx + rng.uniform(-0.35, 0.35), ny + rng.uniform(-0.22, 0.22)
+        if k < 2:
+            parts.append(disc("net_float", 0.07, 0.07, (fx, fy, nz + 0.27), (0, 0, 1), "MI_Glass_Dark", 12, 0.02))
+        else:
+            parts.append(disc("cork", 0.045, 0.06, (fx, fy, nz + 0.25), (rng.uniform(-1, 1), rng.uniform(-1, 1), 1), "MI_Wood_DockWeathered", 10))
+    # Rope coils lying flat on deck.
+    for cx, cy, r0, n in ((0.72, 0.88, 0.22, 5), (-3.75, -0.62, 0.19, 4)):
+        for j in range(n):
+            parts.append(sb.add_torus("deck_coil", r0 - j * 0.03, 0.017, U((cx, cy, deck_z(cx, cy) + 0.017 + (j % 2) * 0.006)),
+                                      (0, 0, j * 0.8), 28, 6, M["MI_Rope_Hemp"]))
+    # A sea chest aft on the port side: planked box, iron corners, rope handles.
+    sx, sy = -2.95, -0.78
+    sz = deck_z(sx, sy)
+    parts.append(block("chest", (0.62, 0.4, 0.34), (sx, sy, sz + 0.17), "MI_Wood_Varnish", 0.03))
+    parts.append(block("chest_lid", (0.66, 0.44, 0.08), (sx, sy, sz + 0.37), "MI_Wood_TeakDark", 0.025))
+    for dx in (-0.29, 0.29):
+        for dy in (-0.18, 0.18):
+            parts.append(block("chest_corner", (0.07, 0.07, 0.42), (sx + dx, sy + dy, sz + 0.2), "MI_Metal_Iron", 0.01))
+    for dx in (-0.33, 0.33):
+        parts.append(ring("chest_handle", 0.05, 0.01, (sx + dx, sy, sz + 0.24), (1, 0, 0), "MI_Rope_Hemp", 10))
+    # A bundle under a lashed tarp, on the port foredeck.
+    tx, ty = 3.0, -0.66
+    tz = deck_z(tx, ty)
+    tarp = sb.add_box("tarp", (0.56, 0.4, 0.3), (0, 0, 0), M["MI_Canvas"])
+    sb.soften(tarp, 0.1, 4)
+    for v in tarp.data.vertices:
+        v.co.z += 0.025 * math.sin(v.co.x * 14.0 + v.co.y * 5.0)
+    tarp.data.transform(Matrix.Translation(U((tx, ty, tz + 0.15))))
+    parts.append(tarp)
+    for dx in (-0.15, 0.15):
+        parts += rope("tarp_lash", [(tx + dx, ty - 0.22, tz + 0.02), (tx + dx, ty - 0.2, tz + 0.27), (tx + dx, ty, tz + 0.31),
+                                    (tx + dx, ty + 0.2, tz + 0.27), (tx + dx, ty + 0.22, tz + 0.02)], 0.012)
+    # A boat hook along the inside of the starboard bulwark.
+    by_ = lambda x: half_beam(x) - BULWARK_T - 0.05
+    hook = tb.spar("boathook", 2.3, 0.025, 0.022, M["MI_Wood_Varnish"], nseed(), sides=12, sweep=0.01, axis=(1, 0, 0), facets=6, checks=0)
+    hook.data.transform(Matrix.Translation(U((0.95, by_(2.0), sheer_z(2.0) + 0.32))))
+    parts.append(hook)
+    hx_ = 3.25
+    parts.append(rod("hook_iron", (hx_, by_(2.0), sheer_z(2.0) + 0.32), (hx_ + 0.16, by_(2.0), sheer_z(2.0) + 0.32), 0.016, "MI_Metal_Iron", 8))
+    parts.append(rod("hook_tip", (hx_ + 0.12, by_(2.0), sheer_z(2.0) + 0.32), (hx_ + 0.1, by_(2.0), sheer_z(2.0) + 0.42), 0.012, "MI_Metal_Iron", 8))
+    # Bell on the aft face of the mast and a lantern on its forward face, each on an iron bracket.
+    deck_m = sheer_z(MAST_X)
+    bz = deck_m + 1.65
+    parts.append(rod("bell_bracket", (MAST_X - 0.12, 0, bz + 0.12), (MAST_X - 0.36, 0, bz + 0.12), 0.014, "MI_Metal_Iron", 8))
+    bell = sb.add_cylinder("bell", 0.09, 0.15, U((MAST_X - 0.34, 0, bz - 0.0)), "Z", 16, M["MI_Metal_Brass"], radius_top=0.06)
+    sb.soften(bell, 0.015, 2)
+    parts.append(bell)
+    parts.append(ring("bell_lip", 0.09, 0.012, (MAST_X - 0.34, 0, bz - 0.075), (0, 0, 1), "MI_Metal_Brass", 16))
+    lz = deck_m + 1.5
+    parts.append(rod("lantern_bracket", (MAST_X + 0.12, 0, lz + 0.22), (MAST_X + 0.34, 0, lz + 0.22), 0.014, "MI_Metal_Iron", 8))
+    lx = MAST_X + 0.34
+    parts.append(block("lantern_glass", (0.14, 0.14, 0.18), (lx, 0, lz), "MI_Glass_Dark", 0.01))
+    parts.append(block("lantern_base", (0.18, 0.18, 0.04), (lx, 0, lz - 0.1), "MI_Metal_Iron", 0.01))
+    parts.append(sb.add_cylinder("lantern_cap", 0.1, 0.08, U((lx, 0, lz + 0.13)), "Z", 8, M["MI_Metal_Iron"], radius_top=0.02))
+    for dx in (-0.075, 0.075):
+        for dy in (-0.075, 0.075):
+            parts.append(rod("lantern_post", (lx + dx, dy, lz - 0.09), (lx + dx, dy, lz + 0.1), 0.008, "MI_Metal_Iron", 6))
+    parts.append(ring("lantern_ring", 0.035, 0.008, (lx, 0, lz + 0.21), (1, 0, 0), "MI_Metal_Iron", 10))
+    # The ensign's staff at the stern (SM_Boat_Ensign flies from its top, ASaltBoat).
+    ez = deck_z(ENSIGN_X, 0.0)
+    parts.append(block("ensign_socket", (0.14, 0.14, 0.12), (ENSIGN_X, 0, ez + 0.05), "MI_Wood_Varnish", 0.02))
+    parts.append(rod("ensign_staff", (ENSIGN_X, 0, ez), (ENSIGN_X, 0, ez + ENSIGN_H + 0.04), 0.022, "MI_Wood_Varnish", 10))
+    parts.append(ring("ensign_knob", 0.012, 0.022, (ENSIGN_X, 0, ez + ENSIGN_H + 0.06), (0, 0, 1), "MI_Metal_Brass", 10))
+    # Carved trailboards on both bows: a cream board on the second strake with a rosette at its forward end.
+    th = strake_bounds()
+    ta, tb_ = th[STRAKES - 2], th[STRAKES - 1]
+    w0 = (Vector(section_point(0.0, tb_, 1)) - Vector(section_point(0.0, ta, 1))).length
+    for side in (-1, 1):
+        base = strake_frame(side, ta, tb_, 3.3, 4.55, w0)
+
+        def tframe(sf, base=base):
+            pm, am, nm, wm = base(sf)
+            return pm + nm * (PLANK_T * 0.5 + 0.012), am, nm, 0.55 * (1.0 - 0.45 * sf)
+        parts.append(laid_board("trailboard", path_length(tframe), w0 * 0.55, 0.022, tframe, "MI_Paint_CreamAged", wear=0.5, grooves=(1, 1)))
+        pm, am, nm, wm = tframe(0.97)
+        parts.append(disc("rosette", 0.055, 0.03, tuple(pm + nm * 0.015), tuple(nm), "MI_Paint_CreamAged", 14, 0.008))
+        parts.append(ring("rosette_ring", 0.06, 0.01, tuple(pm + nm * 0.03), tuple(nm), "MI_Metal_Brass", 14))
+    return parts
+
+
 def build_hull():
-    parts = [hull_core()] + planking() + bulwarks() + deck_planks() + keel_and_posts() + rig_and_fittings() + deck_gear()
+    parts = [hull_core()] + planking() + bulwarks() + deck_planks() + keel_and_posts() + rig_and_fittings() + deck_gear() + boat_decor()
     obj = finish(parts, "SM_Boat_Hull", waterline=0.0, deck_grime=True)
     cols = hull_collision("SM_Boat_Hull")
     print("SB_BOAT_HULL faces", len(obj.data.polygons), "parts", len(parts), "collision pieces", len(cols))
@@ -1144,6 +1303,35 @@ def build_pennant():
     export(obj)
 
 
+def build_ensign():
+    """Ensign (SM_Boat_Ensign): an oxblood and cream flag flying along +X from its hoist (pivot at the top of the hoist),
+    rope grommets at the hoist. M_SB_Flag streams it out and makes it flutter, like the pennant (D52)."""
+    nu, nv, fly, hoist = 30, 6, 0.9, 0.56
+    parts = []
+    for band, mat in ((0, "MI_EnsignRed"), (1, "MI_EnsignCream")):
+        bm = bmesh.new()
+        grid = []
+        for j in range(nv // 2 + 1):
+            v = (band * (nv // 2) + j) / nv
+            grid.append([bm.verts.new(U((0.03 + (fly - 0.03) * i / nu, 0.01 * math.sin(i * 0.5) * i / nu, -hoist * v)))
+                         for i in range(nu + 1)])
+        for j in range(nv // 2):
+            for i in range(nu):
+                f = bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+                f.smooth = True
+        cloth = mesh_object("ensign_" + str(band), bm, [mat])
+        sol = cloth.modifiers.new("Solidify", "SOLIDIFY")
+        sol.thickness = 0.006
+        sol.offset = 0.0
+        sb.apply_modifiers(cloth)
+        parts.append(cloth)
+    for z in (-0.02, -hoist + 0.02):
+        parts.append(ring("grommet", 0.022, 0.006, (0.0, 0.0, z), (0, 0, 1), "MI_Rope_Hemp", 10))
+    parts.append(rod("hoist_seam", (0.03, 0.0, 0.0), (0.03, 0.0, -hoist), 0.007, "MI_Rope_Hemp", 6))
+    obj = finish(parts, "SM_Boat_Ensign", wear=0.0, chips=0.0)
+    export(obj)
+
+
 def build_anchor():
     """Fisherman's anchor, hanging from its ring (pivot at the ring, shank down -Z): iron shank, crown and arms with
     flukes, a wooden stock with iron bands across the top."""
@@ -1171,12 +1359,12 @@ def build_anchor():
 
 
 def main():
-    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway", "anchor", "windlass", "pennant", "oar"]
+    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway", "anchor", "windlass", "pennant", "oar", "ensign"]
     builds = [("hull", build_hull),
               ("spars", lambda: build_spar("SM_Boat_Boom", BOOM_L, 0.085, 0.068, 0.14)),
               ("spars", lambda: build_spar("SM_Boat_Gaff", GAFF_L, 0.075, 0.06, 0.13)),
               ("sail", build_sail), ("rudder", build_rudder), ("wheel", build_wheel), ("gangway", build_gangway),
-              ("anchor", build_anchor), ("windlass", build_windlass), ("pennant", build_pennant), ("oar", build_steering_oar)]
+              ("anchor", build_anchor), ("windlass", build_windlass), ("pennant", build_pennant), ("oar", build_steering_oar), ("ensign", build_ensign)]
     for part, fn in builds:
         if part in args:
             sb.reset_scene()

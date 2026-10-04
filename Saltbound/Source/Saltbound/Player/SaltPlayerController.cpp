@@ -12,6 +12,8 @@
 #include "UI/SaltHUDWidget.h"
 #include "UI/SaltMenuWidget.h"
 #include "UI/SaltSatchelWidget.h"
+#include "UI/SaltStoreWidget.h"
+#include "Player/SaltInventoryComponent.h"
 
 ASaltPlayerController::ASaltPlayerController()
 {
@@ -84,6 +86,55 @@ void ASaltPlayerController::SetMenuOpen(bool bOpen)
 	}
 }
 
+bool ASaltPlayerController::IsStoreOpen() const
+{
+	return StoreWidget && StoreWidget->IsInViewport();
+}
+
+void ASaltPlayerController::SetUIInput(bool bOn, UUserWidget* Focus)
+{
+	FlushPressedKeys();
+	if (ASaltPlayerCharacter* SaltCharacter = Cast<ASaltPlayerCharacter>(GetPawn()))
+	{
+		SaltCharacter->ResetHeldInput();
+	}
+	bShowMouseCursor = bOn;
+	if (bOn)
+	{
+		FInputModeUIOnly Mode;
+		Mode.SetWidgetToFocus(Focus->TakeWidget());
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(Mode);
+	}
+	else
+	{
+		SetInputMode(FInputModeGameOnly());
+	}
+}
+
+void ASaltPlayerController::OpenStore(USaltInventoryComponent* Store)
+{
+	ASaltPlayerCharacter* SaltCharacter = Cast<ASaltPlayerCharacter>(GetPawn());
+	if (!IsLocalController() || !Store || !SaltCharacter || IsMenuOpen() || IsSatchelOpen() || IsStoreOpen())
+	{
+		return;
+	}
+	StoreWidget = CreateWidget<USaltStoreWidget>(this, USaltStoreWidget::StaticClass());
+	StoreWidget->SetInventories(SaltCharacter->GetInventory(), Store);
+	StoreWidget->AddToViewport(8);
+	SetUIInput(true, StoreWidget);
+}
+
+void ASaltPlayerController::CloseStore()
+{
+	if (IsStoreOpen())
+	{
+		StoreWidget->RemoveFromParent();
+		StoreWidget = nullptr;
+		SetUIInput(false, nullptr);
+	}
+}
+
 bool ASaltPlayerController::IsSatchelOpen() const
 {
 	return SatchelWidget && SatchelWidget->IsInViewport();
@@ -91,7 +142,7 @@ bool ASaltPlayerController::IsSatchelOpen() const
 
 void ASaltPlayerController::SetSatchelOpen(bool bOpen, int32 Page)
 {
-	if (!IsLocalController() || (bOpen && IsMenuOpen()))
+	if (!IsLocalController() || (bOpen && (IsMenuOpen() || IsStoreOpen())))
 	{
 		return;
 	}

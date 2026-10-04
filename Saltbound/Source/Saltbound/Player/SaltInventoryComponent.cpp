@@ -82,7 +82,36 @@ int32 USaltInventoryComponent::CountOf(FName Id) const
 
 void USaltInventoryComponent::SetSlots(const TArray<FSaltItemStack>& InSlots)
 {
+	const int32 N = Slots.Num();
 	Slots = InSlots;
-	Slots.SetNum(Capacity);
+	Slots.SetNum(N);
 	OnChanged.Broadcast();
+}
+
+void USaltInventoryComponent::InitStore(FName InStorageId, const FText& InName, int32 InCapacity)
+{
+	StorageId = InStorageId;
+	DisplayName = InName;
+	Slots.Reset();
+	Slots.SetNum(FMath::Max(InCapacity, 1));
+}
+
+int32 USaltInventoryComponent::MoveStack(int32 Index, USaltInventoryComponent* To)
+{
+	if (!To || To == this || !Slots.IsValidIndex(Index) || Slots[Index].IsEmpty())
+	{
+		return 0;
+	}
+	const FSaltItemStack Stack = Slots[Index];
+	const int32 Moved = To->Add(Stack.Id, Stack.Count);
+	if (Moved > 0)
+	{
+		Slots[Index].Count -= Moved;
+		if (Slots[Index].Count <= 0)
+		{
+			Slots[Index] = FSaltItemStack();
+		}
+		OnChanged.Broadcast();
+	}
+	return Moved;
 }
