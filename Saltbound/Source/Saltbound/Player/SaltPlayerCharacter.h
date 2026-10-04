@@ -29,6 +29,7 @@ public:
 	explicit ASaltPlayerCharacter(const FObjectInitializer& ObjectInitializer);
 
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
@@ -84,6 +85,11 @@ public:
 	 *  in the sea (down a ladder), otherwise standing on the top. */
 	void StartScriptedClimb(USceneComponent* Base, const TArray<FVector>& LocalPoints, const TArray<bool>& Stepped, bool bEndInWater);
 	bool IsClimbing() const { return bClimbing; }
+
+	/** Applies the look settings (field of view, mouse sensitivity, invert look) from USaltGameUserSettings. */
+	void ApplyUserSettings();
+	/** Forgets held movement keys (the pause menu takes the input away while they are down). */
+	void ResetHeldInput();
 	float GetCapsuleHalfHeightForClimb() const;
 
 	/** Height of one climbing step (ladder rung) and the time it takes. */

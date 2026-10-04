@@ -213,13 +213,15 @@ ASaltBoat::ASaltBoat()
 	const FVector Hub(WheelX, 0.f, SheerZ(WheelX) + WheelHeight);
 	Wheel = Part(TEXT("Wheel"), Hull);
 	Wheel->SetRelativeLocation(Hub * 100.0);
+	OarPivot = Pivot(TEXT("OarPivot"), Hull, OarBoss());
+	OarPivot->SetRelativeRotation(FRotator(-OarRakeDeg, 0.f, 0.f));
+	SteeringOar = Part(TEXT("SteeringOar"), OarPivot);
+	PennantPivot = Pivot(TEXT("PennantPivot"), Hull, FVector(MastX, 0.f, SheerZ(MastX) + MastHeight + PennantHeight));
+	Pennant = Part(TEXT("Pennant"), PennantPivot);
+	Pennant->SetBoundsScale(3.f);   // its vertex animation moves it beyond the mesh bounds
 
 	Helm = CreateDefaultSubobject<USaltStationComponent>(TEXT("Helm"));
 	Helm->SetupAttachment(Hull);
-	Helm->SetRelativeLocation(Hub * 100.0);
-	Helm->SetBoxExtent(FVector(18.f, 52.f, 52.f));
-	Helm->StandOffset = (FVector(HelmsmanX, 0.f, SheerZ(HelmsmanX)) - Hub) * 100.0;
-	Helm->ExitOffset = (FVector(HelmsmanX + 0.25f, 0.62f, SheerZ(HelmsmanX + 0.25f)) - Hub) * 100.0;
 	Helm->YawLimit = 160.f;
 	Helm->PitchMin = -50.f;
 	Helm->PitchMax = 75.f;
@@ -253,6 +255,7 @@ ASaltBoat::ASaltBoat()
 	LadderPort = Interaction(TEXT("LadderPort"), FVector(LadderX, -LadderY, 0.4f), FVector(32.f, 28.f, 70.f));
 	LadderStarboard = Interaction(TEXT("LadderStarboard"), FVector(LadderX, LadderY, 0.4f), FVector(32.f, 28.f, 70.f));
 	LadderPort->PromptText = LadderStarboard->PromptText = NSLOCTEXT("Saltbound", "BoatClimbLadder", "Climb the ladder");
+	ApplySteeringLayout();
 	// Gangway to the pier while moored (placed every frame; the player walks on it).
 	Gangway = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Gangway"));
 	Gangway->SetupAttachment(Hull);
@@ -298,6 +301,7 @@ void ASaltBoat::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	ResolveContent();
+	ApplySteeringLayout();
 	StartTransform = Transform;
 	// The editor shows the boat as it starts: moored, the sail taken in (the material's default).
 	UpdateVisuals(0.f);
@@ -323,6 +327,8 @@ void ASaltBoat::ResolveContent()
 	Resolve(WindlassDrum, TEXT("WindlassDrum"));
 	Resolve(WindlassRope, TEXT("WindlassRope"));
 	Resolve(Gangway, TEXT("Gangway"));
+	Resolve(Pennant, TEXT("Pennant"));
+	Resolve(SteeringOar, TEXT("SteeringOar"));
 	UMaterialInterface* RopeMaterial = LoadObject<UMaterialInterface>(nullptr, SaltContent::RopeMaterial);
 	for (UCableComponent* C : { AnchorLine.Get(), MainSheet.Get(), MooringLineFore.Get(), MooringLineAft.Get() })
 	{
@@ -351,12 +357,14 @@ void ASaltBoat::SetupSailMaterials()
 		}
 		SailMaterials.Add(Mid);
 	}
+	PennantMaterial = Pennant->GetMaterial(0) ? Pennant->CreateAndSetMaterialInstanceDynamic(0) : nullptr;
 }
 
 void ASaltBoat::BeginPlay()
 {
 	Super::BeginPlay();
 	ResolveContent();
+	ApplySteeringLayout();
 	BuildHullModel();
 	StartTransform = GetActorTransform();
 	SetPose(GetActorLocation() * 0.01, GetActorQuat());
@@ -519,8 +527,18 @@ void ASaltBoat::BuildHullModel()
 	// anchor, rudder blade and head, chain wales and deadeyes, fenders, ladders, and the boom wherever it swings.
 	Capsules.Add({FVector(4.92f, 0.f, 1.0f), FVector(5.0f, 0.f, 1.62f), 0.1f});
 	Capsules.Add({FVector(4.5f, 0.88f, SheerZ(4.5f) + 0.25f), FVector(4.5f, 0.88f, SheerZ(4.5f) - 0.75f), 0.2f});
-	Capsules.Add({FVector(RudderHeelX - 0.3f, 0.f, RudderHeelZ + 0.1f), FVector(RudderHeadX - 0.25f, 0.f, RudderBladeTopZ - 0.05f), 0.28f});
-	Capsules.Add({FVector(RudderHeadX + 0.12f, 0.f, 0.f), FVector(RudderHeadX, 0.f, RudderHeadZ), 0.1f});
+	if (Steering == ESaltSteering::Wheel)
+	{
+		Capsules.Add({FVector(RudderHeelX - 0.3f, 0.f, RudderHeelZ + 0.1f), FVector(RudderHeadX - 0.25f, 0.f, RudderBladeTopZ - 0.05f), 0.28f});
+		Capsules.Add({FVector(RudderHeadX + 0.12f, 0.f, 0.f), FVector(RudderHeadX, 0.f, RudderHeadZ), 0.1f});
+	}
+	else
+	{
+		// The steering oar: its shaft from the head down to the blade, and the blade aft of it.
+		Capsules.Add({OarAlong(OarHead), OarAlong(OarBladeTop), 0.08f});
+		const FVector BladeMid = OarAft() * (OarBladeChord * 0.5f);
+		Capsules.Add({OarAlong(OarBladeTop - 0.2f) + BladeMid, OarAlong(OarTip + 0.2f) + BladeMid, 0.25f});
+	}
 	for (float Side : { -1.f, 1.f })
 	{
 		const float Cx0 = MastX - 0.05f, Cx1 = MastX + 0.85f;
@@ -562,6 +580,7 @@ void ASaltBoat::SetPose(const FVector& OriginWorldM, const FQuat& Rotation)
 		C.bHasWater = false;
 	}
 	Contacts.Reset();
+	ClearTrail();
 }
 
 void ASaltBoat::ClearMotion()
@@ -794,6 +813,7 @@ void ASaltBoat::Tick(float DeltaSeconds)
 	UpdateAnchor(Dt);
 	UpdateRopes(Dt);
 	UpdateGangway();
+	UpdateTrail(Dt);
 	PushOceanMask(bMasksOcean);
 	UpdateHints();
 	UpdateRecovery(Dt);
@@ -932,7 +952,7 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 	T += Q.RotateVector(DampB * Wet);
 
 	// Rudder: a foil turned against the flow (+ angle = bear away to starboard: the stern is pushed to port).
-	const FVector RudderPoint(RudderHeelX - RudderChord * 0.5f, 0.f, (RudderHeelZ + RudderBladeTopZ) * 0.5f);
+	const FVector RudderPoint = RudderFoilPoint();
 	const FVector Vr = BodyVel(RudderPoint);
 	const double Delta = FMath::DegreesToRadians(-RudderAngle);
 	const FVector2D Fr = FoilForce(FVector2D(-Vr.X, -Vr.Y), FVector2D(FMath::Cos(Delta), FMath::Sin(Delta)), RudderArea, RhoWater, RudderCoefficients);
@@ -1169,6 +1189,21 @@ void ASaltBoat::UpdateVisuals(float DeltaSeconds)
 	}
 	Rudder->SetRelativeRotation(FRotator(0.f, -RudderAngle, 0.f));
 	Wheel->SetRelativeRotation(FRotator(0.f, 0.f, RudderAngle * WheelRatio));
+	SteeringOar->SetRelativeRotation(FRotator(0.f, -RudderAngle, 0.f));
+	// The pennant flies where the apparent wind blows (it keeps its last direction in a calm) and streams out
+	// as the wind freshens; it hangs in light air.
+	const double AppSpeed = LastApparentWind.Size();
+	if (AppSpeed > 0.3)
+	{
+		const float Target = FMath::RadiansToDegrees(FMath::Atan2(LastApparentWind.Y, LastApparentWind.X));
+		PennantYaw += FRotator::NormalizeAxis(Target - PennantYaw) * FMath::Min(DeltaSeconds * 3.f, 1.f);
+	}
+	PennantWind = FMath::FInterpTo(PennantWind, FMath::Clamp((float)AppSpeed / 9.f, 0.f, 1.f), DeltaSeconds, 1.5f);
+	PennantPivot->SetRelativeRotation(FRotator(0.f, PennantYaw, 0.f));
+	if (PennantMaterial)
+	{
+		PennantMaterial->SetScalarParameterValue(TEXT("Wind"), PennantWind);
+	}
 }
 
 void ASaltBoat::UpdateHints()
@@ -1232,6 +1267,83 @@ void ASaltBoat::PushOceanMask(bool bEnable)
 	UKismetMaterialLibrary::SetVectorParameterValue(this, OceanCollection, TEXT("BoatAxisX"), FLinearColor(Ax.X, Ax.Y, Ax.Z, 0.f));
 	UKismetMaterialLibrary::SetVectorParameterValue(this, OceanCollection, TEXT("BoatAxisY"), FLinearColor(Ay.X, Ay.Y, Ay.Z, 0.f));
 	UKismetMaterialLibrary::SetVectorParameterValue(this, OceanCollection, TEXT("BoatAxisZ"), FLinearColor(Az.X, Az.Y, Az.Z, 0.f));
+	// Bow wave and wake (D44, SaltBoatWake.ush): shaped by the speed through the water.
+	const float Forward = FMath::Max((float)FVector::DotProduct(V, FVector(Ax.X, Ax.Y, 0.0)), 0.f);
+	UKismetMaterialLibrary::SetVectorParameterValue(this, OceanCollection, TEXT("BoatWake"),
+		FLinearColor(Forward, TrailClock, WakeStrength, bEnable && WakeStrength > 0.f ? 1.f : 0.f));
+	// Trail (D45, SaltBoatWake.ush): the stern now, then the samples (newest first), two points per vector; the
+	// speed there four per vector. Unused points repeat the last one with no strength.
+	static const FName TrailP[8] = { TEXT("BoatTrailP0"), TEXT("BoatTrailP1"), TEXT("BoatTrailP2"), TEXT("BoatTrailP3"),
+		TEXT("BoatTrailP4"), TEXT("BoatTrailP5"), TEXT("BoatTrailP6"), TEXT("BoatTrailP7") };
+	static const FName TrailS[4] = { TEXT("BoatTrailS0"), TEXT("BoatTrailS1"), TEXT("BoatTrailS2"), TEXT("BoatTrailS3") };
+	FVector2D P[16];
+	float S[16];
+	P[0] = FVector2D(GetActorTransform().TransformPosition(FVector(-470.0, 0.0, 0.0)));
+	S[0] = bEnable ? FMath::Clamp((float)V.Size2D() / 2.5f, 0.f, 1.f) * WakeStrength : 0.f;
+	for (int32 K = 1; K < 16; ++K)
+	{
+		const bool bHas = TrailPoints.IsValidIndex(K - 1);
+		P[K] = bHas ? TrailPoints[K - 1] : P[K - 1];
+		S[K] = bHas && bEnable ? TrailStrength[K - 1] * WakeStrength : 0.f;
+	}
+	for (int32 I = 0; I < 8; ++I)
+	{
+		UKismetMaterialLibrary::SetVectorParameterValue(this, OceanCollection, TrailP[I], FLinearColor(P[2 * I].X, P[2 * I].Y, P[2 * I + 1].X, P[2 * I + 1].Y));
+	}
+	for (int32 I = 0; I < 4; ++I)
+	{
+		UKismetMaterialLibrary::SetVectorParameterValue(this, OceanCollection, TrailS[I], FLinearColor(S[4 * I], S[4 * I + 1], S[4 * I + 2], S[4 * I + 3]));
+	}
+}
+
+void ASaltBoat::UpdateTrail(float DeltaSeconds)
+{
+	// The stern's path, one sample a second: the sea draws the trail along it (it follows the turns).
+	TrailClock += DeltaSeconds;
+	if (TrailPoints.Num() == 0 || TrailClock >= 1.f)
+	{
+		TrailClock = TrailPoints.Num() == 0 ? 0.f : FMath::Fmod(TrailClock, 1.f);
+		TrailPoints.Insert(FVector2D(GetActorTransform().TransformPosition(FVector(-470.0, 0.0, 0.0))), 0);
+		TrailStrength.Insert(FMath::Clamp((float)V.Size2D() / 2.5f, 0.f, 1.f), 0);
+		TrailPoints.SetNum(FMath::Min(TrailPoints.Num(), 15));
+		TrailStrength.SetNum(TrailPoints.Num());
+	}
+}
+
+void ASaltBoat::ClearTrail()
+{
+	TrailPoints.Reset();
+	TrailStrength.Reset();
+	TrailClock = 0.f;
+}
+
+void ASaltBoat::ApplySteeringLayout()
+{
+	using namespace SaltHull;
+	const bool bWheel = Steering == ESaltSteering::Wheel;
+	Wheel->SetVisibility(bWheel);
+	Rudder->SetVisibility(bWheel);
+	SteeringOar->SetVisibility(!bWheel);
+	// The helm station: at the wheel's hub, or at the oar's handle with the helmsman behind it.
+	const FVector At = bWheel ? FVector(WheelX, 0.f, SheerZ(WheelX) + WheelHeight)
+		: OarAlong(OarHead) + FVector(0.f, -OarHandleLength * 0.6f, 0.04f);
+	const FVector Stand = bWheel ? FVector(HelmsmanX, 0.f, SheerZ(HelmsmanX)) : FVector(OarHelmsmanX, OarHelmsmanY, SheerZ(OarHelmsmanX));
+	const FVector Exit = bWheel ? FVector(HelmsmanX + 0.25f, 0.62f, SheerZ(HelmsmanX + 0.25f))
+		: FVector(OarHelmsmanX + 0.45f, 0.05f, SheerZ(OarHelmsmanX + 0.45f));
+	Helm->SetRelativeLocation(At * 100.0);
+	Helm->SetBoxExtent(bWheel ? FVector(18.f, 52.f, 52.f) : FVector(28.f, 45.f, 26.f));
+	Helm->StandOffset = (Stand - At) * 100.0;
+	Helm->ExitOffset = (Exit - At) * 100.0;
+}
+
+FVector ASaltBoat::RudderFoilPoint() const
+{
+	using namespace SaltHull;
+	if (Steering == ESaltSteering::Wheel)
+	{
+		return FVector(RudderHeelX - RudderChord * 0.5f, 0.f, (RudderHeelZ + RudderBladeTopZ) * 0.5f);
+	}
+	return OarAlong((OarTip + OarBladeTop) * 0.5f) + OarAft() * (OarBladeChord * 0.5f);
 }
 
 void ASaltBoat::UpdateRopes(float DeltaSeconds)

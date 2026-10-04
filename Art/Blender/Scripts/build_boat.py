@@ -9,7 +9,8 @@ chunky rope rigging with deadeyes, a canvas sail with sewn panels, boltropes, re
 The hull follows Saltbound/Source/Saltbound/Boat/SaltHullShape.h exactly (same formulas and constants), because
 ASaltBoat floats on columns computed from that shape: keep both in sync. The planking lies on that surface.
 
-  SM_Boat_Hull    hull, deck, bulwarks with boarding gaps midship, keel, stem, mast, standing rigging, wheel
+  SM_Boat_Hull    hull, deck, bulwarks with boarding gaps midship, keel, stem, mast, standing rigging, the steering
+                  oar's boss (or the wheel pedestal)
                   pedestal, bitts, hatch; UCX collision (walkable deck, bulwarks, keel, mast foot). Pivot: midship,
                   design waterline. Nanite.
   SM_Boat_Boom    pivot at the gooseneck, spar along -X
@@ -17,7 +18,8 @@ ASaltBoat floats on columns computed from that shape: keep both in sync. The pla
   SM_Boat_Sail    gaff mainsail in the boom's frame (X/Z plane), bellied towards +Y; the actor scales Y to leeward
                   and Z to lower it (the mast hoops are part of it and stack up on the boom)
   SM_Boat_Rudder  pivot at the heel of the stock, stock along +Z, blade aft (-X)
-  SM_Boat_Wheel   pivot at the hub, axle along X
+  SM_Boat_Wheel   pivot at the hub, axle along X (wheel steering, kept for later boats)
+  SM_Boat_SteeringOar  pivot in the boss, +Z up along the raked shaft, blade aft (-X), handle inboard (-Y)
 
 Coordinates below are Unreal body coordinates in metres (x forward, y starboard, z up); U() converts to Blender,
 where starboard is -Y.
@@ -43,6 +45,12 @@ KEEL_AFT_X, KEEL_AFT_Z, KEEL_FORE_X, KEEL_HALF_T = -4.3, -1.45, 3.6, 0.14
 BULWARK_H, GATE_HALF = 0.45, 0.5
 MAST_X, MAST_H, BOOM_H, BOOM_L, THROAT_H, GAFF_L, GAFF_ANGLE = 1.2, 10.5, 2.05, 5.0, 6.8, 4.6, 35.0
 WHEEL_X, WHEEL_H = -3.2, 0.68
+# Steering (D45): the first boat steers with a big oar on the starboard quarter (SaltHullShape.h Oar*). "wheel" builds
+# the pedestal for the wheel and sternpost rudder of D36-D43 instead (kept for later boats, ESaltSteering::Wheel).
+STEERING = "oar"
+OAR_BOSS_X, OAR_OUT, OAR_BOSS_H, OAR_RAKE = -3.35, 0.14, 0.1, 16.5
+OAR_TIP, OAR_BLADE_TOP, OAR_CHORD, OAR_HEAD, OAR_HANDLE = -2.05, -1.15, 0.5, 0.72, 0.85
+PENNANT_H, PENNANT_L, PENNANT_HOIST = 0.42, 1.6, 0.28   # swivel above the mast top; length and hoist of the cloth
 # Windlass (its drum and rope are moving parts, D43) and the boarding ladders over both sides at the gap (D43).
 WINDLASS_X, WINDLASS_DRUM_H = 3.55, 0.34
 LADDER_X, LADDER_OUT, LADDER_BOTTOM_Z, RUNG_STEP = 0.0, 0.07, -0.75, 0.3
@@ -117,7 +125,7 @@ def mats():
                  "MI_Wood_Teak": (0.55, 0.35, 0.18), "MI_Wood_Varnish": (0.4, 0.2, 0.08), "MI_Metal_Iron": (0.1, 0.1, 0.1),
                  "MI_Caulk_Dark": (0.05, 0.05, 0.05), "MI_Canvas": (0.85, 0.8, 0.7), "MI_Rope_Hemp": (0.6, 0.5, 0.3),
                  "MI_Wood_DockWeathered": (0.5, 0.45, 0.4), "MI_SailCloth": (0.85, 0.8, 0.7), "MI_SailRope": (0.6, 0.5, 0.3),
-                 "MI_SailHoop": (0.4, 0.2, 0.08)}.items():
+                 "MI_SailHoop": (0.4, 0.2, 0.08), "MI_Pennant": (0.5, 0.1, 0.07)}.items():
         M[n] = sb.get_material(n, (*c, 1))
 
 
@@ -496,6 +504,9 @@ def rig_and_fittings():
     parts.append(mast)
     top = deck_m + MAST_H
     parts.append(block("mast_cap", (0.32, 0.26, 0.12), (MAST_X, 0, top - 0.02), "MI_Wood_Varnish", 0.03))
+    # Iron spindle on the cap for the wind pennant (SM_Boat_Pennant swivels on it, D44), with a knob on top.
+    parts.append(rod("pennant_spindle", (MAST_X, 0, top + 0.03), (MAST_X, 0, top + PENNANT_H + 0.06), 0.012, "MI_Metal_Iron", 8))
+    parts.append(ring("spindle_knob", 0.014, 0.013, (MAST_X, 0, top + PENNANT_H + 0.07), (0, 0, 1), "MI_Metal_Iron", 10))
     def mast_r(z):
         t = clamp((z - deck_m + 0.1) / (MAST_H + 0.1))
         return 0.13 + (0.085 - 0.13) * t ** 1.3
@@ -543,10 +554,21 @@ def rig_and_fittings():
             parts.append(ring("strap", r_de + 0.012, 0.011, tuple(low), tuple(out), "MI_Metal_Iron"))
             parts.append(block("chainplate", (0.06, 0.03, 0.8), (edge.x - out.x * 0.01, edge.y - out.y * 0.01, sheer_z(x) + 0.07), "MI_Metal_Iron", 0.008))
     parts += rope("forestay", sagging((MAST_X, 0, top - 0.3), (HALF_LENGTH + 0.02, 0, sheer_z(HALF_LENGTH) + 0.55), 0.12, 10), 0.022)
-    # Wheel pedestal: a chunky square post with a head block.
-    hub_z = sheer_z(WHEEL_X) + WHEEL_H
-    parts.append(post("pedestal", 0.15, hub_z - 0.12 - sheer_z(WHEEL_X), (WHEEL_X, 0, sheer_z(WHEEL_X) - 0.02), "MI_Wood_Varnish", 4, 0.88))
-    parts.append(block("pedestal_head", (0.24, 0.2, 0.2), (WHEEL_X, 0, hub_z - 0.06), "MI_Wood_Varnish", 0.03))
+    if STEERING == "wheel":
+        # Wheel pedestal: a chunky square post with a head block.
+        hub_z = sheer_z(WHEEL_X) + WHEEL_H
+        parts.append(post("pedestal", 0.15, hub_z - 0.12 - sheer_z(WHEEL_X), (WHEEL_X, 0, sheer_z(WHEEL_X) - 0.02), "MI_Wood_Varnish", 4, 0.88))
+        parts.append(block("pedestal_head", (0.24, 0.2, 0.2), (WHEEL_X, 0, hub_z - 0.06), "MI_Wood_Varnish", 0.03))
+    else:
+        # Steering oar boss on the starboard quarter: a chunky block on the sheer strake and a rope withy round the
+        # oar's shaft (SM_Boat_SteeringOar turns in it), lashed to the block.
+        bx, by, bz = OAR_BOSS_X, half_beam(OAR_BOSS_X), sheer_z(OAR_BOSS_X)
+        parts.append(block("oar_boss", (0.36, 0.12, 0.28), (bx, by + 0.05, bz - 0.04), "MI_Wood_Varnish", 0.03))
+        rake = math.radians(OAR_RAKE)
+        c = (bx, by + OAR_OUT, bz + OAR_BOSS_H)
+        parts.append(ring("oar_withy", 0.088, 0.024, c, (math.sin(rake), 0.0, math.cos(rake)), "MI_Rope_Hemp", 16))
+        for dz in (-0.06, 0.04):
+            parts.append(rod("withy_lash", (c[0], c[1] - 0.07, c[2] + dz), (bx, by + 0.1, bz + dz), 0.016, "MI_Rope_Hemp", 6))
     # Bitts fore and aft (mooring lines).
     for x in (4.0, -4.15):
         for y in (-0.22, 0.22):
@@ -780,8 +802,9 @@ def hull_collision(mesh_name):
         add(pts)
     deck_m = sheer_z(MAST_X)
     add([(MAST_X + 0.14 * math.cos(a), 0.14 * math.sin(a), z) for a in [i * math.pi / 4 for i in range(8)] for z in (deck_m - 0.1, deck_m + 2.6)])
-    hub_z = sheer_z(WHEEL_X) + WHEEL_H
-    add([(WHEEL_X + dx, dy, z) for dx in (-0.15, 0.15) for dy in (-0.15, 0.15) for z in (sheer_z(WHEEL_X) - 0.05, hub_z + 0.04)])
+    if STEERING == "wheel":
+        hub_z = sheer_z(WHEEL_X) + WHEEL_H
+        add([(WHEEL_X + dx, dy, z) for dx in (-0.15, 0.15) for dy in (-0.15, 0.15) for z in (sheer_z(WHEEL_X) - 0.05, hub_z + 0.04)])
     for x in (4.0, -4.15):
         add([(x + dx, dy, z) for dx in (-0.08, 0.08) for dy in (-0.32, 0.32) for z in (deck_z(x, 0) - 0.05, deck_z(x, 0) + 0.36)])
     hx, hs = 2.75, 0.8
@@ -1002,6 +1025,36 @@ def build_rudder():
     export(obj)
 
 
+def build_steering_oar():
+    """Steering oar (SM_Boat_SteeringOar) in its pivot's frame: origin in the boss, +Z up along the hewn shaft, a blade
+    of three boards below trailing aft (-X) with iron straps, a rope wrap where the withy holds it, and the handle at
+    the head pointing inboard (-Y: the oar hangs on the starboard quarter)."""
+    shaft = tb.spar("shaft", OAR_HEAD + 0.1 - OAR_TIP, 0.058, 0.066, M["MI_Wood_Varnish"], nseed(), sides=24, sweep=0.02,
+                    axis=(0, 0, 1), facets=8, checks=1)
+    shaft.data.transform(Matrix.Translation(U((0.0, 0.0, OAR_TIP))))
+    parts = [shaft]
+    h = OAR_BLADE_TOP - OAR_TIP
+    bw = OAR_CHORD / 3
+    for k in range(3):
+        hk = h * (1.0 - 0.12 * k)
+        parts.append(tb.rough_plank("blade", hk, bw - 0.008, 0.06 - 0.01 * k, (-0.04 - (k + 0.5) * bw, 0.0, OAR_TIP + hk / 2),
+                                    (math.pi / 2, -math.pi / 2, 0), M["MI_Wood_Varnish"], nseed(), wear=0.45, grooves=(1, 1),
+                                    split_chance=0.0))
+    for z in (OAR_TIP + 0.2, OAR_BLADE_TOP - 0.2):
+        parts.append(sb.add_box("strap", (OAR_CHORD + 0.1, 0.085, 0.05), (-OAR_CHORD / 2 - 0.01, 0.0, z), M["MI_Metal_Iron"]))
+        sb.soften(parts[-1], 0.01, 2)
+    for k in range(7):
+        parts.append(ring("wrap", 0.07, 0.012, (0.0, 0.0, -0.12 + k * 0.04), (0, 0, 1), "MI_Rope_Hemp", 14))
+    zh = OAR_HEAD - 0.04
+    handle = tb.spar("handle", OAR_HANDLE, 0.042, 0.034, M["MI_Wood_Varnish"], nseed(), sides=16, sweep=0.0, axis=(0, 1, 0), facets=8)
+    handle.data.transform(Matrix.Translation(U((0.0, 0.0, zh))))       # spar axes are Blender space: +Y = Unreal -Y
+    parts.append(handle)
+    parts.append(rod("grip", (0.0, -OAR_HANDLE + 0.02, zh), (0.0, -OAR_HANDLE - 0.1, zh), 0.045, "MI_Wood_Varnish", 12))
+    parts.append(ring("collar", 0.072, 0.014, (0.0, 0.0, zh), (0, 0, 1), "MI_Metal_Iron", 16))
+    obj = finish(parts, "SM_Boat_SteeringOar", wear=0.7)
+    export(obj)
+
+
 def build_wheel():
     """Chunky ship's wheel in the Y/Z plane (axle along X): thick rim, turned spokes and handles, iron hub."""
     parts = [sb.add_torus("rim", 0.42, 0.042, (0, 0, 0), (0, math.pi / 2, 0), 40, 12, M["MI_Wood_Varnish"]),
@@ -1060,6 +1113,37 @@ def build_windlass():
     export(obj)
 
 
+def build_pennant():
+    """Wind pennant (SM_Boat_Pennant): a long tapered cloth flying along +X from the swivel (pivot) at the top of its
+    hoist, two rope grommets round the spindle. M_SB_Flag streams it out, droops it and makes it flutter."""
+    nu, nv = 44, 3
+    bm = bmesh.new()
+
+    def point(u, v):
+        x = 0.03 + (PENNANT_L - 0.03) * u
+        half = 0.5 * (PENNANT_HOIST * (1.0 - u) ** 0.85 + 0.03 * u)
+        zc = -0.5 * PENNANT_HOIST
+        # A soft static crease, so it never looks cut from sheet metal.
+        y = 0.012 * math.sin(u * 9.0 + v * 2.0) * u
+        return (x, y, zc + half * (2.0 * v - 1.0))
+    grid = [[bm.verts.new(U(point(i / nu, j / nv))) for i in range(nu + 1)] for j in range(nv + 1)]
+    for j in range(nv):
+        for i in range(nu):
+            f = bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+            f.smooth = True
+    cloth = mesh_object("pennant", bm, ["MI_Pennant"])
+    solid = cloth.modifiers.new("Solidify", "SOLIDIFY")
+    solid.thickness = 0.006
+    solid.offset = 0.0
+    sb.apply_modifiers(cloth)
+    parts = [cloth]
+    for z in (-0.02, -PENNANT_HOIST + 0.02):
+        parts.append(ring("grommet", 0.022, 0.006, (0.0, 0.0, z), (0, 0, 1), "MI_Rope_Hemp", 10))
+    parts.append(rod("hoist_seam", (0.03, 0.0, 0.0), (0.03, 0.0, -PENNANT_HOIST), 0.007, "MI_Rope_Hemp", 6))
+    obj = finish(parts, "SM_Boat_Pennant", wear=0.0, chips=0.0)
+    export(obj)
+
+
 def build_anchor():
     """Fisherman's anchor, hanging from its ring (pivot at the ring, shank down -Z): iron shank, crown and arms with
     flukes, a wooden stock with iron bands across the top."""
@@ -1087,12 +1171,12 @@ def build_anchor():
 
 
 def main():
-    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway", "anchor", "windlass"]
+    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway", "anchor", "windlass", "pennant", "oar"]
     builds = [("hull", build_hull),
               ("spars", lambda: build_spar("SM_Boat_Boom", BOOM_L, 0.085, 0.068, 0.14)),
               ("spars", lambda: build_spar("SM_Boat_Gaff", GAFF_L, 0.075, 0.06, 0.13)),
               ("sail", build_sail), ("rudder", build_rudder), ("wheel", build_wheel), ("gangway", build_gangway),
-              ("anchor", build_anchor), ("windlass", build_windlass)]
+              ("anchor", build_anchor), ("windlass", build_windlass), ("pennant", build_pennant), ("oar", build_steering_oar)]
     for part, fn in builds:
         if part in args:
             sb.reset_scene()

@@ -1,0 +1,223 @@
+// Saltbound - the player boat's bow wave and wake (D44). Rendering only: the CPU sea (SaltWaveTypes.cpp) does not
+// see it, so boats and swimmers float on the undisturbed surface.
+//
+// Boat frame in metres: x forward from the boat's origin, y to starboard. The hull is the one of
+// Source/Saltbound/Boat/SaltHullShape.h (half length 5 m, half beam 1.7 m), as in the ocean's hull cut-out.
+// Inputs (MPC_Ocean): BoatPos (cm, w = 1 when the boat masks the sea), BoatAxisX, BoatWake (x = forward speed in
+// m/s, y = trail sample fraction, z = strength, w = 1 when on). Speed U sets the shape: the transverse wavelength
+// 2 pi U^2 / g (9 m at 7 kn) and the height (0.022 U^2 m, 0.32 m at 7 kn).
+// White water (D45): along the bow wave's crest and in a collar against the hull, and the trail: BoatTrailP0..7 hold
+// 16 stern positions (cm, two per vector, newest first; point 0 is the stern now, point k >= 1 the stern
+// k - 1 + fraction seconds ago), BoatTrailS0..3 how fast the boat went there (0..1). The trail widens and fades as it
+// ages and follows the boat's real path through turns.
+// The vertex shader evaluates everything (ShadingInputs) and hands slope, coverage and slick to the pixel shader.
+// Embedded into the ocean materials by Tools/ue_scripts/setup_ocean.py.
+
+struct FSaltBoatWake
+{
+	float2 Pos;
+	float2 Ax;
+	float U;
+	float A;
+	float K;
+	bool bOn;
+	float2 Tp[16];
+	float Ts[16];
+	float Frac;
+	bool bTrail;
+
+	void Init(float4 BoatPos, float4 BoatAxisX, float4 BoatWake)
+	{
+		Pos = BoatPos.xy;
+		Ax = normalize(BoatAxisX.xy + float2(1e-5, 0.0));
+		U = max(BoatWake.x, 0.0);
+		A = BoatWake.z * min(0.022 * U * U, 0.4) * saturate(U / 1.2);
+		K = 9.81 / max(U * U, 0.05);
+		bOn = BoatPos.w > 0.5 && BoatWake.w > 0.5 && A > 0.002;
+	}
+
+	// Waterline half-breadth of the hull at x (m), as the hull cut-out at z = 0.
+	float HalfBreadth(float x)
+	{
+		const float t = clamp(x / 5.0, -1.0, 1.0);
+		const float Zs = 0.75 + 0.3 * t * t;
+		const float Bs = 1.7 * pow(max(1.0 - pow(abs(t), 2.2), 0.0), 0.55);
+		const float s = saturate((abs(x) - 3.0) / 2.0);
+		const float Zb = -0.65 + 1.7 * s * s * s;
+		if (Zb >= 0.0)
+		{
+			return 0.0;
+		}
+		const float CosT = saturate(Zs / max(Zs - Zb, 1e-4));
+		return Bs * pow(sqrt(1.0 - CosT * CosT), 0.8);
+	}
+
+	// Height (cm) the moving boat adds to the sea at the world position XY (cm).
+	float Height(float2 XY)
+	{
+		if (!bOn)
+		{
+			return 0.0;
+		}
+		const float2 D = (XY - Pos) * 0.01;
+		const float x = dot(D, Ax);
+		const float y = dot(D, float2(-Ax.y, Ax.x));
+		if (x > 12.0 || x < -100.0 || abs(y) > 45.0)
+		{
+			return 0.0;
+		}
+		const float ay = abs(y);
+		const float s = 4.95 - x;                       // distance aft of the stem
+		const float Hb = HalfBreadth(clamp(x, -4.95, 4.95));
+		float H = 0.0;
+
+		// Water piled up at the stem.
+		H += 0.4 * A * exp(-(((x - 5.1) / 0.8) * ((x - 5.1) / 0.8) + (y / 0.8) * (y / 0.8)));
+
+		// Alongside the hull: a crest at the bow, a trough amidships and the stern wave (one transverse wavelength).
+		if (s > -0.5 && s < 12.0)
+		{
+			const float Off = (ay - Hb) / (0.7 + 0.08 * max(s, 0.0));
+			const float Side = exp(-Off * Off);
+			const float Along = cos(K * max(s, 0.0)) * smoothstep(-0.5, 0.3, s) * exp(-max(s, 0.0) / 14.0);
+			H += 0.5 * A * Side * Along;
+		}
+
+		// The bow wave: a ridge that hugs the hull until it peels off, then runs out at about 22 degrees with a
+		// trough on its inner side, flattening and widening as it spreads.
+		if (s > 0.0 && s < 60.0)
+		{
+			const float Yr = max(Hb + 0.25, s * 0.4);
+			const float W = 0.45 + 0.05 * s;
+			const float q = (ay - Yr) / W;
+			const float Env = smoothstep(0.0, 1.0, s) * rsqrt(1.0 + s / 3.0) * exp(-s / 30.0);
+			H += A * Env * (exp(-q * q) - 0.5 * exp(-(q + 1.7) * (q + 1.7)));
+		}
+
+		// Kelvin wake from the bow, beyond the hull: transverse and divergent waves inside the 19.5 degree wedge
+		// (the two wave directions with tan(a) = tan(t) / (1 + 2 tan^2(t)) at polar angle a), strongest along the
+		// cusp lines and fading just outside them. The square root is softened at the cusp (a real cusp is smooth,
+		// not a crease); the divergent waves fade near the track, where they get too short to draw.
+		if (s > 6.0)
+		{
+			const float TanA = max(ay / s, 1e-3);
+			const float Disc = 1.0 - 8.0 * TanA * TanA;
+			const float Sq = max(Disc, 0.0) * rsqrt(max(Disc, 0.0) + 0.04) * 1.0198;   // = 1 on the track
+			const float Tt = (1.0 - Sq) / (4.0 * TanA);
+			const float Td = (1.0 + Sq) / (4.0 * TanA);
+			const float R = sqrt(s * s + y * y);
+			const float Lambda = 6.2832 / K;
+			const float Amp = 0.3 * A * rsqrt(1.0 + R / Lambda) * exp(-R / 60.0) * smoothstep(6.0, 14.0, s) * (1.0 - smoothstep(75.0, 100.0, s))
+				* (1.0 + exp(-max(Disc, 0.0) * 12.0)) * (Disc >= 0.0 ? 1.0 : exp(Disc * 25.0));
+			const float Pt = K * (s + ay * Tt) * sqrt(1.0 + Tt * Tt);
+			const float Pd = K * (s + ay * Td) * sqrt(1.0 + Td * Td);
+			const float Wd = 1.0 - smoothstep(1.5, 3.0, Td);
+			H += Amp * (cos(Pt) + Wd * cos(Pd));
+		}
+
+		// A shallow hollow down the middle of the track behind the stern.
+		const float Aft = -4.95 - x;
+		if (Aft > 0.0)
+		{
+			const float Wt = 1.0 + 0.06 * Aft;
+			H -= 0.25 * A * exp(-(y / Wt) * (y / Wt)) * exp(-Aft / 20.0) * smoothstep(0.0, 2.0, Aft);
+		}
+		return H * 100.0;
+	}
+
+	void InitTrail(float4 P0, float4 P1, float4 P2, float4 P3, float4 P4, float4 P5, float4 P6, float4 P7,
+		float4 S0, float4 S1, float4 S2, float4 S3, float InFrac)
+	{
+		const float4 P[8] = { P0, P1, P2, P3, P4, P5, P6, P7 };
+		const float4 S[4] = { S0, S1, S2, S3 };
+		float Most = 0.0;
+		[unroll] for (int k = 0; k < 8; k++)
+		{
+			Tp[2 * k] = P[k].xy;
+			Tp[2 * k + 1] = P[k].zw;
+		}
+		[unroll] for (int j = 0; j < 4; j++)
+		{
+			Ts[4 * j] = S[j].x;
+			Ts[4 * j + 1] = S[j].y;
+			Ts[4 * j + 2] = S[j].z;
+			Ts[4 * j + 3] = S[j].w;
+			Most = max(Most, max(max(S[j].x, S[j].y), max(S[j].z, S[j].w)));
+		}
+		Frac = InFrac;
+		bTrail = Most > 0.01;
+	}
+
+	// Seconds since the stern was at trail point k (one sample per second).
+	float TrailAge(int k)
+	{
+		return k == 0 ? 0.0 : (float)(k - 1) + Frac;
+	}
+
+	// Trail coverage at XY (cm): a band behind the stern, about 1 m either side at first, widening by 0.2 m a second
+	// and fading over about 12 s.
+	float Trail(float2 XY)
+	{
+		if (!bTrail || dot(XY - Tp[0], XY - Tp[0]) > 12000.0 * 12000.0)
+		{
+			return 0.0;
+		}
+		float Cov = 0.0;
+		[unroll] for (int k = 0; k < 15; k++)
+		{
+			const float2 A = Tp[k];
+			const float2 AB = Tp[k + 1] - A;
+			const float t = saturate(dot(XY - A, AB) / max(dot(AB, AB), 1.0));
+			const float d = length(XY - (A + AB * t)) * 0.01;
+			const float Age = lerp(TrailAge(k), TrailAge(k + 1), t);
+			const float W = 0.9 + 0.2 * Age;
+			Cov = max(Cov, lerp(Ts[k], Ts[k + 1], t) * exp(-(d / W) * (d / W)) * exp(-Age / 12.0));
+		}
+		return Cov;
+	}
+
+	// White water the moving hull throws up: a collar against the hull from the stem aft and the bow wave's crest
+	// as it peels off; full at about 7 kn.
+	float BowFoam(float2 XY)
+	{
+		if (!bOn)
+		{
+			return 0.0;
+		}
+		const float2 D = (XY - Pos) * 0.01;
+		const float x = dot(D, Ax);
+		const float y = dot(D, float2(-Ax.y, Ax.x));
+		const float s = 4.95 - x;
+		if (s < -0.6 || s > 25.0 || abs(y) > 15.0)
+		{
+			return 0.0;
+		}
+		const float ay = abs(y);
+		const float Hb = HalfBreadth(clamp(x, -4.95, 4.95));
+		const float Off = (ay - Hb) / 0.35;
+		float Cov = exp(-Off * Off) * smoothstep(-0.6, 0.2, s) * (1.0 - smoothstep(2.0, 10.0, s)) * 0.9;
+		const float Yr = max(Hb + 0.25, s * 0.4);
+		const float q = (ay - Yr) / (0.45 + 0.05 * s);
+		Cov = max(Cov, exp(-2.0 * q * q) * smoothstep(0.0, 0.8, s) * exp(-s / 6.0));
+		return Cov * saturate(A / 0.3);
+	}
+
+	// For the pixel shader: slope of the added height (xy), white-water coverage (z) and how much the trail calms the
+	// ripples (w: the glassy slick behind a boat).
+	float4 ShadingInputs(float2 XY)
+	{
+		const float Tr = Trail(XY);
+		return float4(Slope(XY, 15.0), max(BowFoam(XY), 0.95 * Tr), saturate(1.5 * Tr));
+	}
+
+	// Slope (dH/dx, dH/dy) of the added height at XY (central differences over E cm), for the shading normal.
+	float2 Slope(float2 XY, float E)
+	{
+		if (!bOn)
+		{
+			return float2(0.0, 0.0);
+		}
+		return float2(Height(XY + float2(E, 0.0)) - Height(XY - float2(E, 0.0)),
+			Height(XY + float2(0.0, E)) - Height(XY - float2(0.0, E))) / (2.0 * E);
+	}
+};

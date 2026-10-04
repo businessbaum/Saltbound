@@ -4,6 +4,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/SaltGameUserSettings.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Core/SaltTypes.h"
@@ -85,6 +86,32 @@ void ASaltPlayerCharacter::OnConstruction(const FTransform& Transform)
 	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()));
 	Camera->SetFieldOfView(FieldOfView);
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+}
+
+void ASaltPlayerCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	ApplyUserSettings();
+}
+
+void ASaltPlayerCharacter::ApplyUserSettings()
+{
+	if (const USaltGameUserSettings* S = USaltGameUserSettings::Get())
+	{
+		FieldOfView = S->FieldOfView;
+		MouseSensitivity = S->MouseSensitivity;
+		bInvertLookY = S->bInvertLookY;
+		Camera->SetFieldOfView(FieldOfView);
+	}
+}
+
+void ASaltPlayerCharacter::ResetHeldInput()
+{
+	MoveInput = FVector2D::ZeroVector;
+	bSprinting = false;
+	bSwimUpHeld = false;
+	bSwimDownHeld = false;
+	StopJumping();
 }
 
 void ASaltPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

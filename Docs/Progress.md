@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D43).
+Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45).
 
 ## Milestone status
 
@@ -223,6 +223,9 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D44 / D45 (awaiting the owner's check):** a settings menu (Esc / F10) with vsync off and a frame cap by default;
+  a wind pennant at the masthead; the boat steers with an oar on the starboard quarter (the wheel is kept for later
+  boats); the sea shows a bow wave, white water along the hull, a Kelvin wake and a foam trail that follows the turns.
 - **D43 (awaiting the owner's check):** the anchor brings the boat to a smooth stop and holds it (sail set or
   not); the windlass drum and rope turn; the wheel turns a full turn each way and sits lower; ladders on both
   sides with a rung-by-rung climb; the whole boat collides as one piece (boom, rudder, cathead, ladders); the
@@ -235,7 +238,7 @@ for a higher screen percentage (for example 75 %) and more content.
 
 ## M4 – Sailing boat, technical part (D36)
 A 10 m double-ender (hand-made style since D38) lies moored on the south side of the pier in `L_VisualTest` (`ASaltBoat`, meshes
-from `Art/Blender/Scripts/build_boat.py`). Walk aboard through the gap in the bulwark, take the wheel, raise
+from `Art/Blender/Scripts/build_boat.py`). Walk aboard through the gap in the bulwark, take the steering oar (D45), raise
 the sail and cast off.
 - **Physics:** buoyancy from 67 hull columns on the shared wave field (heave, pitch, roll, heel), keel and
   hull resistance, a rudder foil, the gaff sail as a foil in the apparent wind with a free-swinging boom
@@ -248,8 +251,8 @@ the sail and cast off.
 - **Recovery:** capsized boats right themselves at their last safe position; `sb.Boat.Reset` returns to the
   mooring.
 - **Test:** `python Tools/run_pie_test.py "sb.Dev.RunBoatTests" --timeout 560 --done "SB_TEST BoatSuite DONE"`
-  (27 checks, all pass: 6.7–7.4 kn at every wind angle, slowing with the sail in, anchor stop, 20 m turning
-  circle, pier and beach collisions, player aboard, helm only steers, rope points, windlass, ladders up and
+  (28 checks, all pass: 6.7–7.4 kn at every wind angle, the wake and trail data, slowing with the sail in, anchor
+  stop, 22 m turning circle with the steering oar, pier and beach collisions, player aboard, helm only steers, rope points, windlass, ladders up and
   down, Rough and Storm seas, mooring).
 
 ## Controls
@@ -262,7 +265,8 @@ the sail and cast off.
 | Dive (while swimming) | Left Ctrl / C | B / Circle |
 | Interact / leave station | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
-| On the boat | Wheel: A / D steer. Ropes by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Ladders (both sides, midship): E climbs up from the water or down into the sea | |
+| Pause menu / settings | Esc (in the editor: F10) | Start |
+| On the boat | Steering oar (starboard quarter, E at its handle): A / D steer. Ropes by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Ladders (both sides, midship): E climbs up from the water or down into the sea | |
 
 Developer console (`~`, non-shipping builds):
 - `sb.Lighting Day|Evening|Dusk`
@@ -273,7 +277,7 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.DumpFrames <n>`: the renderer writes the next n frames to `Saved/Screenshots` (with `-UseFixedTimeStep -FPS=<n>`, see `Tools/record_clip.py --dump`)
 - `sb.Dev.RunMovementTests [motion speed turn]`, `sb.Dev.Platform <motion> [speed turn]`
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
-- `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`
+- `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`, `sb.Dev.RunMenuTests`
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`
   (SB_BOAT state line), `sb.Boat.Place X Y Yaw [Speed m/s]`, `sb.Boat.Hold Free|Moored|Anchored`,
@@ -311,8 +315,11 @@ Developer console (`~`, non-shipping builds):
     pier.
   - Performance with the underside tiles and the underwater pass has not been benchmarked in a packaged
     build yet (also outstanding for the FFT ocean itself).
-- **Vsync frame pacing:** with vsync on, the standalone build runs at about 55–60 fps even though the GPU
-  needs only about 7.5 ms. Default display settings (vsync off or a frame cap, later a settings menu) are needed.
+- **Vsync frame pacing:** with vsync on, the standalone build ran at about 55–60 fps even though the GPU needed only
+  about 7.5 ms. Since D44 the default is vsync off with a frame cap at the display's refresh rate (settings menu);
+  not yet measured in a packaged build.
+- **Boat wake (D44, D45):** rendering only: swimmers and floating objects do not feel the bow wave. Only the player
+  boat makes a wake. The trail is a polyline of 15 one-second samples (sharp turns at speed show slight corners).
 - **Benchmarking:** always close the editor first. A running editor renders in the background (throttling
   is disabled for automated tests) and halves standalone performance.
 - **Water inside hulls:** masked inside the player boat's hull (D42); other hulls (the test deck section) are not.
@@ -339,8 +346,8 @@ Developer console (`~`, non-shipping builds):
    the decisions; water masking inside the hull if the cabin goes below the waterline; sail and rope visuals;
    a wind indicator (flag or telltale).
 4. M4 art after the decisions: full starter boat in Blender (about 10 m double-ender, 3.4 m beam), interior, sail.
-5. Water polish: bow wave and wake, spray at crests (`SprayAmount`), verification captures of all
+5. Water polish: spray at crests (`SprayAmount`), verification captures of all
    region × weather × time-of-day combinations, curved (non-Gerstner) crests against the remaining banding.
-6. Display settings menu: vsync/frame cap, screen percentage.
+6. Packaged benchmark with the D44 defaults (frame cap), the masked ocean and the wake (editor closed).
 7. Underwater after the owner's review: waterline split at the camera, god rays and bubbles, sea grass
    bending around the player, a packaged-build benchmark of the FFT ocean plus the underwater rendering.

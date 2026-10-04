@@ -871,3 +871,39 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   the pier while moored, stowed otherwise (it was a separate actor that the boat could cut through).
 - **Tests:** `sb.Dev.RunBoatTests` 27/27 (new: anchor stop; ladder up from the water and down into the sea, 7
   rungs each); `Tools/swim_test.py` 5/5.
+
+### D44 · Settings menu with display defaults, a wind pennant, the bow wave and wake (Adopted)
+- **Settings menu:** Esc in the game, F10 in the editor (Esc ends a play session there), Start on a gamepad. It pauses
+  the game and offers V-Sync, frame rate limit (30-240 or unlimited, including the display's refresh rate), resolution
+  scale (50-100 %), window mode, field of view (70-110), mouse sensitivity, invert look, restore defaults and quit.
+  Changes apply at once and are saved (`USaltGameUserSettings`, GameUserSettings.ini). Built in code like the HUD.
+- **Display defaults:** vsync off with the frame rate capped at the display's refresh rate (vsync on paced the game at
+  55-60 fps), native resolution. The editor keeps its own vsync off (`[SystemSettingsEditor] r.VSync=0` in
+  BaseEngine.ini), so V-Sync reads "(game only)" there, like the window mode.
+- **Wind pennant:** a long faded oxblood pennant on an iron spindle at the masthead (`SM_Boat_Pennant`, `M_SB_Flag`).
+  It swings to the apparent wind, streams out as the wind freshens, hangs in light air and flutters toward the tail.
+- **Bow wave and wake (shape):** the moving boat shapes the sea around it (`SaltBoatWake.ush`, rendering only; the CPU
+  sea and everything floating on it ignore it): water piled up at the stem, a crest, trough and stern wave along the
+  sides (one transverse wavelength, 2 pi U^2 / g), a bow-wave ridge that hugs the hull and peels off at about 22
+  degrees, a Kelvin wake (transverse and divergent waves in the 19.5 degree wedge, softened cusps) and a shallow hollow
+  down the track. Heights grow with the square of the speed (0.4 m at 7 kn). The vertex shader evaluates it and hands
+  slope, white water and slick to the pixel shader (ocean pixel shader 1732 instructions).
+- **Tests:** `sb.Dev.RunMenuTests` 7/7.
+
+### D45 · The first boat steers with an oar; white water and a trail (Adopted)
+- **Owner (2026-10-04):** "Remove the wheel but save the data. The first boat will only get a rudder in form of a big
+  stick at the side in the back." "I dont see water being pushed back by the boat, i dont see a trail in the water."
+- **Steering oar:** a big oar hangs on the starboard quarter in a wooden boss with a rope withy, raked 16.5 degrees aft,
+  blade of three boards with iron straps; a handle across the boat turns it about its shaft (`SM_Boat_SteeringOar`).
+  The helmsman stands behind the handle (A / D steer as before, full rudder 35 degrees). The physics foil sits at the
+  oar's blade; the oar collides as part of the boat. Turning circle 21.7 m (22 m with the rudder).
+- **Wheel kept:** `ESaltSteering::Wheel` brings back the wheel, its pedestal (`STEERING = "wheel"` in build_boat.py)
+  and the sternpost rudder for later boats; the meshes and code stay.
+- **White water and trail:** white water rides the bow wave's crest and hugs the hull at the waterline from the stem
+  aft. The boat records its stern position once a second (15 samples) and the sea draws a foam trail along that path,
+  so it follows the turns; it starts about 1 m either side, widens by 0.2 m a second and fades over about 12 s, and the
+  trail calms the small ripples (the glassy slick behind a boat). The foam uses the crest foam's lace pattern.
+  Everything scales with speed (nothing at rest). Tunables: `WakeFoamAmount`, `WakeSlick` (MI_Ocean, Wake group),
+  `WakeStrength` on the boat.
+- **Tests:** `sb.Dev.RunBoatTests` 28/28 (new: the sea gets the boat's speed and a trail sampled a second apart, 3.79 m
+  spacing at 3.79 m/s); `Tools/swim_test.py` 5/5; `sb.Dev.RunMenuTests` 7/7.

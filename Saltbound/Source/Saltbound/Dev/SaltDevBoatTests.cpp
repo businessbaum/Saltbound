@@ -6,12 +6,15 @@
 #include "Boat/SaltHullShape.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/SaltContent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "Interaction/SaltInteractableComponent.h"
 #include "Interaction/SaltStationComponent.h"
+#include "Kismet/KismetMaterialLibrary.h"
+#include "Materials/MaterialParameterCollection.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Saltbound.h"
 #include "World/SaltLightingRig.h"
@@ -241,6 +244,29 @@ void USaltDevTestSubsystem::RunBoatSuite()
 					TEXT("speed=%.2fkn heel=%.1fdeg leeway=%.1fdeg headingError=%.1fdeg (from rest in 25 s)"), Speed, Heel, Leeway, MaxValue));
 			}});
 	}
+	// The sea draws the boat's wake (D44, D45): it gets the speed and a trail of stern positions a second apart.
+	Steps.Add({TEXT("WakeTrail"), 0.f, [this]()
+	{
+		const ASaltBoat* Bt = TestBoat.Get();
+		UMaterialParameterCollection* Mpc = LoadObject<UMaterialParameterCollection>(nullptr, SaltContent::OceanParameterCollection);
+		if (!Bt || !Mpc)
+		{
+			Report(TEXT("BoatWakeTrail"), false, TEXT("no boat or MPC_Ocean"));
+			return;
+		}
+		auto Get = [this, Mpc](const TCHAR* Name) { return UKismetMaterialLibrary::GetVectorParameterValue(GetWorld(), Mpc, FName(Name)); };
+		const FLinearColor Wake = Get(TEXT("BoatWake"));
+		const FLinearColor P0 = Get(TEXT("BoatTrailP0"));
+		const FLinearColor P1 = Get(TEXT("BoatTrailP1"));
+		const FLinearColor S0 = Get(TEXT("BoatTrailS0"));
+		const float Speed = Bt->GetSpeedKnots() / 1.943844f;
+		// Trail points 1 and 2 are consecutive samples, one second apart.
+		const float Spacing = (float)FVector2D::Distance(FVector2D(P0.B, P0.A), FVector2D(P1.R, P1.G)) * 0.01f;
+		Report(TEXT("BoatWakeTrail"), Wake.A > 0.5f && FMath::Abs(Wake.R - Speed) < 0.5f && S0.R > 0.9f && S0.G > 0.9f
+			&& FMath::Abs(Spacing - Speed) < Speed * 0.25f, FString::Printf(
+			TEXT("wakeSpeed=%.2fm/s boatSpeed=%.2fm/s on=%.0f strengthNow=%.2f strength1=%.2f sampleSpacing=%.2fm"),
+			Wake.R, Speed, Wake.A, S0.R, S0.G, Spacing));
+	}, nullptr, nullptr});
 	// Taking the sail in slows the boat down.
 	Steps.Add({TEXT("TakeInSail"), 20.f, [this]()
 	{
@@ -404,7 +430,7 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		}});
 
 	// 9) Take the helm at sea, steer to starboard with the keys, leave the helm.
-	Steps.Add({TEXT("HelmApproach"), 0.f, [=, this]() { PlacePlayerAboard(SaltHull::HelmsmanX - 0.15f, 0.f, 0.f); }, nullptr, nullptr});
+	Steps.Add({TEXT("HelmApproach"), 0.f, [=, this]() { PlacePlayerAboard(SaltHull::OarHelmsmanX - 0.1f, SaltHull::OarHelmsmanY, 0.f); }, nullptr, nullptr});
 	Wait(TEXT("HelmSettle"), 1.f);
 	Steps.Add({TEXT("HelmAim"), 0.4f, nullptr, [this](float)
 	{

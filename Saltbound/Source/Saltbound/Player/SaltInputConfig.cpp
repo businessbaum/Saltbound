@@ -41,6 +41,8 @@ void USaltInputConfig::Build()
 	Sprint = MakeAction(this, TEXT("IA_Sprint"), EInputActionValueType::Boolean);
 	Dive = MakeAction(this, TEXT("IA_Dive"), EInputActionValueType::Boolean);
 	Interact = MakeAction(this, TEXT("IA_Interact"), EInputActionValueType::Boolean);
+	Menu = MakeAction(this, TEXT("IA_Menu"), EInputActionValueType::Boolean);
+	Menu->bTriggerWhenPaused = true;
 
 	DefaultContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Default"));
 	UInputMappingContext* C = DefaultContext;
@@ -69,4 +71,7 @@ void USaltInputConfig::Build()
 	C->MapKey(Dive, EKeys::Gamepad_FaceButton_Right);
 	C->MapKey(Interact, EKeys::E);
 	C->MapKey(Interact, EKeys::Gamepad_FaceButton_Left);
+	C->MapKey(Menu, EKeys::Escape);
+	C->MapKey(Menu, EKeys::F10);
+	C->MapKey(Menu, EKeys::Gamepad_Special_Right);
 }

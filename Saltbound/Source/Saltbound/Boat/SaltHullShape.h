@@ -31,13 +31,15 @@ namespace SaltHull
 	/** Rig (the gaff mainsail is the only sail): mast, boom and gaff, heights above the deck at the mast. */
 	constexpr float MastX = 1.2f;
 	constexpr float MastHeight = 10.5f;
+	constexpr float PennantHeight = 0.42f;    // the wind pennant's swivel above the mast top
 	constexpr float BoomHeight = 2.05f;
 	constexpr float BoomLength = 5.0f;
 	constexpr float ThroatHeight = 6.8f;
 	constexpr float GaffLength = 4.6f;
 	constexpr float GaffAngleDeg = 35.f;
 
-	/** Helm: the wheel on its pedestal, and the rudder stock (raked, from its heel up to the deck). */
+	/** Wheel steering (D36-D43, ESaltSteering::Wheel, kept for later boats): the wheel on its pedestal and the
+	 *  rudder stock (raked, from its heel up to the deck). The first boat steers with an oar (below). */
 	constexpr float WheelX = -3.2f;
 	constexpr float WheelHeight = 0.68f;      // hub above the deck
 	constexpr float HelmsmanX = -3.85f;
@@ -115,5 +117,38 @@ namespace SaltHull
 	inline float DeepestZ(float X)
 	{
 		return (X >= KeelAftX && X <= KeelForeX) ? FMath::Min(KeelZ(X), BottomZ(X)) : BottomZ(X);
+	}
+
+	/** Steering oar (D45): a big oar hung on the starboard quarter, held in a boss on the sheer, raked aft and turned
+	 *  about its shaft by a handle across the boat. Distances along the shaft are measured from the boss (+ up). */
+	constexpr float OarBossX = -3.35f;
+	constexpr float OarBossOut = 0.14f;       // shaft outside the sheer
+	constexpr float OarBossHeight = 0.1f;     // above the sheer
+	constexpr float OarRakeDeg = 16.5f;       // the lower end aft
+	constexpr float OarTip = -2.05f;
+	constexpr float OarBladeTop = -1.15f;
+	constexpr float OarBladeChord = 0.5f;     // aft of the shaft
+	constexpr float OarHead = 0.72f;          // the handle sits here
+	constexpr float OarHandleLength = 0.85f;  // inboard, across the boat
+	constexpr float OarHelmsmanX = -3.75f;    // behind the handle, clear of the aft bitts
+	constexpr float OarHelmsmanY = 0.55f;
+
+	inline FVector OarBoss()
+	{
+		return FVector(OarBossX, HalfBeamAtSheer(OarBossX) + OarBossOut, SheerZ(OarBossX) + OarBossHeight);
+	}
+
+	/** Point on the oar's shaft, Along metres from the boss. */
+	inline FVector OarAlong(float Along)
+	{
+		const float Rake = FMath::DegreesToRadians(OarRakeDeg);
+		return OarBoss() + FVector(FMath::Sin(Rake), 0.f, FMath::Cos(Rake)) * Along;
+	}
+
+	/** Direction from the shaft to the blade's trailing edge (aft, tilted with the rake). */
+	inline FVector OarAft()
+	{
+		const float Rake = FMath::DegreesToRadians(OarRakeDeg);
+		return FVector(-FMath::Cos(Rake), 0.f, FMath::Sin(Rake));
 	}
 }

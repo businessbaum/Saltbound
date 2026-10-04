@@ -8,6 +8,7 @@
 
 class USaltInputConfig;
 class USaltHUDWidget;
+class USaltMenuWidget;
 
 UCLASS()
 class SALTBOUND_API ASaltPlayerController : public APlayerController
@@ -23,10 +24,20 @@ public:
 	/** Shows or hides the in-game HUD (development captures and recordings). */
 	void SetHUDVisible(bool bVisible);
 
+	/** Pause menu with the settings (Esc in the game, F10 in the editor, Start on a gamepad): pauses the game. */
+	void SetMenuOpen(bool bOpen);
+	void ToggleMenu() { SetMenuOpen(!IsMenuOpen()); }
+	bool IsMenuOpen() const;
+	USaltMenuWidget* GetMenu() const { return MenuWidget; }
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void SetupInputComponent() override;
 
 private:
+	UPROPERTY(Transient)
+	TObjectPtr<USaltMenuWidget> MenuWidget;
+
 	UPROPERTY(Transient)
 	TObjectPtr<USaltInputConfig> InputConfig;
 

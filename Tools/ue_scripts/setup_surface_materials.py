@@ -100,9 +100,29 @@ float Shiver = sin(Aft * 0.05 - Time * 9.0 + LocalPos.z * 0.03) * Flutter * U * 
 P.y = (LocalPos.y * Side * (Fill + Breath) + Shiver) * (1.0 - 0.85 * F);
 return P - LocalPos;
 """
+SAIL_PARAMS = {"Furl": 1.0, "Fill": 0.0, "Side": 1.0, "Flutter": 0.15, "ThroatHeight": 475.0, "GaffTan": 0.7, "Chord": 485.0}
+
+# Wind pennant (M_SB_Flag, D44): local cm, +X along the fly from the swivel, -Z down the hoist. ASaltBoat turns it to
+# the apparent wind and drives Wind (0 = calm .. 1 = about 9 m/s): it hangs in light air and streams out as the wind
+# freshens, with waves running out along the fly that grow towards the tail.
+FLAG_WPO_CODE = """
+float L = max(LocalPos.x, 0.0);
+float U = saturate(L / max(Length, 1.0));
+float W = saturate(Wind);
+float Droop = (1.0 - W) * 1.25 * (0.4 + 0.6 * U);
+float3 P = float3(L * cos(Droop), LocalPos.y, LocalPos.z - L * sin(Droop));
+float Phase = L * 0.05 - Time * (5.0 + 9.0 * W);
+float Amp = (3.0 + 9.0 * W) * U;
+P.y += sin(Phase) * Amp + sin(Phase * 2.3 + 1.7) * Amp * 0.3;
+P.z += sin(Phase * 0.8 + 0.5) * Amp * 0.12;
+return P - LocalPos;
+"""
+FLAG_PARAMS = {"Wind": 0.6, "Length": 160.0}
 
 
-def build_surface(name="M_SB_Surface", sail=False):
+def build_surface(name="M_SB_Surface", wpo=None):
+    """The shared surface master. wpo = (group, description, code, params): a two-sided variant whose vertices the
+    custom node moves in local space (the sail, the pennant)."""
     m = sb_ue.reset_material(name, MASTER)
     uv0 = sb_ue.expr(m, unreal.MaterialExpressionTextureCoordinate, -2200, 0)
     uv_scale = sb_ue.scalar_param(m, "UVScale", 1.0, -2200, 100, "Textures")
@@ -177,17 +197,17 @@ def build_surface(name="M_SB_Surface", sail=False):
     sb_ue.to_prop(nl, "", unreal.MaterialProperty.MP_NORMAL)
     emissive = sb_ue.vector_param(m, "EmissiveColor", (0, 0, 0, 1), -1000, 1100, "Emissive")
     sb_ue.to_prop(emissive, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    if sail:
+    if wpo:
+        group, desc, code, sp = wpo
         m.set_editor_property("two_sided", True)
         lp = sb_ue.expr(m, unreal.MaterialExpressionLocalPosition, -1300, 1300)
         time = sb_ue.expr(m, unreal.MaterialExpressionTime, -1300, 1380)
-        sp = {"Furl": 1.0, "Fill": 0.0, "Side": 1.0, "Flutter": 0.15, "ThroatHeight": 475.0, "GaffTan": 0.7, "Chord": 485.0}
-        sail_nodes = {k: sb_ue.scalar_param(m, k, v, -1300, 1460 + i * 70, "Sail") for i, (k, v) in enumerate(sp.items())}
-        w = custom(m, -900, 1400, "Sail furl / fill / flutter (local cm)", SAIL_WPO_CODE, ["LocalPos", "Time"] + list(sp), F3)
+        wpo_nodes = {k: sb_ue.scalar_param(m, k, v, -1300, 1460 + i * 70, group) for i, (k, v) in enumerate(sp.items())}
+        w = custom(m, -900, 1400, desc, code, ["LocalPos", "Time"] + list(sp), F3)
         sb_ue.connect(lp, "", w, "LocalPos")
         sb_ue.connect(time, "", w, "Time")
         for k in sp:
-            sb_ue.connect(sail_nodes[k], "", w, k)
+            sb_ue.connect(wpo_nodes[k], "", w, k)
         to_world = sb_ue.expr(m, unreal.MaterialExpressionTransform, -600, 1400,
                               transform_source_type=unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_LOCAL,
                               transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
@@ -505,7 +525,8 @@ def wood_textures():
 
 def main():
     surf = build_surface()
-    sail = build_surface("M_SB_Sail", sail=True)
+    sail = build_surface("M_SB_Sail", ("Sail", "Sail furl / fill / flutter (local cm)", SAIL_WPO_CODE, SAIL_PARAMS))
+    flag = build_surface("M_SB_Flag", ("Flag", "Pennant streaming / droop / flutter (local cm)", FLAG_WPO_CODE, FLAG_PARAMS))
     rock = build_rock()
     glow = build_glow()
     grass = build_seagrass()
@@ -574,6 +595,10 @@ def main():
     # The sail's parts on the animated sail master (they must move together): cloth, boltrope and reef ties, hoops.
     for name, base in (("MI_SailCloth", "MI_Canvas"), ("MI_SailRope", "MI_Rope_Hemp"), ("MI_SailHoop", "MI_Wood_Varnish")):
         sb_ue.make_mi(name, MI, sail, **lib[base])
+    # The wind pennant: the sail's canvas dyed a faded oxblood red, like the hull.
+    pennant = dict(lib["MI_Canvas"])
+    pennant["vectors"] = {"Tint": (0.36, 0.075, 0.05, 1)}
+    sb_ue.make_mi("MI_Pennant", MI, flag, **pennant)
     # No lichen on the coastal rocks (owner: "remove the yellow marks at the top of the stones").
     sb_ue.make_mi("MI_Rock_Coast", MI, rock, scalars={"LichenCoverage": 0.0})
     sb_ue.make_mi("MI_Stone_Ruin", MI, rock, vectors={"Tint": (0.42, 0.4, 0.36, 1), "LichenColor": (0.4, 0.46, 0.28, 1)},

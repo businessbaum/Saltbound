@@ -32,6 +32,7 @@ import sb_ue  # noqa: E402
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 USH = os.path.join(REPO_ROOT, "Saltbound", "Shaders", "SaltOcean.ush")
 UNDER_USH = os.path.join(REPO_ROOT, "Saltbound", "Shaders", "SaltUnderwater.ush")
+WAKE_USH = os.path.join(REPO_ROOT, "Saltbound", "Shaders", "SaltBoatWake.ush")
 DIR = "/Game/Saltbound/Water"
 FFT_DIR = DIR + "/FFT"
 mel = sb_ue.mel
@@ -54,6 +55,10 @@ LOOK_PARAMS = ["LookAbsorption", "LookScattering", "LookCrest"]
 UNDER_PARAMS = ["UnderwaterFog", "UnderwaterSky", "UnderwaterColor"]
 # The player boat's pose (ASaltBoat, D42): position (w = 1 enables the hull cut-out) and its forward / right / up axes.
 BOAT_PARAMS = ["BoatPos", "BoatAxisX", "BoatAxisY", "BoatAxisZ"]
+# The player boat's bow wave and wake (D44, SaltBoatWake.ush): BoatWake = (forward speed m/s, -, strength, on).
+WAKE_PARAMS = ["BoatPos", "BoatAxisX", "BoatWake"]
+# Its trail (D45): 16 stern positions, two per vector, and how fast the boat went there (SaltBoatWake.ush).
+TRAIL_PARAMS = ["BoatTrailP%d" % i for i in range(8)] + ["BoatTrailS%d" % i for i in range(4)]
 PS_EXTRA = ["RippleOffsets", "LookCrest"]
 
 
@@ -70,6 +75,7 @@ MPC_DEFAULTS = {
     "Cascade0": cascade_default(0), "Cascade1": cascade_default(1), "Cascade2": cascade_default(2),
     "LookAbsorption": (1.35, 0.26, 0.15, 1), "LookScattering": (0.01, 0.065, 0.1, 1),
     "BoatPos": (0, 0, -1.0e9, 0), "BoatAxisX": (1, 0, 0, 0), "BoatAxisY": (0, 1, 0, 0), "BoatAxisZ": (0, 0, 1, 0),
+    "BoatWake": (0, 0, 1, 0),
     "LookCrest": (0.1, 0.95, 0.9, 1),
     "UnderwaterFog": (0.12, 1.0, 0.3, 0.3), "UnderwaterSky": (0.25, 0.06, 0.3, 0.6), "UnderwaterColor": (0.12, 0.48, 0.62, 1.0),
 }
@@ -79,7 +85,7 @@ MPC_DEFAULTS = {
 def make_mpc():
     mpc = sb_ue.get_or_create_asset("MPC_Ocean", DIR, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
     names = (WAVE_PARAMS + PHASE_PARAMS + PREV_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals", "RippleOffsets"]
-             + CASCADE_PARAMS + LOOK_PARAMS + UNDER_PARAMS + BOAT_PARAMS)
+             + CASCADE_PARAMS + LOOK_PARAMS + UNDER_PARAMS + BOAT_PARAMS + ["BoatWake"] + TRAIL_PARAMS)
     # Keep existing entries: each has an ID that materials reference. Recreated entries get new IDs and every
     # material not rebuilt in the same run fails to compile ("invalid parameter") and renders the default material.
     existing = {str(p.get_editor_property("parameter_name")): p for p in mpc.get_editor_property("vector_parameters")}
@@ -151,6 +157,7 @@ def link(a, a_out, b, b_in):
 
 F1 = unreal.CustomMaterialOutputType.CMOT_FLOAT1
 F3 = unreal.CustomMaterialOutputType.CMOT_FLOAT3
+F4 = unreal.CustomMaterialOutputType.CMOT_FLOAT4
 
 INIT = """FSaltOcean O;
 O.Init(W0, W1, W2, W3, W4, W5, W6, W7, W8, W9, W10, W11, Phase0123, Phase4567, Phase891011,
@@ -178,6 +185,13 @@ else
     D = O.SurfaceDisplacement(XY, FadeK, CellSize, Cascade0, Cascade1, VSMipBias, Disp0, Disp0Sampler,
         Disp1, Disp1Sampler, QuietTex, QuietTexSampler, QuietTile, RippleOffsets.w, TroughCalm, QuietAmount, WindSeaVS1);
 }
+// The player boat's bow wave and wake (D44): its height here; slope, white water and slick for the pixel shader.
+FSaltBoatWake Wk;
+Wk.Init(BoatPos, BoatAxisX, BoatWake);
+Wk.InitTrail(BoatTrailP0, BoatTrailP1, BoatTrailP2, BoatTrailP3, BoatTrailP4, BoatTrailP5, BoatTrailP6, BoatTrailP7,
+    BoatTrailS0, BoatTrailS1, BoatTrailS2, BoatTrailS3, BoatWake.y);
+D.z += Wk.Height(XY);
+WakeOut = IsPrev > 0.5 ? float4(0.0, 0.0, 0.0, 0.0) : Wk.ShadingInputs(XY);
 P0 = float3(XY, D.z);
 return float3(XY - WorldPos.xy, 0.0) + D;
 """
@@ -197,6 +211,7 @@ float3 DC = 0;
 if (Globals.y + DC.z - CamPos.z < -2.0)
 {
     P0 = float3(WorldPos.xy, 0.0);
+    WakeOut = float4(0.0, 0.0, 0.0, 0.0);
     return CamPos - float3(0.0, 0.0, 100000.0) - WorldPos;
 }
 """
@@ -246,12 +261,15 @@ float Mask = O.ShortWaveMask(Height / max(O.Chop.w, 1.0), Quiet, TroughCalm, Qui
     Tx += float3(M1.x, M1.z, H1.x);  Ty += float3(M1.z, M1.y, H1.y);
     SlopeVar += max(X1.y + X1.z - dot(G1.xy, G1.xy), 0.0) * F1 * F1 * O.MinifyWeight(UV1, Cascade1);
 }
+// The boat's bow wave and wake (D44) tilt the normal like the waves do (slope from the vertex shader).
+Tx.z += WakeIn.x;  Ty.z += WakeIn.y;
 float3 Nm = normalize(cross(Tx, Ty));                // wave-scale normal (swells + cascades 0, 1)
 float J = Tx.x * Ty.y - Tx.y * Ty.x;                 // horizontal Jacobian (< 1 on compressed crests)
 {
     // Ripples keep a floor in troughs and quiet patches: they barely show in the sky reflection, but break
     // the sun reflection into glints instead of a smooth glare.
-    float F2 = F * lerp(RippleFloor, 1.0, Mask) * saturate(1.0 - Dist / max(RippleFadeDistance, 1.0));
+    // A boat's trail calms the ripples: the glassy slick behind it (D45).
+    float F2 = F * lerp(RippleFloor, 1.0, Mask) * saturate(1.0 - Dist / max(RippleFadeDistance, 1.0)) * (1.0 - WakeSlick * WakeIn.w);
     float2 H2 = O.ToWorld(G2.xy, Cascade2) * F2;
     float3 M2 = O.TensorToWorld(float3(G2.z, G2.w, A2.w), Cascade2) * F2;
     Tx += float3(M2.x, M2.z, H2.x);  Ty += float3(M2.z, M2.y, H2.y);
@@ -333,7 +351,14 @@ float FreshCov = saturate(Fresh * FoamAmount);
 float ResidueCov = saturate(Residue * FoamAmount) * (1.0 - FreshCov);
 float FreshFoam = smoothstep(1.0 - FreshCov, 1.12 - FreshCov, FoamTex.r) * lerp(0.6, 0.97, FreshCov) * (1.0 - 0.7 * FoamTex.g * FreshCov);
 float ResidueFoam = smoothstep(1.0 - ResidueCov, 1.1 - ResidueCov, FineLace * 0.6 + FoamTex.r * 0.4) * 0.45;
-float Foam = max(FreshFoam, ResidueFoam) * saturate(1.0 - Dist / max(FoamFadeDistance, 1.0));
+float Foam = max(FreshFoam, ResidueFoam);
+// The boat's white water and trail (D45): two scales of the lace pattern in world space, filled by the coverage
+// (dense and white at the hull and the stern, breaking into streaks and patches as the trail ages).
+float WakeCov = saturate(WakeIn.z * WakeFoamAmount);
+float WakeLace = Texture2DSample(QuietTex, QuietTexSampler, XY / (FoamTile * 0.5) + float2(0.21, 0.66)).r * 0.55
+    + Texture2DSample(QuietTex, QuietTexSampler, XY / FoamTile + float2(0.58, 0.12)).r * 0.45;
+Foam = max(Foam, smoothstep(1.0 - WakeCov, 1.15 - WakeCov, WakeLace) * lerp(0.55, 0.95, WakeCov));
+Foam *= saturate(1.0 - Dist / max(FoamFadeDistance, 1.0));
 FoamOut = Foam;
 RoughOut = lerp(Rough, 0.85, Foam);
 SpecularOut *= 1.0 - Foam;
@@ -368,6 +393,8 @@ SCALARS = {
     "FoamAmount": (1.0, "Foam"), "FoamJStart": (0.75, "Foam"), "FoamJFull": (0.45, "Foam"),
     "FoamSegment": (0.45, "Foam"), "FoamSegLength": (1600.0, "Foam"), "FoamSegAcross": (5000.0, "Foam"),
     "FoamTrail": (700.0, "Foam"), "FoamTile": (900.0, "Foam"), "FoamFadeDistance": (40000.0, "Foam"),
+    # The boat's white water and trail (D45), and how much the trail calms the ripples.
+    "WakeFoamAmount": (1.0, "Wake"), "WakeSlick": (0.7, "Wake"),
 }
 
 VS_TEXTURES = ["Disp0", "Disp1", "DispPrev0", "DispPrev1"]
@@ -500,7 +527,7 @@ def rt_name(param):
 def ocean_inputs(m, mpc, rts, textures, scalars):
     """MPC parameters, camera, FFT texture objects (shared wrap sampler, so the sampler count stays low),
     the quiet-patch texture and scalar parameters. Returns a node context."""
-    names = WAVE_PARAMS + FIELD_PARAMS + ["RippleOffsets"] + LOOK_PARAMS + UNDER_PARAMS
+    names = WAVE_PARAMS + FIELD_PARAMS + ["RippleOffsets"] + LOOK_PARAMS + UNDER_PARAMS + WAKE_PARAMS + TRAIL_PARAMS
     ctx = {"nodes": {n: mpc_param(m, mpc, n, -2400, -1600 + i * 60) for i, n in enumerate(names)}}
     ctx["cam"] = sb_ue.expr(m, unreal.MaterialExpressionCameraPositionWS, -2400, 0)
     ctx["tex"] = {}
@@ -535,9 +562,9 @@ def ocean_vertex(m, mpc, ush, ctx, under=False):
     cd = [sb_ue.expr(m, unreal.MaterialExpressionPerInstanceCustomData, -2000, 400 + i * 80, data_index=i) for i in range(3)]
     fade_vs = sb_ue.scalar_param(m, "WaveFadeVS", 0.03, -2000, 650, "Waves")
     vs_inputs = (["WorldPos", "LocalPos", "CamPos", "CellSize", "MorphStart", "MorphEnd", "FadeScale", "IsPrev", "QuietTex", "RippleOffsets"]
-                 + VS_SCALARS + VS_TEXTURES + WAVE_PARAMS + FIELD_PARAMS + (["CameraCellSize"] if under else []))
+                 + VS_SCALARS + VS_TEXTURES + WAVE_PARAMS + FIELD_PARAMS + WAKE_PARAMS + TRAIL_PARAMS + (["CameraCellSize"] if under else []))
     code = VS_CODE.replace("float Dist = distance(CamPos, WorldPos);", UNDER_VS_GUARD + "float Dist = distance(CamPos, WorldPos);", 1) if under else VS_CODE
-    vs = custom(m, -1500, 300, "SaltOcean VS (morph + swells + FFT wind sea)", ush + "\n" + code, vs_inputs, F3, [("P0", F3)])
+    vs = custom(m, -1500, 300, "SaltOcean VS (morph + swells + FFT wind sea)", ush + "\n" + code, vs_inputs, F3, [("P0", F3), ("WakeOut", F4)])
     link(wp_vs, "", vs, "WorldPos")
     link(lp, "", vs, "LocalPos")
     link(ctx["cam"], "", vs, "CamPos")
@@ -547,7 +574,7 @@ def ocean_vertex(m, mpc, ush, ctx, under=False):
     link(fade_vs, "", vs, "FadeScale")
     link(ctx["quiet_tex"], "", vs, "QuietTex")
     link(nodes["RippleOffsets"], "", vs, "RippleOffsets")
-    link_inputs(ctx, vs, VS_TEXTURES + VS_SCALARS + (["CameraCellSize"] if under else []))
+    link_inputs(ctx, vs, VS_TEXTURES + VS_SCALARS + WAKE_PARAMS + TRAIL_PARAMS + (["CameraCellSize"] if under else []))
     # Last frame's displacement for the velocity pass: PreviousFrameSwitch picks PrevPhase* for the swells
     # and IsPrev = 1 (last frame's FFT textures). Without it the waves get zero motion vectors and TSR
     # reprojects history onto moving water (D23). UsePrevFramePhases = 0 restores that for A/B tests.
@@ -571,6 +598,9 @@ def ocean_vertex(m, mpc, ush, ctx, under=False):
     sb_ue.to_prop(vs, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
     interp = sb_ue.expr(m, unreal.MaterialExpressionVertexInterpolator, -1200, 500)
     link(vs, "P0", interp, "")
+    # The boat wake's slope, white water and slick (D45), evaluated per vertex.
+    ctx["wake"] = sb_ue.expr(m, unreal.MaterialExpressionVertexInterpolator, -1200, 600)
+    link(vs, "WakeOut", ctx["wake"], "")
     return interp
 
 
@@ -624,7 +654,7 @@ def make_material(mpc, ush, rts):
     sun_dir, sun_illum = sun_nodes(m, -1500, 2000)
     ps_scalars = [n for n in SCALARS if n not in VS_ONLY]
     ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "QuietTex", "SunDir", "SunIllum"]
-                 + PS_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA)
+                 + PS_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA + ["WakeIn"])
     ps = custom(m, -700, 900, "SaltOcean PS (surface normal, roughness, crest light)", ush + "\n" + PS_CODE, ps_inputs, F3,
                 [("RoughOut", F1), ("EmissiveOut", F3), ("SpecularOut", F1), ("FoamOut", F1)])
     link(sun_dir, "", ps, "SunDir")
@@ -635,6 +665,7 @@ def make_material(mpc, ush, rts):
     link(fade_ps, "", ps, "FadeScale")
     link(ctx["quiet_tex"], "", ps, "QuietTex")
     link_inputs(ctx, ps, PS_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA)
+    link(ctx["wake"], "", ps, "WakeIn")
 
     sb_ue.to_prop(ps, "", unreal.MaterialProperty.MP_NORMAL)
     # Surface layer = crest foam (opacity 0 = pure Single Layer Water elsewhere).
@@ -867,6 +898,8 @@ def main():
     parts = sys.argv[1:] or ["ocean", "under", "post", "particles"]
     with open(USH, encoding="utf-8") as f:
         ush = f.read()
+    with open(WAKE_USH, encoding="utf-8") as f:
+        ush += "\n" + f.read()
     with open(UNDER_USH, encoding="utf-8") as f:
         under_ush = f.read()
     mpc = make_mpc()

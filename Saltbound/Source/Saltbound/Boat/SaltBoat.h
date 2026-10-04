@@ -17,6 +17,13 @@ class ASaltPlayerCharacter;
 
 /** What holds the boat in place. */
 UENUM(BlueprintType)
+enum class ESaltSteering : uint8
+{
+	SteeringOar,   // a big oar on the starboard quarter, turned by a handle (the first boat, D45)
+	Wheel          // sternpost rudder and ship's wheel (D36-D43, kept for later boats)
+};
+
+UENUM(BlueprintType)
 enum class ESaltBoatHold : uint8
 {
 	Free,      // sailing or drifting
@@ -127,7 +134,13 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Gaff;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> RudderPivot;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Rudder;
+	/** The steering oar (D45): its pivot sits in the boss, raked aft; the oar turns about its shaft. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> OarPivot;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> SteeringOar;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Wheel;
+	/** Wind pennant at the masthead: swings to the apparent wind and streams out with its strength (D44). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> PennantPivot;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Pennant;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltStationComponent> Helm;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> SailRopePort;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> SailRopeStarboard;
@@ -188,6 +201,8 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Boat|Rudder") float RestTurnTorque = 1500.f;
 	/** Wheel turns per rudder turn (visual): full rudder is one full turn of the wheel either way. */
 	UPROPERTY(EditAnywhere, Category = "Boat|Rudder") float WheelRatio = 360.f / 35.f;
+	/** How the boat is steered: the steering oar (first boat) or the wheel and sternpost rudder. */
+	UPROPERTY(EditAnywhere, Category = "Boat|Rudder") ESaltSteering Steering = ESaltSteering::SteeringOar;
 
 	/** Forward force of the set sail in a 7 m/s breeze (N): about 7.5 kn at full sail, reached in about 20 s. */
 	UPROPERTY(EditAnywhere, Category = "Boat|Sail") float SailThrust = 7800.f;
@@ -231,6 +246,8 @@ public:
 
 	/** The sea is cut out inside this boat's hull (MPC_Ocean Boat*, D42): no waves inside the boat or on its deck. */
 	UPROPERTY(EditAnywhere, Category = "Boat") bool bMasksOcean = true;
+	/** Height of the bow wave and wake the sea shows (D44); 0 = none. */
+	UPROPERTY(EditAnywhere, Category = "Boat", meta = (ClampMin = "0")) float WakeStrength = 1.f;
 
 private:
 	struct FColumn
@@ -288,6 +305,12 @@ private:
 	UFUNCTION() void HandleWindlass(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleLadder(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	void UpdateGangway();
+	/** Shows the steering oar or the wheel and rudder, and puts the helm station at its handle or wheel. */
+	void ApplySteeringLayout();
+	/** Centre of the steering foil (oar blade or rudder blade), body m. */
+	FVector RudderFoilPoint() const;
+	void UpdateTrail(float DeltaSeconds);
+	void ClearTrail();
 	void UpdateBoomCapsule();
 	void UpdateRopes(float DeltaSeconds);
 	void UpdateAnchor(float DeltaSeconds);
@@ -324,6 +347,9 @@ private:
 	float BoomAngle = 0.f;                   // deg, + = boom to starboard
 	float SailSide = 1.f;                    // leeward side of the belly (visual)
 	float SailSideVisual = 1.f;
+	float PennantYaw = 180.f;                  // deg in the hull's frame (streaming aft)
+	float PennantWind = 0.f;                   // 0 = hanging .. 1 = streaming out
+	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> PennantMaterial;
 	float Fill = 0.f;                        // belly fill (spring: pops when the sail catches the wind)
 	float FillVel = 0.f;
 	float Luff = 0.f;                        // 0..1, wind from ahead: the sail shivers
@@ -341,6 +367,10 @@ private:
 	float WindlassAngle = 0.f;
 	float AnchorDepth = 500.f;                 // cm of rode paid out at the bottom
 	int32 BoomCapsule = INDEX_NONE;
+	// Trail (D45): the stern's path, one sample a second, newest first (world cm), and the speed there (0..1).
+	TArray<FVector2D> TrailPoints;
+	TArray<float> TrailStrength;
+	float TrailClock = 0.f;
 	FVector AnchorGround = FVector::ZeroVector;   // world, cm
 	bool bAutopilot = false;
 	float AutopilotYaw = 0.f;

@@ -35,6 +35,8 @@ public:
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Dive;
 	/** Use the focused object; leaves a control station when at one. */
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Interact;
+	/** Opens the pause menu (Esc; F10 also works in the editor, where Esc ends the play session). */
+	UPROPERTY(Transient) TObjectPtr<UInputAction> Menu;
 
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> DefaultContext;
 };

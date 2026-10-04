@@ -194,5 +194,17 @@
     "dest": "/Game/Saltbound/Boat",
     "nanite": false,
     "collision": "none"
+  },
+  "SM_Boat_Pennant": {
+    "fbx": "Boat/SM_Boat_Pennant.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Boat_SteeringOar": {
+    "fbx": "Boat/SM_Boat_SteeringOar.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
   }
 }
