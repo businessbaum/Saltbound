@@ -296,35 +296,104 @@ bool ASaltPlayerCharacter::TryClimbOutOfWater()
 		}
 		USceneComponent* Base = Top.GetComponent();
 		const FTransform BaseXf = Base ? Base->GetComponentTransform() : FTransform::Identity;
-		ClimbBase = Base;
-		ClimbStartLocal = BaseXf.InverseTransformPosition(Center);
-		ClimbEndLocal = BaseXf.InverseTransformPosition(End);
-		ClimbAlpha = 0.f;
-		bClimbing = true;
-		Move->SuppressWater(ClimbOutTime + 0.4f);
-		Move->StopMovementImmediately();
-		Move->SetMovementMode(MOVE_None);
+		// Up (in steps when it is high: pulling up a ladder or a pier side), then forward onto the ledge.
+		StartScriptedClimb(Base, { BaseXf.InverseTransformPosition(Center), BaseXf.InverseTransformPosition(Raised),
+			BaseXf.InverseTransformPosition(End) }, { Rise > 60.f, false }, false);
 		UE_LOG(LogSaltbound, Log, TEXT("Climbing out of the water onto %s (%.0f cm)"), *GetNameSafe(Top.GetActor()), Rise);
 		return true;
 	}
 	return false;
 }
 
+float ASaltPlayerCharacter::GetCapsuleHalfHeightForClimb() const
+{
+	return GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+}
+
+float ASaltPlayerCharacter::SegmentDuration(int32 Segment) const
+{
+	if (!ClimbPoints.IsValidIndex(Segment + 1))
+	{
+		return 0.f;
+	}
+	const FVector D = ClimbPoints[Segment + 1] - ClimbPoints[Segment];
+	if (ClimbStepped.IsValidIndex(Segment) && ClimbStepped[Segment])
+	{
+		return FMath::Max(1, FMath::RoundToInt(FMath::Abs(D.Z) / FMath::Max(ClimbStepHeight, 5.f))) * ClimbStepTime;
+	}
+	return FMath::Clamp((float)D.Size() / 140.f, 0.25f, 1.2f);
+}
+
+void ASaltPlayerCharacter::StartScriptedClimb(USceneComponent* Base, const TArray<FVector>& LocalPoints, const TArray<bool>& Stepped, bool bEndInWater)
+{
+	USaltCharacterMovementComponent* Move = Cast<USaltCharacterMovementComponent>(GetCharacterMovement());
+	if (!Move || LocalPoints.Num() < 2)
+	{
+		return;
+	}
+	if (ActiveStation)
+	{
+		LeaveStation();
+	}
+	ClimbBase = Base;
+	ClimbPoints = LocalPoints;
+	ClimbStepped = Stepped;
+	ClimbStepped.SetNum(ClimbPoints.Num() - 1);
+	ClimbSegment = 0;
+	ClimbSegmentTime = 0.f;
+	bClimbEndInWater = bEndInWater;
+	bClimbing = true;
+	float Total = 0.f;
+	for (int32 I = 0; I + 1 < ClimbPoints.Num(); ++I)
+	{
+		Total += SegmentDuration(I);
+	}
+	// No swimming while climbing; after climbing down, the sea takes over again at once.
+	Move->SuppressWater(Total + (bEndInWater ? 0.f : 0.4f));
+	Move->StopMovementImmediately();
+	Move->SetMovementMode(MOVE_None);
+}
+
 void ASaltPlayerCharacter::TickClimb(float DeltaSeconds)
 {
-	ClimbAlpha = FMath::Min(1.f, ClimbAlpha + DeltaSeconds / FMath::Max(ClimbOutTime, 0.1f));
 	const FTransform BaseXf = ClimbBase.IsValid() ? ClimbBase->GetComponentTransform() : FTransform::Identity;
-	const FVector Start = BaseXf.TransformPosition(ClimbStartLocal);
-	const FVector End = BaseXf.TransformPosition(ClimbEndLocal);
-	// Up first (head and shoulders over the edge), then forward onto the ledge.
-	const float Up = FMath::InterpEaseInOut(0.f, 1.f, FMath::Min(ClimbAlpha / 0.65f, 1.f), 2.f);
-	const float Over = FMath::InterpEaseInOut(0.f, 1.f, FMath::Clamp((ClimbAlpha - 0.35f) / 0.65f, 0.f, 1.f), 2.f);
-	const FVector P(FMath::Lerp(Start.X, End.X, Over), FMath::Lerp(Start.Y, End.Y, Over), FMath::Lerp(Start.Z, End.Z, Up));
-	SetActorLocation(P, false, nullptr, ETeleportType::None);
-	if (ClimbAlpha >= 1.f)
+	const float RestZ = EyeHeight - GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+	float Bob = 0.f;
+	ClimbSegmentTime += DeltaSeconds;
+	float Duration = SegmentDuration(ClimbSegment);
+	while (ClimbSegmentTime >= Duration && ClimbPoints.IsValidIndex(ClimbSegment + 2))
 	{
+		ClimbSegmentTime -= Duration;
+		++ClimbSegment;
+		Duration = SegmentDuration(ClimbSegment);
+	}
+	const float Alpha = Duration > 0.f ? FMath::Min(ClimbSegmentTime / Duration, 1.f) : 1.f;
+	const FVector A = ClimbPoints[ClimbSegment];
+	const FVector B = ClimbPoints[ClimbSegment + 1];
+	FVector Local;
+	if (ClimbStepped.IsValidIndex(ClimbSegment) && ClimbStepped[ClimbSegment])
+	{
+		// Rung by rung: each step eases in and out (pull, settle) and dips the head a little.
+		const int32 Steps = FMath::Max(1, FMath::RoundToInt(FMath::Abs(B.Z - A.Z) / FMath::Max(ClimbStepHeight, 5.f)));
+		const float P = Alpha * Steps;
+		const int32 K = FMath::Min((int32)P, Steps - 1);
+		const float Frac = P - K;
+		const float Eased = (K + FMath::InterpEaseInOut(0.f, 1.f, FMath::Min(Frac, 1.f), 2.2f)) / Steps;
+		Local = FMath::Lerp(A, B, Alpha >= 1.f ? 1.f : Eased);
+		Bob = -4.f * FMath::Sin(PI * FMath::Min(Frac, 1.f)) * (Alpha >= 1.f ? 0.f : 1.f);
+	}
+	else
+	{
+		Local = FMath::Lerp(A, B, FMath::InterpEaseInOut(0.f, 1.f, Alpha, 2.f));
+	}
+	SetActorLocation(BaseXf.TransformPosition(Local), false, nullptr, ETeleportType::None);
+	Camera->SetRelativeLocation(FVector(0.f, 0.f, RestZ + Bob));
+	if (Alpha >= 1.f && !ClimbPoints.IsValidIndex(ClimbSegment + 2))
+	{
+		Camera->SetRelativeLocation(FVector(0.f, 0.f, RestZ));
 		bClimbing = false;
 		GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+		UE_LOG(LogSaltbound, Log, TEXT("Climb finished (%s)"), bClimbEndInWater ? TEXT("in the water") : TEXT("on top"));
 	}
 }
 
@@ -340,6 +409,10 @@ void ASaltPlayerCharacter::HandleSprintCompleted()
 
 void ASaltPlayerCharacter::HandleInteract()
 {
+	if (bClimbing)
+	{
+		return;
+	}
 	if (ActiveStation)
 	{
 		// Ignore the press that may still be bouncing from entering.
@@ -518,6 +591,7 @@ void ASaltPlayerCharacter::TeleportFeetTo(const FVector& FeetLocation, float Yaw
 		LeaveStation();
 	}
 	bClimbing = false;
+	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()));
 	const float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	SetActorLocationAndRotation(FeetLocation + FVector(0.f, 0.f, HalfHeight + 2.f), FRotator(0.f, Yaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 	GetCharacterMovement()->StopMovementImmediately();

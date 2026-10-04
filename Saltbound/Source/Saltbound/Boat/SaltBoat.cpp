@@ -18,6 +18,7 @@
 #include "Materials/MaterialParameterCollection.h"
 #include "Ocean/SaltOcean.h"
 #include "Ocean/SaltOceanSubsystem.h"
+#include "Player/SaltPlayerCharacter.h"
 #include "Saltbound.h"
 #include "World/SaltWindSubsystem.h"
 
@@ -243,6 +244,24 @@ ASaltBoat::ASaltBoat()
 	Windlass = Interaction(TEXT("Windlass"), FVector(3.55f, 0.f, SheerZ(3.55f) + 0.45f), FVector(30.f, 55.f, 35.f));
 	Windlass->PromptText = NSLOCTEXT("Saltbound", "BoatCastOff", "Cast off");
 
+	// Windlass drum and rope (they turn while the anchor runs out or comes up).
+	WindlassDrum = Part(TEXT("WindlassDrum"), Hull);
+	WindlassDrum->SetRelativeLocation(FVector(WindlassX, 0.f, SheerZ(WindlassX) + DeckCamber + WindlassDrumHeight) * 100.0);
+	WindlassRope = Part(TEXT("WindlassRope"), WindlassDrum);
+	// Boarding ladders: climb up from the water, or down from the deck.
+	const float LadderY = HalfBeamAtSheer(LadderX) + LadderOut + 0.12f;
+	LadderPort = Interaction(TEXT("LadderPort"), FVector(LadderX, -LadderY, 0.4f), FVector(32.f, 28.f, 70.f));
+	LadderStarboard = Interaction(TEXT("LadderStarboard"), FVector(LadderX, LadderY, 0.4f), FVector(32.f, 28.f, 70.f));
+	LadderPort->PromptText = LadderStarboard->PromptText = NSLOCTEXT("Saltbound", "BoatClimbLadder", "Climb the ladder");
+	// Gangway to the pier while moored (placed every frame; the player walks on it).
+	Gangway = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Gangway"));
+	Gangway->SetupAttachment(Hull);
+	Gangway->SetMobility(EComponentMobility::Movable);
+	Gangway->SetUsingAbsoluteLocation(true);
+	Gangway->SetUsingAbsoluteRotation(true);
+	Gangway->SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
+	Gangway->SetCanEverAffectNavigation(false);
+
 	// Anchor at the cathead (starboard bow), its rode, the mainsheet and the mooring lines (physics ropes).
 	Cathead = Pivot(TEXT("Cathead"), Hull, FVector(4.55f, 0.85f, SheerZ(4.55f) + 0.27f));
 	Anchor = Part(TEXT("Anchor"), Cathead);
@@ -301,6 +320,9 @@ void ASaltBoat::ResolveContent()
 	Resolve(Rudder, TEXT("Rudder"));
 	Resolve(Wheel, TEXT("Wheel"));
 	Resolve(Anchor, TEXT("Anchor"));
+	Resolve(WindlassDrum, TEXT("WindlassDrum"));
+	Resolve(WindlassRope, TEXT("WindlassRope"));
+	Resolve(Gangway, TEXT("Gangway"));
 	UMaterialInterface* RopeMaterial = LoadObject<UMaterialInterface>(nullptr, SaltContent::RopeMaterial);
 	for (UCableComponent* C : { AnchorLine.Get(), MainSheet.Get(), MooringLineFore.Get(), MooringLineAft.Get() })
 	{
@@ -341,6 +363,8 @@ void ASaltBoat::BeginPlay()
 	SailRopePort->OnInteract.AddDynamic(this, &ASaltBoat::HandleSailRope);
 	SailRopeStarboard->OnInteract.AddDynamic(this, &ASaltBoat::HandleSailRope);
 	Windlass->OnInteract.AddDynamic(this, &ASaltBoat::HandleWindlass);
+	LadderPort->OnInteract.AddDynamic(this, &ASaltBoat::HandleLadder);
+	LadderStarboard->OnInteract.AddDynamic(this, &ASaltBoat::HandleLadder);
 	SetupSailMaterials();
 	SetHold(StartHold);
 	bInitialised = true;
@@ -491,6 +515,42 @@ void ASaltBoat::BuildHullModel()
 		const float Y = FMath::Min(HalfBreadthAt(Bx, BilgeZ), HalfBreadthAt(-Bx, BilgeZ)) - BilgeR;
 		Capsules.Add({FVector(Bx, Side * Y, BilgeZ), FVector(-Bx, Side * Y, BilgeZ), BilgeR});
 	}
+	// Everything that stands out collides too (D43: "the boat is one thing"): stem head, cathead with the stowed
+	// anchor, rudder blade and head, chain wales and deadeyes, fenders, ladders, and the boom wherever it swings.
+	Capsules.Add({FVector(4.92f, 0.f, 1.0f), FVector(5.0f, 0.f, 1.62f), 0.1f});
+	Capsules.Add({FVector(4.5f, 0.88f, SheerZ(4.5f) + 0.25f), FVector(4.5f, 0.88f, SheerZ(4.5f) - 0.75f), 0.2f});
+	Capsules.Add({FVector(RudderHeelX - 0.3f, 0.f, RudderHeelZ + 0.1f), FVector(RudderHeadX - 0.25f, 0.f, RudderBladeTopZ - 0.05f), 0.28f});
+	Capsules.Add({FVector(RudderHeadX + 0.12f, 0.f, 0.f), FVector(RudderHeadX, 0.f, RudderHeadZ), 0.1f});
+	for (float Side : { -1.f, 1.f })
+	{
+		const float Cx0 = MastX - 0.05f, Cx1 = MastX + 0.85f;
+		const float Cy = Side * (HalfBeamAtSheer(MastX + 0.35f) + 0.16f);
+		Capsules.Add({FVector(Cx0, Cy, SheerZ(MastX)), FVector(Cx1, Cy, SheerZ(MastX)), 0.1f});
+		Capsules.Add({FVector(Cx0, Cy, SheerZ(MastX) + 0.8f), FVector(Cx1, Cy, SheerZ(MastX) + 0.8f), 0.12f});
+		const float Ly = Side * (HalfBeamAtSheer(LadderX) + LadderOut);
+		Capsules.Add({FVector(LadderX, Ly, LadderBottomZ + 0.25f), FVector(LadderX, Ly, SheerZ(LadderX)), 0.25f});
+	}
+	for (float Fx : { -1.8f, 1.8f })
+	{
+		const float Fy = HalfBeamAtSheer(Fx) + 0.14f;
+		Capsules.Add({FVector(Fx, Fy, SheerZ(Fx) - 0.45f), FVector(Fx, Fy, SheerZ(Fx) - 0.15f), 0.12f});
+	}
+	BoomCapsule = Capsules.Num();
+	Capsules.Add({FVector::ZeroVector, FVector::ZeroVector, 0.12f});
+	UpdateBoomCapsule();
+}
+
+void ASaltBoat::UpdateBoomCapsule()
+{
+	using namespace SaltHull;
+	if (!Capsules.IsValidIndex(BoomCapsule))
+	{
+		return;
+	}
+	const double Phi = FMath::DegreesToRadians(BoomAngle);
+	const FVector Goose(MastX, 0.f, SheerZ(MastX) + BoomHeight);
+	Capsules[BoomCapsule].A = Goose + FVector(-FMath::Cos(Phi), FMath::Sin(Phi), 0.0) * 0.4;
+	Capsules[BoomCapsule].B = Goose + FVector(-FMath::Cos(Phi), FMath::Sin(Phi), 0.0) * (BoomLength - 0.1);
 }
 
 void ASaltBoat::SetPose(const FVector& OriginWorldM, const FQuat& Rotation)
@@ -598,8 +658,10 @@ void ASaltBoat::SetHold(ESaltBoatHold NewHold)
 				AnchorGround = Hit.ImpactPoint + FVector(0.0, 0.0, 6.0);
 			}
 		}
-		const FVector Bow(HalfLength - 0.3f, 0.f, SheerZ(HalfLength - 0.3f));
-		Lines.Add({Bow, AnchorGround * 0.01, AnchorRode});
+		AnchorDepth = FMath::Max((float)(Fair.Z - AnchorGround.Z), 100.f);
+		HoldPoint = X - Q.RotateVector(CoM);
+		HoldYaw = (float)Q.Rotator().Yaw;
+		bHoldSet = false;
 	}
 }
 
@@ -623,6 +685,56 @@ void ASaltBoat::HandleSailRope(USaltInteractableComponent* Interactable, ASaltPl
 void ASaltBoat::HandleWindlass(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
 {
 	ToggleHold();
+}
+
+void ASaltBoat::GetLadderPath(bool bStarboard, bool bUp, float CapsuleHalfHeight, TArray<FVector>& OutPoints, TArray<bool>& OutStepped) const
+{
+	using namespace SaltHull;
+	// Capsule centre: on the ladder (just outside it, facing the hull), from the water up to deck height, then in
+	// over the gap onto the deck. Hull space, cm.
+	const float Side = bStarboard ? 1.f : -1.f;
+	const float Half = CapsuleHalfHeight * 0.01f;
+	const float OnLadderY = Side * (HalfBeamAtSheer(LadderX) + LadderOut + 0.4f);
+	const float DeckZ = SheerZ(LadderX) + DeckCamber * 0.3f;
+	const FVector Water(LadderX, OnLadderY, -Half + 0.55f);
+	const FVector Top(LadderX, OnLadderY, DeckZ + Half + 0.12f);
+	const FVector Deck(LadderX, Side * (HalfBeamAtSheer(LadderX) - 0.75f), DeckZ + Half + 0.03f);
+	OutPoints.Reset();
+	OutStepped.Reset();
+	if (bUp)
+	{
+		OutPoints = { Water * 100.0, Top * 100.0, Deck * 100.0 };
+		OutStepped = { true, false };
+	}
+	else
+	{
+		OutPoints = { Deck * 100.0, Top * 100.0, (Water - FVector(0.0, 0.0, 0.25)) * 100.0 };
+		OutStepped = { false, true };
+	}
+}
+
+void ASaltBoat::HandleLadder(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
+{
+	if (!Player)
+	{
+		return;
+	}
+	const bool bStarboard = Interactable == LadderStarboard;
+	const bool bUp = Player->IsSwimming();
+	TArray<FVector> Points;
+	TArray<bool> Stepped;
+	GetLadderPath(bStarboard, bUp, Player->GetCapsuleHalfHeightForClimb(), Points, Stepped);
+	if (!bUp)
+	{
+		// The climb starts where the player stands.
+		Points[0] = Hull->GetComponentTransform().InverseTransformPosition(Player->GetActorLocation());
+	}
+	else
+	{
+		Points.Insert(Hull->GetComponentTransform().InverseTransformPosition(Player->GetActorLocation()), 0);
+		Stepped.Insert(false, 0);
+	}
+	Player->StartScriptedClimb(Hull, Points, Stepped, !bUp);
 }
 
 // --- Simulation ------------------------------------------------------------------------------------------
@@ -656,6 +768,7 @@ void ASaltBoat::Tick(float DeltaSeconds)
 	LastTrueWind = Wind;
 
 	UpdateControls(Dt);
+	UpdateBoomCapsule();
 	SampleWater(Dt);
 	FindContacts();
 
@@ -680,6 +793,7 @@ void ASaltBoat::Tick(float DeltaSeconds)
 	UpdateVisuals(Dt);
 	UpdateAnchor(Dt);
 	UpdateRopes(Dt);
+	UpdateGangway();
 	PushOceanMask(bMasksOcean);
 	UpdateHints();
 	UpdateRecovery(Dt);
@@ -708,7 +822,8 @@ void ASaltBoat::FindContacts()
 	const FCollisionObjectQueryParams Objects(ECC_WorldStatic);
 	// Broad phase: one box around the whole boat (with room for a frame's motion). In open water nothing is near.
 	const FVector BoxCentre = BodyToWorld(FVector(0.0, 0.0, -0.1)) * 100.0;
-	const FCollisionShape Box = FCollisionShape::MakeBox(FVector(SaltHull::HalfLength + 0.8, SaltHull::HalfBeam + 0.8, 2.3) * 100.0);
+	const float BoomReach = FMath::Abs(FMath::Sin(FMath::DegreesToRadians(BoomAngle))) * SaltHull::BoomLength;
+	const FCollisionShape Box = FCollisionShape::MakeBox(FVector(SaltHull::HalfLength + 0.8, FMath::Max(SaltHull::HalfBeam, BoomReach) + 0.8, 3.3) * 100.0);
 	bNearStatic = World->OverlapAnyTestByObjectType(BoxCentre, Q, Objects, Box, Params);
 	if (!bNearStatic)
 	{
@@ -824,7 +939,19 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 	AddBodyForceAt(FVector(Fr.X, Fr.Y, 0.0) * Wet, RudderPoint);
 	// A little steerage at rest (sculling with the rudder), fading out with speed.
 	const double RestFactor = 1.0 - FMath::Clamp(FMath::Abs(U) / 1.5, 0.0, 1.0);
-	T += Up * (RestTurnTorque * (RudderAngle / FMath::Max(MaxRudderAngle, 1.f)) * RestFactor * Wet);
+	T += Up * (RestTurnTorque * (RudderAngle / FMath::Max(MaxRudderAngle, 1.f)) * RestFactor * Wet * (1.0 - AnchorHold));
+
+	// Anchored (D43): a smooth stop, then the boat holds its place and heading (no swinging on the rode).
+	if (AnchorHold > 0.001f)
+	{
+		const FVector Origin = X - Q.RotateVector(CoM);
+		FVector Brake = -V * AnchorBrake;
+		FVector Pull = bHoldSet ? (HoldPoint - Origin) * AnchorHoldSpring : FVector::ZeroVector;
+		Brake.Z = Pull.Z = 0.0;
+		AddForceAt((Brake + Pull) * AnchorHold, X);
+		const float YawError = FMath::DegreesToRadians(FRotator::NormalizeAxis(HoldYaw - (float)Q.Rotator().Yaw));
+		T.Z += ((bHoldSet ? AnchorYawSpring * YawError : 0.f) - AnchorYawBrake * W.Z) * AnchorHold;
+	}
 
 	// Sail (simple, D41): the set sail pushes the boat forward. The wind only shades the force a little (stronger
 	// wind a bit faster, wind from ahead a bit slower) and its sideways share heels the boat to leeward.
@@ -845,7 +972,7 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 		const double AngleFactor = 0.6 + 0.4 * FMath::SmoothStep(15.0, 80.0, FromDeg) - 0.1 * FMath::SmoothStep(140.0, 180.0, FromDeg);
 		const double SpeedFactor = FMath::Clamp(TrueSpeed / 7.0, 0.3, 1.5);
 		const double Factor = FMath::Lerp(1.0, SpeedFactor * AngleFactor, (double)WindInfluence);
-		const double Fx = SailThrust * Hoist * Factor;
+		const double Fx = SailThrust * Hoist * Factor * (1.0 - AnchorHold);
 		const double AppSpeed = FMath::Max(LastApparentWind.Size(), 0.1);
 		const double Fy = Fx * SailHeel * FMath::Clamp(Apparent.Y / AppSpeed, -1.0, 1.0);
 		// Applied on the centreline at the sail's height (heel, no twist): with the boom far out, the real centre of
@@ -1149,9 +1276,33 @@ void ASaltBoat::UpdateRopes(float DeltaSeconds)
 
 void ASaltBoat::UpdateAnchor(float DeltaSeconds)
 {
+	using namespace SaltHull;
 	const float Target = Hold == ESaltBoatHold::Anchored ? 1.f : 0.f;
 	const float Duration = Target > AnchorAlpha ? AnchorDropTime : AnchorRaiseTime;
+	const float OldAlpha = AnchorAlpha;
 	AnchorAlpha = FMath::FInterpConstantTo(AnchorAlpha, Target, DeltaSeconds, 1.f / FMath::Max(Duration, 0.1f));
+	// The hold bites as the anchor reaches the bottom and lets go as soon as it is weighed.
+	AnchorHold = Target > 0.f ? FMath::SmoothStep(0.35f, 1.f, AnchorAlpha) : 0.f;
+	// A pure brake until the boat has come to rest; then it holds that place and heading (no swinging back).
+	if (AnchorHold < 0.95f)
+	{
+		bHoldSet = false;
+	}
+	else if (!bHoldSet && V.Size2D() < 0.25 && FMath::Abs(W.Z) < 0.01)
+	{
+		bHoldSet = true;
+	}
+	if (!bHoldSet)
+	{
+		HoldPoint = X - Q.RotateVector(CoM);
+		HoldYaw = (float)Q.Rotator().Yaw;
+	}
+	// The windlass turns with the rode running out (fast) or being hove in (slower); the coil on its drum thins.
+	const float RodeCm = (float)AnchorDepth * 1.3f + 150.f;
+	WindlassAngle += (AnchorAlpha - OldAlpha) * RodeCm / (2.f * PI * WindlassDrumRadius * 100.f) * 360.f;
+	WindlassDrum->SetRelativeRotation(FRotator(WindlassAngle, 0.f, 0.f));
+	const float Coil = FMath::Lerp(1.f, 0.82f, AnchorAlpha);
+	WindlassRope->SetRelativeScale3D(FVector(Coil, FMath::Lerp(1.f, 0.7f, AnchorAlpha), Coil));
 	if (AnchorAlpha <= 0.001f)
 	{
 		// Stowed: hanging from the cathead.
@@ -1164,6 +1315,23 @@ void ASaltBoat::UpdateAnchor(float DeltaSeconds)
 	const FVector P = FMath::Lerp(Fair - FVector(0.0, 0.0, 4.0), AnchorGround, A);
 	const float Yaw = (float)Q.Rotator().Yaw;
 	Anchor->SetWorldLocationAndRotation(P, FRotator(-75.f * FMath::SmoothStep(0.85f, 1.f, AnchorAlpha), Yaw, 0.f));
+}
+
+void ASaltBoat::UpdateGangway()
+{
+	using namespace SaltHull;
+	// Moored: the gangway rests on the pier (fixed) and its other end on the boat at the gap, so it follows the boat.
+	const bool bShow = Hold == ESaltBoatHold::Moored;
+	Gangway->SetVisibility(bShow);
+	Gangway->SetCollisionEnabled(bShow ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	if (!bShow)
+	{
+		return;
+	}
+	FVector Pier = StartTransform.TransformPosition(FVector(LadderX * 100.f, MooringReach + 15.f, 0.f));
+	Pier.Z = StartTransform.GetLocation().Z + 111.f;
+	const FVector OnBoat = Hull->GetComponentTransform().TransformPosition(FVector(LadderX, HalfBeamAtSheer(LadderX) - 0.2f, SheerZ(LadderX) + 0.03f) * 100.0);
+	Gangway->SetWorldLocationAndRotation(Pier, (OnBoat - Pier).Rotation());
 }
 
 void ASaltBoat::UpdateRecovery(float DeltaSeconds)

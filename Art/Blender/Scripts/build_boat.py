@@ -42,7 +42,10 @@ BILGE_EXP, ENDS_START_X = 0.8, 3.0
 KEEL_AFT_X, KEEL_AFT_Z, KEEL_FORE_X, KEEL_HALF_T = -4.3, -1.45, 3.6, 0.14
 BULWARK_H, GATE_HALF = 0.45, 0.5
 MAST_X, MAST_H, BOOM_H, BOOM_L, THROAT_H, GAFF_L, GAFF_ANGLE = 1.2, 10.5, 2.05, 5.0, 6.8, 4.6, 35.0
-WHEEL_X, WHEEL_H = -3.2, 0.85
+WHEEL_X, WHEEL_H = -3.2, 0.68
+# Windlass (its drum and rope are moving parts, D43) and the boarding ladders over both sides at the gap (D43).
+WINDLASS_X, WINDLASS_DRUM_H = 3.55, 0.34
+LADDER_X, LADDER_OUT, LADDER_BOTTOM_Z, RUNG_STEP = 0.0, 0.07, -0.75, 0.3
 RUDDER_HEEL, RUDDER_HEAD, RUDDER_CHORD = (-4.38, -1.45), (-4.98, 1.0), 0.6
 CAMBER = 0.04            # deck crown
 BOOTTOP = 0.03           # top of the dark bottom paint above the waterline
@@ -653,20 +656,32 @@ def deck_gear():
         sb.soften(fender, 0.04, 3)
         parts.append(fender)
         parts += rope("fender_line", [(fx, fy, fz + 0.22), (fx, bs + 0.1, sheer_z(fx) + 0.3), top], 0.012)
-    # Windlass on the foredeck: a hewn drum between two cheek posts, rope wound on it, iron crank handles.
-    wx = 3.55
+    # Windlass on the foredeck: two cheek posts (the drum, its rope and the cranks are SM_Boat_WindlassDrum /
+    # SM_Boat_WindlassRope, turned by ASaltBoat), and the rope's lead from the drum to the cathead.
+    wx = WINDLASS_X
     wz = deck_z(wx, 0.0)
     for y in (-0.5, 0.5):
         parts.append(post("windlass_cheek", 0.07, 0.62, (wx, y, wz - 0.03), "MI_Wood_Varnish", 4, 0.9))
-    drum = tb.spar("windlass_drum", 0.86, 0.12, 0.12, M["MI_Wood_Varnish"], nseed(), sides=24, sweep=0.0, axis=(0, 1, 0), facets=8, checks=1)
-    drum.data.transform(Matrix.Translation(U((wx, 0.43, wz + 0.34))))      # spar axes are Blender space: +Y = Unreal -Y
-    parts.append(drum)
-    for k in range(5):
-        parts.append(ring("windlass_rope", 0.135, 0.02, (wx, -0.16 + k * 0.07, wz + 0.34), (0, 1, 0), "MI_Rope_Hemp"))
-    for y in (-0.6, 0.6):
-        parts.append(rod("crank", (wx, y * 0.95, wz + 0.34), (wx, y * 1.08, wz + 0.34), 0.02, "MI_Metal_Iron"))
-        parts.append(rod("crank_arm", (wx, y * 1.08, wz + 0.34), (wx - 0.05, y * 1.08, wz + 0.08), 0.018, "MI_Metal_Iron"))
-        parts.append(rod("crank_grip", (wx - 0.05, y * 1.08, wz + 0.08), (wx - 0.05, y * 1.2, wz + 0.08), 0.022, "MI_Wood_Varnish"))
+        parts.append(ring("windlass_bearing", 0.05, 0.016, (wx, y * 0.9, wz + WINDLASS_DRUM_H), (0, 1, 0), "MI_Metal_Iron", 12))
+    lead_a = (wx + 0.1, 0.32, wz + WINDLASS_DRUM_H + 0.12)
+    lead_b = (4.58, 0.95, sheer_z(4.58) + 0.3)
+    parts += rope("anchor_lead", sagging(lead_a, lead_b, 0.03, 6), 0.022)
+    # Boarding ladders hanging over both sides at the gap: two stiles, rungs every 0.3 m, iron hooks over the edge.
+    for side in (-1, 1):
+        y = side * (half_beam(LADDER_X) + LADDER_OUT)
+        top = sheer_z(LADDER_X) + 0.08
+        for xs in (LADDER_X - 0.22, LADDER_X + 0.22):
+            def stile(sf, xs=xs):
+                z = top + (LADDER_BOTTOM_Z - top) * sf
+                return Vector((xs, y, z)), Vector((1.0, 0.0, 0.0)), Vector((0.0, side, 0.0)), 1.0
+            parts.append(laid_board("ladder_stile", top - LADDER_BOTTOM_Z, 0.07, 0.045, stile, "MI_Wood_Varnish", wear=0.7, grooves=(1, 1)))
+            hook = (xs, y, top - 0.02)
+            parts.append(rod("ladder_hook", hook, (xs, y - side * 0.2, top + 0.06), 0.014, "MI_Metal_Iron"))
+            parts.append(rod("ladder_hook", (xs, y - side * 0.2, top + 0.06), (xs, y - side * 0.24, top - 0.04), 0.014, "MI_Metal_Iron"))
+        z = top - 0.2
+        while z > LADDER_BOTTOM_Z + 0.08:
+            parts.append(rod("ladder_rung", (LADDER_X - 0.2, y, z), (LADDER_X + 0.2, y, z), 0.022, "MI_Wood_Varnish"))
+            z -= RUNG_STEP
     # Cathead: a stout timber out over the starboard bow, where the anchor hangs (ASaltBoat's Cathead point).
     ca, cb = Vector((4.25, 0.32, sheer_z(4.25) + 0.2)), Vector((4.6, 0.98, sheer_z(4.6) + 0.27))
     d = cb - ca
@@ -778,8 +793,12 @@ def hull_collision(mesh_name):
     add([(cx + dx, cy + dy, z) for dx in (-0.27, 0.27) for dy in (-0.2, 0.2) for z in (deck_z(cx, cy) - 0.03, deck_z(cx, cy) + 0.39)])
     px = MAST_X - 0.42
     add([(px + dx, dy, z) for dx in (-0.07, 0.07) for dy in (-0.5, 0.5) for z in (deck_z(px, 0) - 0.03, deck_z(px, 0) + 0.66)])
-    wx = 3.55
+    wx = WINDLASS_X
     add([(wx + dx, dy, z) for dx in (-0.14, 0.14) for dy in (-0.58, 0.58) for z in (deck_z(wx, 0) - 0.03, deck_z(wx, 0) + 0.6)])
+    # Ladders: thin slabs, so a swimmer or a walker does not pass through them.
+    for side in (-1, 1):
+        y = side * (half_beam(LADDER_X) + LADDER_OUT)
+        add([(LADDER_X + dx, y + dy, z) for dx in (-0.26, 0.26) for dy in (-0.03, 0.03) for z in (LADDER_BOTTOM_Z, sheer_z(LADDER_X) + 0.08)])
     return cols
 
 
@@ -1020,6 +1039,27 @@ def build_gangway():
     export(obj, cols)
 
 
+def build_windlass():
+    """The windlass drum with its crank handles (SM_Boat_WindlassDrum) and the rope wound on it
+    (SM_Boat_WindlassRope); both pivot on the drum's axis (along Y), so ASaltBoat turns them and thins the coil."""
+    parts = [tb.spar("windlass_drum", 0.86, 0.12, 0.12, M["MI_Wood_Varnish"], nseed(), sides=24, sweep=0.0, axis=(0, 1, 0), facets=8, checks=1)]
+    parts[0].data.transform(Matrix.Translation(U((0.0, 0.43, 0.0))))       # spar axes are Blender space: +Y = Unreal -Y
+    for y in (-0.6, 0.6):
+        parts.append(rod("crank", (0.0, y * 0.95, 0.0), (0.0, y * 1.08, 0.0), 0.02, "MI_Metal_Iron"))
+        parts.append(rod("crank_arm", (0.0, y * 1.08, 0.0), (-0.05, y * 1.08, -0.26), 0.018, "MI_Metal_Iron"))
+        parts.append(rod("crank_grip", (-0.05, y * 1.08, -0.26), (-0.05, y * 1.2, -0.26), 0.022, "MI_Wood_Varnish"))
+    obj = finish(parts, "SM_Boat_WindlassDrum", wear=0.7)
+    export(obj)
+    sb.reset_scene()
+    mats()
+    coil = []
+    for layer in range(2):
+        for k in range(9):
+            coil.append(ring("windlass_rope", 0.135 + layer * 0.034, 0.018, (0.0, -0.26 + k * 0.065 + layer * 0.03, 0.0), (0, 1, 0), "MI_Rope_Hemp"))
+    obj = finish(coil, "SM_Boat_WindlassRope", wear=0.0, chips=0.0)
+    export(obj)
+
+
 def build_anchor():
     """Fisherman's anchor, hanging from its ring (pivot at the ring, shank down -Z): iron shank, crown and arms with
     flukes, a wooden stock with iron bands across the top."""
@@ -1047,12 +1087,12 @@ def build_anchor():
 
 
 def main():
-    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway", "anchor"]
+    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway", "anchor", "windlass"]
     builds = [("hull", build_hull),
               ("spars", lambda: build_spar("SM_Boat_Boom", BOOM_L, 0.085, 0.068, 0.14)),
               ("spars", lambda: build_spar("SM_Boat_Gaff", GAFF_L, 0.075, 0.06, 0.13)),
               ("sail", build_sail), ("rudder", build_rudder), ("wheel", build_wheel), ("gangway", build_gangway),
-              ("anchor", build_anchor)]
+              ("anchor", build_anchor), ("windlass", build_windlass)]
     for part, fn in builds:
         if part in args:
             sb.reset_scene()

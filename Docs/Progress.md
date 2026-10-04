@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 4: M4 sailing boat, technical part, D36).
+Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D43).
 
 ## Milestone status
 
@@ -223,6 +223,10 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D43 (awaiting the owner's check):** the anchor brings the boat to a smooth stop and holds it (sail set or
+  not); the windlass drum and rope turn; the wheel turns a full turn each way and sits lower; ladders on both
+  sides with a rung-by-rung climb; the whole boat collides as one piece (boom, rudder, cathead, ladders); the
+  boat carries its own gangway.
 - **D40 (awaiting the owner's check):** the boat weathered (tone patches, paint chips, grime, rain streaks), hewn
   spars with dents and knots, and lived-in gear (pin rail, barrel, crate, bucket, oars, fenders, cleats).
 
@@ -238,12 +242,15 @@ the sail and cast off.
   limited by the sheet (luffs head to wind, gybes downwind). 10.9 t, gathers way in about half a minute.
 - **Collision:** capsules along the hull against the pier, rocks and seabed (contact springs and sweeps);
   it stops at the pier and runs aground on the beach.
-- **Holding:** moored at the start (bow and stern lines), anchor anywhere when slow, cast off with C.
+- **Holding:** moored at the start (bow and stern lines, gangway to the pier); at the windlass: cast off, moor
+  near the pier, or drop the anchor anywhere (smooth stop, holds place and heading, D43).
+- **Boarding:** across the gangway while moored, or up the ladders on either side from the water (D43).
 - **Recovery:** capsized boats right themselves at their last safe position; `sb.Boat.Reset` returns to the
   mooring.
 - **Test:** `python Tools/run_pie_test.py "sb.Dev.RunBoatTests" --timeout 560 --done "SB_TEST BoatSuite DONE"`
-  (18 checks, all pass: points of sail 5.4–7.0 kn in 13.6 kn of wind, no headway head to wind, 22 m
-  turning circle, pier and beach collisions, player aboard, helm, Rough and Storm seas, mooring).
+  (27 checks, all pass: 6.7–7.4 kn at every wind angle, slowing with the sail in, anchor stop, 20 m turning
+  circle, pier and beach collisions, player aboard, helm only steers, rope points, windlass, ladders up and
+  down, Rough and Storm seas, mooring).
 
 ## Controls
 | Action | Keyboard / mouse | Gamepad |
@@ -255,7 +262,7 @@ the sail and cast off.
 | Dive (while swimming) | Left Ctrl / C | B / Circle |
 | Interact / leave station | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
-| On the boat | Wheel: A / D steer. Ropes by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor | |
+| On the boat | Wheel: A / D steer. Ropes by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Ladders (both sides, midship): E climbs up from the water or down into the sea | |
 
 Developer console (`~`, non-shipping builds):
 - `sb.Lighting Day|Evening|Dusk`
@@ -308,18 +315,16 @@ Developer console (`~`, non-shipping builds):
   needs only about 7.5 ms. Default display settings (vsync off or a frame cap, later a settings menu) are needed.
 - **Benchmarking:** always close the editor first. A running editor renders in the background (throttling
   is disabled for automated tests) and halves standalone performance.
-- **Water inside hulls:** the ocean is not masked inside hulls yet. This matters if the cabin floor goes
-  below the waterline (decision 2).
+- **Water inside hulls:** masked inside the player boat's hull (D42); other hulls (the test deck section) are not.
 - **Test deck section:** it is a slice of the boat with flat end caps (not a full hull), and its deckhouse
   is a shed-like 95 cm box.
 - **Floater:** `ASaltDevFloater` (the moored test deck section) is a simple spring-fitted floater, not the M4
   boat model.
 - **Sailing boat (D36):**
-  - Greybox only: open deck (no cabin until decision 2), no sheet or halyard ropes, no anchor or mooring
-    line visuals, a simple shiver when the sail luffs. 40 m² of sail are simulated, the mesh shows the 27 m² main.
+  - Open deck (no cabin until decision 2). Halyards are not modelled as working ropes; the climb has no body
+    animation (first-person camera only, no hands yet).
   - Heavy and stiff: half a minute to full speed. Tunables are on the actor (Boat category) for tuning by feel.
-  - Ignores short chop (the CPU mirrors only the long waves). Water is not masked inside the hull; the deck
-    stays above the water except in a storm.
+  - Ignores short chop (the CPU mirrors only the long waves).
   - The boat does not push a swimmer away; a thin slab hit at bulwark height can make the bow ride up.
 - About 0.25 cm vertical camera pops on heaving decks (CharacterMovement floor correction), below the visible threshold.
 - Mouse sensitivity has not been tested by a human (`sb.MouseSensitivity`). The prompt key label is fixed to "E".

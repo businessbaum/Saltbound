@@ -182,5 +182,17 @@
     "dest": "/Game/Saltbound/Boat",
     "nanite": false,
     "collision": "none"
+  },
+  "SM_Boat_WindlassDrum": {
+    "fbx": "Boat/SM_Boat_WindlassDrum.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Boat_WindlassRope": {
+    "fbx": "Boat/SM_Boat_WindlassRope.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
   }
 }

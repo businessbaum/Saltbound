@@ -39,7 +39,7 @@ namespace SaltHull
 
 	/** Helm: the wheel on its pedestal, and the rudder stock (raked, from its heel up to the deck). */
 	constexpr float WheelX = -3.2f;
-	constexpr float WheelHeight = 1.0f;       // hub above the deck
+	constexpr float WheelHeight = 0.68f;      // hub above the deck
 	constexpr float HelmsmanX = -3.85f;
 	constexpr float RudderHeelX = -4.38f;
 	constexpr float RudderHeelZ = -1.45f;
@@ -47,6 +47,15 @@ namespace SaltHull
 	constexpr float RudderHeadZ = 1.0f;
 	constexpr float RudderChord = 0.6f;
 	constexpr float RudderBladeTopZ = 0.0f;   // the wide blade ends at the waterline; a narrow head above
+
+	/** Windlass on the foredeck (drum axis height above the deck) and the boarding ladders over both sides at the gap. */
+	constexpr float DeckCamber = 0.04f;       // deck crown on the centreline
+	constexpr float WindlassX = 3.55f;
+	constexpr float WindlassDrumHeight = 0.34f;
+	constexpr float WindlassDrumRadius = 0.14f;
+	constexpr float LadderX = 0.0f;
+	constexpr float LadderOut = 0.07f;        // ladder plane outside the sheer
+	constexpr float LadderBottomZ = -0.75f;
 
 	inline float SheerZ(float X)
 	{

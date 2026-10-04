@@ -256,6 +256,57 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		Report(TEXT("SailTakenInSlows"), Speed < 2.5f && Speed < MaxValue * 0.4f, FString::Printf(TEXT("before=%.2fkn after20s=%.2fkn"), MaxValue, Speed));
 	}});
 
+	// 3b) Dropping the anchor under full sail and full rudder (D43): the boat comes to a smooth stop and stops turning.
+	Steps.Add({TEXT("AnchorSetup"), 0.f, [=, this]() { SetWind(0.f, 7.f); Place(TestWater, 90.f, 3.f, true, true); }, nullptr, nullptr});
+	Wait(TEXT("AnchorBuild"), 15.f);
+	Steps.Add({TEXT("AnchorStop"), 14.f, [this]()
+	{
+		Samples.Reset();
+		if (ASaltBoat* Bt = TestBoat.Get())
+		{
+			Bt->SetAutopilot(false);
+			Bt->SetControlOverride(true, 1.f);
+			Bt->SetHold(ESaltBoatHold::Anchored);
+		}
+	},
+	[this](float)
+	{
+		if (const ASaltBoat* Bt = TestBoat.Get())
+		{
+			Samples.Add(FVector(StepTime, Bt->GetSpeedKnots() / 1.943844f, Bt->GetYawRateDeg()));
+		}
+	},
+	[this]()
+	{
+		// Smooth: the speed never falls faster than 2.5 m/s2 (over a quarter of a second); at the end it lies still.
+		float MaxDecel = 0.f;
+		int32 J = 0;
+		for (int32 I = 1; I < Samples.Num(); ++I)
+		{
+			while (J + 1 < I && Samples[I].X - Samples[J + 1].X >= 0.25f)
+			{
+				++J;
+			}
+			const float Dt = Samples[I].X - Samples[J].X;
+			if (Dt >= 0.2f)
+			{
+				MaxDecel = FMath::Max(MaxDecel, (float)(Samples[J].Y - Samples[I].Y) / Dt);
+			}
+		}
+		float EndRate = 0.f;
+		for (int32 I = Samples.Num() * 4 / 5; I < Samples.Num(); ++I)
+		{
+			EndRate = FMath::Max(EndRate, (float)FMath::Abs(Samples[I].Z));
+		}
+		const float Before = Samples.Num() > 0 ? Samples[0].Y : 0.f;
+		const float EndSpeed = MeanOf(Samples, 1, Samples.Num() * 4 / 5);
+		const ASaltBoat* Bt = TestBoat.Get();
+		const bool bSail = Bt && Bt->IsSailSet();
+		Report(TEXT("AnchorStopsBoat"), Before > 2.f && EndSpeed < 0.15f && EndRate < 0.5f && MaxDecel < 2.5f && bSail, FString::Printf(
+			TEXT("before=%.2fm/s end=%.3fm/s endYawRate=%.2fdeg/s maxDecel=%.2fm/s2 sailSet=%d hold=%.2f"),
+			Before, EndSpeed, EndRate, MaxDecel, bSail ? 1 : 0, Bt ? Bt->GetAnchorHold() : 0.f));
+	}});
+
 	// 4) Turning circle: beam reach at speed, then full starboard rudder.
 	Steps.Add({TEXT("TurnSetup"), 0.f, [=, this]() { SetWind(0.f, 7.f); Place(TestWater, 90.f, 3.f, true, true); }, nullptr, nullptr});
 	Wait(TEXT("TurnBuild"), 15.f);
@@ -445,6 +496,107 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		[this]() { return TestBoat.IsValid() && TestBoat->GetHold() == ESaltBoatHold::Anchored; },
 		[this]() { return FString::Printf(TEXT("hold=%d (2 = anchored)"), TestBoat.IsValid() ? (int32)TestBoat->GetHold() : -1); });
 	Steps.Add({TEXT("PointsTidy"), 0.f, [this]() { if (ASaltBoat* Bt = TestBoat.Get()) { Bt->SetSailSet(false); Bt->SetHold(ESaltBoatHold::Free); } }, nullptr, nullptr});
+
+	// 9c) The starboard ladder (D43): climb up from the water onto the deck, then back down into the sea, rung by rung.
+	auto UseLadder = [=, this](const FString& Name, TFunction<bool()> Check, TFunction<FString()> State)
+	{
+		Steps.Add({Name + TEXT("Aim"), 0.4f, nullptr, [this](float)
+		{
+			ASaltPlayerCharacter* P = GetPlayer();
+			const ASaltBoat* Bt = TestBoat.Get();
+			if (P && Bt && P->GetController())
+			{
+				const FVector Target = Bt->GetLadder(true)->GetComponentLocation() + FVector(0.f, 0.f, 30.f);
+				P->GetController()->SetControlRotation((Target - P->GetCamera()->GetComponentLocation()).Rotation());
+			}
+		}, nullptr});
+		Steps.Add({Name, 5.f, [=, this]()
+		{
+			ASaltPlayerCharacter* P = GetPlayer();
+			const bool bFocused = P && TestBoat.IsValid() && P->GetFocusedInteractable() == TestBoat->GetLadder(true);
+			Report(Name + TEXT("Focus"), bFocused, FString::Printf(TEXT("focused=%s swimming=%d"),
+				*GetNameSafe(P ? P->GetFocusedInteractable() : nullptr), P && P->IsSwimming() ? 1 : 0));
+			Samples.Reset();
+			if (P) { P->DebugInteract(); }
+		},
+		[=, this](float)
+		{
+			const ASaltPlayerCharacter* P = GetPlayer();
+			Samples.Add(FVector(StepTime, FeetInBoat().Z, P && P->IsClimbing() ? 1.f : 0.f));
+		},
+		[=, this]() { Report(Name, Check(), State()); }});
+	};
+	// Climb time and the number of rungs pulled (the body pauses between steps).
+	auto ClimbStats = [this](float& OutTime, int32& OutSteps)
+	{
+		OutTime = 0.f;
+		OutSteps = 0;
+		bool bMoving = false;
+		for (int32 I = 1; I < Samples.Num(); ++I)
+		{
+			if (Samples[I].Z > 0.5f)
+			{
+				OutTime = Samples[I].X;
+			}
+			const float Dt = FMath::Max((float)(Samples[I].X - Samples[I - 1].X), 1e-3f);
+			const float Speed = FMath::Abs((float)(Samples[I].Y - Samples[I - 1].Y)) / Dt;
+			if (!bMoving && Speed > 60.f)
+			{
+				bMoving = true;
+				++OutSteps;
+			}
+			else if (bMoving && Speed < 30.f)
+			{
+				bMoving = false;
+			}
+		}
+	};
+	Steps.Add({TEXT("LadderSetup"), 0.f, [=, this]() { SetWind(0.f, 0.f); Place(TestWater, 90.f, 0.f, false, false); }, nullptr, nullptr});
+	Wait(TEXT("LadderSettle"), 1.f);
+	Steps.Add({TEXT("LadderSwim"), 0.f, [this]()
+	{
+		ASaltPlayerCharacter* P = GetPlayer();
+		const ASaltBoat* Bt = TestBoat.Get();
+		if (P && Bt)
+		{
+			const FVector Local(SaltHull::LadderX * 100.f, (SaltHull::HalfBeamAtSheer(SaltHull::LadderX) + 0.8f) * 100.f, -150.f);
+			P->TeleportFeetTo(Bt->GetActorTransform().TransformPosition(Local), Bt->GetYawDeg() - 90.f);
+		}
+	}, nullptr, nullptr});
+	Wait(TEXT("LadderFloat"), 2.5f);
+	UseLadder(TEXT("BoatLadderUp"), [=, this]()
+	{
+		const ASaltPlayerCharacter* P = GetPlayer();
+		float Time;
+		int32 Rungs;
+		ClimbStats(Time, Rungs);
+		return P && !P->IsClimbing() && OnBoat() && FMath::Abs(FeetInBoat().Y) < SaltHull::HalfBeamAtSheer(0.f) * 100.f - 30.f && Time > 1.5f && Rungs >= 4;
+	}, [=, this]()
+	{
+		float Time;
+		int32 Rungs;
+		ClimbStats(Time, Rungs);
+		const FVector F = FeetInBoat();
+		return FString::Printf(TEXT("onDeck=%d feet=(%.0f, %.0f, %.0f)cm climb=%.2fs rungs=%d"), OnBoat() ? 1 : 0, F.X, F.Y, F.Z, Time, Rungs);
+	});
+	Steps.Add({TEXT("LadderDeck"), 0.f, [=, this]() { PlacePlayerAboard(SaltHull::LadderX, 0.85f, 90.f); }, nullptr, nullptr});
+	Wait(TEXT("LadderDeckSettle"), 1.f);
+	UseLadder(TEXT("BoatLadderDown"), [=, this]()
+	{
+		const ASaltPlayerCharacter* P = GetPlayer();
+		float Time;
+		int32 Rungs;
+		ClimbStats(Time, Rungs);
+		return P && !P->IsClimbing() && P->IsSwimming() && FMath::Abs(FeetInBoat().Y) > SaltHull::HalfBeamAtSheer(0.f) * 100.f && Time > 1.5f && Rungs >= 4;
+	}, [=, this]()
+	{
+		const ASaltPlayerCharacter* P = GetPlayer();
+		float Time;
+		int32 Rungs;
+		ClimbStats(Time, Rungs);
+		const FVector F = FeetInBoat();
+		return FString::Printf(TEXT("swimming=%d feet=(%.0f, %.0f, %.0f)cm climb=%.2fs rungs=%d"), P && P->IsSwimming() ? 1 : 0, F.X, F.Y, F.Z, Time, Rungs);
+	});
 
 	// 10) Waves: a beam reach in the Rough sea, then bare poles in the Storm sea (open water beyond the cove's calm
 	// zone). The boat must ride the waves without capsizing.

@@ -846,3 +846,28 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   to the bulwark top) the sea is not drawn, so waves never show inside the hull or on the deck. `ASaltBoat` writes
   its pose to `MPC_Ocean` (`BoatPos`, w = on, and its three axes) every frame; existing MPC entries are kept.
 - **Cost:** masked rendering of the ocean (depth pre-pass with the mask). To be measured in the packaged benchmark.
+
+### D43 · Anchor stop, windlass motion, a full-turn wheel, ladders and one-piece collision (Adopted)
+- **Owner (2026-10-04):** animate the windlass drum and rope when the anchor goes down or up; turn the wheel a full
+  360 degrees each way and set it lower; when the anchor falls the boat comes to a smooth stop and stops turning,
+  whether the sail is set or not; two ladders to climb, with a climb animation; "the boat is one thing" (parts
+  must not pass through other objects).
+- **Anchor:** dropping it is a brake that ramps in as the anchor reaches the bottom (6000 N s/m, 90000 N m s on yaw),
+  and the sail's drive and the at-rest steering fade out at the same time. Once the boat has come to rest
+  (below 0.25 m/s) it holds that place and heading with soft springs; it no longer swings on a rode. Test: from
+  3.8 m/s with the sail set and full rudder, 0.03 m/s and 0.01 deg/s after 14 s, peak deceleration 1.5 m/s2.
+- **Windlass:** the drum with its cranks (`SM_Boat_WindlassDrum`) and the rope coil (`SM_Boat_WindlassRope`) are
+  separate meshes. The drum turns with the rode paid out (fast going down, slower hove in) and the coil thins.
+  A rope lead runs from the drum to the cathead.
+- **Wheel:** full rudder is one full turn of the wheel either way (`WheelRatio` 360/35); the hub is 0.68 m above
+  the deck (was 1.0 m).
+- **Ladders:** a ladder hangs over each side at the boarding gap (two stiles, rungs every 0.3 m, iron hooks).
+  E at a ladder climbs it: up from the water onto the deck, or down from the deck into the sea. The climb goes
+  rung by rung (30 cm steps of 0.34 s, each eased, with a small dip of the head) and follows the moving boat.
+  Climbing out of the water elsewhere (Space at a ledge) uses the same stepped climb for rises over 0.6 m.
+- **One piece:** the boat's collision now covers everything that stands out: stem head, cathead with the stowed
+  anchor, rudder blade and head, chain wales and deadeyes, ladders, fenders, and the boom wherever it swings (a
+  capsule that follows it; the broad phase reaches the swung-out boom). The gangway is part of the boat: laid to
+  the pier while moored, stowed otherwise (it was a separate actor that the boat could cut through).
+- **Tests:** `sb.Dev.RunBoatTests` 27/27 (new: anchor stop; ladder up from the water and down into the sea, 7
+  rungs each); `Tools/swim_test.py` 5/5.

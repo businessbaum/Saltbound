@@ -76,12 +76,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0", Units = "cm"))
 	float ClimbOutReach = 300.f;
 
-	/** Duration of the climb out of the water (up first, then forward onto the ledge). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0.1", Units = "s"))
-	float ClimbOutTime = 0.6f;
-
 	/** True while swimming in the sea (surface or under water). */
 	bool IsSwimming() const;
+
+	/** Scripted climb along a path (capsule centre points in Base's space, cm, so it follows a moving boat). Stepped
+	 *  segments go rung by rung with a dip of the head on each pull; the others glide. bEndInWater: the climb ends
+	 *  in the sea (down a ladder), otherwise standing on the top. */
+	void StartScriptedClimb(USceneComponent* Base, const TArray<FVector>& LocalPoints, const TArray<bool>& Stepped, bool bEndInWater);
+	bool IsClimbing() const { return bClimbing; }
+	float GetCapsuleHalfHeightForClimb() const;
+
+	/** Height of one climbing step (ladder rung) and the time it takes. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (Units = "cm"))
+	float ClimbStepHeight = 30.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (Units = "s"))
+	float ClimbStepTime = 0.34f;
 
 	/** Camera height above the feet (capsule height is 150 cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "100", ClampMax = "180", Units = "cm"))
@@ -156,10 +165,13 @@ private:
 	bool bSwimUpHeld = false;
 	bool bSwimDownHeld = false;
 
-	/** Climb out of the water: capsule centre path in the space of the ledge's component (boats move). */
+	/** Climbs (out of the water, ladders): capsule centre path in the space of the ledge's component (boats move). */
 	bool bClimbing = false;
-	float ClimbAlpha = 0.f;
-	FVector ClimbStartLocal = FVector::ZeroVector;
-	FVector ClimbEndLocal = FVector::ZeroVector;
+	bool bClimbEndInWater = false;
+	TArray<FVector> ClimbPoints;
+	TArray<bool> ClimbStepped;
+	int32 ClimbSegment = 0;
+	float ClimbSegmentTime = 0.f;
 	TWeakObjectPtr<USceneComponent> ClimbBase;
+	float SegmentDuration(int32 Segment) const;
 };

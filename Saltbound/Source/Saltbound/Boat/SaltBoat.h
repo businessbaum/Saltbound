@@ -110,6 +110,11 @@ public:
 	USaltStationComponent* GetHelm() const { return Helm; }
 	USaltInteractableComponent* GetSailRope(bool bStarboard) const { return bStarboard ? SailRopeStarboard : SailRopePort; }
 	USaltInteractableComponent* GetWindlass() const { return Windlass; }
+	USaltInteractableComponent* GetLadder(bool bStarboard) const { return bStarboard ? LadderStarboard : LadderPort; }
+	/** Climb path (capsule centre, in the hull component's space, cm) up from the water or down from the deck. */
+	void GetLadderPath(bool bStarboard, bool bUp, float CapsuleHalfHeight, TArray<FVector>& OutPoints, TArray<bool>& OutStepped) const;
+	/** 0 = anchor up .. 1 = anchor holding the boat (smooth stop, no turning). */
+	float GetAnchorHold() const { return AnchorHold; }
 	/** One line for logs and tests (SB_BOAT). */
 	FString Describe() const;
 
@@ -127,6 +132,14 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> SailRopePort;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> SailRopeStarboard;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> Windlass;
+	/** The windlass drum (with its cranks) and the rope wound on it: they turn while the anchor goes down or up. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> WindlassDrum;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> WindlassRope;
+	/** Boarding ladders over both sides at the gap: climb up from the water or down from the deck. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> LadderPort;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> LadderStarboard;
+	/** Gangway from the pier to the gap while moored; part of the boat, so it never cuts through it. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Gangway;
 	/** The anchor: hangs at the cathead, goes down to the seabed when dropped. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Anchor;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> Cathead;
@@ -173,8 +186,8 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Boat|Rudder") float RudderReturnRate = 30.f;
 	/** Yaw torque at full rudder when at rest ("sculling"), fading out by 1.5 m/s (N m). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Rudder") float RestTurnTorque = 1500.f;
-	/** Wheel turns per rudder turn (visual). */
-	UPROPERTY(EditAnywhere, Category = "Boat|Rudder") float WheelRatio = 5.f;
+	/** Wheel turns per rudder turn (visual): full rudder is one full turn of the wheel either way. */
+	UPROPERTY(EditAnywhere, Category = "Boat|Rudder") float WheelRatio = 360.f / 35.f;
 
 	/** Forward force of the set sail in a 7 m/s breeze (N): about 7.5 kn at full sail, reached in about 20 s. */
 	UPROPERTY(EditAnywhere, Category = "Boat|Sail") float SailThrust = 7800.f;
@@ -206,6 +219,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "cm")) float MooringReach = 240.f;
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "s")) float AnchorDropTime = 3.f;
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "s")) float AnchorRaiseTime = 4.f;
+	/** Anchored (D43): the boat comes to a smooth stop and holds its place and heading, whatever the sail does.
+	 *  Brake (N s/m, N m s) and hold springs (N/m, N m/rad). */
+	UPROPERTY(EditAnywhere, Category = "Boat|Lines") float AnchorBrake = 6000.f;
+	UPROPERTY(EditAnywhere, Category = "Boat|Lines") float AnchorYawBrake = 90000.f;
+	UPROPERTY(EditAnywhere, Category = "Boat|Lines") float AnchorHoldSpring = 1500.f;
+	UPROPERTY(EditAnywhere, Category = "Boat|Lines") float AnchorYawSpring = 60000.f;
 
 	/** Initial state when play starts. */
 	UPROPERTY(EditAnywhere, Category = "Boat") ESaltBoatHold StartHold = ESaltBoatHold::Moored;
@@ -267,6 +286,9 @@ private:
 
 	UFUNCTION() void HandleSailRope(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleWindlass(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
+	UFUNCTION() void HandleLadder(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
+	void UpdateGangway();
+	void UpdateBoomCapsule();
 	void UpdateRopes(float DeltaSeconds);
 	void UpdateAnchor(float DeltaSeconds);
 	void SetupSailMaterials();
@@ -310,8 +332,15 @@ private:
 	bool bOverride = false;
 	float OverrideRudder = 0.f;
 	UPROPERTY(Transient) TArray<TObjectPtr<UMaterialInstanceDynamic>> SailMaterials;
-	// Anchor: 0 stowed at the cathead .. 1 on the seabed.
+	// Anchor: 0 stowed at the cathead .. 1 on the seabed; the hold ramps in as it bites.
 	float AnchorAlpha = 0.f;
+	float AnchorHold = 0.f;
+	FVector HoldPoint = FVector::ZeroVector;   // world, m (origin)
+	float HoldYaw = 0.f;
+	bool bHoldSet = false;                     // the boat has come to rest: hold this place and heading
+	float WindlassAngle = 0.f;
+	float AnchorDepth = 500.f;                 // cm of rode paid out at the bottom
+	int32 BoomCapsule = INDEX_NONE;
 	FVector AnchorGround = FVector::ZeroVector;   // world, cm
 	bool bAutopilot = false;
 	float AutopilotYaw = 0.f;
