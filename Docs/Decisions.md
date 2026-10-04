@@ -589,3 +589,31 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - Far roughness 0.08 from 150 m (was 0.06 from 300 m); specular anti-aliasing may add up to 0.004
     (was 0.001).
   - Near highlights stay crisp. The crest glow fades to 10 % by 80 m (was 30 % at 120 m).
+
+### D32 · Rough sea refinement: one dominant direction, broader crests, swell restored, soft crest light, foam patches (Adopted, awaiting owner review)
+- **Owner brief (2026-10-04):**
+  - Weaker crossing secondary waves (one dominant direction, no pointed peaks).
+  - Broader crests with softer tips.
+  - Some broad swell restored under the medium waves (too crowded after D30).
+  - No narrow turquoise streaks around sharp peaks: soft, light-dependent crest light over upper faces.
+  - Keep the small sun highlights but break up long reflective contours selectively.
+  - Then a few soft, irregular crest-foam patches, distinct from sun reflections.
+- **Rough preset:**
+  - Swell 0.6 → 0.8.
+  - Spreading 6/2 → 11/3.5 (more parallel wind waves).
+  - Choppiness 1.35 → 1.1 (broader crests).
+  - Medium waves 1.5 → 1.15.
+- **Crest light:** driven by height over the upper faces (smoothstep, start 20 %, range 75 % of the sea
+  height) with a gentle slope term (`ThinScale` 2.5). It no longer uses compression, which had outlined
+  the pinched tips. Strength 0.2, still backlit and sun-scaled.
+- **Reflection contours:** α² ×5 in broad drifting patches (`ReflBreak`, 30 m tile, the quiet-patch
+  noise). Long contours break into segments without added microdetail.
+- **Foam (returns after D27):**
+  - Driven by crest compression (Jacobian below 0.75, full at 0.45), on the upper part of the wave, and
+    only in broad patches (`FoamPatch`, 90 m tile).
+  - Irregular soft edges from the lace channel of `T_OceanFoam_M`. It rides with the water and fades by
+    400 m.
+  - It is the Single Layer Water surface layer (opacity, `FoamColor`, roughness 0.85, no specular), so
+    it stays distinct from sun glints.
+  - Calm water barely compresses, so Calm and Flat stay clear.
+- **Cost:** `M_Ocean` 1500 pixel-shader instructions (was 1362).

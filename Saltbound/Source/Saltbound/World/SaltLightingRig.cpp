@@ -293,8 +293,10 @@ ASaltLightingRig::ASaltLightingRig()
 	// Rough (owner's rough reference): substantial swell carrying steep, short-crested wind waves with
 	// distinctive major ridges (peaky spectrum, sharp crests) rather than uniformly tall waves. D30 (owner
 	// brief): less broad rounded swell, narrower and more varied crests (choppier, more crossing directions),
-	// stronger medium waves across the faces so highlights break into strokes.
-	Sea(TEXT("Rough"),    0.6f,  1.f,   0.5f,  280.f, 2600.f, 5.f,  6.f, 2.f,  1.35f, 0.f, 1.5f, 1.f);
+	// stronger medium waves across the faces so highlights break into strokes. D32 (owner brief): one
+	// dominant direction (narrow spreading, no equal crossing waves forming pointed peaks), broader crests
+	// (less chop), broad swell restored under moderate medium waves.
+	Sea(TEXT("Rough"),    0.8f,  1.f,   0.5f,  280.f, 2600.f, 5.f, 11.f, 3.5f, 1.1f,  0.f, 1.15f, 1.f);
 	// Storm (D30: "way bigger waves", used by the storm area): tall long swell and a big, long wind sea.
 	Sea(TEXT("Storm"),    1.8f,  1.f,   0.35f, 650.f, 6000.f, 4.f,  5.f, 2.f,  1.25f, 0.f, 1.3f, 1.f);}
 

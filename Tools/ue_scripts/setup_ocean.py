@@ -247,6 +247,10 @@ float Variance = SpecAAVariance * (dot(dNx, dNx) + dot(dNy, dNy));
 float FarK = saturate(Dist / max(FarRoughnessDistance, 1.0));
 float BaseRough = lerp(WaterRoughness, FarRoughness, FarK);
 float Alpha2 = BaseRough * BaseRough * BaseRough * BaseRough + min(Variance, SpecAAMax) + SlopeVar * SlopeVarScale;
+// Long reflective contours along smooth faces break into segments: broad drifting patches of slightly rougher
+// water (D32). No added microdetail; the small sun highlights keep their shape outside the patches.
+float ReflPatch = Texture2DSampleLevel(QuietTex, QuietTexSampler, XY / ReflBreakTile + float2(0.41, 0.17), 0.0).b;
+Alpha2 *= lerp(1.0, ReflBreak, smoothstep(0.45, 0.7, ReflPatch));
 // The cap keeps near highlights crisp (D27); far away a crest is smaller than a pixel, so the cap rises and the
 // sun spreads over the pixel instead of sparking in single pixels (owner: "pixel errors at the top of the
 // waves in the distance", D31).
@@ -268,13 +272,30 @@ RoughOut = Rough;
 float3 L = normalize(SunDir);
 float SeaH = max(O.Chop.w, 1.0);
 float CrestH = saturate((Height / SeaH - CrestStart) / max(CrestRange, 0.01));
-float Thin = saturate(CrestH * saturate(1.0 - Nm.z) * ThinScale) * saturate(1.5 - J);
+// D32: spread over the upper wave faces (height-driven, a gentle slope term) instead of thin lines around the
+// sharpest, most compressed tips.
+float Upper = CrestH * CrestH * (3.0 - 2.0 * CrestH);
+float Thin = Upper * lerp(0.4, 1.0, saturate((1.0 - Nm.z) * ThinScale));
 float Forward = pow(saturate(dot(-V, L) * 0.6 + 0.4), SSSBacklitPower);
 float Facing = saturate(dot(Nm, V) * 1.5);
 float Glow = Thin * Forward * (0.35 + 0.65 * Facing) + SSSAmbient * CrestH * CrestH * Facing;
 Glow *= lerp(1.0, 0.1, saturate(Dist / max(SSSFarDistance, 1.0)));
 float SunLum = dot(SunIllum, float3(0.2126, 0.7152, 0.0722));
 EmissiveOut = LookCrest.rgb * SunLum * (Glow * SSSStrength * LookCrest.a);
+// --- Crest foam (D32): a few soft, irregular patches where crests are compressed (horizontal Jacobian J < 1),
+// only in some broad areas, riding with the water (Lagrangian XY). Lace pattern for irregular soft edges.
+// Calm seas barely compress, so they stay clear. Diffuse surface layer (opacity), distinct from sun glints.
+float Compress = saturate((FoamJStart - J) / max(FoamJStart - FoamJFull, 0.01));
+float FoamPatches = smoothstep(FoamPatch, FoamPatch + 0.2, Texture2DSampleLevel(QuietTex, QuietTexSampler, XY / FoamPatchTile + float2(0.73, 0.29), 0.0).b);
+float2 FUV = float2(dot(XY, WDir), dot(XY, WPerp)) / FoamTile;
+float Lace = Texture2DSample(QuietTex, QuietTexSampler, FUV).r;
+float Foam = Compress * smoothstep(0.0, 0.5, CrestH + 0.3) * FoamPatches;
+Foam = smoothstep(0.2, 0.7, Foam * lerp(0.5, 1.3, Lace)) * FoamAmount;
+Foam *= saturate(1.0 - Dist / max(FoamFadeDistance, 1.0));
+FoamOut = Foam;
+RoughOut = lerp(Rough, 0.85, Foam);
+SpecularOut *= 1.0 - Foam;
+EmissiveOut *= 1.0 - Foam;
 // Diagnostics: DebugView 1 = magenta where reflections are occluded; 3 = slope variance.
 float Dbg = saturate(DebugView);
 EmissiveOut = lerp(EmissiveOut, float3(20000.0, 0.0, 20000.0) * HorizonT, Dbg);
@@ -295,9 +316,14 @@ SCALARS = {
     "Specular": (0.24, "Surface"), "HorizonOcclusion": (1.0, "Surface"), "HorizonOccTop": (0.08, "Surface"),
     "HorizonOccBottom": (0.0, "Surface"), "HorizonOccFloor": (0.2, "Surface"), "DebugView": (0.0, "Diagnostics"),
     # crest light (CrestStart / CrestRange are fractions of the sea height)
-    "SSSStrength": (0.22, "Crest light"), "CrestStart": (0.15, "Crest light"), "CrestRange": (0.55, "Crest light"),
-    "SSSBacklitPower": (2.5, "Crest light"), "SSSAmbient": (0.02, "Crest light"), "ThinScale": (6.0, "Crest light"),
+    "SSSStrength": (0.2, "Crest light"), "CrestStart": (0.2, "Crest light"), "CrestRange": (0.75, "Crest light"),
+    "SSSBacklitPower": (2.5, "Crest light"), "SSSAmbient": (0.02, "Crest light"), "ThinScale": (2.5, "Crest light"),
     "SSSFarDistance": (8000.0, "Crest light"),
+    # long reflection contours (D32)
+    "ReflBreak": (5.0, "Surface"), "ReflBreakTile": (3000.0, "Surface"),
+    # crest foam (D32): Jacobian thresholds, patch threshold and sizes
+    "FoamAmount": (1.0, "Foam"), "FoamJStart": (0.75, "Foam"), "FoamJFull": (0.45, "Foam"), "FoamPatch": (0.5, "Foam"),
+    "FoamTile": (900.0, "Foam"), "FoamPatchTile": (9000.0, "Foam"), "FoamFadeDistance": (40000.0, "Foam"),
 }
 
 VS_TEXTURES = ["Disp0", "Disp1", "DispPrev0", "DispPrev1"]
@@ -520,7 +546,7 @@ def make_material(mpc, ush, rts):
     ps_inputs = (["P0", "WorldPos", "CamPos", "FadeScale", "QuietTex", "SunDir", "SunIllum"]
                  + PS_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA)
     ps = custom(m, -700, 900, "SaltOcean PS (surface normal, roughness, crest light)", ush + "\n" + PS_CODE, ps_inputs, F3,
-                [("RoughOut", F1), ("EmissiveOut", F3), ("SpecularOut", F1)])
+                [("RoughOut", F1), ("EmissiveOut", F3), ("SpecularOut", F1), ("FoamOut", F1)])
     link(sun_dir, "", ps, "SunDir")
     link(sun_illum, "", ps, "SunIllum")
     link(interp, "", ps, "P0")
@@ -531,9 +557,10 @@ def make_material(mpc, ush, rts):
     link_inputs(ctx, ps, PS_TEXTURES + ps_scalars + WAVE_PARAMS + FIELD_PARAMS + PS_EXTRA)
 
     sb_ue.to_prop(ps, "", unreal.MaterialProperty.MP_NORMAL)
-    # No surface layer on the water (opacity 0 = pure Single Layer Water).
-    zero_opacity = sb_ue.expr(m, unreal.MaterialExpressionConstant, -300, 1100, r=0.0)
-    sb_ue.to_prop(zero_opacity, "", unreal.MaterialProperty.MP_OPACITY)
+    # Surface layer = crest foam (opacity 0 = pure Single Layer Water elsewhere).
+    sb_ue.to_prop(ps, "FoamOut", unreal.MaterialProperty.MP_OPACITY)
+    foam_color = sb_ue.vector_param(m, "FoamColor", (0.82, 0.9, 0.92, 1), -300, 1050, "Foam")
+    sb_ue.to_prop(foam_color, "", unreal.MaterialProperty.MP_BASE_COLOR)
     sb_ue.to_prop(ps, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
     sb_ue.to_prop(ps, "EmissiveOut", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     sb_ue.to_prop(ps, "SpecularOut", unreal.MaterialProperty.MP_SPECULAR)
