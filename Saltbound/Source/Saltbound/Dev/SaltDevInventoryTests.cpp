@@ -238,6 +238,34 @@ namespace
 		Report(TEXT("SatchelOpens"), bOpen && W && Shown == SaltItems::Find(TEXT("GlassFloat"))->Name.ToString(),
 			FString::Printf(TEXT("open=%d cursor=%d paused=%d selected=%s"), PC->IsSatchelOpen() ? 1 : 0, PC->bShowMouseCursor ? 1 : 0,
 				World->IsPaused() ? 1 : 0, *Shown));
+		// D55: the tag describes the selected pocket (name, how many it holds and how many fit), an empty one says so; G drops
+		// one in front of the player.
+		if (W)
+		{
+			Satchel->Add(TEXT("Seashell"), 3);
+			const int32 ShellSlot = Satchel->GetSlots().IndexOfByPredicate([](const FSaltItemStack& St) { return St.Id == TEXT("Seashell"); });
+			W->SelectSlot(ShellSlot);
+			const FString Name = W->GetTagLine(0).ToString(), Line = W->GetTagLine(1).ToString();
+			W->SelectSlot(USaltInventoryComponent::Capacity - 1);
+			const FString Empty = W->GetTagLine(0).ToString();
+			Report(TEXT("SatchelTag"), Name == TEXT("Seashell") && Line.StartsWith(TEXT("3 in this pocket")) && Line.EndsWith(TEXT("30 fit"))
+				&& Empty == TEXT("Empty pocket"), FString::Printf(TEXT("name=%s line=%s emptyPocket=%s"), *Name, *Line, *Empty));
+			W->SelectSlot(ShellSlot);
+			int32 PickupsBefore = 0;
+			for (TActorIterator<ASaltPickup> It(World); It; ++It) { ++PickupsBefore; }
+			const bool bDropped = W->DropSelected();
+			int32 PickupsAfter = 0;
+			ASaltPickup* Dropped = nullptr;
+			for (TActorIterator<ASaltPickup> It(World); It; ++It) { ++PickupsAfter; Dropped = *It; }
+			Report(TEXT("SatchelDrops"), bDropped && Satchel->CountOf(TEXT("Seashell")) == 2 && PickupsAfter == PickupsBefore + 1,
+				FString::Printf(TEXT("dropped=%d shellsLeft=%d pickups %d -> %d"), bDropped ? 1 : 0, Satchel->CountOf(TEXT("Seashell")), PickupsBefore, PickupsAfter));
+			if (bDropped && Dropped && Dropped != Pickup)
+			{
+				Dropped->Destroy();
+			}
+			Satchel->Remove(TEXT("Seashell"), 2);
+			W->SelectSlot(0);
+		}
 		if (W)
 		{
 			W->SetPage(USaltSatchelWidget::Map);
@@ -347,6 +375,34 @@ namespace
 			if (Args.Num() > 1 && PC->GetSatchel())
 			{
 				PC->GetSatchel()->SetChart(FCString::Atoi(*Args[1]));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdSatchelDemo(
+		TEXT("sb.Dev.SatchelDemo"),
+		TEXT("For captures: fill the satchel as in the design's picture (driftwood 20 and 7, seashells 30 and 12, rope 2, glass floats 3, ")
+		TEXT("the ancient shard), open it and select the shard. sb.Dev.SatchelDemo off empties it back to two rope coils."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ASaltPlayerController* PC = World ? Cast<ASaltPlayerController>(UGameplayStatics::GetPlayerController(World, 0)) : nullptr;
+			ASaltPlayerCharacter* P = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr;
+			USaltInventoryComponent* Satchel = P ? P->GetInventory() : nullptr;
+			if (!Satchel)
+			{
+				return;
+			}
+			if (Args.Num() > 0 && Args[0] == TEXT("off"))
+			{
+				Satchel->SetSlots({ { TEXT("RopeCoil"), 2 } });
+				PC->SetSatchelOpen(false);
+				return;
+			}
+			Satchel->SetSlots({ { TEXT("Driftwood"), 20 }, { TEXT("Driftwood"), 7 }, { TEXT("Seashell"), 30 }, { TEXT("Seashell"), 12 },
+				{ TEXT("RopeCoil"), 2 }, { TEXT("GlassFloat"), 3 }, { TEXT("AncientShard"), 1 } });
+			PC->SetSatchelOpen(true, 0);
+			if (USaltSatchelWidget* W = PC->GetSatchel())
+			{
+				W->SelectSlot(6);
 			}
 		}));
 

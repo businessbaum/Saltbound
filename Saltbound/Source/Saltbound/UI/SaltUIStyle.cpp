@@ -73,7 +73,7 @@ UTextBlock* SaltUI::InkText(UWidgetTree* Tree, const FText& Value, ESaltFace Fac
 	// Ink bleed: a faint soft edge round the letters.
 	FSlateFontInfo F = T->GetFont();
 	F.OutlineSettings.OutlineSize = 1;
-	F.OutlineSettings.OutlineColor = SRGB(48, 30, 16, 0.3f);
+	F.OutlineSettings.OutlineColor = SRGB(48, 30, 16, 0.1f);
 	T->SetFont(F);
 	return T;
 }

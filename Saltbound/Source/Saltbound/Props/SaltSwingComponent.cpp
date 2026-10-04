@@ -9,9 +9,9 @@
 
 namespace
 {
-	constexpr float MaxSubstep = 1.f / 120.f;
+	constexpr float SwingMaxSubstep = 1.f / 120.f;
 	/** A pivot that jumps further than this in one frame was placed, not moved: hang down at rest again. */
-	constexpr float TeleportDistance = 150.f;
+	constexpr float SwingTeleportDistance = 150.f;
 }
 
 USaltSwingComponent::USaltSwingComponent()
@@ -74,15 +74,15 @@ void USaltSwingComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 		return;
 	}
 	const FVector Pivot = GetComponentLocation();
-	if (!bStarted || FVector::DistSquared(Pivot, LastPivot) > FMath::Square(TeleportDistance))
+	if (!bStarted || FVector::DistSquared(Pivot, LastPivot) > FMath::Square(SwingTeleportDistance))
 	{
 		Settle();
 		return;
 	}
 	const FVector Down = ParentDown();
 	const FVector PivotVel = (Pivot - LastPivot) / DeltaTime;
-	const float Gravity = GetWorld() ? GetWorld()->GetGravityZ() : -980.f;
-	const float Omega = FMath::Sqrt(FMath::Abs(Gravity) / FMath::Max(Length, 1.f));
+	const float GravityZ = GetWorld() ? GetWorld()->GetGravityZ() : -980.f;
+	const float Omega = FMath::Sqrt(FMath::Abs(GravityZ) / FMath::Max(Length, 1.f));
 	const float CosMax = FMath::Cos(FMath::DegreesToRadians(MaxAngle));
 	const float SinMax = FMath::Sin(FMath::DegreesToRadians(MaxAngle));
 	StrikeCooldown = FMath::Max(StrikeCooldown - DeltaTime, 0.f);
@@ -120,13 +120,13 @@ void USaltSwingComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 		}
 	}
 
-	const int32 Steps = FMath::Clamp(FMath::CeilToInt(DeltaTime / MaxSubstep), 1, 12);
+	const int32 Steps = FMath::Clamp(FMath::CeilToInt(DeltaTime / SwingMaxSubstep), 1, 12);
 	const float H = DeltaTime / Steps;
 	const float Decay = FMath::Exp(-2.f * Damping * Omega * H);
 	for (int32 I = 0; I < Steps; ++I)
 	{
 		const FVector P = FMath::Lerp(LastPivot, Pivot, float(I + 1) / Steps);
-		BobVel.Z += Gravity * H;
+		BobVel.Z += GravityZ * H;
 		BobVel += PushAccel * H;
 		BobVel = PivotVel + (BobVel - PivotVel) * Decay;
 		const FVector Old = Bob;

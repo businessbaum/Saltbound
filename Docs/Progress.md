@@ -225,7 +225,8 @@ for a higher screen percentage (for example 75 %) and more content.
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
 - **D55 (in progress, awaiting the owner's check):** the new UI from the approved design. Done: the fonts, the shared parts,
   the key-scrap prompt with painted lettering, the hold (raising the anchor) with the ink soaking up through the key's
-  scrap, the save sign in the corner; the camera at 1.2 m. Next: satchel, stores, landfall, icons, tool wheel (hold Q).
+  scrap, the save sign in the corner, the satchel (leather bag, pressed pockets, the tag on twine); the camera at 1.2 m.
+  Next: stores, landfall, icons, tool wheel (hold Q).
 - **D54 (awaiting the owner's check):** calm flags (a slow wave, no side-to-side swing with the boat's roll); the player
   1.4 m and slimmer; ladders climbed with W / S after taking hold with E, E lets go, off the bottom into the sea, over
   the top on board.
@@ -291,7 +292,7 @@ the sail and cast off.
 | Interact / leave station (raising the anchor: hold E) | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
 | Pause menu / settings | Esc (in the editor: F10) | Start |
-| Satchel: inventory / map | Tab or I / M (Q / E switch pages, Tab / Esc close) | Back |
+| Satchel / map | Tab or I / M (arrows choose a pocket, R turn the item, G drop one; Tab, I or Esc close) | Back |
 | On the boat | Steering oar (starboard quarter, E at its handle): A / D steer. Pin rails by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Bell rope: E rings the bell; lantern: E lights / douses it. Ladders (both sides, midship): E takes hold (from the water or the deck), W / S climb, E lets go; off the bottom into the sea, over the top on board | |
 
 Developer console (`~`, non-shipping builds):

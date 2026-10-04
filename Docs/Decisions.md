@@ -1122,7 +1122,19 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Captures:** `Tools/ui_capture.py` takes `shot showui` in a floating 1920 x 1080 PIE window (Editor > Play In window
   size; the editor viewport would capture the whole editor) and puts it on top of its reference picture. Dev cvars
   `sb.Dev.Prompt <text>`, `sb.Dev.Hold <0..1>`, `sb.Dev.SaveSign 1`.
-- **Tests:** `sb.Dev.RunInventoryTests` 15/15, new: `HoldFills`, `HoldDrains`, `HoldFires` (the anchor rises after 0.8 s),
-  `SaveSignShows`, `SaveSignHides`.
-- **Next (spec order):** the satchel, the stores (crate, then the round barrel), the landfall banner, the item icons from an
-  icon booth, the tool wheel (hold Q) with the held tools.
+- **Tests:** `sb.Dev.RunInventoryTests` 17/17, new: `HoldFills`, `HoldDrains`, `HoldFires` (the anchor rises after 0.8 s),
+  `SaveSignShows`, `SaveSignHides`, `SatchelTag`, `SatchelDrops`. Dev: `sb.Dev.SatchelDemo` (the picture's contents).
+- **Satchel (section 5):** the bag thrown open (flap, body, strap and buckle, "SATCHEL" debossed, the 24 dishes pressed
+  into the leather, the lip with its hints, the D-ring and twine) is one painted part from the design's code; on it the
+  count ("7 / 24", debossed), the pockets (selection glow and gold ring, the item 86 px with its contact and drop shadows,
+  lifted to 96 px when chosen, the shard's slow turquoise glow, counts on leather coins) and the parchment tag that hangs on
+  the twine and swings when the selection changes (a ~6 degree kick settling in ~0.8 s). The tag: name, "N in this pocket
+  . M fit", an ink rule, the description, and E (the item's use, greyed: none works yet; "(later)" when it has none),
+  R turns the item in the hand, G drops one in front of the player. I, Tab or Esc close (Tab still opens the satchel: the
+  wheel is on Q). The map is its own screen on M (the D50 chart, unchanged, without tabs).
+- **Fonts in Slate** use the fonts' Windows metrics (Alegreya 1.123 / 0.345 em, a 1.468 em line; IM Fell English 0.905 em
+  ascent): the layout uses them so baselines land where the design puts them.
+- **The design pictures** were taken from the design page with its dark border: the frame sits ~9 px in and is 0.990 x
+  0.997 the size. `Tools/ui_capture.py` undoes that, so the A/B sheets compare true 1080p positions.
+- **Next (spec order):** the stores (crate, then the round barrel), the landfall banner, the item icons from an icon booth,
+  the tool wheel (hold Q) with the held tools.

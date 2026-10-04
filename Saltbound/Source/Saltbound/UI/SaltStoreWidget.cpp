@@ -164,7 +164,7 @@ void USaltStoreWidget::Refresh()
 		{
 			const FSaltItemStack S = Inv && Inv->GetSlots().IsValidIndex(I) ? Inv->GetSlots()[I] : FSaltItemStack();
 			const FSaltItemDef* Def = S.IsEmpty() ? nullptr : SaltItems::Find(S.Id);
-			Slots[I]->Show(Def && Def->Icon ? LoadObject<UTexture2D>(nullptr, Def->Icon) : nullptr, Def ? S.Count : 0, false);
+			Slots[I]->Show(Def, Def ? S.Count : 0, false);
 		}
 	};
 	Fill(Satchel.Get(), SatchelSlots);

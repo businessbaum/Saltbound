@@ -77,6 +77,9 @@ def main():
     im = im.resize((1920, 1080), Image.LANCZOS)
     if ns.ref:
         ref = Image.open(ns.ref).convert("RGB").resize((1920, 1080), Image.LANCZOS)
+        # The design pictures were taken from the design page with its dark border: the frame sits about 9 px in and is
+        # 0.990 / 0.997 the size (fitted on landmarks). Undo that so the A/B compares true 1080p positions.
+        ref = ref.transform((1920, 1080), Image.AFFINE, (0.9902, 0.0, 9.38, 0.0, 0.9973, 10.55), resample=Image.BICUBIC)
         sheet = Image.new("RGB", (1920, 2160))
         sheet.paste(im, (0, 0))
         sheet.paste(ref, (0, 1080))
