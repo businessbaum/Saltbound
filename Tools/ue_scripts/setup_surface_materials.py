@@ -111,10 +111,12 @@ float U = saturate(L / max(Length, 1.0));
 float W = saturate(Wind);
 float Droop = (1.0 - W) * 1.25 * (0.4 + 0.6 * U);
 float3 P = float3(L * cos(Droop), LocalPos.y, LocalPos.z - L * sin(Droop));
-float Phase = L * 0.05 - Time * (5.0 + 9.0 * W);
-float Amp = (3.0 + 9.0 * W) * U;
-P.y += sin(Phase) * Amp + sin(Phase * 2.3 + 1.7) * Amp * 0.3;
-P.z += sin(Phase * 0.8 + 0.5) * Amp * 0.12;
+// A slow wave running along the cloth (D54: the old one ran at about 2 Hz with a 12 cm swing and looked frantic):
+// about 0.3 Hz in light air, 0.6 Hz in a fresh breeze; the hoist stays still, the fly swings a few centimetres.
+float Phase = L * 0.035 - Time * (1.9 + 2.0 * W);
+float Amp = (2.0 + 4.0 * W) * U * U;
+P.y += sin(Phase) * Amp + sin(Phase * 1.7 + 1.7) * Amp * 0.25;
+P.z += sin(Phase * 0.8 + 0.5) * Amp * 0.1;
 return P - LocalPos;
 """
 FLAG_PARAMS = {"Wind": 0.6, "Length": 160.0}

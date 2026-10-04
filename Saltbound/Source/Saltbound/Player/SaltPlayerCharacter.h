@@ -21,6 +21,18 @@ struct FInputActionValue;
  *   it follows the moving deck exactly) and movement input is routed to the station.
  * The camera never rolls; pitch and roll of the deck only move the eye point.
  */
+/** A ladder to hold on to (D54): the capsule centre's line from Bottom to Top in Base's space (cm, so it follows a moving
+ *  boat), the yaw in Base's space that faces the rungs, the rung spacing, and where the top lets you off on deck. */
+struct FSaltLadderLine
+{
+	TWeakObjectPtr<USceneComponent> Base;
+	FVector Bottom = FVector::ZeroVector;
+	FVector Top = FVector::ZeroVector;
+	FVector TopExit = FVector::ZeroVector;
+	float FacingYaw = 0.f;
+	float RungStep = 30.f;
+};
+
 UCLASS()
 class SALTBOUND_API ASaltPlayerCharacter : public ACharacter
 {
@@ -87,6 +99,15 @@ public:
 	void StartScriptedClimb(USceneComponent* Base, const TArray<FVector>& LocalPoints, const TArray<bool>& Stepped, bool bEndInWater);
 	bool IsClimbing() const { return bClimbing; }
 
+	/** Takes hold of a ladder (D54): from the deck at its top, from the water where the body is. W and S climb rung by
+	 *  rung, E lets go (into the sea); at the bottom you are in the sea, at the top you step on board. */
+	void MountLadder(const FSaltLadderLine& Line, bool bFromTop);
+	bool IsOnLadder() const { return bOnLadder; }
+	/** 0 at the bottom .. 1 at the top. */
+	float GetLadderAlong() const { return LadderAlong; }
+	/** Lets go of the ladder: falls (into the sea), pushed a little off the hull. */
+	void LetGoOfLadder();
+
 	/** The satchel (D50). */
 	USaltInventoryComponent* GetInventory() const { return Inventory; }
 
@@ -101,10 +122,13 @@ public:
 	float ClimbStepHeight = 30.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (Units = "s"))
 	float ClimbStepTime = 0.34f;
+	/** Fastest climbing speed on a ladder, between two rungs (the hands slow it at each rung). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (Units = "cm/s"))
+	float LadderSpeed = 150.f;
 
-	/** Camera height above the feet (capsule height is 150 cm). */
+	/** Camera height above the feet (capsule height is 140 cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "100", ClampMax = "180", Units = "cm"))
-	float EyeHeight = 140.f;
+	float EyeHeight = 130.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "60", ClampMax = "110"))
 	float FieldOfView = 80.f;
@@ -152,6 +176,10 @@ private:
 	/** Starts climbing onto a walkable ledge in front when swimming at the surface. */
 	bool TryClimbOutOfWater();
 	void TickClimb(float DeltaSeconds);
+	void TickLadder(float DeltaSeconds, float Input);
+	/** Off the bottom of the ladder into the sea. */
+	void LeaveLadderIntoWater();
+	FVector LadderPoint(float Along) const { return FMath::Lerp(Ladder.Bottom, Ladder.Top, Along); }
 
 	void ApplyMoveInput(const FVector2D& Input);
 	void ApplyLook(float YawDelta, float PitchDelta);
@@ -187,4 +215,13 @@ private:
 	float ClimbSegmentTime = 0.f;
 	TWeakObjectPtr<USceneComponent> ClimbBase;
 	float SegmentDuration(int32 Segment) const;
+
+	/** On a ladder (D54): where along it (0 bottom .. 1 top), and the short glide from where the hold was taken. */
+	bool bOnLadder = false;
+	FSaltLadderLine Ladder;
+	float LadderAlong = 0.f;
+	float LadderTime = 0.f;
+	float LadderGlide = 1.f;
+	float LadderGlideTime = 0.3f;
+	FVector LadderGlideFrom = FVector::ZeroVector;
 };

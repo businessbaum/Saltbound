@@ -34,6 +34,8 @@ public:
 
 	/** Leave the water now (e.g. climbing out); swimming cannot restart for Seconds. */
 	void SuppressWater(float Seconds);
+	/** Swimming may start again at once (off a ladder into the sea). */
+	void ClearWaterSuppression() { SuppressTime = 0.f; }
 
 	/** Start swimming when the water reaches this share of the capsule (about chest height)... */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0", ClampMax = "1"))

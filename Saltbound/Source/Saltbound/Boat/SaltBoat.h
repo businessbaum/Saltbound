@@ -8,6 +8,7 @@
 #include "SaltBoat.generated.h"
 
 class UCableComponent;
+struct FSaltLadderLine;
 class UPointLightComponent;
 class USaltSwingComponent;
 class UMaterialParameterCollection;
@@ -125,8 +126,9 @@ public:
 	USaltInteractableComponent* GetLadder(bool bStarboard) const { return bStarboard ? LadderStarboard : LadderPort; }
 	USaltInteractableComponent* GetStoreLid(bool bCrate) const { return bCrate ? CrateLid : BarrelLid; }
 	USaltInventoryComponent* GetStore(bool bCrate) const { return bCrate ? CrateStore : BarrelStore; }
-	/** Climb path (capsule centre, in the hull component's space, cm) up from the water or down from the deck. */
-	void GetLadderPath(bool bStarboard, bool bUp, float CapsuleHalfHeight, TArray<FVector>& OutPoints, TArray<bool>& OutStepped) const;
+	/** The ladder as the player holds it (D54): the capsule centre's line from the lowest rung to the top, in the hull
+	 *  component's space (cm), facing the hull, and the step on to the deck at the top. */
+	FSaltLadderLine GetLadderLine(bool bStarboard, float CapsuleHalfHeight, float CapsuleRadius) const;
 	/** 0 = anchor up .. 1 = anchor holding the boat (smooth stop, no turning). */
 	float GetAnchorHold() const { return AnchorHold; }
 	/** How far (m) the bow wave and Kelvin wake reach behind the stern: the boat's recent straight course (D48). */

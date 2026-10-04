@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53).
+Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54).
 
 ## Milestone status
 
@@ -223,6 +223,9 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D54 (awaiting the owner's check):** calm flags (a slow wave, no side-to-side swing with the boat's roll); the player
+  1.4 m and slimmer; ladders climbed with W / S after taking hold with E, E lets go, off the bottom into the sea, over
+  the top on board.
 - **D53 (awaiting the owner's check):** object overhaul. The mast is a worked spar with partners, wedges and a coat, an
   old fish repair, bands, a boom saddle, hounds cheeks, halyard blocks and a truck; the gaff hangs from real halyards
   whose falls belay at new pin rails (the sail is set there); boom and gaff jaws with leather and a beaded parrel; the
@@ -286,7 +289,7 @@ the sail and cast off.
 | At a station | W/S and A/D are routed to the station | Left stick |
 | Pause menu / settings | Esc (in the editor: F10) | Start |
 | Satchel: inventory / map | Tab or I / M (Q / E switch pages, Tab / Esc close) | Back |
-| On the boat | Steering oar (starboard quarter, E at its handle): A / D steer. Ropes by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Ladders (both sides, midship): E climbs up from the water or down into the sea | |
+| On the boat | Steering oar (starboard quarter, E at its handle): A / D steer. Pin rails by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Bell rope: E rings the bell; lantern: E lights / douses it. Ladders (both sides, midship): E takes hold (from the water or the deck), W / S climb, E lets go; off the bottom into the sea, over the top on board | |
 
 Developer console (`~`, non-shipping builds):
 - `sb.Lighting Day|Evening|Dusk`

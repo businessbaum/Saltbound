@@ -8,6 +8,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Core/SaltContent.h"
 #include "Core/SaltSaveSubsystem.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -895,54 +896,35 @@ void ASaltBoat::UpdateLantern(float DeltaSeconds)
 	}
 }
 
-void ASaltBoat::GetLadderPath(bool bStarboard, bool bUp, float CapsuleHalfHeight, TArray<FVector>& OutPoints, TArray<bool>& OutStepped) const
+FSaltLadderLine ASaltBoat::GetLadderLine(bool bStarboard, float CapsuleHalfHeight, float CapsuleRadius) const
 {
 	using namespace SaltHull;
-	// Capsule centre: on the ladder (just outside it, facing the hull), from the water up to deck height, then in
-	// over the gap onto the deck. Hull space, cm.
+	// Capsule centre: just outside the ladder (facing the hull), from the feet on the lowest rung (head out of the
+	// water) up to the feet at the sheer; at the top, in over the gap onto the deck. Hull space, cm.
 	const float Side = bStarboard ? 1.f : -1.f;
 	const float Half = CapsuleHalfHeight * 0.01f;
-	const float OnLadderY = Side * (HalfBeamAtSheer(LadderX) + LadderOut + 0.4f);
+	const float OnLadderY = Side * (HalfBeamAtSheer(LadderX) + LadderOut + 0.04f + CapsuleRadius * 0.01f + 0.04f);
 	const float DeckZ = SheerZ(LadderX) + DeckCamber * 0.3f;
-	const FVector Water(LadderX, OnLadderY, -Half + 0.55f);
-	const FVector Top(LadderX, OnLadderY, DeckZ + Half + 0.12f);
-	const FVector Deck(LadderX, Side * (HalfBeamAtSheer(LadderX) - 0.75f), DeckZ + Half + 0.03f);
-	OutPoints.Reset();
-	OutStepped.Reset();
-	if (bUp)
-	{
-		OutPoints = { Water * 100.0, Top * 100.0, Deck * 100.0 };
-		OutStepped = { true, false };
-	}
-	else
-	{
-		OutPoints = { Deck * 100.0, Top * 100.0, (Water - FVector(0.0, 0.0, 0.25)) * 100.0 };
-		OutStepped = { false, true };
-	}
+	FSaltLadderLine Line;
+	Line.Base = Hull;
+	Line.Bottom = FVector(LadderX, OnLadderY, LadderBottomZ + 0.08f + Half) * 100.0;
+	Line.Top = FVector(LadderX, OnLadderY, DeckZ + Half + 0.1f) * 100.0;
+	Line.TopExit = FVector(LadderX, Side * (HalfBeamAtSheer(LadderX) - 0.75f), DeckZ + Half + 0.03f) * 100.0;
+	Line.FacingYaw = bStarboard ? -90.f : 90.f;
+	Line.RungStep = 30.f;
+	return Line;
 }
 
 void ASaltBoat::HandleLadder(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
 {
-	if (!Player)
+	if (!Player || Player->IsOnLadder())
 	{
 		return;
 	}
-	const bool bStarboard = Interactable == LadderStarboard;
-	const bool bUp = Player->IsSwimming();
-	TArray<FVector> Points;
-	TArray<bool> Stepped;
-	GetLadderPath(bStarboard, bUp, Player->GetCapsuleHalfHeightForClimb(), Points, Stepped);
-	if (!bUp)
-	{
-		// The climb starts where the player stands.
-		Points[0] = Hull->GetComponentTransform().InverseTransformPosition(Player->GetActorLocation());
-	}
-	else
-	{
-		Points.Insert(Hull->GetComponentTransform().InverseTransformPosition(Player->GetActorLocation()), 0);
-		Stepped.Insert(false, 0);
-	}
-	Player->StartScriptedClimb(Hull, Points, Stepped, !bUp);
+	// D54: take hold of the ladder; from the water where the body is, from the deck at the top.
+	const FSaltLadderLine Line = GetLadderLine(Interactable == LadderStarboard, Player->GetCapsuleHalfHeightForClimb(),
+		Player->GetCapsuleComponent()->GetScaledCapsuleRadius());
+	Player->MountLadder(Line, !Player->IsSwimming());
 }
 
 // --- Simulation ------------------------------------------------------------------------------------------
@@ -1380,13 +1362,15 @@ void ASaltBoat::UpdateVisuals(float DeltaSeconds)
 	Rudder->SetRelativeRotation(FRotator(0.f, -RudderAngle, 0.f));
 	Wheel->SetRelativeRotation(FRotator(0.f, 0.f, RudderAngle * WheelRatio));
 	SteeringOar->SetRelativeRotation(FRotator(0.f, -RudderAngle, 0.f));
-	// The pennant flies where the apparent wind blows (it keeps its last direction in a calm) and streams out
-	// as the wind freshens; it hangs in light air.
-	const double AppSpeed = LastApparentWind.Size();
+	// The pennant and the ensign fly where the wind blows past the moving boat (it keeps its last direction in a calm)
+	// and stream out as the wind freshens; they hang in light air. D54: the boat's way only, not the masthead's sway
+	// as the boat rolls (that swung them from side to side), and they turn slowly.
+	const FVector FlagAir = Q.Inverse().RotateVector(FVector(LastTrueWind.X - V.X, LastTrueWind.Y - V.Y, 0.0));
+	const double AppSpeed = FVector2D(FlagAir.X, FlagAir.Y).Size();
 	if (AppSpeed > 0.3)
 	{
-		const float Target = FMath::RadiansToDegrees(FMath::Atan2(LastApparentWind.Y, LastApparentWind.X));
-		PennantYaw += FRotator::NormalizeAxis(Target - PennantYaw) * FMath::Min(DeltaSeconds * 3.f, 1.f);
+		const float Target = FMath::RadiansToDegrees(FMath::Atan2(FlagAir.Y, FlagAir.X));
+		PennantYaw += FRotator::NormalizeAxis(Target - PennantYaw) * FMath::Min(DeltaSeconds * 1.2f, 1.f);
 	}
 	PennantWind = FMath::FInterpTo(PennantWind, FMath::Clamp((float)AppSpeed / 9.f, 0.f, 1.f), DeltaSeconds, 1.5f);
 	PennantPivot->SetRelativeRotation(FRotator(0.f, PennantYaw, 0.f));

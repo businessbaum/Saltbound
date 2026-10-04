@@ -33,8 +33,9 @@ namespace
 		TEXT("Draw interaction focus probe hits."),
 		ECVF_Cheat);
 
-	constexpr float CapsuleRadius = 34.f;
-	constexpr float CapsuleHalfHeight = 75.f;   // 1.5 m: owner feedback (1.76 m, then 1.6 m felt too tall)
+	// 1.4 m and slimmer (owner, D54: too big for the boat; earlier 1.76 m, 1.6 m and 1.5 m with a 68 cm wide capsule).
+	constexpr float CapsuleRadius = 26.f;
+	constexpr float CapsuleHalfHeight = 70.f;
 }
 
 ASaltPlayerCharacter::ASaltPlayerCharacter(const FObjectInitializer& ObjectInitializer)
@@ -147,7 +148,11 @@ void ASaltPlayerCharacter::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	const FVector2D EffectiveMove = DebugMoveInput.IsNearlyZero() ? MoveInput : DebugMoveInput;
-	if (bClimbing)
+	if (bOnLadder)
+	{
+		TickLadder(DeltaSeconds, EffectiveMove.Y);
+	}
+	else if (bClimbing)
 	{
 		TickClimb(DeltaSeconds);
 	}
@@ -187,7 +192,7 @@ void ASaltPlayerCharacter::Tick(float DeltaSeconds)
 void ASaltPlayerCharacter::HandleMove(const FInputActionValue& Value)
 {
 	MoveInput = Value.Get<FVector2D>().GetClampedToMaxSize(1.f);
-	if (!ActiveStation)
+	if (!ActiveStation && !bOnLadder)
 	{
 		ApplyMoveInput(MoveInput);
 	}
@@ -250,7 +255,7 @@ void ASaltPlayerCharacter::HandleJumpStarted()
 	{
 		ActiveStation->TriggerAction(0);
 	}
-	else if (!IsSwimming())
+	else if (!IsSwimming() && !bOnLadder)
 	{
 		Jump();
 	}
@@ -299,7 +304,8 @@ bool ASaltPlayerCharacter::TryClimbOutOfWater()
 	const FVector Forward = FRotationMatrix(FRotator(0.f, Controller->GetControlRotation().Yaw, 0.f)).GetUnitAxis(EAxis::X);
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(SaltClimbOut), false, this);
 	const FVector Side(-Forward.Y, Forward.X, 0.f);
-	for (const float Ahead : { Radius + 25.f, Radius + 50.f, Radius + 75.f })
+	// Up to an arm's length ahead (the reach does not shrink with a slimmer body, D54).
+	for (const float Ahead : { Radius + 25.f, Radius + 50.f, Radius + 75.f, Radius + 100.f })
 	for (const float Lateral : { 0.f, -35.f, 35.f })
 	{
 		// Straight ahead first, then a little to either side (pier posts, rails).
@@ -426,6 +432,141 @@ void ASaltPlayerCharacter::TickClimb(float DeltaSeconds)
 	}
 }
 
+// --- Ladders (D54) ---------------------------------------------------------------
+
+void ASaltPlayerCharacter::MountLadder(const FSaltLadderLine& Line, bool bFromTop)
+{
+	USaltCharacterMovementComponent* Move = Cast<USaltCharacterMovementComponent>(GetCharacterMovement());
+	USceneComponent* Base = Line.Base.Get();
+	if (!Move || !Base || bOnLadder || bClimbing)
+	{
+		return;
+	}
+	if (ActiveStation)
+	{
+		LeaveStation();
+	}
+	Ladder = Line;
+	const FTransform BaseXf = Base->GetComponentTransform();
+	LadderGlideFrom = BaseXf.InverseTransformPosition(GetActorLocation());
+	if (bFromTop)
+	{
+		LadderAlong = 1.f;
+	}
+	else
+	{
+		// From the water: take hold at the body's height, on a rung.
+		const float Length = FMath::Max((float)(Ladder.Top - Ladder.Bottom).Size(), 1.f);
+		const float Along = FMath::Clamp((float)((LadderGlideFrom.Z - Ladder.Bottom.Z) / (Ladder.Top.Z - Ladder.Bottom.Z)), 0.f, 1.f);
+		LadderAlong = FMath::Clamp(FMath::RoundToFloat(Along * Length / Ladder.RungStep) * Ladder.RungStep / Length, 0.f, 1.f);
+	}
+	LadderGlideTime = FMath::Clamp((float)(LadderPoint(LadderAlong) - LadderGlideFrom).Size() / 140.f, 0.2f, 0.8f);
+	LadderGlide = 0.f;
+	LadderTime = 0.f;
+	bOnLadder = true;
+	Move->SuppressWater(0.5f);
+	Move->StopMovementImmediately();
+	Move->SetMovementMode(MOVE_None);
+	// Face the rungs; the view stays free to look around.
+	if (Controller)
+	{
+		const float Yaw = BaseXf.GetRotation().Rotator().Yaw + Ladder.FacingYaw;
+		Controller->SetControlRotation(FRotator(FMath::Clamp(Controller->GetControlRotation().GetNormalized().Pitch, -30.f, 30.f), Yaw, 0.f));
+	}
+	UE_LOG(LogSaltbound, Log, TEXT("Took hold of the ladder (%s, along %.2f)"), bFromTop ? TEXT("from the top") : TEXT("from the water"), LadderAlong);
+}
+
+void ASaltPlayerCharacter::TickLadder(float DeltaSeconds, float Input)
+{
+	USaltCharacterMovementComponent* Move = Cast<USaltCharacterMovementComponent>(GetCharacterMovement());
+	USceneComponent* Base = Ladder.Base.Get();
+	if (!Move || !Base)
+	{
+		bOnLadder = false;
+		GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+		return;
+	}
+	LadderTime += DeltaSeconds;
+	// No swimming while holding on (the lower rungs are in the sea).
+	Move->SuppressWater(0.2f);
+	const FTransform BaseXf = Base->GetComponentTransform();
+	const float RestZ = EyeHeight - GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+	if (LadderGlide < 1.f)
+	{
+		LadderGlide = FMath::Min(LadderGlide + DeltaSeconds / LadderGlideTime, 1.f);
+		const FVector Local = FMath::Lerp(LadderGlideFrom, LadderPoint(LadderAlong), FMath::InterpEaseInOut(0.f, 1.f, LadderGlide, 2.f));
+		SetActorLocation(BaseXf.TransformPosition(Local), false, nullptr, ETeleportType::None);
+		Camera->SetRelativeLocation(FVector(0.f, 0.f, RestZ));
+		return;
+	}
+	const float Length = FMath::Max((float)(Ladder.Top - Ladder.Bottom).Size(), 1.f);
+	const float Dir = FMath::Abs(Input) > 0.2f ? FMath::Sign(Input) : 0.f;
+	// Rung by rung: fast between the rungs, slow where the hands change grip; the head dips a little with each pull.
+	const float Pos = LadderAlong * Length;
+	const float Frac = FMath::Fractional(Pos / Ladder.RungStep);
+	float Bob = 0.f;
+	if (Dir != 0.f)
+	{
+		const float Speed = LadderSpeed * (0.15f + 0.85f * FMath::Sin(PI * Frac));
+		LadderAlong += Dir * Speed * DeltaSeconds / Length;
+		Bob = -3.f * FMath::Sin(PI * Frac);
+	}
+	else
+	{
+		// Let go of the keys: settle on the nearest rung.
+		const float Rung = FMath::RoundToFloat(Pos / Ladder.RungStep) * Ladder.RungStep;
+		LadderAlong = FMath::FInterpTo(Pos, Rung, DeltaSeconds, 6.f) / Length;
+	}
+	if (LadderAlong >= 1.f && Dir > 0.f)
+	{
+		// The top: step over on to the deck.
+		bOnLadder = false;
+		Camera->SetRelativeLocation(FVector(0.f, 0.f, RestZ));
+		StartScriptedClimb(Base, { Ladder.Top, Ladder.TopExit }, { false }, false);
+		UE_LOG(LogSaltbound, Log, TEXT("Off the ladder on to the deck"));
+		return;
+	}
+	if (LadderAlong <= 0.f && Dir < 0.f)
+	{
+		LeaveLadderIntoWater();
+		return;
+	}
+	LadderAlong = FMath::Clamp(LadderAlong, 0.f, 1.f);
+	SetActorLocation(BaseXf.TransformPosition(LadderPoint(LadderAlong)), false, nullptr, ETeleportType::None);
+	Camera->SetRelativeLocation(FVector(0.f, 0.f, RestZ + Bob));
+}
+
+void ASaltPlayerCharacter::LeaveLadderIntoWater()
+{
+	bOnLadder = false;
+	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()));
+	if (USaltCharacterMovementComponent* Move = Cast<USaltCharacterMovementComponent>(GetCharacterMovement()))
+	{
+		Move->ClearWaterSuppression();
+		Move->SetMovementMode(MOVE_Falling);
+	}
+	UE_LOG(LogSaltbound, Log, TEXT("Off the bottom of the ladder into the sea"));
+}
+
+void ASaltPlayerCharacter::LetGoOfLadder()
+{
+	if (!bOnLadder)
+	{
+		return;
+	}
+	bOnLadder = false;
+	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight()));
+	if (USaltCharacterMovementComponent* Move = Cast<USaltCharacterMovementComponent>(GetCharacterMovement()))
+	{
+		Move->ClearWaterSuppression();
+		Move->SetMovementMode(MOVE_Falling);
+		// Push off the hull a little, so the body falls clear of the ladder.
+		const FVector Facing = FRotator(0.f, (Ladder.Base.IsValid() ? Ladder.Base->GetComponentRotation().Yaw : 0.f) + Ladder.FacingYaw, 0.f).Vector();
+		Move->Velocity = -Facing * 120.f;
+	}
+	UE_LOG(LogSaltbound, Log, TEXT("Let go of the ladder (along %.2f)"), LadderAlong);
+}
+
 void ASaltPlayerCharacter::HandleSprintStarted()
 {
 	bSprinting = true;
@@ -440,6 +581,15 @@ void ASaltPlayerCharacter::HandleInteract()
 {
 	if (bClimbing)
 	{
+		return;
+	}
+	if (bOnLadder)
+	{
+		// E lets go (not the press that may still be bouncing from taking hold).
+		if (LadderTime > 0.25f)
+		{
+			LetGoOfLadder();
+		}
 		return;
 	}
 	if (ActiveStation)
@@ -466,7 +616,7 @@ void ASaltPlayerCharacter::UpdateInteractionFocus()
 {
 	USaltInteractableComponent* NewFocus = nullptr;
 	UWorld* World = GetWorld();
-	if (!ActiveStation && Controller && World)
+	if (!ActiveStation && !bOnLadder && Controller && World)
 	{
 		const FVector Start = Camera->GetComponentLocation();
 		const FVector End = Start + Controller->GetControlRotation().Vector() * InteractionRange;
@@ -501,6 +651,10 @@ void ASaltPlayerCharacter::UpdateInteractionFocus()
 
 FText ASaltPlayerCharacter::GetPromptText() const
 {
+	if (bOnLadder)
+	{
+		return NSLOCTEXT("Saltbound", "LadderLetGo", "Let go of the ladder");
+	}
 	if (ActiveStation)
 	{
 		return ActiveStation->LeavePromptText;
@@ -514,6 +668,10 @@ FText ASaltPlayerCharacter::GetPromptText() const
 
 FText ASaltPlayerCharacter::GetHintText() const
 {
+	if (bOnLadder)
+	{
+		return NSLOCTEXT("Saltbound", "LadderHint", "W / S  climb up and down");
+	}
 	return ActiveStation ? ActiveStation->ControlsHintText : FText::GetEmpty();
 }
 

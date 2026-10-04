@@ -1063,3 +1063,24 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   arm, ensign staff), the hatch's and the removed items' hulls are gone; bell and lantern have their own.
 - **Tests:** boat suite 38/38, new: `BoatHalyardsHoldGaff`, `BoatBellAndLanternSwing`, `BoatSwingsSettle`,
   `BoatBellRope` (+focus), `BoatLantern` (+focus), `BoatBellBumped`; swim 5/5, menu 7/7, save 5/5, inventory 10/10.
+
+### D54 · Calmer flags, a smaller player, ladders you climb yourself (Adopted)
+- **Owner (2026-10-04):** "the flag is bouncing like crazy left and right, it looks like the animation speed is 20x";
+  "my character is too big to use the boat, make the character a bit smaller again"; ladders: one press takes you on to
+  the ladder, W and S go up and down, E leaves it, at the bottom you leave it too, at the top you go on board. And: "you
+  never wait for me in things like tools, if you need them take them".
+- **Flags:** the cloth's wave (M_SB_Flag) ran at about 2 Hz with a 12 cm swing; now about 0.3 Hz in light air and 0.6 Hz
+  in a fresh breeze, the hoist still and the fly swinging a few centimetres. The pennant and the ensign also turned with
+  the wind at the sail's centre, which includes the masthead's sway as the boat rolls, so they swung from side to side
+  with every roll; they now follow the wind past the moving boat (true wind less the boat's way) and turn slowly.
+- **Player:** 1.4 m (capsule half height 70 cm, eyes at 1.3 m) and slimmer (capsule radius 26 cm instead of 34: the
+  68 cm wide body was what made the deck feel cramped between the mast, the bell, the pin rails and the stores).
+- **Ladders:** E takes hold, from the water where the body is or from the deck at the top (a short glide, facing the
+  rungs, the view stays free). W / S climb rung by rung (fast between rungs, a slower grip at each, the head dips with
+  each pull); with no key the hands rest on the nearest rung. E lets go (a push off the hull, into the sea); off the
+  bottom rung you are in the sea, over the top you step on board. The HUD shows "[E] Let go of the ladder" and
+  "W / S climb up and down".
+- **Tests:** the boat suite's ladder part rewritten: take hold from the water and from the deck (with focus checks), no
+  slipping without keys, climb up on board, climb down into the sea, let go half way.
+- **Climbing out of the water** now reaches up to an arm's length ahead regardless of the body's width (the slimmer
+  capsule fell short of the pier's edge). Tests: boat 44/44, swim 5/5, movement 10/10.
