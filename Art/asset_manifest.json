@@ -89,7 +89,14 @@
     "dest": "/Game/Saltbound/Environment/Underwater",
     "nanite": false,
     "collision": "complex",
-    "_note": "Sculpted sand seabed of the visual test cove (build_seabed.py); placed at the world origin. Not Nanite: the complex collision must keep the ripples (a Nanite mesh collides with its reduced fallback)."
+    "_note": "Collision floor of the visual test cove (build_seabed.py, the broad shape at 1 m cells); hidden in the map, the visible sand is SM_Seabed_Sand. Not Nanite: complex collision."
+  },
+  "SM_Seabed_Sand": {
+    "fbx": "VisualTest/SM_Seabed_Sand.fbx",
+    "dest": "/Game/Saltbound/Environment/Underwater",
+    "nanite": true,
+    "collision": "none",
+    "_note": "Visible sand of the visual test cove (D37): 0.2 m cells with sculpted ripples and vertex colours (crest, trough, tone). No collision (SM_Seabed collides)."
   },
   "SM_SeaGrass_A": {
     "fbx": "VisualTest/SM_SeaGrass_A.fbx",

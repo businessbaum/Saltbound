@@ -507,11 +507,13 @@ def main():
     sb_ue.make_mi("MI_Stone_Ruin", MI, rock, vectors={"Tint": (0.42, 0.4, 0.36, 1), "LichenColor": (0.4, 0.46, 0.28, 1)},
                   scalars={"Scale": 250.0, "LichenCoverage": 0.35, "NormalStrength": 0.6, "StrataScale": 1.0e6})
     # Engine primitives carry no vertex colours (they read as white): switch the masks off.
-    # Sand has its own painted texture set (ripple bands, grains; D29).
+    # Sand (D37): the ripples are sculpted geometry; its vertex colours light the crests (R), shade the troughs (G)
+    # and vary the tone (B). The texture adds only broad colour and sparse flecks.
     sb_ue.make_mi("MI_Sand", MI, rock, vectors={"Tint": (0.62, 0.55, 0.42, 1), "LichenColor": (0.5, 0.48, 0.36, 1)},
                   textures={"AlbedoTex": TEX + "/Sand/T_Sand_D", "NormalTex": TEX + "/Sand/T_Sand_N", "ORMTex": TEX + "/Sand/T_Sand_ORM"},
-                  scalars={"Scale": 550.0, "AntiTile": 1.0, "PatternContrast": 0.6, "LichenCoverage": 0.0, "NormalStrength": 0.5, "MacroAmount": 0.25, "WetDarken": 0.7,
-                           "VertexMaskAmount": 0.0, "AlgaeAmount": 0.0, "BarnacleAmount": 0.0, "StrataScale": 1.0e6})
+                  scalars={"Scale": 550.0, "AntiTile": 1.0, "PatternContrast": 1.0, "LichenCoverage": 0.0, "NormalStrength": 0.35, "MacroAmount": 0.2, "WetDarken": 0.7,
+                           "VertexMaskAmount": 1.0, "EdgeLighten": 1.2, "CavityDarken": 0.78, "PlateVar": 0.1, "TopLighten": 0.12,
+                           "AlgaeAmount": 0.0, "BarnacleAmount": 0.0, "StrataScale": 1.0e6})
     sb_ue.make_mi("MI_SeaGrass", MI, grass)
     sb_ue.make_mi("MI_LanternGlass", MI, glow, vectors={"BaseColor": (0.35, 0.25, 0.14, 1), "GlowColor": (1.0, 0.52, 0.2, 1)}, scalars={"GlowIntensity": 80.0, "Roughness": 0.1})
     sb_ue.make_mi("MI_CandleFlame", MI, glow, vectors={"BaseColor": (0.9, 0.7, 0.4, 1), "GlowColor": (1.0, 0.62, 0.28, 1)}, scalars={"GlowIntensity": 600.0})

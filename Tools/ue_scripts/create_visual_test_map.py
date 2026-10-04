@@ -14,6 +14,9 @@ import unreal
 sys.path.insert(0, os.path.dirname(__file__))
 import sb_ue  # noqa: E402
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "Art", "Blender", "Scripts"))
+import seabed_shape  # noqa: E402  (pure Python: the seabed's height function)
+
 MAP = "/Game/Saltbound/Maps/L_VisualTest"
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -80,10 +83,16 @@ UW = "/Game/Saltbound/Environment/Underwater/"
 seabed = mesh("Seabed", CUBE, (0, 0, -6000), scale=(1200, 1200, 1), mat="/Game/Saltbound/Materials/Instances/MI_Sand")
 # Sculpted cove floor (build_seabed.py): beach behind the rocks, about 2.3 m under the pier, a drop-off to the
 # 17.5 m floor, and the shallow sandbank east of the pier (light ground: how each region's water reads).
+# SM_Seabed (1 m cells, broad shape) only collides and is hidden; SM_Seabed_Sand (Nanite, 0.2 m) is the visible
+# sand with sculpted ripples (D37).
 cove_floor = mesh("Seabed_Cove", UW + "SM_Seabed", (0, 0, 0))
+cove_floor.static_mesh_component.set_editor_property("visible", False)
+cove_floor.set_actor_hidden_in_game(True)
+sand = mesh("Seabed_Sand", UW + "SM_Seabed_Sand", (0, 0, 0))
+sand.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
 # Steep wave faces reflect rays downward; hardware-traced Lumen reflections would show the sand as beige
 # streaks on the open sea. The seabed is only seen through the water, never in reflections.
-for floor in (seabed, cove_floor):
+for floor in (seabed, cove_floor, sand):
     floor.static_mesh_component.set_editor_property("visible_in_ray_tracing", False)
     floor.static_mesh_component.set_editor_property("affect_distance_field_lighting", False)
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
@@ -190,6 +199,7 @@ while patches < 34:
         centre = 1.0 - r / radius
         kind = "A" if grng.random() < 0.25 + 0.5 * centre else ("B" if grng.random() < 0.6 else "C")
         sc = grng.uniform(0.8, 1.25) * (1.0 + min(-z / 1400.0, 1.0) * 0.4)
+        z = seabed_shape.height(x / 100.0, y / 100.0) * 100.0      # the visible, rippled surface
         grass[kind].append(unreal.Transform(unreal.Vector(x, y, z - 3.0),
                                             unreal.Rotator(roll=grng.uniform(-6, 6), pitch=grng.uniform(-6, 6), yaw=grng.uniform(0, 360)),
                                             unreal.Vector(sc, sc, sc)))

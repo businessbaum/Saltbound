@@ -737,3 +737,19 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   The CPU wave field carries only the long waves (D27), so the boat ignores short chop. A thin horizontal
   slab hit at the bulwark's height can flip the contact normal upward (the bow rides up). The boat does
   not push a swimmer; the swimmer's movement resolves the overlap.
+
+### D37 · Sand with sculpted ripples (Adopted, awaiting owner review)
+- **Owner (2026-10-04):** "make the texture you added on the sand visible not only through color. Shape is the
+  keyword. The sand itself as an object is completely flat."
+- **Change:** the ripples moved from the texture into the geometry.
+  - `SM_Seabed_Sand` (Nanite, 1.26 M triangles, 0.2 m cells) is the visible sand: the broad shape plus ripples
+    1.6 m apart and up to 20 cm high, with rounded crests, wide soft troughs and a steeper lee side. They
+    wander in direction and are gently crooked, cover about 90 % of the wet floor (small calm spots), and fade
+    out on the dry beach and under the pier.
+  - Vertex colours light the crests and shade the troughs (`MI_Sand` vertex masks on); the texture only adds
+    broad tone patches and sparse flecks (no painted ripple bands, no fine grain).
+  - `SM_Seabed` (1 m cells, broad shape) stays as the hidden collision floor. Sea grass roots on the rippled
+    surface. `Art/Blender/Scripts/seabed_shape.py` holds the shape for both meshes and the map script.
+  - The sandbank and headland shoals blend smoothly (a hard max showed as a saw-toothed edge on the fine grid).
+- **Lesson:** never import assets while a play session runs: the static mesh build fails ("Bad MeshDescription")
+  and nothing saves.

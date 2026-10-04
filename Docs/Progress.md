@@ -217,6 +217,9 @@ for a higher screen percentage (for example 75 %) and more content.
   fresh foam vs residue, varied crest spacing (D33); the coloured specks on distant crests fixed at the
   cause, an overflow in the underside's underwater light (D35; D34 was a wrong guess and is reverted).
 
+- **Sand with shape (D37, awaiting the owner's check):** the ripples are sculpted geometry now (Nanite sand mesh,
+  crests about 1.6 m apart and up to 20 cm high), lit on the crests; the sand texture only adds broad colour.
+
 ## M4 – Sailing boat, technical part (D36)
 A greybox 10 m double-ender lies moored on the south side of the pier in `L_VisualTest` (`ASaltBoat`, meshes
 from `Art/Blender/Scripts/build_boat.py`). Walk aboard through the gap in the bulwark, take the wheel, raise
