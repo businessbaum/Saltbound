@@ -1162,5 +1162,20 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     lid).
   - `sb.Dev.Store crate|barrel [demo [t]] | off` (demo: the design picture's contents with the floats in flight, held at t);
     tests `StoreShiftMovesOne`, `StoreCounts`, `StoreCursor`, `StoreFlightLands`. Inventory 21/21.
-- **Next (spec order):** the landfall banner, the item icons from an icon booth,
+- **Landfall (section 9):** the places are shared data now (`Core/SaltPlaces`: id, name, centre in world metres, the
+  shore as an ellipse; the satchel's chart reads them too). `USaltLandfallSubsystem` checks four times a second whether
+  the player is within **300 m of the shore** (owner) of an island not found yet (the Spire, Ruin Isle, Mistholm, Gull
+  Rock, Longshoal; not the home cove or the storm waters); it marks it found in the save (`FoundPlaces`, save version 4)
+  and the HUD shows the banner once.
+  - The banner is the design's `banner()` split into layers per island (`T_UI_Landfall_<Id>_Band`: tails, band and
+    rules; `_Name`: the letters on the arch) and the shared wax seal with the island-and-gateway glyph; "A new island"
+    and the line under it are painted lettering. A UI material (`M_UI_Reveal`) unrolls the ribbon from its middle and
+    inks the name in from the left with a slightly uneven edge.
+  - Motion: unroll 0.6 s, the seal stamps at 0.5 s (1.4 to 1 with a slight overshoot), the name inks in 0.6 s, the
+    line fades in, a hold to 5.6 s, then it rolls up and fades (0.5 s). A second landfall waits for the first.
+  - The line is computed: distance and the 16-point bearing from Saltbound Cove ("1.7 km north-north-east of Saltbound
+    Cove"; north is +X). "· now on your chart" waits until the chart marks found places (spec).
+  - `sb.Dev.Landfall <Id> [t] | reset`; tests `LandfallFoundOnce`, `LandfallSaved`, `LandfallBanner`, `LandfallRollsUp`.
+    Inventory 25/25.
+- **Next (spec order):** the item icons from an icon booth,
   the tool wheel (hold Q) with the held tools.

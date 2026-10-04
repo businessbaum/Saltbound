@@ -7,12 +7,14 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Core/SaltPlaces.h"
 #include "Core/SaltSaveSubsystem.h"
 #include "HAL/IConsoleManager.h"
 #include "Interaction/SaltInteractableComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Styling/CoreStyle.h"
+#include "UI/SaltLandfallWidget.h"
 #include "UI/SaltPaintedText.h"
 #include "UI/SaltUIStyle.h"
 
@@ -169,6 +171,15 @@ TSharedRef<SWidget> USaltHUDWidget::RebuildWidget()
 		};
 		SignRing = SignLayer(TEXT("T_UI_SaveKnot_Ring"));
 		SignRose = SignLayer(TEXT("T_UI_SaveKnot_Rose"));
+
+		// The landfall banner over the whole screen (it places itself at 1080p design coordinates).
+		Landfall = CreateWidget<USaltLandfallWidget>(this, USaltLandfallWidget::StaticClass());
+		if (UCanvasPanelSlot* S = Root->AddChildToCanvas(Landfall))
+		{
+			S->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			S->SetOffsets(FMargin(0.f));
+		}
+		Landfall->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
 	return Super::RebuildWidget();
 }
@@ -181,6 +192,18 @@ void USaltHUDWidget::NativeConstruct()
 		SaveStartedHandle = Saves->OnSaveStarted.AddUObject(this, &USaltHUDWidget::HandleSaveStarted);
 		SaveFinishedHandle = Saves->OnSaveFinished.AddUObject(this, &USaltHUDWidget::HandleSaveFinished);
 	}
+	if (USaltLandfallSubsystem* Landfalls = GetWorld() ? GetWorld()->GetSubsystem<USaltLandfallSubsystem>() : nullptr)
+	{
+		LandfallHandle = Landfalls->OnLandfall.AddUObject(this, &USaltHUDWidget::HandleLandfall);
+	}
+}
+
+void USaltHUDWidget::HandleLandfall(FName PlaceId)
+{
+	if (Landfall)
+	{
+		Landfall->Show(PlaceId);
+	}
 }
 
 void USaltHUDWidget::NativeDestruct()
@@ -189,6 +212,10 @@ void USaltHUDWidget::NativeDestruct()
 	{
 		Saves->OnSaveStarted.Remove(SaveStartedHandle);
 		Saves->OnSaveFinished.Remove(SaveFinishedHandle);
+	}
+	if (USaltLandfallSubsystem* Landfalls = GetWorld() ? GetWorld()->GetSubsystem<USaltLandfallSubsystem>() : nullptr)
+	{
+		Landfalls->OnLandfall.Remove(LandfallHandle);
 	}
 	Super::NativeDestruct();
 }

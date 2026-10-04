@@ -113,6 +113,7 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 		Save->Wind = FVector(Wind->GetBaseFromDeg(), Wind->GetBaseSpeed(), Wind->GetGustiness());
 	}
 	Save->Collected = Collected.Array();
+	Save->FoundPlaces = Found.Array();
 	for (TObjectIterator<USaltInventoryComponent> It; It; ++It)
 	{
 		if (It->GetWorld() == World && !It->GetStorageId().IsNone())
@@ -208,6 +209,7 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 	}
 	// Pickups taken in that game stay gone; the others are back.
 	Collected = TSet<FName>(Save->Collected);
+	Found = TSet<FName>(Save->FoundPlaces);
 	for (TActorIterator<ASaltPickup> It(World); It; ++It)
 	{
 		It->SetCollected(IsCollected(It->PickupId));

@@ -20,6 +20,7 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Components/WidgetSwitcher.h"
 #include "Core/SaltItems.h"
+#include "Core/SaltPlaces.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -43,21 +44,6 @@ namespace
 			{ TEXT("T_Map_Sea"), FVector2D(3000.0, 0.0), 12000.f, TEXT("2 km"), 2000.f, NSLOCTEXT("Saltbound", "ChartSea", "Open sea") },
 		};
 		return Charts[FMath::Clamp(Index, 0, 1)];
-	}
-
-	struct FPlace { FText Name; FVector2D WorldM; };
-	const TArray<FPlace>& Places()
-	{
-		static const TArray<FPlace> P = {
-			{ NSLOCTEXT("Saltbound", "PlaceCove", "Saltbound Cove"), FVector2D(0.0, 0.0) },
-			{ NSLOCTEXT("Saltbound", "PlaceSpire", "The Spire"), FVector2D(420.0, 150.0) },
-			{ NSLOCTEXT("Saltbound", "PlaceRuinIsle", "Ruin Isle"), FVector2D(1600.0, 600.0) },
-			{ NSLOCTEXT("Saltbound", "PlaceMistholm", "Mistholm"), FVector2D(5500.0, 2500.0) },
-			{ NSLOCTEXT("Saltbound", "PlaceGullRock", "Gull Rock"), FVector2D(7000.0, -1500.0) },
-			{ NSLOCTEXT("Saltbound", "PlaceLongshoal", "Longshoal"), FVector2D(4200.0, -4800.0) },
-			{ NSLOCTEXT("Saltbound", "PlaceStorm", "Storm waters"), FVector2D(0.0, -3000.0) },
-		};
-		return P;
 	}
 
 	ASaltBoat* FindBoat(const UObject* Context)
@@ -495,7 +481,7 @@ UWidget* USaltSatchelWidget::BuildMapPage()
 		S->SetVerticalAlignment(VAlign_Fill);
 	}
 	PlaceLabels.Reset();
-	for (const FPlace& P : Places())
+	for (const FSaltPlace& P : SaltPlaces::All())
 	{
 		UTextBlock* L = Text(WidgetTree, P.Name, 13, Ink, true);
 		L->SetShadowOffset(FVector2D(1.f, 1.f));
@@ -753,10 +739,10 @@ void USaltSatchelWidget::UpdateMarkers()
 		W->SetVisibility(bShow ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	};
 	auto Inside = [](const FVector2D& P, float Margin) { return P.X > Margin && P.Y > Margin && P.X < MapSize - Margin && P.Y < MapSize - Margin; };
-	const TArray<FPlace>& Ps = Places();
+	const TArray<FSaltPlace>& Ps = SaltPlaces::All();
 	for (int32 I = 0; I < PlaceLabels.Num(); ++I)
 	{
-		const FVector2D P = WorldToChart(FVector(Ps[I].WorldM.X * 100.0, Ps[I].WorldM.Y * 100.0, 0.0)) + FVector2D(0.0, 16.0);
+		const FVector2D P = WorldToChart(FVector(Ps[I].CentreM.X * 100.0, Ps[I].CentreM.Y * 100.0, 0.0)) + FVector2D(0.0, 16.0);
 		Place(PlaceLabels[I], P, Inside(P, 18.f));
 	}
 	auto Clamp = [](const FVector2D& P) { return FVector2D(FMath::Clamp(P.X, 14.0, MapSize - 14.0), FMath::Clamp(P.Y, 14.0, MapSize - 14.0)); };

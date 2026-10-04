@@ -9,6 +9,9 @@ Runs inside the editor:  python Tools/ue_exec.py Tools/ue_scripts/setup_ui_mater
                     hold the ink rising through the paper from the bottom with a gently moving wavy surface; where the
                     ink covers the letter it turns parchment-light. Progress 0..1, Time (s); the frame is 120 x 120 px
                     with the 58 px scrap in its middle (Tools/textures/ui_parts.js).
+  M_UI_Reveal       a picture revealed by two masks (section 9, the landfall banner): from its middle outward (Half, the
+                    revealed half-width as a fraction of the half-frame; the ribbon unrolls and rolls up) and from the left
+                    (Front, the ink's edge in U, a little uneven; the name inks in). Soft edges; Tex is the picture.
 Colours in the code are the spec's sRGB values, converted to linear (Slate blends in linear and writes sRGB).
 """
 import os
@@ -125,6 +128,41 @@ def key_soak():
     sb_ue.eal.save_loaded_asset(m)
 
 
+REVEAL_CODE = """
+float4 T = Texture2DSample(Tex, TexSampler, UV);
+float d = abs(UV.x - 0.5) * 2.0;
+float mc = saturate((Half - d) / max(Soft, 0.0001) + 0.5);
+float front = Front + 0.004 * sin(UV.y * 37.0) + 0.003 * sin(UV.y * 91.0 + 1.3);
+float ms = saturate((front - UV.x) / max(FrontSoft, 0.0001) + 0.5);
+return float4(T.rgb * VC.rgb, T.a * mc * ms * VA);
+"""
+
+
+def reveal():
+    m = ui_material("M_UI_Reveal")
+    uv = sb_ue.expr(m, unreal.MaterialExpressionTextureCoordinate, -900, 0)
+    tex = tex_object(m, "Tex", "T_UI_LandfallSeal", -900, 100)
+    half = sb_ue.scalar_param(m, "Half", 1.0, -900, 260, "Reveal")
+    soft = sb_ue.scalar_param(m, "Soft", 0.02, -900, 340, "Reveal")
+    front = sb_ue.scalar_param(m, "Front", 2.0, -900, 420, "Reveal")
+    fsoft = sb_ue.scalar_param(m, "FrontSoft", 0.012, -900, 500, "Reveal")
+    vc = sb_ue.expr(m, unreal.MaterialExpressionVertexColor, -900, 600)
+    c = custom(m, -500, 300, "Reveal from the middle and from the left", REVEAL_CODE, ["UV", "Tex", "Half", "Soft", "Front", "FrontSoft", "VC", "VA"],
+               unreal.CustomMaterialOutputType.CMOT_FLOAT4)
+    for node, pin in ((uv, "UV"), (tex, "Tex"), (half, "Half"), (soft, "Soft"), (front, "Front"), (fsoft, "FrontSoft"), (vc, "VC")):
+        sb_ue.connect(node, "", c, pin)
+    sb_ue.connect(vc, "A", c, "VA")
+    rgb = sb_ue.expr(m, unreal.MaterialExpressionComponentMask, -250, 250, r=True, g=True, b=True, a=False)
+    alpha = sb_ue.expr(m, unreal.MaterialExpressionComponentMask, -250, 380, r=False, g=False, b=False, a=True)
+    sb_ue.connect(c, "", rgb, "")
+    sb_ue.connect(c, "", alpha, "")
+    sb_ue.to_prop(rgb, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    sb_ue.to_prop(alpha, "", unreal.MaterialProperty.MP_OPACITY)
+    mel.recompile_material(m)
+    sb_ue.eal.save_loaded_asset(m)
+
+
 painted_text()
 key_soak()
+reveal()
 print("SB_UI_MATERIALS_OK")

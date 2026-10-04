@@ -11,6 +11,7 @@ class UCanvasPanel;
 class UImage;
 class UMaterialInstanceDynamic;
 class UTextBlock;
+class USaltLandfallWidget;
 class USaltPaintedText;
 
 /**
@@ -32,6 +33,8 @@ public:
 	float GetShownHoldProgress() const { return ShownHold; }
 	float GetSaveSignOpacity() const { return SignAlpha; }
 	float GetSaveSignShownTime() const { return SignTime; }
+	/** The landfall banner (section 9): shown when USaltLandfallSubsystem finds an island. */
+	USaltLandfallWidget* GetLandfall() const { return Landfall; }
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -54,6 +57,7 @@ private:
 	void TickSaveSign(float DeltaSeconds);
 	void HandleSaveStarted();
 	void HandleSaveFinished();
+	void HandleLandfall(FName PlaceId);
 
 	UPROPERTY(Transient) TObjectPtr<UImage> Dot;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> Hint;
@@ -64,6 +68,7 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<USaltPaintedText>> RowLabels;
 	UPROPERTY(Transient) TObjectPtr<UImage> SignRing;
 	UPROPERTY(Transient) TObjectPtr<UImage> SignRose;
+	UPROPERTY(Transient) TObjectPtr<USaltLandfallWidget> Landfall;
 
 	FPromptRow Rows[2];
 	int32 ActiveRow = 0;
@@ -81,4 +86,5 @@ private:
 	float SignAlpha = 0.f;
 	FDelegateHandle SaveStartedHandle;
 	FDelegateHandle SaveFinishedHandle;
+	FDelegateHandle LandfallHandle;
 };

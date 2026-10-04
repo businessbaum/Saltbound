@@ -257,3 +257,44 @@ part('T_UI_StoreHints', 860, 80, 1, c => {
   txt(c, '·', x, y, '400 27px Alegreya', '#f0e2c4', sh); x += 30;
   x += keycap(c, 'E', x, y - 28, 38) + 12; txt(c, 'close the lid', x, y, '400 27px Alegreya,Georgia,serif', '#f0e2c4', sh);
 });
+
+/* ---------- 6. landfall (section 9) ---------- */
+/* Each island's banner, drawn by the design's banner() (UI_Prompts.html) and split into layers the widget animates: the
+   ribbon (tails, band, rules) and the name (each letter on the arch, ink with bleed). The seal is shared; the heading and
+   the subtitle are painted lettering in the widget. Frame: 1080p x 160..1760, y 120..340; the band's top is at y 150,
+   centred on x 960, half as wide as max(300, name / 2 + 100). Keep LANDFALL in sync with Core/SaltPlaces.cpp. */
+const LANDFALL = [['Spire', 'The Spire'], ['RuinIsle', 'Ruin Isle'], ['Mistholm', 'Mistholm'], ['GullRock', 'Gull Rock'], ['Longshoal', 'Longshoal']];
+const LF_X0 = 160, LF_Y0 = 120;
+function landfallLayer(c, name, layer) {
+  c.translate(-LF_X0, -LF_Y0);
+  const cx = 960, size = 66, F = `400 ${size}px ${FSC}`, ls = 5, chars = [...name];
+  const cw = chars.map(ch => measure(c, ch, F)), tw = cw.reduce((a, b) => a + b, 0) + ls * (chars.length - 1);
+  const halfW = Math.max(300, tw / 2 + 100), h = 90, arch = 18, yTop = 150, xL = cx - halfW, xR = cx + halfW, tailW = 118, ov = 40;
+  const T = x => yTop + arch * ((x - cx) / halfW) ** 2, dT = x => 2 * arch * (x - cx) / (halfW * halfW);
+  if (layer === 'name') {
+    let x = cx - tw / 2;
+    chars.forEach((ch, i) => { const xm = x + cw[i] / 2, ym = T(xm) + h / 2 + size * .33, a = Math.atan(dT(xm));
+      c.save(); c.translate(xm, ym); c.rotate(a); c.filter = 'blur(.8px)'; txt(c, ch, 0, 0, F, 'rgba(48,30,16,.35)', { align: 'center' }); c.filter = 'none'; txt(c, ch, 0, 0, F, INK, { align: 'center' }); c.restore(); x += cw[i] + ls; });
+    return;
+  }
+  // the tails behind, with a swallowtail cut
+  [-1, 1].forEach(side => { const xe = side < 0 ? xL : xR, top = T(xe) + h * .46, bot = top + h * .92, out = xe + side * tailW, inn = xe - side * ov, mid = (top + bot) / 2, dy = 10;
+    const tp = poly([[inn, top], [out, top + dy], [out - side * 36, mid + dy], [out, bot + dy], [inn, bot]]);
+    dropShadow(c, tp, 16, 'rgba(0,0,0,.55)', 3, 8); c.save(); c.clip(tp); c.filter = 'brightness(.74)'; c.drawImage(PARCH_BIG, side < 0 ? xL - tailW - 10 : xR - 200, top - 20); c.restore();
+    const g = c.createLinearGradient(inn, 0, out, 0); g.addColorStop(0, 'rgba(40,20,6,.45)'); g.addColorStop(1, 'rgba(40,20,6,0)'); c.save(); c.clip(tp); c.fillStyle = g; c.fillRect(Math.min(inn, out), top - 5, tailW + ov, bot - top + 30); c.restore();
+    innerShadow(c, tp, 10, 'rgba(110,62,20,.6)');
+    const fold = poly([[xe, T(xe) + h - 2], [inn, T(xe) + h - 2], [inn, bot]]); const fg = c.createLinearGradient(0, T(xe) + h, 0, bot); fg.addColorStop(0, '#3d2410'); fg.addColorStop(1, '#6b4626'); c.fillStyle = fg; c.fill(fold); });
+  // the band along its arch
+  const band = new Path2D(); for (let x = xL; x <= xR + .1; x += 8) x === xL ? band.moveTo(x, T(x)) : band.lineTo(x, T(x)); for (let x = xR; x >= xL - .1; x -= 8) band.lineTo(x, T(x) + h); band.closePath();
+  dropShadow(c, band, 22, 'rgba(0,0,0,.6)', 4, 10); c.save(); c.clip(band); c.drawImage(PARCH_BIG, xL - 20, yTop - 30); c.restore();
+  c.save(); c.clip(band); const sg = c.createLinearGradient(0, yTop, 0, yTop + h + arch); sg.addColorStop(0, 'rgba(255,246,220,.28)'); sg.addColorStop(.35, 'rgba(255,246,220,0)'); sg.addColorStop(1, 'rgba(70,40,14,.32)'); c.fillStyle = sg; c.fillRect(xL, yTop - 5, 2 * halfW, h + arch + 10); c.restore();
+  innerShadow(c, band, 14, 'rgba(120,70,24,.6)'); innerShadow(c, band, 2.5, 'rgba(90,52,18,.7)');
+  const rule = (off, lw) => { c.save(); c.strokeStyle = 'rgba(48,30,16,.55)'; c.lineWidth = lw; c.beginPath(); for (let x = xL + 14; x <= xR - 14; x += 6) x === xL + 14 ? c.moveTo(x, T(x) + off) : c.lineTo(x, T(x) + off); c.stroke(); c.restore(); };
+  [[9, 1.6], [14, .8], [h - 9, 1.6], [h - 14, .8]].forEach(([off, lw]) => rule(off, lw));
+}
+for (const [id, name] of LANDFALL) {
+  part('T_UI_Landfall_' + id + '_Band', 1600, 220, 1, c => landfallLayer(c, name, 'band'));
+  part('T_UI_Landfall_' + id + '_Name', 1600, 220, 1, c => landfallLayer(c, name, 'name'));
+}
+/* The oxblood wax seal (radius 40) with the island-and-gateway glyph, centred in a 120 x 120 frame. */
+part('T_UI_LandfallSeal', 120, 120, 2, c => { waxSeal(c, 60, 60, 40, '', 7); sealGlyph(c, 'island', 60, 60, 40); });

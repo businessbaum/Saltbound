@@ -7,6 +7,7 @@
 #include "Containers/Ticker.h"
 #include "Components/CapsuleComponent.h"
 #include "Core/SaltItems.h"
+#include "Core/SaltPlaces.h"
 #include "Core/SaltSaveSubsystem.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -18,6 +19,7 @@
 #include "Player/SaltPlayerController.h"
 #include "Saltbound.h"
 #include "UI/SaltHUDWidget.h"
+#include "UI/SaltLandfallWidget.h"
 #include "UI/SaltSatchelWidget.h"
 #include "UI/SaltStoreWidget.h"
 #include "World/SaltPickup.h"
@@ -187,6 +189,31 @@ namespace
 					PC->CloseStore();
 					P->GetInventory()->SetSlots(S->OwnSatchel);
 					Boat->GetStore(true)->SetSlots(S->OwnCrate);
+					// A landfall banner (Ruin Isle) runs its course.
+					if (USaltLandfallWidget* L = Hud->GetLandfall())
+					{
+						L->Clear();
+						L->Show(TEXT("RuinIsle"));
+					}
+					Next();
+				}
+				break;
+			case 8:
+				if (T > 1.7f)
+				{
+					USaltLandfallWidget* L = Hud->GetLandfall();
+					const FString Line = L ? L->GetSubtitle().ToString() : FString();
+					Report(TEXT("LandfallBanner"), L && L->IsShowing() && L->GetShownPlace() == TEXT("RuinIsle") && L->GetUnroll() > 0.99f && L->GetInk() > 0.99f
+						&& Line == TEXT("1.7 km north-north-east of Saltbound Cove"), FString::Printf(TEXT("after 1.7 s: showing=%d unrolled=%.2f inked=%.2f line='%s'"),
+							L && L->IsShowing() ? 1 : 0, L ? L->GetUnroll() : 0.f, L ? L->GetInk() : 0.f, *Line));
+					Next();
+				}
+				break;
+			case 9:
+				if (T > 4.7f)
+				{
+					USaltLandfallWidget* L = Hud->GetLandfall();
+					Report(TEXT("LandfallRollsUp"), L && !L->IsShowing(), FString::Printf(TEXT("6.4 s after it showed: showing=%d"), L && L->IsShowing() ? 1 : 0));
 					UE_LOG(LogSaltbound, Display, TEXT("SB_TEST InventorySuite DONE passed=%d failed=%d"), S->Passed, S->Failed);
 					return false;
 				}
@@ -384,6 +411,36 @@ namespace
 			Report(TEXT("BoatStores"), false, TEXT("no boat or stores"));
 		}
 
+		// D55: landfall. An island is found once, within 300 m of its shore, and its banner shows.
+		TArray<FName> OwnFound;
+		for (const FSaltPlace& Pl : SaltPlaces::All())
+		{
+			if (Saves->IsFound(Pl.Id))
+			{
+				OwnFound.Add(Pl.Id);
+			}
+		}
+		Saves->ClearFound();
+		USaltLandfallSubsystem* Landfalls = World->GetSubsystem<USaltLandfallSubsystem>();
+		USaltHUDWidget* Hud = PC->GetHUDWidget();
+		if (Landfalls && Hud && Hud->GetLandfall())
+		{
+			Hud->GetLandfall()->Clear();
+			// The Spire (420, 150 m, its shore 28 m round): 418 m from home's shore is too far; 250 m off its centre finds it.
+			const FName AtHome = Landfalls->CheckAt(FVector::ZeroVector);
+			const FVector Near((420.0 - 250.0) * 100.0, 150.0 * 100.0, 0.0);
+			const FName First = Landfalls->CheckAt(Near);
+			const FName Again = Landfalls->CheckAt(Near);
+			const bool bBanner = Hud->GetLandfall()->IsShowing() && Hud->GetLandfall()->GetShownPlace() == TEXT("Spire");
+			Report(TEXT("LandfallFoundOnce"), AtHome.IsNone() && First == TEXT("Spire") && Again.IsNone() && bBanner && Saves->IsFound(TEXT("Spire")),
+				FString::Printf(TEXT("at home=%s near the Spire=%s again=%s banner=%d"), *AtHome.ToString(), *First.ToString(), *Again.ToString(), bBanner ? 1 : 0));
+			Hud->GetLandfall()->Clear();
+		}
+		else
+		{
+			Report(TEXT("LandfallFoundOnce"), false, TEXT("no landfall subsystem or HUD"));
+		}
+
 		// Saved and loaded: the satchel's contents and the taken pickup.
 		const FString OwnSlot = Saves->Slot;
 		Saves->Slot = TEXT("SaltDevTest");
@@ -392,6 +449,7 @@ namespace
 		Satchel->SetSlots({});
 		Pickup->SetCollected(false);
 		Saves->ClearCollected();
+		Saves->ClearFound();
 		if (Barrel)
 		{
 			Barrel->SetSlots({});
@@ -401,6 +459,13 @@ namespace
 			&& (!Barrel || Barrel->CountOf(TEXT("Seashell")) == 2), FString::Printf(TEXT("shells=%d floats=%d pickupGone=%d barrelShells=%d"),
 				Satchel->CountOf(TEXT("Seashell")), Satchel->CountOf(TEXT("GlassFloat")), Pickup->IsCollected() ? 1 : 0,
 				Barrel ? Barrel->CountOf(TEXT("Seashell")) : -1));
+		Report(TEXT("LandfallSaved"), Saves->IsFound(TEXT("Spire")) && !Saves->IsFound(TEXT("RuinIsle")), FString::Printf(TEXT("after loading: spire found=%d ruin isle found=%d"),
+			Saves->IsFound(TEXT("Spire")) ? 1 : 0, Saves->IsFound(TEXT("RuinIsle")) ? 1 : 0));
+		Saves->ClearFound();
+		for (const FName& Id : OwnFound)
+		{
+			Saves->MarkFound(Id);
+		}
 		if (Barrel && Crate)
 		{
 			Barrel->SetSlots(OwnBarrel);
@@ -501,6 +566,31 @@ namespace
 				W->HoldFlightAt(Args.Num() > 2 ? FCString::Atof(*Args[2]) : -1.f);
 				W->ClickSatchelSlot(5);
 			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdLandfall(
+		TEXT("sb.Dev.Landfall"),
+		TEXT("Show an island's landfall banner: sb.Dev.Landfall <Spire|RuinIsle|Mistholm|GullRock|Longshoal> [t] (held at t s; the design ")
+		TEXT("shows the full banner, e.g. 2) | reset (forget the islands found)."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ASaltPlayerController* PC = World ? Cast<ASaltPlayerController>(UGameplayStatics::GetPlayerController(World, 0)) : nullptr;
+			USaltHUDWidget* Hud = PC ? PC->GetHUDWidget() : nullptr;
+			if (!Hud || !Hud->GetLandfall() || Args.Num() == 0)
+			{
+				return;
+			}
+			if (Args[0] == TEXT("reset"))
+			{
+				if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(World))
+				{
+					Saves->ClearFound();
+				}
+				return;
+			}
+			Hud->GetLandfall()->Clear();
+			Hud->GetLandfall()->HoldAt(Args.Num() > 1 ? FCString::Atof(*Args[1]) : -1.f);
+			Hud->GetLandfall()->Show(FName(*Args[0]));
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdGive(

@@ -16,7 +16,7 @@ class SALTBOUND_API USaltSaveGame : public USaveGame
 	GENERATED_BODY()
 
 public:
-	UPROPERTY() int32 Version = 3;
+	UPROPERTY() int32 Version = 4;
 	UPROPERTY() FDateTime SavedAt;
 	UPROPERTY() FString Map;
 
@@ -44,6 +44,9 @@ public:
 
 	// D52: the stores (the boat's barrel and crate) by their ids.
 	UPROPERTY() TArray<FSaltSavedStore> Stores;
+
+	// D55 (version 4): the islands found (SaltPlaces ids); each one's landfall banner shows only once.
+	UPROPERTY() TArray<FName> FoundPlaces;
 };
 
 /**
@@ -79,8 +82,14 @@ public:
 	bool IsCollected(FName PickupId) const { return !PickupId.IsNone() && Collected.Contains(PickupId); }
 	void ClearCollected() { Collected.Reset(); }
 
+	/** Islands found this game (D55, saved with it). */
+	void MarkFound(FName PlaceId) { if (!PlaceId.IsNone()) { Found.Add(PlaceId); } }
+	bool IsFound(FName PlaceId) const { return Found.Contains(PlaceId); }
+	void ClearFound() { Found.Reset(); }
+
 private:
 	void Notify(UWorld* World, const FText& Text) const;
 
 	TSet<FName> Collected;
+	TSet<FName> Found;
 };
