@@ -295,8 +295,10 @@ ASaltLightingRig::ASaltLightingRig()
 	// brief): less broad rounded swell, narrower and more varied crests (choppier, more crossing directions),
 	// stronger medium waves across the faces so highlights break into strokes. D32 (owner brief): one
 	// dominant direction (narrow spreading, no equal crossing waves forming pointed peaks), broader crests
-	// (less chop), broad swell restored under moderate medium waves.
-	Sea(TEXT("Rough"),    0.8f,  1.f,   0.5f,  280.f, 2600.f, 5.f, 11.f, 3.5f, 1.1f,  0.f, 1.15f, 1.f);
+	// (less chop), broad swell restored under moderate medium waves. D33: a broader spectrum (gamma 3.3) varies
+	// the crest spacing and slightly wider spreading at the peak varies the crest length, so the wave field
+	// does not repeat as uniform bowls; the floor of the spreading stays high (no strongly crossing waves).
+	Sea(TEXT("Rough"),    0.8f,  1.f,   0.5f,  280.f, 2600.f, 3.3f, 8.f, 3.5f, 1.1f,  0.f, 1.15f, 1.f);
 	// Storm (D30: "way bigger waves", used by the storm area): tall long swell and a big, long wind sea.
 	Sea(TEXT("Storm"),    1.8f,  1.f,   0.35f, 650.f, 6000.f, 4.f,  5.f, 2.f,  1.25f, 0.f, 1.3f, 1.f);}
 

@@ -183,6 +183,25 @@ struct FSaltOcean
 		}
 	}
 
+	// Horizontal Jacobian of the wave-scale surface (swells + wind-sea cascades 0 and 1, as the pixel shader
+	// builds it) at another Lagrangian position: crest foam left behind by a crest that has moved on (D33).
+	// F = calm-zone x chop factor, Mask1 = short-wave mask for cascade 1 (taken from the shading point).
+	float JacobianAt(float2 P0, float FadeK, float F, float Mask1, float4 C0, float4 C1,
+		Texture2D TD0, SamplerState SD0, Texture2D TG0, SamplerState SG0,
+		Texture2D TD1, SamplerState SD1, Texture2D TG1, SamplerState SG1)
+	{
+		float3 Dx = float3(1, 0, 0);
+		float3 Dy = float3(0, 1, 0);
+		SwellTangents(P0, FadeK, Dx, Dy);
+		const float2 UV0 = TileUV(P0, C0);
+		const float2 UV1 = TileUV(P0, C1);
+		const float3 M0 = TensorToWorld(float3(Texture2DSample(TG0, SG0, UV0).zw, Texture2DSample(TD0, SD0, UV0).w), C0) * F;
+		const float3 M1 = TensorToWorld(float3(Texture2DSample(TG1, SG1, UV1).zw, Texture2DSample(TD1, SD1, UV1).w), C1) * (F * Mask1);
+		Dx.xy += float2(M0.x + M1.x, M0.z + M1.z);
+		Dy.xy += float2(M0.z + M1.z, M0.y + M1.y);
+		return Dx.x * Dy.y - Dx.y * Dy.x;
+	}
+
 	// World-space normal and horizontal Jacobian (1 = undisturbed, < 1 = compressed crest).
 	void NormalAndJacobian(float2 P0, float FadeK, out float3 Normal, out float Jacobian)
 	{

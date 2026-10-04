@@ -617,3 +617,29 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     it stays distinct from sun glints.
   - Calm water barely compresses, so Calm and Flat stay clear.
 - **Cost:** `M_Ocean` 1500 pixel-shader instructions (was 1362).
+
+### D33 · Foam structure, fresh vs residue, varied crest spacing, subtle reflection patches (Adopted, awaiting owner review)
+- **Owner brief (2026-10-04):**
+  - Break the foreground foam ribbons into shorter irregular patches with clear water between, varied
+    width and tapered ends.
+  - Give the foam internal structure (openings, partial coverage, trailing fragments, denser off-white
+    only on selected crest sections, no uniform bands, not just blurred edges).
+  - Separate fresh foam from fading residue.
+  - Reduce the repeated bowl-shaped wave pattern (vary crest length and spacing, keep the swell, no
+    crossing waves or pointed peaks).
+  - Check the roughness patches and keep them subtle.
+- **Foam (`M_Ocean`):**
+  - Fresh foam = crest compression now × a crest-segment mask. The mask is the patch noise stretched
+    across the waves (`FoamSegLength` 16 m along the crest, `FoamSegAcross` 50 m), so foam forms short
+    tapered segments.
+  - Residue = compression where the crest passed a few seconds ago. That crest now lies `FoamTrail` (7 m)
+    and 2.8 m downwind, evaluated with `FSaltOcean::JacobianAt`. Weights 0.6 and 0.35.
+  - Structure: coverage thresholds the lace pattern. Thin coverage leaves filaments with large openings;
+    dense coverage fills the cells, with bubble holes. Fresh opacity is 0.6–0.97. Residue uses a finer
+    lace at 0.45 opacity: thinner, more open, more transparent.
+- **Waves (Rough):** gamma 5 → 3.3 (varied spacing), spreading at the peak 11 → 8 (varied crest length);
+  the spreading floor stays 3.5. Swell unchanged (0.8).
+- **Reflection patches:** `ReflBreak` 5 → 2 with a softer ramp. `ReflBreak` 1 on `MI_Ocean` switches them
+  off for an A/B check.
+- **Cost:** `M_Ocean` 1715 pixel-shader instructions (was 1500), mostly the residue samples. A packaged
+  benchmark of the ocean is still outstanding.

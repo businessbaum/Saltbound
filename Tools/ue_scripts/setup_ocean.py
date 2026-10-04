@@ -250,7 +250,7 @@ float Alpha2 = BaseRough * BaseRough * BaseRough * BaseRough + min(Variance, Spe
 // Long reflective contours along smooth faces break into segments: broad drifting patches of slightly rougher
 // water (D32). No added microdetail; the small sun highlights keep their shape outside the patches.
 float ReflPatch = Texture2DSampleLevel(QuietTex, QuietTexSampler, XY / ReflBreakTile + float2(0.41, 0.17), 0.0).b;
-Alpha2 *= lerp(1.0, ReflBreak, smoothstep(0.45, 0.7, ReflPatch));
+Alpha2 *= lerp(1.0, ReflBreak, smoothstep(0.4, 0.8, ReflPatch));
 // The cap keeps near highlights crisp (D27); far away a crest is smaller than a pixel, so the cap rises and the
 // sun spreads over the pixel instead of sparking in single pixels (owner: "pixel errors at the top of the
 // waves in the distance", D31).
@@ -282,16 +282,36 @@ float Glow = Thin * Forward * (0.35 + 0.65 * Facing) + SSSAmbient * CrestH * Cre
 Glow *= lerp(1.0, 0.1, saturate(Dist / max(SSSFarDistance, 1.0)));
 float SunLum = dot(SunIllum, float3(0.2126, 0.7152, 0.0722));
 EmissiveOut = LookCrest.rgb * SunLum * (Glow * SSSStrength * LookCrest.a);
-// --- Crest foam (D32): a few soft, irregular patches where crests are compressed (horizontal Jacobian J < 1),
-// only in some broad areas, riding with the water (Lagrangian XY). Lace pattern for irregular soft edges.
-// Calm seas barely compress, so they stay clear. Diffuse surface layer (opacity), distinct from sun glints.
-float Compress = saturate((FoamJStart - J) / max(FoamJStart - FoamJFull, 0.01));
-float FoamPatches = smoothstep(FoamPatch, FoamPatch + 0.2, Texture2DSampleLevel(QuietTex, QuietTexSampler, XY / FoamPatchTile + float2(0.73, 0.29), 0.0).b);
-float2 FUV = float2(dot(XY, WDir), dot(XY, WPerp)) / FoamTile;
-float Lace = Texture2DSample(QuietTex, QuietTexSampler, FUV).r;
-float Foam = Compress * smoothstep(0.0, 0.5, CrestH + 0.3) * FoamPatches;
-Foam = smoothstep(0.2, 0.7, Foam * lerp(0.5, 1.3, Lace)) * FoamAmount;
-Foam *= saturate(1.0 - Dist / max(FoamFadeDistance, 1.0));
+// --- Crest foam (D32, D33). Lagrangian (rides with the water); Single Layer Water surface layer (opacity),
+// distinct from sun glints. Calm seas barely compress, so they stay clear.
+// Fresh foam: the crest is compressed here now (horizontal Jacobian J < 1), but only on short crest segments
+// (a mask that varies along the crest, tapering the ends, clear water between segments).
+float2 Along = float2(dot(XY, WDir), dot(XY, WPerp));
+float Segments = smoothstep(FoamSegment, FoamSegment + 0.18,
+    Texture2DSampleLevel(QuietTex, QuietTexSampler, Along / float2(FoamSegAcross, FoamSegLength) + float2(0.73, 0.29), 0.0).b);
+float Fresh = saturate((FoamJStart - J) / max(FoamJStart - FoamJFull, 0.01)) * smoothstep(0.0, 0.5, CrestH + 0.3) * Segments;
+// Residue: water a crest passed a few seconds ago (that crest is now a few metres downwind). Older foam is
+// thinner, more open and more transparent.
+float Residue = 0.0;
+[unroll] for (int k = 0; k < 2; k++)
+{
+    float Behind = (k == 0) ? FoamTrail * 0.4 : FoamTrail;
+    float2 P1 = XY + WDir * Behind;
+    float J1 = O.JacobianAt(P1, FadeK, F, Mask, Cascade0, Cascade1, Disp0, Disp0Sampler, Deriv0, Deriv0Sampler,
+        Disp1, Disp1Sampler, Deriv1, Deriv1Sampler);
+    float Seg1 = smoothstep(FoamSegment, FoamSegment + 0.18,
+        Texture2DSampleLevel(QuietTex, QuietTexSampler, (Along + float2(Behind, 0.0)) / float2(FoamSegAcross, FoamSegLength) + float2(0.73, 0.29), 0.0).b);
+    Residue = max(Residue, saturate((FoamJStart - J1) / max(FoamJStart - FoamJFull, 0.01)) * Seg1 * ((k == 0) ? 0.6 : 0.35));
+}
+// Internal structure: coverage fills the lace pattern (thin coverage = filaments with large openings, dense =
+// filled cells), bubble holes in the dense parts; residue uses a finer, fragmented lace. No uniform bands.
+float3 FoamTex = Texture2DSample(QuietTex, QuietTexSampler, Along / FoamTile).rgb;
+float FineLace = Texture2DSample(QuietTex, QuietTexSampler, Along / (FoamTile * 0.45) + float2(0.37, 0.53)).r;
+float FreshCov = saturate(Fresh * FoamAmount);
+float ResidueCov = saturate(Residue * FoamAmount) * (1.0 - FreshCov);
+float FreshFoam = smoothstep(1.0 - FreshCov, 1.12 - FreshCov, FoamTex.r) * lerp(0.6, 0.97, FreshCov) * (1.0 - 0.7 * FoamTex.g * FreshCov);
+float ResidueFoam = smoothstep(1.0 - ResidueCov, 1.1 - ResidueCov, FineLace * 0.6 + FoamTex.r * 0.4) * 0.45;
+float Foam = max(FreshFoam, ResidueFoam) * saturate(1.0 - Dist / max(FoamFadeDistance, 1.0));
 FoamOut = Foam;
 RoughOut = lerp(Rough, 0.85, Foam);
 SpecularOut *= 1.0 - Foam;
@@ -320,10 +340,12 @@ SCALARS = {
     "SSSBacklitPower": (2.5, "Crest light"), "SSSAmbient": (0.02, "Crest light"), "ThinScale": (2.5, "Crest light"),
     "SSSFarDistance": (8000.0, "Crest light"),
     # long reflection contours (D32)
-    "ReflBreak": (5.0, "Surface"), "ReflBreakTile": (3000.0, "Surface"),
+    # ReflBreak 1 = off (owner A/B); D33: kept subtle, it must not read as drifting cloudy stains
+    "ReflBreak": (2.0, "Surface"), "ReflBreakTile": (3000.0, "Surface"),
     # crest foam (D32): Jacobian thresholds, patch threshold and sizes
-    "FoamAmount": (1.0, "Foam"), "FoamJStart": (0.75, "Foam"), "FoamJFull": (0.45, "Foam"), "FoamPatch": (0.5, "Foam"),
-    "FoamTile": (900.0, "Foam"), "FoamPatchTile": (9000.0, "Foam"), "FoamFadeDistance": (40000.0, "Foam"),
+    "FoamAmount": (1.0, "Foam"), "FoamJStart": (0.75, "Foam"), "FoamJFull": (0.45, "Foam"),
+    "FoamSegment": (0.45, "Foam"), "FoamSegLength": (1600.0, "Foam"), "FoamSegAcross": (5000.0, "Foam"),
+    "FoamTrail": (700.0, "Foam"), "FoamTile": (900.0, "Foam"), "FoamFadeDistance": (40000.0, "Foam"),
 }
 
 VS_TEXTURES = ["Disp0", "Disp1", "DispPrev0", "DispPrev1"]
