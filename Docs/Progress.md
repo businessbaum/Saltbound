@@ -220,6 +220,8 @@ for a higher screen percentage (for example 75 %) and more content.
 - **Beach with shape (D37, awaiting the owner's check):** the dry beach has sculpted wind ripples, soft mounds and
   swash ridges (Nanite sand mesh); the sea floor keeps its earlier look.
 - **D39:** player 1.5 m; no lichen on the coastal rocks; gulls over the cove and at sea; a gangway to the boat.
+- **D40 (awaiting the owner's check):** the boat weathered (tone patches, paint chips, grime, rain streaks), hewn
+  spars with dents and knots, and lived-in gear (pin rail, barrel, crate, bucket, oars, fenders, cleats).
 
 - **Hand-crafted boat and materials (D38, awaiting the owner's check):** the boat rebuilt from individual hand-made
   boards, spars, ropes and a paneled sail; wood golden-brown and matte with simplified grain, paint muted, metal dark.

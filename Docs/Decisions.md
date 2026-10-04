@@ -794,3 +794,19 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   shoulder). Nine circle over the cove at 14–45 m, five further out at sea.
 - **Boarding:** a hand-made gangway from the pier down to the boat's gap in the bulwark (WorldDynamic, so the
   boat's collision ignores it).
+
+### D40 · Boat weathering and lived-in gear (Adopted, awaiting owner review)
+- **Owner (2026-10-04):** "Shape of the things is way better. Colouring and detail is still needed. Everything looks
+  too perfect. The mast for example is pixel perfect flat, with not a single colour mistake." The test deck section
+  looked better in colour: its many short boards each carry their own tone, worn edges and grime, while the boat's
+  long parts (mast, strakes) came out one even colour.
+- **Weathering bake (`build_boat.weather`):** the vertex masks of every boat mesh are broken up. Tone (B) blends
+  each part's value with blotches 0.4-1.5 m across; wear (R) is the bevel wear broken up plus scattered chips that
+  knock paint off (hull, cream; only a trace on wood, none on rope and metal); grime (G) collects along the deck
+  corners at the feet of bulwarks, posts and gear, and runs as rain streaks down the topsides.
+- **Materials:** stronger variation where the masks act: teak boards grey in patches, varnish patchy, hull paint
+  sun-faded and chipped to the dark wood, cream yellowed; dirt slightly green-brown on the hull.
+- **Spars:** adze facets, shallow dents and knot bumps (`sb_timber.spar`), so no stretch is perfectly round.
+- **Gear:** a pin rail with belaying pins and hanging coils at the mast, a lashed water barrel and crate (staved,
+  iron hoops), a bucket by the wheel, two oars on the side deck, fenders over the pier side, horn cleats fore and
+  aft (with collision for barrel, crate and pin rail).

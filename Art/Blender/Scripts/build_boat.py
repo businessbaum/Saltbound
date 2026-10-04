@@ -501,7 +501,104 @@ def rig_and_fittings():
     # Coiled rope by the mast foot.
     for k in range(4):
         r = 0.22 - k * 0.035
-        parts.append(sb.add_torus("coil", r, 0.022, U((MAST_X - 0.55, -0.45, deck_z(MAST_X - 0.55, -0.45) + 0.02 + k * 0.006)), (0, 0, k * 0.5), 32, 8, M["MI_Rope_Hemp"]))
+        parts.append(sb.add_torus("coil", r, 0.022, U((MAST_X + 0.65, 0.5, deck_z(MAST_X + 0.65, 0.5) + 0.02 + k * 0.006)), (0, 0, k * 0.5), 32, 8, M["MI_Rope_Hemp"]))
+    return parts
+
+
+# --- lived-in gear (D40) ------------------------------------------------------------------------------------
+def staved(name, radius_at, height, staves, base, mat, hoops=(), hoop_mat="MI_Metal_Iron"):
+    """Barrel or bucket from bent staves around radius_at(s) (s 0 bottom .. 1 top), with hoops and a bottom."""
+    parts = []
+    r_max = max(radius_at(i / 10) for i in range(11))
+    w0 = 2 * math.pi * r_max / staves
+    bx, by, bz = base
+    for k in range(staves):
+        a = 2 * math.pi * (k + 0.5) / staves
+
+        def f(s, a=a):
+            r = radius_at(s)
+            ds = 0.01
+            dr = (radius_at(min(s + ds, 1.0)) - radius_at(max(s - ds, 0.0))) / (2 * ds * height)
+            radial = Vector((math.cos(a), math.sin(a), 0.0))
+            n = (radial - Vector((0.0, 0.0, dr))).normalized()
+            return (Vector((bx, by, bz + height * s)) + radial * (r - 0.012), Vector((-math.sin(a), math.cos(a), 0.0)), n,
+                    r / r_max)
+        parts.append(laid_board(name, height, w0 - 0.006, 0.024, f, mat, wear=0.4, grooves=(0, 1), bevel=0.6))
+    for h in hoops:
+        parts.append(sb.add_torus(name + "_hoop", radius_at(h) + 0.006, 0.012, U((bx, by, bz + height * h)), (0, 0, 0), 32, 6, M[hoop_mat]))
+    parts.append(sb.add_cylinder(name + "_bottom", radius_at(0.04) - 0.01, 0.03, U((bx, by, bz + 0.04)), "Z", 16, M[mat]))
+    return parts
+
+
+def deck_gear():
+    """Pin rail with belaying pins and hanging coils at the mast, a lashed water barrel and crate, a bucket by the
+    wheel, oars on the side deck, fenders over the pier side and horn cleats fore and aft."""
+    parts = []
+    # Pin rail aft of the mast.
+    px = MAST_X - 0.42
+    dz0 = deck_z(px, 0.0)
+    for y in (-0.42, 0.42):
+        parts.append(post("pinrail_post", 0.05, 0.62, (px, y, dz0 - 0.03), "MI_Wood_Varnish", 4, 0.9))
+    parts.append(tb.rough_plank("pinrail", 1.06, 0.12, 0.07, U((px, 0.0, dz0 + 0.6)), (0, 0, math.pi / 2), M["MI_Wood_Varnish"], nseed(),
+                                wear=0.4, grooves=(1, 1), split_chance=0.0))
+    for k, y in enumerate((-0.33, -0.17, 0.0, 0.17, 0.33)):
+        parts.append(rod("pin", (px, y, dz0 + 0.5), (px, y, dz0 + 0.78), 0.016, "MI_Wood_Varnish"))
+        parts.append(sb.add_cylinder("pin_head", 0.022, 0.05, U((px, y, dz0 + 0.78)), "Z", 10, M["MI_Wood_Varnish"]))
+        if k % 2 == 0:
+            for j in range(3):
+                coil = sb.add_torus("hang_coil", 0.13 - j * 0.012, 0.016, U((px - 0.03, y, dz0 + 0.42 - j * 0.01)),
+                                    (math.pi / 2, 0, math.pi / 2 + j * 0.25), 24, 6, M["MI_Rope_Hemp"])
+                parts.append(coil)
+    # Water barrel and crate, port side aft of the gap, lashed together.
+    bx, by = -1.65, -1.0
+    parts += staved("barrel", lambda s: 0.21 + 0.045 * math.sin(math.pi * s), 0.66, 12, (bx, by, deck_z(bx, by) - 0.01), "MI_Wood_Varnish",
+                    hoops=(0.12, 0.3, 0.7, 0.88))
+    parts.append(sb.add_cylinder("barrel_lid", 0.2, 0.03, U((bx, by, deck_z(bx, by) + 0.63)), "Z", 20, M["MI_Wood_Teak"]))
+    cx, cy = -2.25, -0.95
+    cz = deck_z(cx, cy)
+    for w, rot, off in ((0.52, (math.pi / 2, 0, 0), (0, 0.19)), (0.52, (math.pi / 2, 0, 0), (0, -0.19)),
+                        (0.38, (math.pi / 2, 0, math.pi / 2), (0.25, 0)), (0.38, (math.pi / 2, 0, math.pi / 2), (-0.25, 0))):
+        for r in range(3):
+            parts.append(tb.rough_plank("crate", w, 0.11, 0.025, U((cx + off[0], cy + off[1], cz + 0.065 + r * 0.115)), rot, M["MI_Wood_Teak"], nseed(),
+                                        wear=0.6, grooves=(0, 1), split_chance=0.2))
+    for r in range(4):
+        parts.append(tb.rough_plank("crate_lid", 0.54, 0.095, 0.025, U((cx, cy - 0.15 + r * 0.1, cz + 0.37)), (0, 0, 0), M["MI_Wood_Teak"], nseed(),
+                                    wear=0.6, grooves=(0, 1), split_chance=0.2))
+    parts += rope("lashing", [(bx + 0.24, by - 0.08, deck_z(bx, by) + 0.35), (bx + 0.1, by - 0.3, deck_z(bx, by) + 0.4),
+                              (cx + 0.1, cy - 0.3, cz + 0.3), (cx - 0.26, cy - 0.12, cz + 0.3)], 0.014)
+    # Bucket by the wheel, with a rope handle.
+    ux, uy = WHEEL_X + 0.15, 0.75
+    parts += staved("bucket", lambda s: 0.12 + 0.035 * s, 0.3, 10, (ux, uy, deck_z(ux, uy) - 0.01), "MI_Wood_Teak", hoops=(0.2, 0.8))
+    parts.append(sb.add_torus("bucket_handle", 0.15, 0.012, U((ux, uy, deck_z(ux, uy) + 0.29)), (math.pi / 2, 0, 0.3), 24, 6, M["MI_Rope_Hemp"]))
+    # Oars lying along the port side deck.
+    for k, y in enumerate((-1.08, -0.96)):
+        x0, x1 = 0.7 + k * 0.1, 3.3 + k * 0.05
+        z = deck_z((x0 + x1) / 2, y) + 0.04 + k * 0.035
+        loom = tb.spar("oar", x1 - x0, 0.03, 0.026, M["MI_Wood_Varnish"], nseed(), sides=10, sweep=0.01, axis=(1, 0, 0))
+        loom.data.transform(Matrix.Translation(U((x0, y, z))))
+        parts.append(loom)
+        parts.append(tb.rough_plank("oar_blade", 0.7, 0.14, 0.022, U((x1 + 0.3, y, z)), (0, 0, 0), M["MI_Wood_Varnish"], nseed(),
+                                    wear=0.5, grooves=(1, 1), split_chance=0.1))
+    # Fenders over the pier (starboard) side.
+    for fx in (-1.8, 1.8):
+        bs = half_beam(fx)
+        top = (fx, bs + 0.02, sheer_z(fx) + BULWARK_H + 0.07)
+        fy = bs + 0.14
+        fz = sheer_z(fx) - 0.3
+        fender = sb.add_cylinder("fender", 0.11, 0.44, U((fx, fy, fz)), "Z", 14, M["MI_Rope_Hemp"])
+        for f in fender.data.polygons:
+            f.use_smooth = True
+        sb.soften(fender, 0.04, 3)
+        parts.append(fender)
+        parts += rope("fender_line", [(fx, fy, fz + 0.22), (fx, bs + 0.1, sheer_z(fx) + 0.3), top], 0.012)
+    # Horn cleats on the covering boards fore and aft.
+    for cxx in (3.55, -3.55):
+        for side in (-1, 1):
+            bs = half_beam(cxx)
+            y = side * (bs - BULWARK_T - 0.1)
+            z = deck_z(cxx, y)
+            parts.append(block("cleat_base", (0.12, 0.06, 0.06), (cxx, y, z + 0.03), "MI_Wood_Varnish", 0.012))
+            parts.append(rod("cleat_horn", (cxx - 0.15, y, z + 0.075), (cxx + 0.15, y, z + 0.075), 0.022, "MI_Wood_Varnish"))
     return parts
 
 
@@ -574,16 +671,90 @@ def hull_collision(mesh_name):
         add([(x + dx, dy, z) for dx in (-0.08, 0.08) for dy in (-0.32, 0.32) for z in (deck_z(x, 0) - 0.05, deck_z(x, 0) + 0.36)])
     hx, hs = 2.75, 0.8
     add([(hx + dx, dy, z) for dx in (-hs / 2, hs / 2) for dy in (-hs / 2, hs / 2) for z in (deck_z(hx, 0) - 0.05, deck_z(hx, 0) + 0.18)])
+    bx, by = -1.65, -1.0
+    add([(bx + 0.25 * math.cos(a), by + 0.25 * math.sin(a), z) for a in [i * math.pi / 4 for i in range(8)]
+         for z in (deck_z(bx, by) - 0.03, deck_z(bx, by) + 0.66)])
+    cx, cy = -2.25, -0.95
+    add([(cx + dx, cy + dy, z) for dx in (-0.27, 0.27) for dy in (-0.2, 0.2) for z in (deck_z(cx, cy) - 0.03, deck_z(cx, cy) + 0.39)])
+    px = MAST_X - 0.42
+    add([(px + dx, dy, z) for dx in (-0.07, 0.07) for dy in (-0.5, 0.5) for z in (deck_z(px, 0) - 0.03, deck_z(px, 0) + 0.66)])
     return cols
 
 
+# --- weathering (D40) -----------------------------------------------------------------------------------------
+def smooth01(t):
+    t = clamp(t)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def weather(obj, chips=0.85, deck_grime=True, seed=0):
+    """Breaks up the baked vertex masks so no part is one perfect colour (owner: "everything looks too perfect"):
+    B tone = the part's own value blended with blotches 0.4-1.5 m across; R wear = the bevel wear broken up, plus
+    scattered chips where paint or varnish is knocked off; G grime = dirt along the deck corners (feet of bulwarks,
+    posts and fittings) and rain streaks down the topsides."""
+    from mathutils import noise as mnoise
+    me = obj.data
+    col = me.color_attributes["Col"]
+    n_l, n_v = len(me.loops), len(me.vertices)
+    data = [0.0] * (n_l * 4)
+    col.data.foreach_get("color", data)
+    co = [0.0] * (n_v * 3)
+    me.vertices.foreach_get("co", co)
+    vi = [0] * n_l
+    me.loops.foreach_get("vertex_index", vi)
+    # Chips knock paint off (hull, cream); wood only shows a faint trace, rope and metal none.
+    chip_scale = []
+    for m in me.materials:
+        name = m.name if m else ""
+        chip_scale.append(1.0 if "Paint" in name else (0.2 if "Wood" in name else 0.0))
+    loop_chip = [0.0] * n_l
+    starts, totals, mat_idx = [0] * len(me.polygons), [0] * len(me.polygons), [0] * len(me.polygons)
+    me.polygons.foreach_get("loop_start", starts)
+    me.polygons.foreach_get("loop_total", totals)
+    me.polygons.foreach_get("material_index", mat_idx)
+    for pi in range(len(starts)):
+        c = chip_scale[mat_idx[pi]] if mat_idx[pi] < len(chip_scale) else 0.0
+        for li in range(starts[pi], starts[pi] + totals[pi]):
+            loop_chip[li] = c
+    off = Vector((seed * 3.7, seed * 1.3, seed * 2.1))
+    tone, chip, wear_mod, grime = [0.0] * n_v, [0.0] * n_v, [0.0] * n_v, [0.0] * n_v
+    for v in range(n_v):
+        x, yb, z = co[3 * v], co[3 * v + 1], co[3 * v + 2]
+        y = -yb                                              # Unreal y
+        p = Vector((x, yb, z)) + off
+        tone[v] = 0.5 + 0.5 * (0.65 * mnoise.noise(p * 1.4) + 0.35 * mnoise.noise(p * 3.1 + Vector((5.0, 1.0, 2.0))))
+        chip[v] = smooth01((mnoise.noise(p * 6.5 + Vector((13.1, 7.7, 3.3))) - 0.42) / 0.12) * chips
+        wear_mod[v] = 0.45 + 0.55 * (0.5 + 0.5 * mnoise.noise(p * 2.7 + Vector((2.0, 9.0, 4.0))))
+        g = 0.0
+        if deck_grime and abs(x) < HALF_LENGTH:
+            bs = half_beam(x)
+            if abs(y) < bs + 0.02:
+                dz = z - deck_z(x, min(abs(y), bs))
+                if -0.06 < dz < 0.16:
+                    g = max(g, smooth01((0.16 - dz) / 0.16) * (0.4 + 0.6 * (0.5 + 0.5 * mnoise.noise(p * 2.0))))
+            if 0.05 < z < sheer_z(x) and abs(y) > bs * 0.8:
+                streak = 0.5 + 0.5 * mnoise.noise(Vector((x * 3.0, yb * 3.0, z * 0.3)) + off)
+                g = max(g, smooth01((streak - 0.58) / 0.22) * 0.65)
+        grime[v] = g
+    for li in range(n_l):
+        v = vi[li]
+        k = 4 * li
+        data[k] = max(data[k] * wear_mod[v], chip[v] * loop_chip[li])
+        data[k + 1] = max(data[k + 1], grime[v])
+        data[k + 2] = 0.55 * data[k + 2] + 0.45 * tone[v]
+    col.data.foreach_set("color", data)
+    me.update()
+    return obj
+
+
 # --- assembly -------------------------------------------------------------------------------------------------
-def finish(parts, name, waterline=None, wear=0.6):
+def finish(parts, name, waterline=None, wear=0.6, chips=0.85, deck_grime=False):
     for p in parts:
         if not p.data.uv_layers:
             sb.world_box_uv(p, 1.0)
     obj = sb.join(parts, name)
     sb.bake_vertex_masks(obj, wear=wear, waterline=waterline, wet_height=0.15, seed=7)
+    weather(obj, chips=chips, deck_grime=deck_grime, seed=len(name))
     return obj
 
 
@@ -593,8 +764,8 @@ def export(obj, cols=()):
 
 
 def build_hull():
-    parts = [hull_core()] + planking() + bulwarks() + deck_planks() + keel_and_posts() + rig_and_fittings()
-    obj = finish(parts, "SM_Boat_Hull", waterline=0.0)
+    parts = [hull_core()] + planking() + bulwarks() + deck_planks() + keel_and_posts() + rig_and_fittings() + deck_gear()
+    obj = finish(parts, "SM_Boat_Hull", waterline=0.0, deck_grime=True)
     cols = hull_collision("SM_Boat_Hull")
     print("SB_BOAT_HULL faces", len(obj.data.polygons), "parts", len(parts), "collision pieces", len(cols))
     export(obj, cols)
@@ -667,7 +838,7 @@ def build_sail():
         z = 0.35 + (rise - 0.5) * k / max(n_hoops - 1, 1)
         hoop = sb.add_torus("hoop", 0.175, 0.026, U((0.0, 0.0, z)), (0, 0, 0), 24, 8, M["MI_Wood_Varnish"])
         parts.append(hoop)
-    obj = finish(parts, "SM_Boat_Sail", wear=0.0)
+    obj = finish(parts, "SM_Boat_Sail", wear=0.0, chips=0.0)
     export(obj)
 
 

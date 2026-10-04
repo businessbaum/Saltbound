@@ -227,12 +227,16 @@ def bend_board(obj, length, frame):
 
 
 def spar(name, length, radius, end_radius, material=None, seed=0, sides=14, sweep=0.03, axis=(-1.0, 0.0, 0.0)):
-    """Hand-shaped round spar (mast, boom, gaff): tapered, faintly faceted, gently crooked along its length.
+    """Hand-shaped round spar (mast, boom, gaff): tapered, faceted from the adze, gently crooked along its length,
+    with shallow dents and a few knot bumps, so no two stretches look alike.
     Built from the origin along `axis`; returns the object."""
+    from mathutils import noise as mnoise
     rng = random.Random(seed)
-    rings = max(6, int(length / 0.3))
+    rings = max(8, int(length / 0.12))
     bow_y, bow_z = Wave1D(rng, 2, 0.5), Wave1D(rng, 2, 0.5)
-    radii = [rng.uniform(0.96, 1.04) for _ in range(sides)]
+    radii = [rng.uniform(0.94, 1.05) for _ in range(sides)]
+    knots = [(rng.uniform(0.05, 0.95), rng.uniform(0, 2 * math.pi), rng.uniform(0.04, 0.07)) for _ in range(max(2, int(length / 2.5)))]
+    offset = Vector((rng.uniform(0, 50), rng.uniform(0, 50), rng.uniform(0, 50)))
     bm = bmesh.new()
     rows = []
     for r in range(rings + 1):
@@ -243,7 +247,14 @@ def spar(name, length, radius, end_radius, material=None, seed=0, sides=14, swee
         row = []
         for i in range(sides):
             a = 2 * math.pi * i / sides
-            row.append(bm.verts.new((t * length, cy + math.cos(a) * rad * radii[i], cz + math.sin(a) * rad * radii[i])))
+            # Dents (adze and wear) and knot bumps.
+            dent = 0.03 * mnoise.noise(Vector((t * length * 2.2, math.cos(a) * 1.5, math.sin(a) * 1.5)) + offset)
+            bump = 0.0
+            for kt, ka, kh in knots:
+                da = math.atan2(math.sin(a - ka), math.cos(a - ka))
+                bump += kh * math.exp(-((t - kt) * length / 0.07) ** 2 - (da / 0.35) ** 2)
+            r_i = rad * radii[i] * (1.0 + dent + bump)
+            row.append(bm.verts.new((t * length, cy + math.cos(a) * r_i, cz + math.sin(a) * r_i)))
         rows.append(row)
     for r in range(rings):
         for i in range(sides):
