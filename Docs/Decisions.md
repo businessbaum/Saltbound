@@ -1022,3 +1022,44 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   flutters with the pennant.
 - **Tests:** `sb.Dev.RunInventoryTests` 10/10 (new: the boat's stores, moving items, saving them); boat suite 30/30;
   swim 5/5; save 5/5; menu 7/7.
+
+### D53 · Object overhaul: every object built for its purpose, checked up close, and given its physics (Adopted)
+- **Owner (2026-10-04):** check the Blender objects before using them, and their physics; a bell must not just hang on a
+  stick: a detailed wooden arm matching the rest, a small iron ring, the bell, physics for everything. The mast "still
+  looks so boring", far too perfect, without extras like iron rings; "think more about the meaning of the objects".
+  Delete the tarp bundle, the foredeck hatch, the lobster pots and the rope coil on deck.
+- **How objects are made now:** purpose first (what holds it, what it holds, how it is used and worn), then the parts
+  that purpose needs, then the model; every object is checked in close-up workbench renders with its collision drawn
+  over it (`Tools/preview_blend.py ... --ucx`) before it is imported, and hanging things get physics.
+- **Mast:** a hewn spar whose head is worked aft and to port by the peak halyard's pull (7 cm and 2 cm at the truck; the
+  pennant's swivel follows, `SaltHullShape.h` MastHeadAft/Port) and bowed a little in the hoist; tarred at the foot,
+  varnished, painted above the hounds. Partners with eight driven wedges and a lashed canvas mast coat; an old repair
+  just above the deck, where masts spring (fish splints fore and aft, rope seizings, two bands); a wooden saddle for the
+  boom's jaws; a band over the gaff's throat; hounds cheeks under the shrouds' eyes; eye bolts with the throat and peak
+  halyard blocks; the forestay's eye with its seizing; a masthead band and a round truck. Between the boom and the
+  throat nothing stands proud, because the sail's hoops slide there (they are now 19 cm, loose round the mast).
+- **Halyards:** the gaff now hangs from something: physics ropes from the blocks on the mast to an eye bolt at the
+  gaff's heel and to a block on a span along the gaff (taut, `ThroatHalyard` / `PeakHalyard`); their falls come down to
+  new pin rails inside the bulwark at the shrouds and hang there coiled. The sail is set and let go at those pin rails.
+- **Boom and gaff:** their heels stop at the mast; jaws bolted to their sides reach round it, lined with leather, closed
+  by a parrel line threaded with wooden beads; bands with eyes at the outer ends.
+- **Bell:** a hewn arm on a band forward of the mast, braced by a grown knee bolted to the mast, an eye bolt through its
+  end with a small iron ring; the cast bell (`SM_Boat_Bell`, mouldings, crown loop) hangs in that ring and its clapper
+  with the bell rope (`SM_Boat_BellClapper`) hangs inside it. "Ring the bell" swings the clapper across to strike.
+- **Lantern:** a forged arm with a hook on a band aft of the mast; the lantern (`SM_Boat_Lantern`: handle, chimney,
+  hood, frames, amber horn panes, base) hangs on it and swings; light it or douse it; the lighting rig lights it at dusk
+  and in the evening with the harbour's lanterns (same light and flicker).
+- **Swing physics** (`USaltSwingComponent`): a damped pendulum in world space that feels the pivot's real motion (roll,
+  pitch, heave, turns), stops at a limit cone where it strikes (the clapper at the bell's sound bow), and is pushed away
+  by a player walking into it. Bell, clapper and lantern collide (the clapper does not).
+- **Gear:** the barrel's lid has a handle and the barrel is lashed to an eye bolt on the bulwark; the crate has rope
+  handles and iron corner straps; the windlass has a ratchet wheel on its drum and a pawl on the cheek; the oars are
+  seized and lashed to an eye; the boat hook rests low in two lashed cleats; the sea chest is built from boards with
+  hinges, hasp, padlock and rope beckets; the net is a soft heap with its cork line and glass floats in rope nets; the
+  ensign's staff has its flag line and cleat.
+- **Deleted:** the tarp bundle, the foredeck hatch, the lobster pots, the rope coils lying on deck, the old bell and
+  lantern on bare brackets.
+- **Collision:** everything on deck collides (net, chest, oars, boat hook, pin rails, partners and coat, bell arm, lantern
+  arm, ensign staff), the hatch's and the removed items' hulls are gone; bell and lantern have their own.
+- **Tests:** boat suite 38/38, new: `BoatHalyardsHoldGaff`, `BoatBellAndLanternSwing`, `BoatSwingsSettle`,
+  `BoatBellRope` (+focus), `BoatLantern` (+focus), `BoatBellBumped`; swim 5/5, menu 7/7, save 5/5, inventory 10/10.

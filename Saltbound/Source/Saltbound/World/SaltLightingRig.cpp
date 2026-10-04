@@ -21,6 +21,7 @@
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "Ocean/SaltOcean.h"
+#include "Boat/SaltBoat.h"
 #include "Props/SaltLantern.h"
 #include "Saltbound.h"
 
@@ -777,6 +778,10 @@ void ASaltLightingRig::PushEnvironment(const FSaltLightingPreset& P, const FSalt
 	for (TActorIterator<ASaltLantern> It(GetWorld()); It; ++It)
 	{
 		It->SetLit(P.bLanternsLit);
+	}
+	for (TActorIterator<ASaltBoat> It(GetWorld()); It; ++It)
+	{
+		It->SetLanternLit(P.bLanternsLit);
 	}
 }
 

@@ -4,7 +4,9 @@
 
 #include "Boat/SaltBoat.h"
 #include "Boat/SaltHullShape.h"
+#include "CableComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Core/SaltContent.h"
 #include "Engine/World.h"
@@ -16,6 +18,7 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Player/SaltPlayerCharacter.h"
+#include "Props/SaltSwingComponent.h"
 #include "Saltbound.h"
 #include "World/SaltLightingRig.h"
 #include "World/SaltWindSubsystem.h"
@@ -530,6 +533,86 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		[this]() { return TestBoat.IsValid() && TestBoat->GetHold() == ESaltBoatHold::Anchored; },
 		[this]() { return FString::Printf(TEXT("hold=%d (2 = anchored)"), TestBoat.IsValid() ? (int32)TestBoat->GetHold() : -1); });
 	Steps.Add({TEXT("PointsTidy"), 0.f, [this]() { if (ASaltBoat* Bt = TestBoat.Get()) { Bt->SetSailSet(false); Bt->SetHold(ESaltBoatHold::Free); } }, nullptr, nullptr});
+
+	// 9d) D53: the gaff hangs from its halyards; the bell, its clapper and the lantern swing with the boat and settle;
+	// the bell rope rings the bell, the player bumps it aside, the lantern lights and douses.
+	Steps.Add({TEXT("RigSetup"), 0.f, [=, this]() { SetWind(0.f, 0.f); Place(TestWater, 90.f, 0.f, false, false); }, nullptr, nullptr});
+	Wait(TEXT("RigSettle"), 4.f);
+	Steps.Add({TEXT("Halyards"), 0.f, [this]()
+	{
+		const ASaltBoat* Bt = TestBoat.Get();
+		bool bOk = Bt != nullptr;
+		FString State;
+		for (const bool bPeak : { false, true })
+		{
+			const UCableComponent* C = Bt ? Bt->GetHalyard(bPeak) : nullptr;
+			const USceneComponent* End = Bt ? Bt->GetGaffHalyardPoint(bPeak) : nullptr;
+			const float Dist = C && End ? (float)FVector::Dist(C->GetComponentLocation(), End->GetComponentLocation()) : 0.f;
+			const bool bAttached = C && End && C->GetAttachedComponent() == End && C->IsVisible();
+			const bool bTaut = C && C->CableLength >= Dist && C->CableLength < Dist + 5.f;
+			const bool bReach = bPeak ? (Dist > 150.f && Dist < 260.f) : (Dist > 10.f && Dist < 45.f);
+			bOk = bOk && bAttached && bTaut && bReach;
+			State += FString::Printf(TEXT("%s: attached=%d dist=%.0fcm length=%.0fcm  "), bPeak ? TEXT("peak") : TEXT("throat"), bAttached ? 1 : 0, Dist,
+				C ? C->CableLength : 0.f);
+		}
+		Report(TEXT("BoatHalyardsHoldGaff"), bOk, State);
+	}, nullptr, nullptr});
+	Steps.Add({TEXT("SwingRoll"), 2.5f, [this]()
+	{
+		MaxValue = MinValue = 0.f;
+		if (ASaltBoat* Bt = TestBoat.Get()) { Bt->DebugKick(FVector::ZeroVector, Bt->GetActorQuat().RotateVector(FVector(0.35, 0.0, 0.0))); }
+	}, [this](float)
+	{
+		if (const ASaltBoat* Bt = TestBoat.Get())
+		{
+			MaxValue = FMath::Max(MaxValue, Bt->GetBellSwing()->GetSwingAngle());
+			MinValue = FMath::Max(MinValue, Bt->GetLanternSwing()->GetSwingAngle());
+		}
+	}, [this]()
+	{
+		Report(TEXT("BoatBellAndLanternSwing"), MaxValue > 2.f && MinValue > 2.f && MaxValue <= 30.5f && MinValue <= 35.5f,
+			FString::Printf(TEXT("after a roll kick: bell=%.1fdeg lantern=%.1fdeg"), MaxValue, MinValue));
+	}});
+	Wait(TEXT("SwingDie"), 12.f);
+	Steps.Add({TEXT("SwingSettled"), 0.f, [this]()
+	{
+		const ASaltBoat* Bt = TestBoat.Get();
+		const float BellA = Bt ? Bt->GetBellSwing()->GetSwingAngle() : 99.f;
+		const float LanternA = Bt ? Bt->GetLanternSwing()->GetSwingAngle() : 99.f;
+		const float ClapperA = Bt ? Bt->GetClapperSwing()->GetSwingAngle() : 99.f;
+		Report(TEXT("BoatSwingsSettle"), BellA < 1.f && LanternA < 1.f && ClapperA < 1.5f,
+			FString::Printf(TEXT("bell=%.2fdeg lantern=%.2fdeg clapper=%.2fdeg"), BellA, LanternA, ClapperA));
+	}, nullptr, nullptr});
+	Steps.Add({TEXT("BellBaseline"), 0.f, [this]() { MaxValue = TestBoat.IsValid() ? (float)TestBoat->GetClapperSwing()->GetStrikeCount() : 0.f; },
+		nullptr, nullptr});
+	UsePoint(TEXT("BoatBellRope"), [this]() { return TestBoat.IsValid() ? TestBoat->GetBellRope() : nullptr; }, 2.15f, 0.5f,
+		[this]() { return TestBoat.IsValid() && TestBoat->GetClapperSwing()->GetStrikeCount() > (int32)MaxValue; },
+		[this]() { return FString::Printf(TEXT("strikes %d -> %d"), (int32)MaxValue, TestBoat.IsValid() ? TestBoat->GetClapperSwing()->GetStrikeCount() : -1); });
+	UsePoint(TEXT("BoatLantern"), [this]() { return TestBoat.IsValid() ? TestBoat->GetLanternUse() : nullptr; }, 0.4f, 0.85f,
+		[this]() { return TestBoat.IsValid() && TestBoat->IsLanternLit() && TestBoat->GetLanternLight()->IsVisible(); },
+		[this]() { return FString::Printf(TEXT("lit=%d"), TestBoat.IsValid() && TestBoat->IsLanternLit() ? 1 : 0); });
+	Steps.Add({TEXT("LanternDouse"), 0.f, [this]() { if (ASaltBoat* Bt = TestBoat.Get()) { Bt->SetLanternLit(false); } }, nullptr, nullptr});
+	// Walk into the bell from the starboard side: it swings away and stops the walker.
+	Steps.Add({TEXT("BumpApproach"), 0.f, [=, this]() { PlacePlayerAboard(SaltHull::BellPivot().X, 0.85f, -90.f); }, nullptr, nullptr});
+	Wait(TEXT("BumpSettle"), 1.f);
+	Steps.Add({TEXT("BumpBell"), 1.5f, [this]()
+	{
+		MaxValue = 0.f;
+		if (ASaltPlayerCharacter* P = GetPlayer())
+		{
+			if (P->GetController() && TestBoat.IsValid()) { P->GetController()->SetControlRotation(FRotator(0.f, TestBoat->GetYawDeg() - 90.f, 0.f)); }
+			P->SetDebugMoveInput(FVector2D(0.f, 1.f));
+		}
+	}, [this](float)
+	{
+		if (const ASaltBoat* Bt = TestBoat.Get()) { MaxValue = FMath::Max(MaxValue, Bt->GetBellSwing()->GetSwingAngle()); }
+	}, [=, this]()
+	{
+		ASaltPlayerCharacter* P = GetPlayer();
+		if (P) { P->SetDebugMoveInput(FVector2D::ZeroVector); }
+		const FVector Feet = FeetInBoat();
+		Report(TEXT("BoatBellBumped"), MaxValue > 4.f && Feet.Y > 15.f, FString::Printf(TEXT("bellMax=%.1fdeg walkerY=%.0fcm (stopped beside it)"), MaxValue, Feet.Y));
+	}});
 
 	// 9c) The starboard ladder (D43): climb up from the water onto the deck, then back down into the sea, rung by rung.
 	auto UseLadder = [=, this](const FString& Name, TFunction<bool()> Check, TFunction<FString()> State)

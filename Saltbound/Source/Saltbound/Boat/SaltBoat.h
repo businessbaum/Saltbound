@@ -8,6 +8,8 @@
 #include "SaltBoat.generated.h"
 
 class UCableComponent;
+class UPointLightComponent;
+class USaltSwingComponent;
 class UMaterialParameterCollection;
 class UMaterialInstanceDynamic;
 class USaltInventoryComponent;
@@ -132,6 +134,20 @@ public:
 	/** One line for logs and tests (SB_BOAT). */
 	FString Describe() const;
 
+	/** The lantern on the mast (D53): lit at dusk and in the evening by the lighting rig, or by hand. */
+	void SetLanternLit(bool bLit);
+	bool IsLanternLit() const { return bLanternLit; }
+	/** A pull on the bell rope: the clapper swings over and strikes the bell. */
+	void RingBell();
+	USaltSwingComponent* GetBellSwing() const { return BellSwing; }
+	USaltSwingComponent* GetClapperSwing() const { return ClapperSwing; }
+	USaltSwingComponent* GetLanternSwing() const { return LanternSwing; }
+	USaltInteractableComponent* GetBellRope() const { return BellRope; }
+	USaltInteractableComponent* GetLanternUse() const { return LanternUse; }
+	UPointLightComponent* GetLanternLight() const { return LanternLight; }
+	UCableComponent* GetHalyard(bool bPeak) const { return bPeak ? PeakHalyard : ThroatHalyard; }
+	USceneComponent* GetGaffHalyardPoint(bool bPeak) const { return bPeak ? GaffSpanBlock : GaffThroatEye; }
+
 	// Components ---------------------------------------------------------------
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Hull;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> BoomPivot;
@@ -173,7 +189,25 @@ public:
 	/** Where the anchor rope leaves the hull (a hawse hole in the starboard bow, D52). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> Hawse;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> AnchorLine;
-	/** Mainsheet from the boom to a block on deck (slack when the sail is taken in). */
+	/** The halyards (D53): from their blocks on the mast down to the gaff's throat eye and its span block; the gaff hangs
+	 *  from them (their falls to the pin rails are part of the hull). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> ThroatBlockPoint;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> PeakBlockPoint;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> GaffThroatEye;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> GaffSpanBlock;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> ThroatHalyard;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> PeakHalyard;
+	/** The bell (D53): it hangs in the ring under the bell arm and swings with the boat; its clapper swings inside it. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltSwingComponent> BellSwing;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Bell;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltSwingComponent> ClapperSwing;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> BellClapper;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> BellRope;
+	/** The lantern (D53): it hangs on the hook aft of the mast and swings; light it or douse it. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltSwingComponent> LanternSwing;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Lantern;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UPointLightComponent> LanternLight;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> LanternUse;
 	/** Mooring lines from the bitts to the pier while moored (their pier ends stay fixed in the world). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> MooringPierFore;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> MooringPierAft;
@@ -318,6 +352,10 @@ private:
 	UFUNCTION() void HandleWindlass(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleLadder(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleStore(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
+	UFUNCTION() void HandleBell(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
+	UFUNCTION() void HandleLantern(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
+	/** The lantern's light and glass follow its state, with a little flicker while it burns. */
+	void UpdateLantern(float DeltaSeconds);
 	void UpdateGangway();
 	/** Shows the steering oar or the wheel and rudder, and puts the helm station at its handle or wheel. */
 	void ApplySteeringLayout();
@@ -366,6 +404,9 @@ private:
 	float PennantWind = 0.f;                   // 0 = hanging .. 1 = streaming out
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> PennantMaterial;
 	UPROPERTY(Transient) TArray<TObjectPtr<UMaterialInstanceDynamic>> EnsignMaterials;
+	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> LanternGlassMaterial;
+	bool bLanternLit = false;
+	float LanternFlicker = 0.f;
 	float Fill = 0.f;                        // belly fill (spring: pops when the sail catches the wind)
 	float FillVel = 0.f;
 	float Luff = 0.f;                        // 0..1, wind from ahead: the sail shivers

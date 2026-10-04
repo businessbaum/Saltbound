@@ -296,5 +296,23 @@
     "dest": "/Game/Saltbound/Boat",
     "nanite": false,
     "collision": "none"
+  },
+  "SM_Boat_Bell": {
+    "fbx": "Boat/SM_Boat_Bell.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "ucx"
+  },
+  "SM_Boat_BellClapper": {
+    "fbx": "Boat/SM_Boat_BellClapper.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
+  },
+  "SM_Boat_Lantern": {
+    "fbx": "Boat/SM_Boat_Lantern.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "ucx"
   }
 }

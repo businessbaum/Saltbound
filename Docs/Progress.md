@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52).
+Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53).
 
 ## Milestone status
 
@@ -223,6 +223,12 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D53 (awaiting the owner's check):** object overhaul. The mast is a worked spar with partners, wedges and a coat, an
+  old fish repair, bands, a boom saddle, hounds cheeks, halyard blocks and a truck; the gaff hangs from real halyards
+  whose falls belay at new pin rails (the sail is set there); boom and gaff jaws with leather and a beaded parrel; the
+  bell hangs from a ring under a hewn arm and rings, the lantern hangs on a hook and lights; both swing with the boat
+  and when bumped; barrel, crate, windlass, oars, boat hook, chest, net and ensign staff detailed; the tarp, hatch,
+  lobster pots and deck coils removed; collision for everything on deck.
 - **D52 (awaiting the owner's check):** the boat's planks each a bit different, more on deck (lobster pots, net, chest,
   tarp, bell, lantern, trailboards, ensign), the barrel and crate open as 10-slot stores, the anchor rope through a
   hawse hole (the anchor is never seen), no mainsheet, bucket or cathead.

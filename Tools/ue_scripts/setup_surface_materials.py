@@ -605,7 +605,9 @@ def main():
                              ("MI_Wood_TeakDark", "MI_Wood_Teak", (0.118, 0.074, 0.042, 1)),
                              ("MI_Paint_HullFaded", "MI_Paint_Hull", (0.175, 0.072, 0.056, 1)),
                              ("MI_Paint_HullDark", "MI_Paint_Hull", (0.098, 0.032, 0.026, 1)),
-                             ("MI_Paint_CreamAged", "MI_Paint_Cream", (0.5, 0.43, 0.3, 1))):
+                             ("MI_Paint_CreamAged", "MI_Paint_Cream", (0.5, 0.43, 0.3, 1)),
+                             # D53: the mast's foot is tarred where it meets the deck and the wet.
+                             ("MI_Wood_Tarred", "MI_Wood_Varnish", (0.028, 0.022, 0.018, 1))):
         sb_ue.make_mi(name, MI, surf, **variant(base, Tint=tint))
     # The ensign (D52): oxblood and cream canvas on the flag master, 90 cm long.
     for name, tint in (("MI_EnsignRed", (0.3, 0.055, 0.04, 1)), ("MI_EnsignCream", (0.6, 0.53, 0.4, 1))):

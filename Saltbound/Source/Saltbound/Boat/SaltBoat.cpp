@@ -4,6 +4,7 @@
 
 #include "Boat/SaltHullShape.h"
 #include "CableComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Core/SaltContent.h"
 #include "Core/SaltSaveSubsystem.h"
@@ -22,6 +23,7 @@
 #include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
+#include "Props/SaltSwingComponent.h"
 #include "Saltbound.h"
 #include "World/SaltWindSubsystem.h"
 
@@ -219,7 +221,7 @@ ASaltBoat::ASaltBoat()
 	OarPivot = Pivot(TEXT("OarPivot"), Hull, OarBoss());
 	OarPivot->SetRelativeRotation(FRotator(-OarRakeDeg, 0.f, 0.f));
 	SteeringOar = Part(TEXT("SteeringOar"), OarPivot);
-	PennantPivot = Pivot(TEXT("PennantPivot"), Hull, FVector(MastX, 0.f, SheerZ(MastX) + MastHeight + PennantHeight));
+	PennantPivot = Pivot(TEXT("PennantPivot"), Hull, FVector(MastX - MastHeadAft, -MastHeadPort, SheerZ(MastX) + MastHeight + PennantHeight));
 	Pennant = Part(TEXT("Pennant"), PennantPivot);
 	Pennant->SetBoundsScale(3.f);   // its vertex animation moves it beyond the mesh bounds
 	EnsignPivot = Pivot(TEXT("EnsignPivot"), Hull, FVector(EnsignX, 0.f, SheerZ(EnsignX) + DeckCamber + EnsignHeight - 0.02f));
@@ -234,7 +236,7 @@ ASaltBoat::ASaltBoat()
 	Helm->PromptText = NSLOCTEXT("Saltbound", "BoatHelmUse", "Take the helm");
 	Helm->LeavePromptText = NSLOCTEXT("Saltbound", "BoatHelmLeave", "Leave the helm");
 
-	// Sail ropes at the shrouds' deadeyes on either side: let the sail down or raise it.
+	// The sail is set and let go at the halyards' pin rails inside the bulwark by the shrouds, on either side (D53).
 	auto Interaction = [this](FName Name, const FVector& LocationM, const FVector& ExtentCm)
 	{
 		USaltInteractableComponent* C = CreateDefaultSubobject<USaltInteractableComponent>(Name);
@@ -243,10 +245,8 @@ ASaltBoat::ASaltBoat()
 		C->SetBoxExtent(ExtentCm);
 		return C;
 	};
-	const float RopeX = MastX + 0.35f;
-	const float RopeY = HalfBeamAtSheer(RopeX) + 0.12f;
-	SailRopePort = Interaction(TEXT("SailRopePort"), FVector(RopeX, -RopeY, SheerZ(RopeX) + 0.75f), FVector(40.f, 22.f, 45.f));
-	SailRopeStarboard = Interaction(TEXT("SailRopeStarboard"), FVector(RopeX, RopeY, SheerZ(RopeX) + 0.75f), FVector(40.f, 22.f, 45.f));
+	SailRopePort = Interaction(TEXT("SailRopePort"), FVector(PinRailX, -PinRailY(), SheerZ(PinRailX) + 0.48f), FVector(38.f, 18.f, 30.f));
+	SailRopeStarboard = Interaction(TEXT("SailRopeStarboard"), FVector(PinRailX, PinRailY(), SheerZ(PinRailX) + 0.48f), FVector(38.f, 18.f, 30.f));
 	SailRopePort->PromptText = SailRopeStarboard->PromptText = NSLOCTEXT("Saltbound", "BoatLowerSail", "Lower the sail");
 	// Windlass on the foredeck: cast off, moor, drop or raise the anchor.
 	Windlass = Interaction(TEXT("Windlass"), FVector(3.55f, 0.f, SheerZ(3.55f) + 0.45f), FVector(30.f, 55.f, 35.f));
@@ -311,6 +311,73 @@ ASaltBoat::ASaltBoat()
 	MooringPierAft->SetUsingAbsoluteLocation(true);
 	MooringLineFore = Rope(TEXT("MooringLineFore"), Pivot(TEXT("BittFore"), Hull, FVector(4.0f, 0.22f, SheerZ(4.0f) + 0.38f)));
 	MooringLineAft = Rope(TEXT("MooringLineAft"), Pivot(TEXT("BittAft"), Hull, FVector(-4.15f, 0.22f, SheerZ(4.15f) + 0.38f)));
+
+	// The halyards (D53): the gaff hangs from them, from the blocks on the mast to its throat eye and its span block.
+	// Taut lines: almost no slack or gravity, many solver passes.
+	ThroatBlockPoint = Pivot(TEXT("ThroatBlockPoint"), Hull, ThroatBlock());
+	PeakBlockPoint = Pivot(TEXT("PeakBlockPoint"), Hull, PeakBlock());
+	GaffThroatEye = Pivot(TEXT("GaffThroatEye"), Gaff, SaltHull::GaffThroatEye());
+	GaffSpanBlock = Pivot(TEXT("GaffSpanBlock"), Gaff, SaltHull::GaffSpanBlock());
+	ThroatHalyard = Rope(TEXT("ThroatHalyard"), ThroatBlockPoint);
+	PeakHalyard = Rope(TEXT("PeakHalyard"), PeakBlockPoint);
+	for (UCableComponent* C : { ThroatHalyard.Get(), PeakHalyard.Get() })
+	{
+		C->CableWidth = 2.4f;
+		C->NumSegments = 8;
+		C->SolverIterations = 16;
+		C->CableGravityScale = 0.04f;   // the gaff's weight hangs on them: no visible sag
+	}
+	ThroatHalyard->NumSegments = 3;
+
+	// The bell (D53) hangs in the ring under its arm forward of the mast and swings with the boat; its clapper swings
+	// inside it on the staple and strikes the bell. Pull the bell rope to ring it.
+	BellSwing = CreateDefaultSubobject<USaltSwingComponent>(TEXT("BellSwing"));
+	BellSwing->SetupAttachment(Hull);
+	BellSwing->SetRelativeLocation(BellPivot() * 100.0);
+	BellSwing->Length = 12.f;
+	BellSwing->MaxAngle = 30.f;
+	BellSwing->Damping = 0.06f;
+	BellSwing->PushRadius = 12.f;
+	Bell = Part(TEXT("Bell"), BellSwing);
+	Bell->SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
+	ClapperSwing = CreateDefaultSubobject<USaltSwingComponent>(TEXT("ClapperSwing"));
+	ClapperSwing->SetupAttachment(Bell);
+	ClapperSwing->SetRelativeLocation(FVector(0.f, 0.f, -5.6f));     // the staple under the crown
+	ClapperSwing->Length = 12.f;
+	ClapperSwing->MaxAngle = 22.f;                                     // the ball meets the bell's sound bow
+	ClapperSwing->Damping = 0.08f;
+	ClapperSwing->Restitution = 0.5f;
+	BellClapper = Part(TEXT("BellClapper"), ClapperSwing);
+	BellRope = Interaction(TEXT("BellRope"), BellPivot() + FVector(0.f, 0.f, -0.36f), FVector(16.f, 16.f, 22.f));
+	BellRope->PromptText = NSLOCTEXT("Saltbound", "RingBell", "Ring the bell");
+
+	// The lantern (D53) hangs on the hook aft of the mast and swings; its light burns inside it (the lighting rig lights
+	// it at dusk, or the player does).
+	LanternSwing = CreateDefaultSubobject<USaltSwingComponent>(TEXT("LanternSwing"));
+	LanternSwing->SetupAttachment(Hull);
+	LanternSwing->SetRelativeLocation(LanternPivot() * 100.0);
+	LanternSwing->Length = 20.f;
+	LanternSwing->MaxAngle = 35.f;
+	LanternSwing->Damping = 0.05f;
+	LanternSwing->PushRadius = 14.f;
+	Lantern = Part(TEXT("Lantern"), LanternSwing);
+	Lantern->SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
+	Lantern->SetCastShadow(false);
+	LanternLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("LanternLight"));
+	LanternLight->SetupAttachment(Lantern);
+	LanternLight->SetRelativeLocation(FVector(0.f, 0.f, -21.5f));
+	LanternLight->SetIntensityUnits(ELightUnits::Candelas);
+	LanternLight->SetIntensity(28.f);
+	LanternLight->SetUseTemperature(true);
+	LanternLight->SetTemperature(2100.f);
+	LanternLight->SetAttenuationRadius(900.f);
+	LanternLight->SetSourceRadius(3.f);
+	LanternLight->SetSoftSourceRadius(4.f);
+	LanternLight->SetCastShadows(true);
+	LanternLight->bUseInverseSquaredFalloff = true;
+	LanternLight->SetVisibility(false);
+	LanternUse = Interaction(TEXT("LanternUse"), LanternPivot() + FVector(0.f, 0.f, -0.2f), FVector(14.f, 14.f, 20.f));
+	LanternUse->PromptText = NSLOCTEXT("Saltbound", "BoatLanternLight", "Light the lantern");
 }
 
 void ASaltBoat::OnConstruction(const FTransform& Transform)
@@ -346,8 +413,11 @@ void ASaltBoat::ResolveContent()
 	Resolve(Pennant, TEXT("Pennant"));
 	Resolve(Ensign, TEXT("Ensign"));
 	Resolve(SteeringOar, TEXT("SteeringOar"));
+	Resolve(Bell, TEXT("Bell"));
+	Resolve(BellClapper, TEXT("BellClapper"));
+	Resolve(Lantern, TEXT("Lantern"));
 	UMaterialInterface* RopeMaterial = LoadObject<UMaterialInterface>(nullptr, SaltContent::RopeMaterial);
-	for (UCableComponent* C : { AnchorLine.Get(), MooringLineFore.Get(), MooringLineAft.Get() })
+	for (UCableComponent* C : { AnchorLine.Get(), MooringLineFore.Get(), MooringLineAft.Get(), ThroatHalyard.Get(), PeakHalyard.Get() })
 	{
 		if (C && RopeMaterial && C->GetMaterial(0) != RopeMaterial)
 		{
@@ -400,7 +470,14 @@ void ASaltBoat::BeginPlay()
 	LadderStarboard->OnInteract.AddDynamic(this, &ASaltBoat::HandleLadder);
 	BarrelLid->OnInteract.AddDynamic(this, &ASaltBoat::HandleStore);
 	CrateLid->OnInteract.AddDynamic(this, &ASaltBoat::HandleStore);
+	BellRope->OnInteract.AddDynamic(this, &ASaltBoat::HandleBell);
+	LanternUse->OnInteract.AddDynamic(this, &ASaltBoat::HandleLantern);
+	// The clapper swings after the bell has moved this frame.
+	ClapperSwing->AddTickPrerequisiteComponent(BellSwing);
 	SetupSailMaterials();
+	const int32 GlassSlot = Lantern->GetMaterialIndex(TEXT("MI_LanternGlass"));
+	LanternGlassMaterial = GlassSlot != INDEX_NONE ? Lantern->CreateAndSetMaterialInstanceDynamic(GlassSlot) : nullptr;
+	SetLanternLit(bLanternLit);
 	SetHold(StartHold);
 	bInitialised = true;
 	UE_LOG(LogSaltbound, Log, TEXT("Boat %s: mass %.0f kg, displacement %.2f m3, centre of mass (%.2f, %.2f, %.2f) m, %d columns, %d capsules"),
@@ -771,6 +848,53 @@ void ASaltBoat::HandleStore(USaltInteractableComponent* Interactable, ASaltPlaye
 	}
 }
 
+void ASaltBoat::HandleBell(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
+{
+	RingBell();
+}
+
+void ASaltBoat::RingBell()
+{
+	// The rope pulls the clapper over to one side of the bell; it swings across and strikes (the bell rocks a little).
+	const FVector Pull = Hull->GetComponentQuat().RotateVector(FVector(0.f, 1.f, 0.f));
+	ClapperSwing->Kick(Pull * 140.f);
+	BellSwing->Kick(-Pull * 25.f);
+}
+
+void ASaltBoat::HandleLantern(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
+{
+	SetLanternLit(!bLanternLit);
+}
+
+void ASaltBoat::SetLanternLit(bool bLit)
+{
+	bLanternLit = bLit;
+	LanternLight->SetVisibility(bLit);
+	LanternLight->SetIntensity(28.f);
+	LanternUse->PromptText = bLit ? NSLOCTEXT("Saltbound", "BoatLanternDouse", "Douse the lantern")
+		: NSLOCTEXT("Saltbound", "BoatLanternLight", "Light the lantern");
+	if (LanternGlassMaterial)
+	{
+		LanternGlassMaterial->SetScalarParameterValue(TEXT("GlowIntensity"), bLit ? 80.f : 0.f);
+	}
+}
+
+void ASaltBoat::UpdateLantern(float DeltaSeconds)
+{
+	if (!bLanternLit)
+	{
+		return;
+	}
+	// The harbour lanterns' flicker: a slow breath and a small fast flutter.
+	LanternFlicker += DeltaSeconds;
+	const float Factor = 1.f + 0.08f * (0.7f * FMath::PerlinNoise1D(LanternFlicker * 0.9f + 17.f) + 0.3f * FMath::PerlinNoise1D(LanternFlicker * 7.3f + 41.f));
+	LanternLight->SetIntensity(28.f * Factor);
+	if (LanternGlassMaterial)
+	{
+		LanternGlassMaterial->SetScalarParameterValue(TEXT("GlowIntensity"), 80.f * Factor);
+	}
+}
+
 void ASaltBoat::GetLadderPath(bool bStarboard, bool bUp, float CapsuleHalfHeight, TArray<FVector>& OutPoints, TArray<bool>& OutStepped) const
 {
 	using namespace SaltHull;
@@ -877,6 +1001,7 @@ void ASaltBoat::Tick(float DeltaSeconds)
 	UpdateVisuals(Dt);
 	UpdateAnchor(Dt);
 	UpdateRopes(Dt);
+	UpdateLantern(Dt);
 	UpdateGangway();
 	UpdateTrail(Dt);
 	PushOceanMask(bMasksOcean);
@@ -1486,6 +1611,16 @@ void ASaltBoat::UpdateRopes(float DeltaSeconds)
 	Fit(MooringLineAft, MooringPierAft, 1.05f, bMoored);
 	// Anchor rode from the cathead down to the anchor.
 	Fit(AnchorLine, Anchor, 1.08f, AnchorAlpha > 0.01f);
+	// The halyards hold the gaff up: taut, a centimetre to spare.
+	for (UCableComponent* C : { ThroatHalyard.Get(), PeakHalyard.Get() })
+	{
+		USceneComponent* End = C == PeakHalyard ? GaffSpanBlock.Get() : GaffThroatEye.Get();
+		Fit(C, End, 1.f, true);
+		if (C && End)
+		{
+			C->CableLength = (float)FVector::Dist(C->GetComponentLocation(), End->GetComponentLocation()) + 1.f;
+		}
+	}
 }
 
 void ASaltBoat::UpdateAnchor(float DeltaSeconds)

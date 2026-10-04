@@ -158,4 +158,20 @@ namespace SaltHull
 		const float Rake = FMath::DegreesToRadians(OarRakeDeg);
 		return FVector(-FMath::Cos(Rake), 0.f, FMath::Sin(Rake));
 	}
+
+	/** D53, the mast and what hangs on it (build_boat.py MAST_HEAD_OFFSET and its SB_MAST / SB_GAFF prints): the mast's
+	 *  head is worked aft and to port, so the pennant's swivel sits there; the throat and peak halyards' blocks on the
+	 *  mast (where their ropes leave them); the bell's and the lantern's pivots; on the gaff (its own frame, m), the throat
+	 *  halyard's eye and the top of the peak halyard's span block. */
+	constexpr float MastHeadAft = 0.07f;
+	constexpr float MastHeadPort = 0.02f;
+	inline FVector ThroatBlock() { return FVector(MastX - 0.134f, -0.113f, SheerZ(MastX) + 7.275f); }
+	inline FVector PeakBlock() { return FVector(MastX - 0.189f, 0.083f, SheerZ(MastX) + 9.895f); }
+	inline FVector BellPivot() { return FVector(1.686f, 0.f, SheerZ(MastX) + 1.494f); }
+	inline FVector LanternPivot() { return FVector(0.937f, 0.f, SheerZ(MastX) + 1.704f); }
+	inline FVector GaffThroatEye() { return FVector(-0.271f, 0.f, 0.117f); }
+	inline FVector GaffSpanBlock() { return FVector(-2.676f, 0.f, 0.503f); }
+	/** The halyards' falls are made fast on pin rails inside the bulwark at the shrouds (the sail is let go there). */
+	constexpr float PinRailX = MastX + 0.35f;
+	inline float PinRailY() { return HalfBeamAtSheer(PinRailX) - 0.165f; }
 }
