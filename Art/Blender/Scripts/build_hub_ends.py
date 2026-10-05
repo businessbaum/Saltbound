@@ -633,6 +633,11 @@ def tuck_and_post(p):
         zt = min(z + ROW, COUNTER - 0.62)
         zm = 0.5 * (z + zt)
         w = min(tuck_w(z + 0.05), tuck_w(zt - 0.05)) - 0.3
+        # The dark core behind the row follows the tuck's true outline (it flares fast under the counter, faster than a row
+        # of square-ended boards can follow): no see-through beside the fashion pieces.
+        for sgn in (-1.0, 1.0):
+            pts = [(POST_X, sgn * POST_HW, z), (POST_X, sgn * (tuck_w(z) + 0.05), z), (POST_X, sgn * (tuck_w(zt) + 0.05), zt), (POST_X, sgn * POST_HW, zt)]
+            p.polygon(pts, "MI_Caulk_Dark", tone=0.2, facing=(-1.0, 0.0, 0.0))
         if w > POST_HW + 0.3:
             for sgn in (-1.0, 1.0):
                 rngs = [(POST_HW + 0.02, w)] if sgn > 0 else [(-w, -POST_HW - 0.02)]
@@ -659,9 +664,10 @@ def tuck_and_post(p):
     for j in range(k):
         u0, u1 = -f.half + 2 * f.half * j / k, -f.half + 2 * f.half * (j + 1) / k
         a0, a1 = f.at(u0)[0], f.at(u1)[0]
-        b0, b1 = Vector((POST_X, a0.y, a0.z)), Vector((POST_X, a1.y, a1.z))
+        b0, b1 = Vector((POST_X + 0.05, a0.y, a0.z)), Vector((POST_X + 0.05, a1.y, a1.z))
         if min(a0.x, a1.x) < POST_X:
-            p.polygon([a0, a1, b1, b0], "MI_Hub_HullTarDark", tone=0.35, facing=(0.0, 0.0, -1.0))
+            s0, s1 = Vector((min(a0.x, POST_X), a0.y, a0.z)), Vector((min(a1.x, POST_X), a1.y, a1.z))
+            p.polygon([s0, s1, b1, b0], "MI_Hub_HullTarDark", tone=0.35, facing=(0.0, 0.0, -1.0))
         if max(a0.x, a1.x) > POST_X - 0.2:
             c0, c1 = Vector((POST_X - 0.2, a0.y, COUNTER - 0.01)), Vector((POST_X - 0.2, a1.y, COUNTER - 0.01))
             p.polygon([Vector((max(a0.x, POST_X - 0.1), a0.y, COUNTER - 0.01)), Vector((max(a1.x, POST_X - 0.1), a1.y, COUNTER - 0.01)), c1, c0],
