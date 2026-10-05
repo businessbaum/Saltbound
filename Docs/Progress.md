@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60).
+Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D63).
 
 ## Milestone status
 
@@ -224,6 +224,13 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D63 (phases 3 and 4, waiting for the owner's review):** the hub is in the game. Her level `L_Hub` streams in at her berth in
+  `L_VisualTest` (`ASaltHubShip`; hidden until the first island is found, `sb.Hub.Show 1` shows her now) and follows the player
+  between harbours (moves only beyond 2.5 km from both berths). The boat moors at the fitting and fleet berths (the windlass; it
+  saves). 33 gates block the locked zones and say why; E points at every service spot log what they will do; the Well's hoist
+  rides to the lower and main deck; ladders up the quays; the salt purse and the unlocked zones are saved.
+  `sb.Dev.RunHubTests [part]`: every part passes except the Chandlery walk (63 s, as D61). The packaged build runs 70-78 fps at the pier, in the dock, on the
+  main deck and at the Keelgate (D63).
 - **D62 (art pass, waiting for the owner's look):** the hub as a giant old galleon in `L_HubReview`. Only the art draws there;
   the blockout stays as hidden collision, so the D61 measurements hold.
   - Outside: the planked hull with the sheer, wales, lidded ports, windows, the tiered sterncastle, the transom with its
@@ -237,7 +244,7 @@ for a higher screen percentage (for example 75 %) and more content.
   rail 0.9 m, rudders, anchor cables and moorings, the crane, counters facing the customers, the hoist's counterweight, the
   port landing, her berth off the island's channel): walking 5-33 s to the Slip, the Tally House and the Keelgate, 63 s to
   the Chandlery; 3.7 m clear everywhere; the boat in and out under the arch; the Storm sea under +1.06 m (hull) and +0.34 m
-  (basin). Open: eight calm zones, a shortcut to the main deck, the space sheets 08-11.
+  (basin). Open: a shortcut to the main deck, the space sheets 08-11 (the eight calm zones came with D63).
 - **D60 (awaiting the owner's check):** the interaction prompt pinned on its object or low on the screen (pause menu: Prompt
   position; on the object by default). The start is a tropical ring island round a lagoon with the harbour inside: palms in
   groves, broadleaf trees, bushes, flowers, big-leaf plants, ferns and beach grass swaying in the wind, a footpath to a hill in
@@ -351,6 +358,10 @@ Developer console (`~`, non-shipping builds):
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
 - `sb.Dev.RunBoatTests [part]` (a part alone: `ladder`, `WindAbeam`, ...), `sb.Dev.Helm [off]`
 - Hub blockout (D61, on `L_HubBlockout`): `python Tools/hub_blockout_checks.py [headroom] [walk | walk:<space>] [boat] [water]`
+- Hub (D63): `sb.Hub.Show 1|0|-1`, `sb.Hub.Berth <id>`, `sb.Hub.Unlock <L#>|all|none`, `sb.Hub.Info`, `sb.Hub.Hoist <stop> [now]`,
+  `sb.Hub.SeaGate open|close|toggle`, `sb.Dev.Salt <n>`, `sb.Dev.HubGoto dock|slip|tally|well|keelgate|main|chandlery`,
+  `sb.Dev.RunHubTests [placed|sealow|nolowfloor|headroom|route|gates|boatdock|slipway|hoist|follow|save|ladder]`
+  (`python Tools/run_pie_test.py "sb.Dev.RunHubTests hoist" --done "SB_TEST HubSuite DONE"`)
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`
   (SB_BOAT state line), `sb.Boat.Place X Y Yaw [Speed m/s]`, `sb.Boat.Hold Free|Moored|Anchored`,
   `sb.Boat.Control <Rudder> <Sheet> [Sail 0|1]` / `sb.Boat.Control off`, `sb.Dev.RunBoatTests`
@@ -368,6 +379,9 @@ Developer console (`~`, non-shipping builds):
     (GPU 11.2 ms), Dusk 84.3 fps (GPU 11.2 ms). The water shader grew to 1540 instructions with the
     second (previous-frame) wave evaluation in the vertex shader. Overall the build is faster than
     revision 3. It was not profiled pass by pass; one known saving is that Lumen screen traces are off.
+  - The hub (D63), same setup, RTX 4070 SUPER: the pier looking at her 74.4 / 69.5 / 73.9 fps (Day / Evening / Dusk; her hidden
+    75.1 / 69.4 / 73.6), the dock 70.7 / 71.3 / 72.4, the main deck 75.8 / 74.9 / 78.3, the Keelgate 75.8 / 75.3 / 75.5.
+    This is also the first packaged build with the FFT ocean and the underwater pass (the cook had failed since D27).
 - The Jacobian foam trail samples the dominant wave direction only.
 - **Ocean (D27):**
   - No foam and no spray (removed at the owner's request; a foam system needs a new attempt).

@@ -6,9 +6,11 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "GenerateMips.h"
 #include "GlobalShader.h"
+#include "Misc/App.h"
 #include "RenderGraphBuilder.h"
 #include "RenderGraphUtils.h"
 #include "RenderingThread.h"
+#include "ShaderCompilerCore.h"
 #include "ShaderParameterStruct.h"
 #include "TextureResource.h"
 
@@ -50,6 +52,14 @@ namespace
 		static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 		{
 			return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
+		}
+
+		static void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
+		{
+			FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
+			// The FFT transforms in place (float4 UAV loads). DX12 / SM6 has them; the D3D11 SM5 fallback needs the opt-in or
+			// the cook fails ("UAV loads from additional typed formats").
+			OutEnvironment.CompilerFlags.Add(CFLAG_AllowTypedUAVLoads);
 		}
 	};
 	IMPLEMENT_GLOBAL_SHADER(FSaltFFTCS, "/Saltbound/SaltOceanFFT.usf", "FFTCS", SF_Compute);
@@ -195,7 +205,8 @@ namespace SaltOceanFFT
 
 	void Enqueue(const FFrame& Frame, const FTargets& Targets)
 	{
-		if (!Targets.IsValid())
+		// Nothing to render in a commandlet (the cook loads the maps with a null RHI: a dispatch there trips an ensure).
+		if (!Targets.IsValid() || !FApp::CanEverRender())
 		{
 			return;
 		}

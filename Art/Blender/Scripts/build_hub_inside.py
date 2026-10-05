@@ -134,10 +134,11 @@ def ceiling(p, rect, z_top, every=BEAM_EVERY, boards=True, beam=(0.3, 0.3), knee
                 p.beam(T.straight(a, b, X, (b - a).normalized().cross(X) * s), (b - a).length, bw * 0.7, 0.16, "MI_Wood_TeakDark", nseed())
 
 
-def wall(p, axis, line, a0, a1, z0, z1, side, openings=(), mats=WALL_MATS, posts=True, plate=True, skirting=True):
+def wall(p, axis, line, a0, a1, z0, z1, side, openings=(), mats=WALL_MATS, posts=True, plate=True, skirting=True, seal=0.15):
     """The face of a partition on its `side` (+1: the face towards +x for an x line, +y for a y line) from a0 to a1 along
     it and z0 to z1: boards in rows (their fronts at the collision wall's face), frame posts, a skirting and a top plate;
-    frames round the openings [(b0, b1, oz0, oz1)] (absolute z)."""
+    frames round the openings [(b0, b1, oz0, oz1)] (absolute z). `seal`: how far a dark backing reaches up behind the top
+    (into the deck's slab: up to the floor's boards where there is no boarded ceiling; none where the top is outdoors)."""
     face = line + side * WALL * 0.5
     n = (X if axis == "x" else Y) * side
     t = Y if axis == "x" else X
@@ -177,6 +178,27 @@ def wall(p, axis, line, a0, a1, z0, z1, side, openings=(), mats=WALL_MATS, posts
             HH.lbeam(p, F, sa, z0 + 0.1, sb_, z0 + 0.1, 0.2, 0.05, 0.12, "MI_Wood_TeakDark", wear=0.8)
     if plate:
         HH.lbeam(p, F, a0, z1 - 0.13, a1, z1 - 0.13, 0.26, 0.1, 0.12, "MI_Wood_TeakDark", wear=0.8)
+    # A dark backing behind the top, up into the deck's slab: the ceiling's boards wobble, and where they met the wall's top
+    # at the same height hairline slits showed the slab's daylit inside (D63: a pale line along the Well's chamber).
+    if seal > 0.0:
+        c = face - side * 0.03
+        lo, hi = z1 - 0.1, z1 + seal
+        if axis == "x":
+            pts = [(c, a0, lo), (c, a1, lo), (c, a1, hi), (c, a0, hi)]
+        else:
+            pts = [(a0, c, lo), (a1, c, lo), (a1, c, hi), (a0, c, hi)]
+        p.polygon(pts, "MI_Caulk_Dark", tone=0.2, facing=tuple(n))
+
+
+SEAL_TO_FLOOR = SLAB - 0.03    # a wall under a deck without a boarded ceiling: its backing reaches into the floor's boards
+
+
+def seam_backing(p, rect, z, holes=()):
+    """Under a floor seen from below (the Well's galleries and the main deck over them): a dark face just inside its boards,
+    facing down, so the seams between the boards do not show the daylit floor above (D63)."""
+    for r in B.subtract(rect, list(holes)):
+        x0, x1, y0, y1 = r
+        p.polygon([(x0, y0, z - 0.03), (x1, y0, z - 0.03), (x1, y1, z - 0.03), (x0, y1, z - 0.03)], "MI_Caulk_Dark", tone=0.2, facing=-UP)
 
 
 def rail(p, axis, line, a0, a1, z, height=B.RAIL_H):
@@ -990,9 +1012,13 @@ def well_level(p, level):
     if level == "lower":
         opens = [r for zid, r in H.open_rects("lower") if zid == "well_l"]
         floor(p, ch, z, holes=[sh] + [h for h, _ in holes])
+        seam_backing(p, ch, z, holes=[sh] + [h for h, _ in holes])
     else:
         opens = [r for zid, r in H.open_rects(level)]
         floor(p, ring_, z, holes=[sh] + [h for h, _ in holes])
+        seam_backing(p, ring_, z, holes=[sh] + [h for h, _ in holes])
+    if level == "upper":                                                         # the main deck over the top gallery
+        seam_backing(p, ring_, Z["main"], holes=[sh] + [h for h, _ in B.flight_holes("main")])
     gaps = [("x", sh[0], hoist[2], hoist[3])] if level == "lower" else []
     gaps += [(ax, ln, h[2] if ax == "x" else h[0], h[3] if ax == "x" else h[1]) for h, (ax, ln) in holes]
     openings = []
@@ -1014,7 +1040,7 @@ def well_level(p, level):
             continue
         ops = [(o[2], o[3], z + o[4], z + o[5]) for o in openings if o[0] == axis and abs(o[1] - line) < 0.01 and o[3] > a0 and o[2] < a1]
         for sd in open_side(is_open, axis, line, a0, a1):
-            wall(p, axis, line, a0, a1, z, Z[nxt] - SLAB, sd, ops)
+            wall(p, axis, line, a0, a1, z, Z[nxt] - SLAB, sd, ops, seal=SEAL_TO_FLOOR)
     # The deck over the gallery: its beams (the boards are the floor above; over the top gallery the main deck's).
     over = ring_ if level != "lower" else ch
     for r in B.subtract(over, [sh]):
@@ -1176,7 +1202,7 @@ def build_keelgate():
         if kind != "wall" or x < ch[0] - 0.01:
             continue
         for sd in open_side(is_open, axis, line, a0, a1):
-            wall(p, axis, line, a0, a1, zq, Z["lower"] - SLAB, sd)
+            wall(p, axis, line, a0, a1, zq, Z["lower"] - SLAB, sd, seal=SEAL_TO_FLOOR)
     # The Keelgate (G5): the ring and the disc of pale seamless stone, the turquoise lines (two circles, seven spokes), seven
     # empty sockets round it (spaces.keelgate.keelgate).
     raised = kg["raised"]
@@ -1456,8 +1482,8 @@ def build_chandlery():
     for (axis, line, a0, a1, s_out) in (("y", dh["y0"] + 0.15, dh["x0"], dh["x1"], -1.0), ("x", dh["x0"] + 0.15, dh["y0"], dh["y1"], -1.0),
                                         ("x", dh["x1"] - 0.15, dh["y0"], dh["y1"], 1.0)):
         ops = [(win["y0"], win["y1"], zm + win["z0"], zm + win["z1"])] if (axis == "x" and line > 110) else []
-        wall(p, axis, line, a0, a1, zm, zm + eav, s_out, ops, mats=PAINT)
-        wall(p, axis, line, a0, a1, zm, zm + eav, -s_out, ops, posts=False)
+        wall(p, axis, line, a0, a1, zm, zm + eav, s_out, ops, mats=PAINT, seal=0.0)
+        wall(p, axis, line, a0, a1, zm, zm + eav, -s_out, ops, posts=False, seal=0.0)
     if True:                                                                      # the window: glass in its frame
         F = (Vector((dh["x1"], 0.5 * (win["y0"] + win["y1"]), zm + 0.5 * (win["z0"] + win["z1"]))), Y, UP, X)
         HE.window_unit(p, F, 0.5 * (win["y1"] - win["y0"]), 0.5 * (win["z1"] - win["z0"]), -0.15, "glass", "MI_Paint_Cream", panes=(2, 1))

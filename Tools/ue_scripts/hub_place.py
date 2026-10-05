@@ -35,6 +35,9 @@ BLK_SKIP_UNDER_ART = {"Gates", "Markers"}
 SHIP_ZONE = (12000.0, 30000.0, 0.2)
 BASIN_ZONE = (2500.0, 4000.0, 0.07)
 LANTERN_CD = 60.0          # a lantern below decks (the game's ASaltLantern is 28 cd)
+# How far a lantern reaches (cm): 60 cd is under 1 lux beyond 8 m. With 16 m each of the Well's 14 lanterns lit the whole shaft,
+# and their shadows cost 4 ms at the Keelgate in the packaged build (D63).
+LANTERN_RADIUS = 1000.0
 INTERIOR_MIN_EV = 3.0      # how far the eye opens up below decks (the Day preset stops at EV 11, Dusk at 5)
 INTERIOR_MAX_EV = 7.5      # and how far it may close there (the shaft's daylight and the doorways would black the rooms out)
 # The enclosed spaces (ship metres x0, x1, y0, y1, z0, z1): each gets its own exposure range. Under the arcades the eye opens
@@ -203,7 +206,7 @@ def lanterns(p):
         lc.set_editor_property("intensity", LANTERN_CD)
         lc.set_editor_property("use_temperature", True)
         lc.set_editor_property("temperature", 2100.0)
-        lc.set_editor_property("attenuation_radius", 1600.0)
+        lc.set_editor_property("attenuation_radius", LANTERN_RADIUS)
         lc.set_mobility(unreal.ComponentMobility.MOVABLE)
     return len(lamps)
 

@@ -10,6 +10,7 @@ player when it is made). "Measured" values come from the tests and are not set a
 | Player | `Core/SaltStats.h`, `FSaltPlayerStats` (the defaults are the values) |
 | Items | `Core/SaltItems.cpp`, `SaltItems::All()` |
 | Tools | `Core/SaltTools.cpp`, `SaltTools::All()` |
+| The hub ship's systems (D63) | the `Hub` category of `Hub/SaltHubShip.h`, `SaltHubBerth.h`, `SaltHubHoist.h`, `SaltHubLadder.h`, `SaltHubGate.h`; the places from `Docs/Design/HubShip/HubShip_Data.json` (`build_hub_level.py`) |
 
 ## Boats
 
@@ -57,10 +58,20 @@ Every number from `Docs/Design/HubShip/HubShip_Data.json` (generated from `hub_d
 | Walking from the fitting berth | Slip 4.6 s, Tally House 10.2 s, Keelgate 33.4 s, Chandlery 63.1 s | 2.5 m/s; sprinting about 0.6 x |
 | Her berth | (81, 415) m, bow to 92 degrees | off the lagoon's channel, held by two bow cables and two stern moorings |
 | Calm zones | 20 % within 120 m of her (full by 300 m), 10 % → 7 % in the basin | Storm: +1.06 m under the hull, +0.34 m in the basin |
-| Lanterns below decks | 60 cd, 2100 K, lit by day | exposure down to EV 3 inside |
+| Lanterns below decks | 60 cd, 2100 K, lit by day, reach 10 m (D63; was 16 m) | exposure down to EV 3 inside, up to EV 7.5 |
 | Sea gate (D62) | portcullis 20 x 9 m, raised 26.5 m in 24 s (eased), capstans 8 turns | starts open; `sb.Hub.SeaGate`; points at 21.5 m when up |
 | Rig (D62) | masts 54 / 76 / 64 m over the main deck; round tops 14 m (main); shrouds 5 / 8 / 6 a side | ratlines every 0.5 m; lateen yard 34 m on the mizzen |
 | Art (D62) | about 26 000 hand-made boards and timbers in 26 meshes (Nanite) | built in about 2 min (`build_hub_*.py`); the blockout collides |
+| Her level (D63) | `L_Hub`: her pivot (x 80, the waterline) at the origin, bow to +X | `ASaltHubShip` streams it in at a berth (`HubLevel`) |
+| Follow rule (D63) | she moves only while the player is more than 2 500 m from both berths, checked every 2 s | `FollowDistanceM`, `CheckInterval`; a berth's harbour is 1 200 m round it (`HarbourRadiusM`) |
+| First sight (D63) | hidden until the first island is found; then she appears only beyond 2 500 m or outside 75 degrees of the view | `bHiddenUntilLandfall`, `ViewHalfAngle`; `sb.Hub.Show 1` |
+| Moorings (D63) | fitting berth (the quay 2.1 m to starboard), fleet berths (2.1 m and 2.5 m to port); the quays 1.5 m over the water | the windlass moors to the nearest within 8 m (`MooringRadius`); 11-29 cm off the pose moored |
+| Hoist (D63) | stops quay / lower / main deck at 0 / 4 / 16 m; 1.6 m/s, 0.6 m/s2 to start and stop | measured: 4 m in 4.8 s, 12 m in 9.7 s; `HoistSpeed`, `HoistAccel` |
+| Counterweight (D63) | 0.8 x 1.2 x 1.5 m of stone, runs the other way, in its railed bay when the cage is at the main deck | its sheave 0.9 m aft and 2.3 m to port of the cage's |
+| Gates (D63) | 33 blockers (the Keelgate, G5, blocks nothing): doors 1.2 x 2.2 m, rope 2.4 x 1.0, ladders 0.9 x 3.0, shutters 1.6 x 1.4, grilles 3.0 x 2.5 | block while their zone (L1-L17) is locked; `sb.Hub.Unlock` |
+| Quay ladders (D63) | 4 (x 3.5 and 20, both quays), rungs every 30 cm down to 3.3 m under the quay deck | from the water onto the quay in 2.2 s |
+| Salt purse (D63) | a saved number, 0 at the start; nothing spends it yet | `sb.Dev.Salt <n>` |
+| Storm sea at her (D63, `HubSeaLow`) | under the hull up to +1.20 m, in the basin up to +0.36 m (60 s) | right at the 1.2 m limit; D61 measured +1.06 m in another minute of the same sea |
 
 ## Player
 

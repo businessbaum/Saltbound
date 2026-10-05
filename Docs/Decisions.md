@@ -1554,7 +1554,7 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - Raised 26.5 m into a slot in the gatehouse over the arch, its points hang at the springing (21.5 m), clear of any mast.
   - Four ropes run up over sheaves and down through the wings to a capstan on each quay by the mouth. E at a capstan
     raises or lowers it in 24 s, easing in and out: the ropes pay in and out, the capstans turn eight times.
-  - It starts open and is not saved (a boat can always come home). `sb.Hub.SeaGate open|close|toggle|snapopen|snapclosed`.
+  - It starts open (a boat can always come home); since D63 the save keeps its state. `sb.Hub.SeaGate open|close|toggle|snapopen|snapclosed`.
   - The quays' rung ladders moved from x 1.5 to 3.5, out of the grooves.
 - **The rig** (`hub.rig`: the numbers of outside.masts, plus the galleon's lateen and spritsail yards; `build_hub_rig.py`):
   - Each mast is stepped in three pieces: the lower mast with rope wooldings up to a round fighting top (plank platform on
@@ -1614,6 +1614,103 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     iron grilles with timber behind (G6), and the cargo rope with its CARGO board.
 - **Still to do or to decide:**
   - The figurehead is a carved scroll for now.
-  - The hoist and the sea gate's state are not saved (phase 3).
+  - The sea gate's state is saved since D63; the hoist starts at the quay.
   - The space sheets 08-11 still show the layouts from before D61.
   - The section and exploded sheets draw the sterncastle as one block.
+
+### D63 · The hub ship, phases 3 and 4: her systems, her own level, into the game (Provisional: waiting for the owner's review)
+- **Owner (2026-10-05):** "Continue with Phase 03 and 04 I will Review everything when I am back" (the hub prompt's sections 7
+  to 9).
+- **Her own level, `L_Hub`** (`Tools/ue_scripts/build_hub_level.py`): the ship alone, her pivot (x 80, the waterline) at the
+  origin, bow to +X. What goes in is shared with the art review map through `hub_place.py`, so `L_HubReview` and `L_Hub` hold
+  the same ship:
+  - the art (visual only) over the blockout as hidden collision (its gates and markers left out: the gate actors block);
+  - the sea gate, the pennant, the lanterns' lights (35) and the exposure volumes below decks (6);
+  - the gates, the E points, the hoist, the quay ladders and the moorings (below);
+  - `ASaltHubTestData`: the data's open floors, the walks, the sea's sample points and the dock's numbers for the tests.
+- **`ASaltHubShip` and `ASaltHubBerth`** (`Hub/`):
+  - The ship streams `L_Hub` in at the active berth (`ULevelStreamingDynamic::LoadLevelInstanceBySoftObjectPtr`) and unloads
+    the old instance when she moves. While she lies at a berth, its calm zones go to the ocean (the ocean takes 8 calm zones
+    now: shader, `MPC_Ocean` and `MaxCalmZones`; the visual test map uses 6).
+  - **Follow rule:** she lies at the berth of the harbour the player last sailed to or moored at (within 1 200 m of it) and
+    moves only while the player is more than 2 500 m from both berths, checked every 2 s; never while the boat lies moored to
+    her. Today there is one berth; the test spawns a dev berth 6 km away.
+  - **First sight:** hidden until the first island is found (`FoundPlaces`), then she appears when the player is beyond 2.5 km
+    or looking more than 75 degrees away; `sb.Hub.Show 1` shows her at once.
+  - Her berth `SaltboundRoads` and the ship actor are in `L_VisualTest` (`create_visual_test_map.py`, via
+    `hub_place.berth_and_ship`).
+- **Mooring in the hub:** `USaltMooringPointComponent` (on `ASaltHubMooring`) at the fitting berth and the two fleet berths: the
+  boat's pose, which side the quay is and how far, the quay's height. The windlass moors to the nearest mooring within the
+  boat's 8 m mooring radius, the boat's own start mooring at the pier included; the lines and the gangway go to the side the
+  mooring names. Mooring saves (D46).
+- **Gates** (`ASaltHubGate`, 33): a blocker where the blockout's gate box stands (the boxes now come from `hub_layout.gate_box`,
+  shared with the blockout and the art), blocking while its zone (L1-L17) is locked; E shows the line. The data got a prompt and a
+  line per gate type: "Try the door" / "Barred from inside.", "Read the board" / "Closed for now." (the cargo rope's own line
+  "Cargo work, keep clear."), "Try the chain" / "Chained and padlocked.", "Try the shutters" / "Shuttered from inside.", "Look
+  through the grille" / "Stacked timber, and no way in.". The Keelgate (G5) blocks nothing.
+- **E points** (`ASaltHubPoint`, 12): at every E of the spaces with the data's prompts; they log what they would do.
+- **The hoist** (`ASaltHubHoist`): a station in the cage: W up, S down, one stop per press (quay, lower deck, main deck), easing
+  in and out; while it moves the rider is held inside ("Hold on"). E at a stop's rail gap calls it. The rail gaps at the lower and
+  main deck are roped and blocked while the cage is elsewhere. The counterweight runs the other way on its own rope. The cage and
+  the counterweight are their own meshes now (`SM_Hub_HoistCage`, `SM_Hub_HoistWeight`); the gantry, the guide posts and the
+  weight's bay stay in the Well's art. The yoke's ropes now run from the cage's corner posts. The brake's hand line is gone (it
+  cannot stretch with the cage); the lever stays in the cage.
+- **Quay ladders** (`ASaltHubLadder`, 4, the D54 ladder): E or swimming into it takes hold; W climbs onto the quay.
+- **Save version 5:** the boat's mooring, the hub's berth, the unlocked zones, the salt purse and the sea gate's state.
+- **Dev commands:** `sb.Hub.Show 1|0|-1`, `sb.Hub.Berth <id>`, `sb.Hub.Unlock <L#>|all|none`, `sb.Hub.Info`,
+  `sb.Hub.Hoist <stop> [now]`, `sb.Dev.Salt <n>`, `sb.Dev.HubGoto dock|slip|tally|well|keelgate|main|chandlery`.
+- **Tests** (`sb.Dev.RunHubTests [part]`, `Dev/SaltDevHubTests.cpp`; in `L_VisualTest` with her streamed in), each part alone:
+  - placed: at the berth to 0.00 cm and 0.000 degrees; the sea floor 47.5 m under the keel at 40 points.
+  - sealow: Storm for 60 s: +1.20 m under the hull (right at the limit), +0.36 m in the basin.
+  - nolowfloor: 5 854 samples, none below +1.5 m (the slipway excepted).
+  - headroom: 18 136 spots where a player can stand, the least 3.7 m clear. Spots against a wall's foot are left out (a knee-high
+    sphere touches the wall): the first run found 4 samples at the bulwark's foot under its lean, where nobody stands.
+  - route: the Slip 4.6 s, the Tally House 10.2 s, the Keelgate 33.4 s each way; the Chandlery 63 s (fails the 40 s target, as in
+    D61: proposal 3 is still the owner's to decide).
+  - gates: all 33 stop the player and show their line; unlocking all opens all 33, locking closes them again. The forecastle's
+    four (L14) stand behind the cargo rope (L15), so nobody reaches them yet: they are checked by their blocker.
+  - boatdock: in under the arch with no contact (7.8 m from the quays), moored at the fitting berth (29 cm off the pose) and at a
+    fleet berth (11 cm), each mooring kept through a save and a load, out again with no contact.
+  - slipway: driven at it at 2.5 m/s, it runs aground softly (0.7 cm deep) and lies still.
+  - hoist: up 4 m in 4.8 s, up 12 m in 9.7 s, the rider inside all the way, E while moving does nothing, stepping out onto the
+    main deck; down again in 9.8 s and 4.8 s.
+  - follow: she stays while the player is in the dev berth's harbour, moves when the player is 3 km from both.
+  - save: the berth, the zones and the salt come back. ladder: from the water onto the quay in 2.2 s.
+  - The boat's mooring and ladder parts and the save suite pass after the mooring and save changes.
+- **Packaging:** the cook had been failing since the FFT ocean (D27), for two reasons:
+  - Its in-place FFT reads typed UAVs, which the D3D11 SM5 fallback rejects. The FFT shader now opts in
+    (`CFLAG_AllowTypedUAVLoads`); DX12 / SM6 is unchanged.
+  - The cook loads the maps with a null RHI and the ocean still dispatched its FFT there, which trips an engine ensure. The
+    FFT now does nothing where nothing can render (`FApp::CanEverRender`).
+  - The hub's folder is always cooked (`/Game/Saltbound/Hub`): the hoist resolves its meshes by path.
+- **Measured in the packaged build** (Development, 2560 x 1440 fullscreen, the editor closed, RTX 4070 SUPER; `Run-Build.ps1` with
+  `r.VSync 0, t.MaxFPS 0, sb.Hub.Show 1`, then `sb.Dev.HubGoto <space>` or the pier spot, then `sb.Dev.Benchmark 10`; average fps,
+  Day / Evening / Dusk):
+
+  | Where | Day | Evening | Dusk | GPU, frame p95 (worst preset) |
+  |---|---|---|---|---|
+  | The pier, looking at her | 74.4 | 69.5 | 73.9 | 13.7 ms, 15.2 ms |
+  | The pier, her hidden (`sb.Hub.Show 0`) | 75.1 | 69.4 | 73.6 | 13.8 ms, 15.2 ms |
+  | In the dock (the starboard quay) | 70.7 | 71.3 | 72.4 | 13.4 ms, 15.3 ms |
+  | On the main deck | 75.8 | 74.9 | 78.3 | 12.7 ms, 14.4 ms |
+  | At the Keelgate | 75.8 | 75.3 | 75.5 | 12.6 ms, 13.9 ms |
+
+  - Every spot meets D8 (60 fps). Seen from the pier she costs about 0.1 ms.
+  - Before the lanterns' reach was cut (below) the Keelgate measured 62.1 / 61.5 / 61.6 (GPU 15.5 ms, frame p95 16.9 ms): the
+    lanterns' shadows took 4 ms there (`profilegpu`).
+  - Runs vary by 2-3 fps; one whole series came out 5-8 fps lower (the pier 65.9 / 61.3 / 66.1, with her hidden 72.9 / 66.7 /
+    68.9 in the same series). The table is the repeat.
+- **Two fixes to the art pass (D62) found while measuring:**
+  - **Light leaks in the Well:** a pale line ran along the Keelgate chamber's walls under the lower gallery, and the seams of the
+    galleries' floors glowed from below. Over the galleries the deck is beams only, and the boards seen from below are the floor
+    above; its dark seam backing faced up only, and the walls stopped 0.24 m short of those boards. Every wall now has a dark
+    backing behind its top, up into the deck's slab (up to the floor's boards where there is no boarded ceiling), and the
+    floors seen from below have a down-facing backing inside their boards. Evidence:
+    `Docs/Evidence/D63/D63_keelgate_dusk_light_leak_before_after.jpg`.
+  - **The lanterns' reach:** 16 m to 10 m (`hub_place.LANTERN_RADIUS`). 60 cd gives under 1 lux beyond 8 m, but with 16 m each of
+    the Well's 14 lanterns lit the whole shaft and their shadows cost 4 ms at the Keelgate. No visible change at Dusk.
+- **Still to do or to decide:**
+  - The Chandlery is 63 s away on foot (D61 proposal 3: the Keel Walk shortcut, or the hoist from the Keelgate as the way up).
+  - A far view (HLOD or a far mesh) for her silhouette, and her shadow at a distance (phase 2's last item).
+  - Opening a gate does not remove its art yet; the zones behind are not built (not now, prompt section 11).
+  - The hoist's stop is not saved (it starts at the quay).
