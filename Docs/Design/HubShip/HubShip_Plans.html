@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hub Ship Plans</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Alegreya:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* The sheets are drawn on canvases by hub_*.js. Offline (or in the export), the fonts come from Art/Fonts. */
+@font-face{font-family:"SB Fell";src:url("../../../Art/Fonts/IMFellEnglish/IMFeENrm28P.ttf")}
+@font-face{font-family:"SB Fell";font-style:italic;src:url("../../../Art/Fonts/IMFellEnglish/IMFeENit28P.ttf")}
+@font-face{font-family:"SB Fell SC";src:url("../../../Art/Fonts/IMFellEnglishSC/IMFeENsc28P.ttf")}
+@font-face{font-family:"SB Alegreya";src:url("../../../Art/Fonts/Alegreya/Alegreya-Regular.ttf")}
+@font-face{font-family:"SB Alegreya";font-weight:700;src:url("../../../Art/Fonts/Alegreya/Alegreya-Bold.ttf")}
+@font-face{font-family:"SB Alegreya";font-style:italic;src:url("../../../Art/Fonts/Alegreya/Alegreya-Italic.ttf")}
+:root{--bg:#0b1014;--fg:#d6dcdc;--muted:#86929a;--line:#1f2b32;--cream:#f2e2bf;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 17px/1.55 "Alegreya","SB Alegreya",Georgia,serif;padding:28px 16px 72px}
+.wrap{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1{font:400 clamp(2rem,4vw,3rem)/1.1 "IM Fell English","SB Fell",Georgia,serif;margin:0;color:var(--cream)}
+h2{font:400 1.5rem/1.2 "IM Fell English","SB Fell",Georgia,serif;margin:0 0 10px;color:var(--cream)}
+p{margin:0;max-width:72ch;color:var(--fg)}
+.lede{color:var(--muted)}
+nav{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:15px}
+nav a{color:#c9b98f}
+figure{margin:0}
+figure canvas{width:100%;height:auto;display:block;border-radius:4px;box-shadow:0 6px 30px rgba(0,0,0,.5)}
+figcaption{margin-top:10px;color:var(--muted);font-size:15px}
+body.single{padding:0;background:#000}
+body.single .wrap{max-width:none;gap:0}
+body.single header,body.single figcaption,body.single h2{display:none}
+body.single figure canvas{width:auto;max-width:100%;border-radius:0;box-shadow:none}
+</style>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Saltbound &ndash; the hub ship</h1>
+    <p class="lede">Design proposal (2026-10-05). Plans and sketches of the big ship that is the game's hub: its decks, the
+      four service spaces, and the space planned but locked. The text spec is <code>HubShip_Design.md</code>; the build
+      prompt is <code>HubShip_Agent_Prompt.md</code>. Add <code>#sheet-id</code> to the address to see one sheet alone at full size.</p>
+    <nav id="nav"></nav>
+  </header>
+  <main id="sheets" class="wrap"></main>
+</div>
+<script src="hub_kit.js"></script>
+<script src="hub_data.js"></script>
+<script src="hub_sheets1.js"></script>
+<script src="hub_sheets2.js"></script>
+<script>
+(async () => {
+  const faces = ['400 30px "IM Fell English"', 'italic 400 30px "IM Fell English"', '400 30px "IM Fell English SC"', '400 20px "Alegreya"', '700 20px "Alegreya"', 'italic 400 20px "Alegreya"',
+    '400 30px "SB Fell"', 'italic 400 30px "SB Fell"', '400 30px "SB Fell SC"', '400 20px "SB Alegreya"', '700 20px "SB Alegreya"', 'italic 400 20px "SB Alegreya"'];
+  await Promise.all(faces.map(f => document.fonts.load(f).catch(() => null)));
+  const hash = location.hash.slice(1), exporting = hash.startsWith('export'), only = SHEETS.find(s => s.id === hash);
+  const want = exporting && hash.includes(':') ? hash.split(':')[1].split(',') : null;
+  const list = only ? [only] : want ? SHEETS.filter(s => want.includes(s.id)) : SHEETS, out = {}, host = document.getElementById('sheets'), nav = document.getElementById('nav');
+  if (only) document.body.classList.add('single');
+  for (const [i, def] of SHEETS.entries()) {
+    if (!list.includes(def)) continue;
+    const { cv, c } = sheet(def.w, def.h, def.title, def.sub, i + 1, SHEETS.length);
+    const t0 = performance.now();
+    try { def.draw(c); out['time_' + def.id] = Math.round(performance.now() - t0); } catch (e) { console.error(def.id, e); txt(c, 'ERROR: ' + e.message, 80, 400, { size: 30, col: 'red' }); out['error_' + def.id] = String(e.stack); }
+    const n = String(i + 1).padStart(2, '0');
+    if (exporting) { out[`HubShip_${n}_${def.id}`] = cv.toDataURL('image/jpeg', 0.9); continue; }
+    const fig = document.createElement('figure'); fig.id = def.id;
+    const h = document.createElement('h2'); h.textContent = `${i + 1}. ${def.title}`; fig.appendChild(h); fig.appendChild(cv);
+    const cap = document.createElement('figcaption'); cap.textContent = def.sub || ''; fig.appendChild(cap); host.appendChild(fig);
+    const a = document.createElement('a'); a.href = '#' + def.id; a.textContent = `${i + 1}. ${def.title}`; a.onclick = () => setTimeout(() => location.reload(), 0); nav.appendChild(a);
+  }
+  if (exporting) { out.areas = AREAS; document.body.innerHTML = '<pre id="sb-out">' + JSON.stringify(out) + '</pre>'; }
+})();
+</script>
+</html>
