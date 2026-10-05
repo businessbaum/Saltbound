@@ -1,4 +1,4 @@
-"""Render the hub ship's plan sheets (design proposal D60) to PNG.
+"""Render the hub ship's plan sheets (design proposal) to images.
 
   python Tools/design/render_hub_ship.py [sheet-id ...]
 

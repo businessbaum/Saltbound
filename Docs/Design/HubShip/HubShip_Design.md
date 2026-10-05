@@ -1,4 +1,4 @@
-# The hub ship: game concept and design (proposal, D60)
+# The hub ship: game concept and design (proposal)
 
 Owner (2026-10-05): "design a big ship hub for the player. One big ship with multiple decks and multiple shops and some
 areas you can't access yet. The big ship is the shop and it travels with the player: when the player goes to another

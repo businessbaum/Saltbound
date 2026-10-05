@@ -225,7 +225,7 @@ function sheet(w, h, title, sub, num, total) {
   const cw = 470, ch = 74, cx = w - 60 - cw, cy = h - 60 - ch;
   fill(c, rectPts(cx, cy, cw, ch), 'rgba(236,222,186,0.6)');
   line(c, rectPts(cx, cy, cw, ch), { closed: true, w: 1.6, amp: 0.3, seed: 77 });
-  txt(c, 'The hub ship · design proposal (D60)', cx + 18, cy + 31, { size: 20, f: FL });
+  txt(c, 'The hub ship · design proposal', cx + 18, cy + 31, { size: 20, f: FL });
   txt(c, `sheet ${num} of ${total} · 2026-10-05 · working name: Hollowkeel`, cx + 18, cy + 58, { size: 16, style: 'italic' });
   return { cv, c };
 }
