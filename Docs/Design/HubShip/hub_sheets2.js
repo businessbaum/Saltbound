@@ -1,31 +1,6 @@
 /* Saltbound hub ship plans, sheets 6-11: the deck plans, the locked zones and their gates, the four service spaces. */
 'use strict';
 
-/* Where the gates stand (plan positions, metres). zone = the locked zone behind it. */
-const GATE_MARKS = [
-  { level: 'quay', x: 44.6, y: -14, g: 'G6', zone: 'L4' }, { level: 'quay', x: 54, y: -9, g: 'G6', zone: 'L4' },
-  { level: 'quay', x: 64, y: 6.2, g: 'G1', zone: 'L5' }, { level: 'quay', x: 72, y: 6.2, g: 'G1', zone: 'L5' },
-  { level: 'quay', x: 96, y: -5.5, g: 'G6', zone: 'L6' }, { level: 'quay', x: 96, y: 5.5, g: 'G6', zone: 'L6' },
-  { level: 'quay', x: 8, y: 14, g: 'G4', zone: 'L3' }, { level: 'quay', x: 22, y: 14, g: 'G4', zone: 'L3' }, { level: 'quay', x: 8, y: -14, g: 'G4', zone: 'L3' }, { level: 'quay', x: 26, y: -14, g: 'G4', zone: 'L3' },
-  { level: 'quay', x: 84, y: 0, g: 'G5', zone: 'L17' },
-  { level: 'lower', x: 64, y: 19.2, g: 'G1', zone: 'L7' }, { level: 'lower', x: 73, y: -2.5, g: 'G1', zone: 'L7' },
-  { level: 'lower', x: 84, y: -11, g: 'G1', zone: 'L8' }, { level: 'lower', x: 95, y: 3.5, g: 'G1', zone: 'L9' }, { level: 'lower', x: 89.5, y: 11, g: 'G1', zone: 'L9' },
-  { level: 'middle', x: 73, y: 0, g: 'G1', zone: 'L10' }, { level: 'middle', x: 95, y: 3.5, g: 'G2', zone: 'L11' }, { level: 'middle', x: 88, y: -11, g: 'G4', zone: 'L11' }, { level: 'middle', x: 88, y: 11, g: 'G4', zone: 'L11' },
-  { level: 'upper', x: 73, y: -4, g: 'G1', zone: 'L12' }, { level: 'upper', x: 95, y: 0, g: 'G1', zone: 'L13' }, { level: 'upper', x: 88.5, y: -11, g: 'G1', zone: 'L13' }, { level: 'upper', x: 84, y: 11, g: 'G1', zone: 'L13' },
-  { level: 'main', x: 44, y: 14.5, g: 'G1', zone: 'L1' }, { level: 'main', x: 44, y: -14.5, g: 'G1', zone: 'L1' },
-  { level: 'main', x: 116, y: 0, g: 'G2', zone: 'L15' }, { level: 'main', x: 122, y: 0, g: 'G3', zone: 'L6' },
-  { level: 'main', x: 134, y: 8, g: 'G1', zone: 'L14' }, { level: 'main', x: 134, y: -8, g: 'G1', zone: 'L14' }, { level: 'main', x: 134, y: 15, g: 'G3', zone: 'L14' }, { level: 'main', x: 134, y: -15, g: 'G3', zone: 'L14' },
-  { level: 'main', x: 68, y: 17.6, g: 'G3', zone: 'L16' }, { level: 'main', x: 100, y: 17.6, g: 'G3', zone: 'L16' },
-];
-const WHERE = {
-  L1: 'Main deck aft and three storeys above it; the arch over the dock; the poop with the great wheel',
-  L2: 'Both wings over the dock, lower and upper deck', L3: 'Quay deck, behind both arcades', L4: 'Quay deck, port of the Slip',
-  L5: 'Quay deck, between the Slip and the Keelgate', L6: 'Quay deck forward; round the Keelgate chamber', L7: 'Lower deck, between the Tally House and the Well',
-  L8: 'Lower deck, port side, 100 m long', L9: 'Lower deck forward', L10: 'Middle deck aft (over the Tally House, the Slip and the wings)',
-  L11: 'Middle deck forward', L12: 'Upper deck over the Slip', L13: 'Upper deck forward and round the Well', L14: 'Bow: two storeys and the bowsprit',
-  L15: 'Main deck between the Waist and the forecastle', L16: 'Three masts, their tops and yards', L17: 'Under the waterline, behind the Keelgate',
-};
-
 /* ---------- plan drawing (shared by the deck plans and the small plans on the space sheets) ---------- */
 function planTools(c, P, s) {
   const T = {};
@@ -98,7 +73,7 @@ function drawDeckPlan(c, lv, P, s, o = {}) {
     T.walls({ x0: 44, x1: 64, y0: -9, y1: 19 }, [['x0', -9, 9], ['x0', 10.3, 13.6], ['x1', 5, 7.5], ['y0', 48, 60]]);
     for (let x = 48.4; x < 60; x += 0.8) seg(c, P(x, -9.25), P(x, -8.75), { w: 1.6 });
     T.boat(47, 14, 0, 4.4, { bow: '+x', transom: true }); for (const x of [50, 54, 58]) T.box(x - 0.3, x + 0.3, -3, 3, C.timberDark, 0.9, 1);
-    T.box(46, 62, 4.6, 5.0, C.timber); // the mast on trestles
+    T.box(46, 62, -5.7, -5.3, C.timber); // the mast on trestles
     T.box(52, 60, 9.6, 10.6, C.timberLight); T.box(46, 50, 16.5, 18.5, C.timber); T.box(48, 60, 18.4, 18.9, C.cream, 1, 1.2);
     // Keelgate chamber.
     T.walls(HUB.chamber, [['x0', 5, 7.5], ['x1', -7, -4], ['x1', 4, 7], ['y1', 79, 86]]);
@@ -131,7 +106,7 @@ function drawDeckPlan(c, lv, P, s, o = {}) {
       for (let x = 46; x < 62; x += 4) { seg(c, P(x, 8.8), P(x + 3, 8.8), { w: 1 }); seg(c, P(x, 9.2), P(x + 3, 9.2), { w: 1 }); }
       T.walls(HUB.lane, [['x0', 6, 12], ['x1', 6, 12]]);
       fill(c, T.rect({ x0: 42, x1: 44, y0: 14, y1: 17 }), rgba(C.open, 0.7));
-      T.box(63.4, 64, 13, 18.5, C.cream, 1, 1.2); T.box(50, 56, 17.5, 20, C.timber); T.box(57, 62, 18.5, 20, C.timberLight); T.box(47, 56, 12.4, 13.6, C.timberLight);
+      T.box(63.4, 64, 13, 18.5, C.cream, 1, 1.2); T.box(50, 56, 17.5, 20, C.timber); T.box(57, 62, 18.5, 20, C.timberLight); T.box(49, 58, 12.6, 13.8, C.timberLight);
       if (o.labels) { T.name('Tally House', 54, 11.6, s * 1.4); T.name('Wing quarters', 22, 15, s * 1.1, true); T.name('Wing quarters', 22, -15, s * 1.1, true); T.name('The Ropewalk', 112, -15, s * 1.3, true); T.name('Mess and galley', 128, 4, s * 1.4, true); T.name('Purser’s', 68.5, -5, s * 0.9, true); T.name('stores', 68.5, -3.4, s * 0.9, true); T.name('lane', 68.5, 9, s * 0.95); }
     }
     if (o.labels && lv === 'middle') { T.name('Guild rooms', 30, 15, s * 1.3, true); T.name('Guild rooms', 60, -15, s * 1.3, true); T.name('Lantern Market', 128, 0, s * 1.5, true); }

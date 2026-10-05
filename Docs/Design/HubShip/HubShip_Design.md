@@ -24,7 +24,9 @@ The sketches are in `HubShip_Plans.html` (open it in a browser) and as pictures 
 
 The drawings come from code: `hub_data.js` holds every number (the plans, the zones and the area count all read it),
 `hub_kit.js` the ink-and-wash drawing kit, `hub_sheets1.js` / `hub_sheets2.js` the sheets.
-`python Tools/design/render_hub_ship.py [sheet-id ...]` renders them to the JPEGs and prints the areas. They are review drawings, not
+`python Tools/design/render_hub_ship.py [sheet-id ...]` renders them to the JPEGs, prints the areas and writes
+`HubShip_Data.json`: every number (the ship, the zones, the NPC spots, interaction points, props and gates) as plain data
+for the build's Blender and Unreal scripts. They are review drawings, not
 game content.
 
 Nothing in this document is built. It is a proposal for the owner's review; the questions are at the end.
@@ -316,7 +318,7 @@ zones' insides, the hub ever moving in view, a second harbour, the second boat i
 4. **Systems:** berths and the follow rule, hub moorings, the purse, unlock flags, the hoist.
 5. NPCs, jobs, shop screens: designed with the owner after that.
 
-The build prompt for the agent is `HubShip_Agent_Prompt.md`.
+The build prompt for the agent is `HubShip_Agent_Prompt.md`; it builds from `HubShip_Data.json`.
 
 ## 9. Questions for the owner (recommendation first)
 1. **Name:** Hollowkeel · Mother Brine · the Long Harbour · your own.

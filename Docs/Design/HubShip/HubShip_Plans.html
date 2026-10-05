@@ -52,6 +52,7 @@ body.single figure canvas{width:auto;max-width:100%;border-radius:0;box-shadow:n
   const faces = ['400 30px "IM Fell English"', 'italic 400 30px "IM Fell English"', '400 30px "IM Fell English SC"', '400 20px "Alegreya"', '700 20px "Alegreya"', 'italic 400 20px "Alegreya"',
     '400 30px "SB Fell"', 'italic 400 30px "SB Fell"', '400 30px "SB Fell SC"', '400 20px "SB Alegreya"', '700 20px "SB Alegreya"', 'italic 400 20px "SB Alegreya"'];
   await Promise.all(faces.map(f => document.fonts.load(f).catch(() => null)));
+  if (location.hash === '#data') { document.body.innerHTML = '<pre id="sb-out">' + JSON.stringify(exportData()) + '</pre>'; return; }
   const hash = location.hash.slice(1), exporting = hash.startsWith('export'), only = SHEETS.find(s => s.id === hash);
   const want = exporting && hash.includes(':') ? hash.split(':')[1].split(',') : null;
   const list = only ? [only] : want ? SHEETS.filter(s => want.includes(s.id)) : SHEETS, out = {}, host = document.getElementById('sheets'), nav = document.getElementById('nav');
