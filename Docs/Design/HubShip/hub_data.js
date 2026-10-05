@@ -1,87 +1,110 @@
-/* Saltbound hub ship: the numbers. One source for every sheet and for the area count in HubShip_Design.md.
-   Metres. x forward from the stern face (0) to the stem (160 at the main deck), y to starboard (+) from the centreline,
-   z up from the design waterline. (In Unreal: +X forward, +Y starboard, +Z up, 1 m = 100 uu; pivot at x 80, y 0, z 0.) */
+/* Saltbound hub ship: the numbers. One source for the build (HubShip_Data.json, written from this by
+   Tools/design/render_hub_ship.py --data) and for the layout review (Tools/design/hub_review.py).
+   Metres. x forward from the stern (0) to the stem (160 at the main deck), y to starboard (+) from the centreline,
+   z up from the design waterline. (In Unreal: +X forward, +Y starboard, +Z up, 1 m = 100 uu; pivot at x 80, y 0, z 0.)
+
+   D64 (owner review, 2026-10-05): boats come in from THE SIDE through hidden doors in the hull that open inwards like a double
+   door, into a water hall across the bottom deck; the stern is a galleon's again (round, wide and high at the top, no dock
+   mouth); cozy decks 3 m apart, every deck and room built; the hull planked and ported down to the water. */
 'use strict';
 
 const HUB = {
   name: 'Hollowkeel',
   L: 160, B: 40, sprit: 188, keel: -12,
-  // The hull's half-width up its height amidships, [z, half-width] (outside.hull_section in numbers, for the build): ancient
-  // below ancientTop, timber above; aft the tumblehome runs on to the poop rail. Scaled along the ship by hb(x) / 20.
-  section: [[-12, 6], [-6, 16], [0, 19], [6, 20], [18.4, 18.8], [34.4, 15.7]], ancientTop: 3,
-  Z: { deep: -8, quay: 1.5, lower: 5.5, middle: 9.5, upper: 13.5, main: 17.5, sc1: 21.5, sc2: 25.5, sc3: 29.5, poop: 33.5, fc1: 21.5, fcTop: 25.5 },
-  rail: 0.9,                                        // bulwarks and taffrail above their deck: under the 1.4 m player's eyes (1.2 m), so the sea shows
-  basin: { x0: 0, x1: 44, y0: -10, y1: 10, floor: -5 }, // the Stern Dock: sea water, open to the sky
-  ramp: { x0: 32, x1: 46, z0: -3, z1: 1.5 },        // the slipway, out of the water into the boat hall
-  hall: { x0: 44, x1: 64, y0: -9, y1: 9 },          // the Slip's boat hall: quay deck to the upper deck (12 m clear)
-  shop: { x0: 44, x1: 64, y0: 9, y1: 19 },          // the shipwright's shop, starboard of the hall
-  stair: { x0: 30, x1: 44, y0: 14, y1: 17 },        // the dock stair: starboard quay (+1.5) up to the Tally House (+5.5)
-  tally: { x0: 44, x1: 64, y0: 9, y1: 20 },         // the Tally House, lower deck, over the shop
-  lane: { x0: 64, x1: 73, y0: 6, y1: 12 },          // lower deck, from the Tally House to the Well
+  // The hull's half-width up its height amidships, [z, half-width]: a flat floor, a round bilge, widest at z 6, tumblehome to the
+  // main deck's rail and on up the sterncastle (D64: the castle's top is wider than before, 17.4 at the taffrail). Scaled along
+  // the ship by hb(x) / 20 and shaped at the ends by `form`.
+  section: [[-12, 6], [-6, 16], [0, 19], [6, 20], [17.4, 18.8], [29.4, 17.4]],
+  // The floors (their tops), 3 m apart (owner, D64: "cozy, not too big": 2.7 m clear under the beams for the 1.5 m player).
+  Z: { deep: -4.5, hold: -1.5, quay: 1.5, lower: 4.5, middle: 7.5, upper: 10.5, gun: 13.5, main: 16.5,
+       sc1: 19.5, sc2: 22.5, sc3: 25.5, poop: 28.5, fc1: 19.5, fcTop: 22.5 },
+  deckH: 3, slab: 0.3,
+  rail: 0.9,                                        // bulwarks and taffrail above their deck: under the 1.4 m player's eyes
+  // The hull's form at the ends (D64: "more shape"). run: aft of x1 and below the counter the bottom narrows to the sternpost
+  // (its half-width there `post` x the section's), blending to the full section between z blend[0] and the counter;
+  // entry: forward of x0 and below z top the bow's bottom is finer than the deck outline (down to `fine` x at the stem).
+  // stern: the stern face is round in plan, its corners `round` m forward of its middle; above the counter it overhangs the
+  // sternpost (x post_x) and rakes aft 1 m by the taffrail.
+  form: { run: { x1: 30, post: 0.06, pow: 1.6, blend: [2.5, 8.5] }, entry: { x0: 118, fine: 0.82, top: 6, pow: 1.4 },
+          stern: { round: 2.6, counter: 8.5, post_x: 1.6, rake: 1.0 } },
+  // The planking's sheer: the bands, wales and ports rise towards the ends (m at the stern and at the stem); the decks inside
+  // stay level. aft/fore: where the rise starts.
+  sheer: { stern: 2.2, aft: 44, bow: 2.6, fore: 118 },
+  // The water hall (D64): across the ship on the bottom deck, sea water in it at the sea's level (the doors are no seal). Boats
+  // come in with their masts up (owner, D64): the hall rises from the water to the gun deck (13.2 m clear; the first boat's
+  // mast top is 10.9 m over the water), galleries on the lower, middle and upper decks over both quays. The water runs from side
+  // to side between the quays.
+  dock: { x0: 26, x1: 50, water: { x0: 30, x1: 46 }, floor: -4, ceiling: 'gun', mast_max: 12 },
+  // The hidden doors (D64): a pair in each side, the hull's own planking, hinged at x0 and x1, swinging in 90 degrees into the
+  // hall; from below the keel of a boat (z0) to just under the gun deck (z1), tall enough for a mast. Shut, nothing shows but a
+  // seam in the planking and the hinge straps. They open for a boat that comes near (the dock watch), or with E at their
+  // capstans; ropes from each leaf's head to its capstan.
+  doors: { x0: 32, x1: 40, z0: -2.5, z1: 13.0, thick: 0.35, swing: 90, seconds: 10, open_m: 45,
+           capstans: [[28, 16.5], [28, -16.5]] },
+  ramp: { x0: 46, x1: 60, y0: -5, y1: 5, z0: -3, z1: 1.5 },     // the slipway, out of the water into the Slip's boat hall
+  hall: { x0: 50, x1: 68, y0: -10, y1: 10 },        // the Slip's boat hall: the quay deck up to the gun deck (11.7 m clear)
+  shop: { x0: 50, x1: 68, y0: 10, y1: 20 },         // the shipwright's shop, starboard of the hall
+  stair: { x0: 50.4, x1: 55.8, y0: 16.8, y1: 19.2 }, // the dock stair: in the shop, up to the Tally House (+x)
+  tally: { x0: 50, x1: 68, y0: 10, y1: 20 },        // the Tally House, lower deck, over the shop
+  lane: { x0: 68, x1: 73, y0: 6, y1: 12 },          // lower deck, from the Tally House to the Well
   shaft: { x0: 78, x1: 90, y0: -6, y1: 6 },         // the Well: open from the Keelgate floor to the sky
-  ring: { x0: 73, x1: 95, y0: -11, y1: 11 },        // its galleries (5 m wide) on the lower, middle and upper decks
+  ring: { x0: 73, x1: 95, y0: -11, y1: 11 },        // its galleries (5 m wide) on the lower, middle, upper and gun decks
   chamber: { x0: 72, x1: 96, y0: -12, y1: 12 },     // the Keelgate chamber at the foot of the Well (quay deck)
   keelgate: { x: 84, y: 0, r: 3.0, ring: 4.0 },     // the ancient hatch in its floor
   hoist: { x0: 78.2, x1: 80.8, y0: 3.2, y1: 5.8 },  // the hoist cage, aft-starboard corner of the shaft
-  flights: [                                         // the Well's stairs, spiralling up through the ring (22 risers of 18 cm)
-    { from: 'quay', to: 'lower', x0: 79, x1: 86, y0: 8, y1: 11, up: '-x' },
-    { from: 'lower', to: 'middle', x0: 92, x1: 95, y0: -7, y1: 0, up: '-y' },
-    { from: 'middle', to: 'upper', x0: 79, x1: 86, y0: -11, y1: -8, up: '-x' },
-    { from: 'upper', to: 'main', x0: 73, x1: 76, y0: 0, y1: 7, up: '+y' },
+  // The Well's stairs (17 risers of 17.6 cm on 30 cm treads, a short landing at the top), spiralling up round the ring.
+  flights: [
+    { from: 'quay', to: 'lower', x0: 79, x1: 84.4, y0: 8, y1: 11, up: '-x' },
+    { from: 'lower', to: 'middle', x0: 92, x1: 95, y0: -6, y1: -0.6, up: '-y' },
+    { from: 'middle', to: 'upper', x0: 79, x1: 84.4, y0: -11, y1: -8, up: '-x' },
+    { from: 'upper', to: 'gun', x0: 73, x1: 76, y0: 0.6, y1: 6, up: '+y' },
+    { from: 'gun', to: 'main', x0: 84.6, x1: 90, y0: 8, y1: 11, up: '+x' },
   ],
-  chandlery: { x0: 98, x1: 114, y0: -17.5, y1: -8, h: 4.2 },   // back wall clear of the main mast's shrouds (logic pass, D61)
-  arch: { x0: 0, x1: 10, z0: 25.5, z1: 33.5 },
-  wing: 10,     // the wings stand outboard of |y| 10, aft of x 44 (the basin between them)
-  quayY: 14,    // the quays run |y| 10..14 at +1.5 under the wings (arcades)
+  chandlery: { x0: 98, x1: 114, y0: -17.5, y1: -8, h: 4.2 },
+  wing: 10,     // (kept for the room layout: the old wings' line, |y| 10)
   fcX: 134,     // the forecastle starts here
-  // A galleon's stern rises in tiers (owner, D62: "style like a giant galleon"): the quarterdeck over the first storey
-  // (x poopX..44, its deck at sc2), the poop over three (x 0..poopX, its deck at poop).
-  poopX: 22,
-  // The planking's sheer (D62): the bands and wales rise towards the ends (m at the stern face and at the stem); the decks
-  // inside stay level. aft/fore: where the rise starts.
-  sheer: { stern: 0.8, aft: 30, bow: 1.4, fore: 128 },
-  // The beakhead (D62): a platform out from the stem under the bowsprit, headrails up to the forecastle, the figurehead.
-  beakhead: { x0: 158, x1: 171, z: 19.5, halfW: 2.2, rails_to: 25.5, figure: [171.6, 0, 20.2] },
-  // The sea gate (owner, D62: "open and close it with ropes like a castle gate"): a portcullis in grooves just inside the
-  // stern face. Down, it closes the basin to boats (its spikes in a sill on the basin's floor, its top 4 m over the water);
-  // raised by `raise` m into a slot in the gatehouse over the arch, its spikes hang at the arch's springing (21.5), clear of
-  // any mast. Four ropes from its head beam run up over sheaves in the gatehouse and down through the wings to a capstan on
-  // each quay by the mouth (E: raise or lower it). halfW: to the grooves' backs; posts: the grooves' timbers on the walls.
-  seagate: { x: 1.6, thick: 0.6, halfW: 9.9, z0: -5, h: 9, raise: 26.5, ropes: [-7, -2.5, 2.5, 7], capstans: [[6, 12.4], [6, -12.4]],
-             seconds: 24, turns: 8, posts: { x0: 0.9, x1: 2.3, y: 9.55 } },
+  // A galleon's stern rises in tiers: the quarterdeck over the first storey (x poopX..qdX, its deck at sc2), the poop over three
+  // (x 0..poopX, its deck at poop). D64: the castle is a storey taller at 3 m a storey and wider at the top.
+  poopX: 24, qdX: 48,
+  // Stern galleries (D64): open balconies across the stern face at sc1 and sc2 (out `out` m, balustraded), running round the
+  // corners into the quarter galleries, enclosed bays standing out from the sides (x0..x1, out m) over three storeys, domed.
+  galleries: { levels: ['sc1', 'sc2'], out: 2.0, quarter: { x0: 2, x1: 13, out: 2.6, z0: 19.5, z1: 28.5 } },
+  beakhead: { x0: 158, x1: 171, z: 18.5, halfW: 2.2, rails_to: 22.5, figure: [171.6, 0, 19.2] },
   masts: [
     { id: 'mizzen', name: 'Mizzen', x: 68, h: 54 },
     { id: 'main', name: 'Main', x: 100, h: 76 },
     { id: 'fore', name: 'Fore', x: 140, h: 64 },
   ],
-  // The rig (outside.masts in numbers, D62): the masts' thickness at the deck and at the truck; tops and crosstrees at a
-  // fraction of the mast's height over the main deck, their width for the main mast (the others scale with their height);
-  // the square yards (fractions; half-lengths x B for the main, the fore x 0.92, the mizzen x 0.8), all sails furled; the
-  // galleon's lateen yard on the mizzen in place of its lowest square yard (len m, raked `rake` degrees, fore end down);
-  // the spritsail yard under the bowsprit (at a fraction of it, half-length); the channels (length) and shrouds a side
-  // at each mast; the pennant at the main truck (length, hoist).
   rig: { thick: [2.0, 0.7], top: { at: 0.38, w: 14 }, cross: { at: 0.68, w: 6.4 },
          yards: { at: [0.27, 0.47, 0.62, 0.8], half: [0.42, 0.35, 0.26, 0.18], scale: { main: 1, fore: 0.92, mizzen: 0.8 } },
          lateen: { mast: 'mizzen', len: 34, rake: 34 }, spritsail: { at: 0.6, half: 7.5 },
          channels: { mizzen: 12, main: 17, fore: 12 }, shrouds: { mizzen: 5, main: 8, fore: 6 }, pennant: { len: 16, hoist: 1.4 } },
-  helm: { x: 6, y: 0, r: 1.8 },  // the great wheel on the poop over the arch: lashed, it never turns
-  // Twin rudders on the wings' sternposts (the dock mouth splits the stern); the wheel's ropes run down to their tillers.
-  // The blade is x0..x1 at the heel, narrowing to `head` (m) at the top (D62: 1.2 m was a post on a ship this size).
-  rudders: { y: 15, x0: -3.2, x1: 0, z0: -6, z1: 6, head: 1.2 },     // y 15: inside the stern face down to its foot (z -6: +/-15.2)
+  // The great wheel on the quarterdeck, lashed: it never turns. Its ropes run aft to the tiller of the one rudder.
+  helm: { x: 38, y: 0, r: 1.8 },
+  // One rudder on the sternpost (D64: the dock mouth no longer splits the stern): the blade x0..x1 at the heel, narrowing to
+  // `head` at its top under the counter, its tiller in through the counter.
+  rudder: { x0: -3.4, x1: 1.6, z0: -11, z1: 8.5, head: 1.4 },
   // She lies still because she is held: two bow cables from hawse holes to anchors ahead (the capstan heaves them), two stern
-  // moorings from the wings' quarters, splayed out clear of the dock's approach. from: on the hull; to: where it meets the water.
-  cables: [{ id: 'bow', from: [151, 7, 21], to: [178, 13, 0] }, { id: 'bow', from: [151, -7, 21], to: [178, -13, 0] },
-           { id: 'stern', from: [2, 18, 20], to: [-24, 34, 0] }, { id: 'stern', from: [2, -18, 20], to: [-24, -34, 0] }],
-  // Where she lies at Saltbound Cove (world metres, north +X, east +Y; the pier is 0, 0). Since the home island (D60) the pier
-  // is inside its lagoon and the way out is the channel east: she lies off it, her stern (the dock mouth) to the channel, 130 m
-  // off its mouth, 345 m from the pier (logic pass, D61; was 230, -555 west-north-west, behind the island from the pier).
+  // moorings from the quarters. from: on the hull; to: where it meets the water.
+  cables: [{ id: 'bow', from: [151, 7, 20], to: [178, 13, 0] }, { id: 'bow', from: [151, -7, 20], to: [178, -13, 0] },
+           { id: 'stern', from: [5, 17, 18], to: [-24, 34, 0] }, { id: 'stern', from: [5, -17, 18], to: [-24, -34, 0] }],
+  // Where she lies at Saltbound Cove (world metres, north +X, east +Y; the pier is 0, 0): off the lagoon's channel east of the
+  // island, her stern to the channel.
   berth: { id: 'SaltboundRoads', centreM: [81, 415], bowDeg: 92 },
+  // The rooms of every deck (D64, owner: "build all the decks and rooms, you don't need to design every room"): outside the
+  // open spaces each deck is two corridors fore and aft (|y| between spine[0] and spine[1]) and corridors across at `cross`
+  // (cross_w m wide), with rooms between them `room` m long (split once more across where they are deeper than `deep` m); every
+  // room has a door (door m wide) to a corridor or to the room in front of it. The locked zones below name the rooms' owners.
+  rooms: { spine: [6.4, 8.6], cross: [10, 34, 58, 82, 106, 130, 151], cross_w: 2.2, room: [4.5, 6.5], deep: 8.5, door: 1.0 },
+  // How the open spaces meet (D64): 'open' (no wall between them), 'door' (a wall with a doorway), anything else a wall.
+  links: [['dock', 'slip', 'open'], ['dock_g', 'tally', 'door'], ['tally', 'lane', 'door'], ['lane', 'well_l', 'open'],
+          ['slip', 'keelgate', 'wall']],
 };
 
-/** Half-beam of the deck outline at x. */
+/** Half-beam of the deck outline at x (D64: the stern is full and round, wider at the top than before). */
 HUB.hb = function (x) {
   if (x < 0 || x > 160) return 0;
-  if (x < 10) return 19 + x / 10;
+  if (x < 12) return 18.6 + 1.4 * (1 - Math.pow((12 - x) / 12, 2));
   if (x <= 108) return 20;
   const t = (x - 108) / 52; return 20 * Math.pow(Math.max(0, 1 - t * t), 0.55);
 };
@@ -91,66 +114,75 @@ HUB.outline = function (k = 1, n = 80) {
   for (let i = 0; i <= n; i++) { const x = i / n * 160; s.push([x, HUB.hb(x) * k]); p.push([x, -HUB.hb(x) * k]); }
   return s.concat(p.reverse());
 };
-/** The side profile (x, z): stern face, sterncastle, waist, forecastle, stem, keel. */
+/** The side profile (x, z): taffrail, poop, quarterdeck, waist, forecastle, stem, keel, sternpost, counter. */
 HUB.profile = function () {
-  // The stern goes down to z -6 at its face: the dock's floor (z -5) and walls stay inside the hull (logic pass, D61).
-  return [[0, 34.4], [22, 34.4], [22.6, 26.4], [44, 26.4], [44.6, 18.4], [134, 18.4], [134.6, 26.4], [161.5, 26.4], [161, 20], [159.8, 12], [157.5, 4], [153, -4], [145, -10], [132, -12],
-    [14, -12], [6, -11], [2, -8], [0, -6]];
+  const Z = HUB.Z, r = HUB.rail;
+  return [[-1, Z.poop + r + 2.0], [HUB.poopX, Z.poop + r], [HUB.poopX + 0.6, Z.sc2 + r], [HUB.qdX, Z.sc2 + r], [HUB.qdX + 0.6, Z.main + r],
+    [134, Z.main + r], [134.6, Z.fcTop + r], [161.5, Z.fcTop + r], [161, 18], [159.8, 12], [157.5, 4], [153, -4], [145, -10], [132, -12],
+    [12, -12], [4.5, -11.4], [2.2, -9], [1.6, -4], [1.4, 2], [0.8, 6], [0, 8.5]];
 };
 
 const ST = { OPEN: 'open', LOCKED: 'locked', WATER: 'water' };
 const R = (x0, x1, y0, y1) => ({ x0, x1, y0, y1 });
-const WINGS = [R(0, 44, 10, 20), R(0, 44, -20, -10)];
-const WINGS_AFT = [R(0, 22, 10, 20), R(0, 22, -20, -10)];     // under the poop (HUB.poopX): the upper storeys (D62)
+const AFT = R(0, HUB.poopX, -20, 20), QD = R(HUB.poopX, HUB.qdX, -20, 20);
+const DOCK = R(HUB.dock.x0, HUB.dock.x1, -20, 20), WATER = R(HUB.dock.water.x0, HUB.dock.water.x1, -20, 20);
 
-/** Levels (floors) of the ship. width: share of the deck half-beam at that floor (the hull is narrower low down). */
+/** Levels (floors) of the ship. width: share of the deck half-beam at that floor where the hull is narrower (the build uses the
+ *  hull's form itself). only: where the floor is at all; voids: where it is not (open to the floor below); water: sea in it. */
 const LEVELS = [
-  { id: 'sc3', name: 'Sterncastle, third storey', z: 29.5, only: [...WINGS_AFT, R(0, 10, -10, 10)] },
-  { id: 'sc2', name: 'Sterncastle, second storey', z: 25.5, only: [...WINGS_AFT, R(0, 10, -10, 10)] },
-  { id: 'sc1', name: 'Sterncastle, first storey', z: 21.5, only: WINGS },
-  { id: 'fc1', name: 'Forecastle, upper storey', z: 21.5, only: [R(134, 160, -20, 20)] },
-  { id: 'main', name: 'Main deck', z: 17.5, voids: [HUB.basin, HUB.shaft] },
-  { id: 'upper', name: 'Upper deck', z: 13.5, voids: [HUB.basin, HUB.shaft] },
-  { id: 'middle', name: 'Middle deck', z: 9.5, voids: [HUB.basin, HUB.hall, HUB.shaft] },
-  { id: 'lower', name: 'Lower deck', z: 5.5, voids: [HUB.basin, HUB.hall, HUB.shaft] },
-  { id: 'quay', name: 'Quay deck', z: 1.5, width: 0.95, water: [HUB.basin] },
-  { id: 'deep', name: 'The Deep', z: -8, width: 0.8, only: [R(46, 150, -20, 20)] },
+  { id: 'poop', name: 'Poop (deck)', z: HUB.Z.poop, only: [AFT], deck: true },
+  { id: 'sc3', name: 'Sterncastle, third storey', z: HUB.Z.sc3, only: [AFT] },
+  { id: 'sc2', name: 'Sterncastle, second storey (quarterdeck)', z: HUB.Z.sc2, only: [AFT, QD] },
+  { id: 'sc1', name: 'Sterncastle, first storey', z: HUB.Z.sc1, only: [AFT, QD] },
+  { id: 'fcTop', name: 'Forecastle deck', z: HUB.Z.fcTop, only: [R(134, 160, -20, 20)], deck: true },
+  { id: 'fc1', name: 'Forecastle, storey', z: HUB.Z.fc1, only: [R(134, 160, -20, 20)] },
+  { id: 'main', name: 'Main deck', z: HUB.Z.main, voids: [HUB.shaft], deck: true },
+  { id: 'gun', name: 'Gun deck', z: HUB.Z.gun, voids: [HUB.shaft] },
+  { id: 'upper', name: 'Upper deck', z: HUB.Z.upper, voids: [WATER, HUB.hall, HUB.shaft] },
+  { id: 'middle', name: 'Middle deck', z: HUB.Z.middle, voids: [WATER, HUB.hall, HUB.shaft] },
+  { id: 'lower', name: 'Lower deck', z: HUB.Z.lower, voids: [WATER, HUB.hall, HUB.shaft] },
+  { id: 'quay', name: 'Dock deck', z: HUB.Z.quay, water: [WATER] },
+  { id: 'hold', name: 'Hold', z: HUB.Z.hold, voids: [DOCK] },
+  { id: 'deep', name: 'The Deep', z: HUB.Z.deep, voids: [DOCK] },
 ];
 
-/** Open at the start: the 20 %. svc = the service badge (S J Q E). */
+/** Open at the start: about a fifth. svc = the service badge (S J Q E). */
 const OPEN = [
-  { id: 'dock', name: 'Stern Dock', sub: 'basin and quays', level: 'quay', rects: [R(0, 44, 10, 14), R(0, 44, -14, -10), R(44, 48, -14, -9)], water: true },
+  { id: 'dock', name: 'Water Hall', sub: 'water and quays', level: 'quay', rects: [R(26, 30, -20, 20), R(46, 50, -20, 20)], water: true },
+  { id: 'dock_g', name: 'Water Hall galleries', level: 'lower', rects: [R(46, 50, 5, 20)] },
   { id: 'slip', name: 'The Slip', sub: 'boat hall and shop', svc: 'S', level: 'quay', rects: [HUB.hall, HUB.shop] },
-  { id: 'stair', name: 'Dock stair', level: 'quay', rects: [HUB.stair] },
   { id: 'keelgate', name: 'The Keelgate', sub: 'chamber at the foot of the Well', svc: 'Q', level: 'quay', rects: [HUB.chamber] },
-  { id: 'tally', name: 'Tally House', sub: 'jobs and pay', svc: 'J', level: 'lower', rects: [HUB.tally, R(42, 44, 14, 17)] },
+  { id: 'tally', name: 'Tally House', sub: 'jobs and pay', svc: 'J', level: 'lower', rects: [HUB.tally] },
   { id: 'lane', name: 'Starboard lane', level: 'lower', rects: [HUB.lane] },
   { id: 'well_l', name: 'The Well', sub: 'galleries, stairs, hoist', level: 'lower', rects: [HUB.ring] },
   { id: 'well_m', name: 'The Well', level: 'middle', rects: [HUB.ring] },
   { id: 'well_u', name: 'The Well', level: 'upper', rects: [HUB.ring] },
-  { id: 'deck', name: 'Main deck', sub: 'the Waist', level: 'main', rects: [R(44, 116, -20, 20)] },
+  { id: 'well_g', name: 'The Well', level: 'gun', rects: [HUB.ring] },
+  { id: 'deck', name: 'Main deck', sub: 'the Waist', level: 'main', rects: [R(HUB.qdX, 116, -20, 20)] },
   { id: 'chandlery', name: 'Chandlery', sub: 'deckhouse', svc: 'E', level: 'main', rects: [R(98, 114, -17.5, -8)], inside: 'deck' },
 ];
 
-/** Planned, locked, not designed: working names only. gate = the gate type (see GATES). */
+/** Planned, locked, not designed: working names only. gate = how its corridors meet the open spaces (see GATES).
+ *  Every room of these is built (D64), behind its gates; on the levels in `air` the zone is open deck under the sky (no rooms). */
 const LOCKED = [
-  { id: 'L1', name: 'Sterncastle and Stern Arch', levels: { main: WINGS, sc1: WINGS, sc2: [...WINGS_AFT, R(0, 10, -10, 10)], sc3: [...WINGS_AFT, R(0, 10, -10, 10)] }, gate: 'G1', sees: 'Tall doors at the aft end of the main deck, barred from inside. The great windows of the arch glow at night; the great wheel on the poop is lashed and never turns.' },
-  { id: 'L2', name: 'Wing quarters', levels: { lower: WINGS, upper: WINGS }, gate: 'G4', sees: 'Rows of shuttered windows and washing lines on the wings over the dock.' },
-  { id: 'L3', name: 'Quay stores', levels: { quay: [R(0, 44, 14, 20), R(0, 44, -20, -14)] }, gate: 'G4', sees: 'Shuttered bays along both arcades of the dock.' },
-  { id: 'L4', name: 'Timber store', levels: { quay: [R(48, 64, -20, -9), R(44, 48, -20, -14)] }, gate: 'G6', sees: 'Iron grilles on the port side of the Slip and at the end of the port quay; stacked timber behind them, 2 m deep.' },
-  { id: 'L5', name: 'Keel Walk', levels: { quay: [R(64, 72, -20, 20)] }, gate: 'G1', sees: 'A heavy door in the Slip’s forward wall and another in the Keelgate chamber: the first shortcut to open.' },
-  { id: 'L6', name: 'The Holds', levels: { quay: [R(96, 160, -20, 20), R(72, 96, 12, 20), R(72, 96, -20, -12)] }, gate: 'G6', sees: 'Iron grilles in the Keelgate chamber’s forward wall; padlocked cargo hatches on the main deck.' },
-  { id: 'L7', name: 'Purser’s stores', levels: { lower: [R(64, 73, -11, 6), R(64, 73, 12, 20)] }, gate: 'G1', sees: 'A door in the Tally House’s forward wall, by the pay booth.' },
-  { id: 'L8', name: 'The Ropewalk', levels: { lower: [R(44, 150, -20, -9)] }, gate: 'G1', sees: 'Double doors off the Well’s port gallery; the creak of a rope being laid.' },
+  { id: 'L1', name: 'Sterncastle', levels: { main: [AFT, QD], sc1: [AFT, QD], sc2: [AFT, QD], sc3: [AFT], poop: [AFT] }, air: { sc2: [QD], poop: [AFT] }, gate: 'G1', sees: 'Tall doors at the aft end of the main deck, barred from inside. The stern windows glow at night; the great wheel on the quarterdeck is lashed and never turns.' },
+  { id: 'L2', name: 'Stern quarters', levels: { lower: [R(0, 30, -20, 20)], middle: [R(0, 26, -20, 20), R(26, 30, -20, 20)] }, gate: 'G1', sees: 'Doors off the Water Hall’s aft quay, and the aft galleries over the water with their shutters.' },
+  { id: 'L3', name: 'Stern stores', levels: { quay: [R(0, 26, -20, 20)] }, gate: 'G4', sees: 'Shuttered bays along the Water Hall’s aft quay.' },
+  { id: 'L4', name: 'Timber store', levels: { quay: [R(50, 68, -20, -10)] }, gate: 'G6', sees: 'Iron grilles on the port side of the Slip; stacked timber behind them.' },
+  { id: 'L5', name: 'Keel Walk', levels: { quay: [R(68, 72, -20, 20)] }, gate: 'G1', sees: 'A heavy door in the Slip’s forward wall and another in the Keelgate chamber: the first shortcut to open.' },
+  { id: 'L6', name: 'The Holds', levels: { quay: [R(96, 160, -20, 20), R(72, 96, 12, 20), R(72, 96, -20, -12)], hold: [R(0, 160, -20, 20)] }, gate: 'G6', sees: 'Iron grilles in the Keelgate chamber’s forward wall; padlocked cargo hatches on the main deck.' },
+  { id: 'L7', name: 'Purser’s stores', levels: { lower: [R(68, 73, -11, 6), R(68, 73, 12, 20)] }, gate: 'G1', sees: 'A door in the Tally House’s forward wall, by the pay booth.' },
+  { id: 'L8', name: 'The Ropewalk', levels: { lower: [R(30, 150, -20, -9)] }, gate: 'G1', sees: 'Double doors off the Well’s port gallery; the creak of a rope being laid.' },
   { id: 'L9', name: 'Mess and galley', levels: { lower: [R(95, 160, -9, 20), R(73, 95, 11, 20)] }, gate: 'G1', sees: 'A door off the Well’s forward gallery; the galley chimney smokes on the main deck.' },
-  { id: 'L10', name: 'Guild rooms', levels: { middle: [R(0, 73, -20, 20)] }, gate: 'G1', sees: 'Doors with painted crests off the Well’s aft gallery.' },
+  { id: 'L10', name: 'Guild rooms', levels: { middle: [R(46, 73, -20, 20)], lower: [R(46, 50, -20, 5)] }, gate: 'G1', sees: 'Doors with painted crests off the Well’s aft gallery; their galleries over the Water Hall’s forward quay.' },
   { id: 'L11', name: 'Lantern Market', levels: { middle: [R(95, 160, -20, 20), R(73, 95, 11, 20), R(73, 95, -20, -11)] }, gate: 'G2', sees: 'A rope across the forward gallery with a board: “Market closed”; light and voices behind shutters.' },
-  { id: 'L12', name: 'Archive', levels: { upper: [R(44, 73, -20, 20)] }, gate: 'G1', sees: 'A door with a brass plate off the Well’s aft gallery.' },
+  { id: 'L12', name: 'Archive', levels: { upper: [R(0, 73, -20, 20)] }, gate: 'G1', sees: 'A door with a brass plate off the Well’s aft gallery; its galleries high over the Water Hall.' },
   { id: 'L13', name: 'Inn and bunkrooms', levels: { upper: [R(95, 160, -20, 20), R(73, 95, 11, 20), R(73, 95, -20, -11)] }, gate: 'G1', sees: 'A door off the forward gallery; laughter behind it in the evening.' },
-  { id: 'L14', name: 'Forecastle and bow', levels: { main: [R(134, 160, -20, 20)], fc1: [R(134, 160, -20, 20)] }, gate: 'G3', sees: 'Chained ladders and closed doors at the forward end of the main deck; the bowsprit beyond.' },
-  { id: 'L15', name: 'Cargo deck', levels: { main: [R(116, 134, -20, 20)] }, gate: 'G2', sees: 'The forward end of the main deck behind a rope and a board (“Cargo work, keep clear”): lashed cargo under nets, the padlocked hatches, the ship’s boats.' },
+  { id: 'L14', name: 'Forecastle and bow', levels: { main: [R(134, 160, -20, 20)], fc1: [R(134, 160, -20, 20)], fcTop: [R(134, 160, -20, 20)] }, air: { fcTop: [R(134, 160, -20, 20)] }, gate: 'G3', sees: 'Chained ladders and closed doors at the forward end of the main deck; the bowsprit beyond.' },
+  { id: 'L15', name: 'Cargo deck', levels: { main: [R(116, 134, -20, 20)] }, air: { main: [R(116, 134, -20, 20)] }, gate: 'G2', sees: 'The forward end of the main deck behind a rope and a board (“Cargo work, keep clear”): lashed cargo under nets, the padlocked hatches, the ship’s boats.' },
   { id: 'L16', name: 'Masts and tops', levels: {}, gate: 'G3', sees: 'Shrouds whose ratlines start out of reach; the tops’ lanterns at night.' },
-  { id: 'L17', name: 'The Deep', levels: { deep: [R(46, 150, -20, 20)] }, gate: 'G5', sees: 'The Keelgate: the ancient seal in the floor at the foot of the Well, faintly lit from inside.' },
+  { id: 'L17', name: 'The Deep', levels: { deep: [R(0, 160, -20, 20)] }, gate: 'G5', sees: 'The Keelgate: the ancient seal in the floor at the foot of the Well, faintly lit from inside.' },
+  { id: 'L18', name: 'Sail lofts and workshops', levels: { gun: [R(0, 160, -20, 20)] }, gate: 'G1', sees: 'Doors off the Well’s gun-deck gallery; canvas and tar.' },
 ];
 
 const GATES = {
@@ -168,105 +200,101 @@ const GATES = {
    Boxes: x0..x1, y0..y1, height h. Wall items: wall 'x=64' (a plane at x 64) or 'y=19', with their extent and z0..z1. */
 const SPACES = {
   dock: {
-    level: 'quay', floor: 1.5,
+    level: 'quay', floor: 1.5, name: 'The Water Hall',
     props: [
-      { id: 'basin', x0: 0, x1: 44, y0: -10, y1: 10, note: 'sea water, open to the sky; floor of ancient stone at z -5; walls of ancient stone up to the quays' },
-      { id: 'quays', note: 'x 0..44 at |y| 10..14, timber decking on the ancient walls, under the wings (arcades)' },
-      { id: 'arcade_posts', every: 6, from: 3, to: 44, y: 10.2, size: 0.6, h: 4, note: 'both sides; carry the wing over the quay from z 5.5' },
-      { id: 'bollards', every: 6, from: 6, to: 44, y: 10.6, r: 0.3, h: 0.6, note: 'both sides' },
-      { id: 'rung_ladders', at: [3.5, 20], y: 10, note: 'both sides, from the water onto the quay (the D54 ladder)' },
-      { id: 'slipway', x0: 32, x1: 46, y0: -5, y1: 5, z_at_x0: -3, z_at_x1: 1.5, note: 'absolute z (waterline 0); a beach the boat runs up on; enters the hall floor at x 46' },
-      { id: 'fitting_berth', x0: 32, x1: 42, y: 7.9, note: 'starboard quay under the wall crane: the player boat moors here, bow forward (centreline 0.4 m clear of the wall for the 3.4 m beam: blockout, D61)' },
-      { id: 'fleet_berths', berths: [{ x0: 8, x1: 18, y: -7.9, boat: '10 m' }, { x0: 22, x1: 36, y: -7.5, boat: '14 m' }], note: 'port quay; boats the player owns (later)' },
-      { id: 'dock_stair', x0: 30, x1: 44, y0: 14, y1: 17, rises: '+x', from_floor: 1.5, to_floor: 5.5, note: 'inside the starboard wing, through an opening in the arcade wall' },
-      { id: 'dock_head_rail', note: 'main deck, along x 44 for |y| < 10: rail 1.0 m over the basin' },
-      { id: 'port_landing', x0: 44, x1: 48, y0: -14, y1: -9, note: 'the port quay’s end, open to the boat hall: the fleet berths are reached on foot (logic pass, D61)' },
-      { id: 'lanterns', at: [[9, 10.6, 3.0], [21, 10.6, 3.0], [33, 10.6, 3.0], [9, -10.6, 3.0], [21, -10.6, 3.0], [33, -10.6, 3.0]], hook_z: 3.6, note: 'on iron brackets on the arcade posts' },
+      { id: 'water', x0: 30, x1: 46, note: 'sea water from door to door, its floor z -4; the quays’ faces timber on piles; open up to the gun deck (13.2 m over the water)' },
+      { id: 'quays', note: 'x 26..30 (aft) and 46..50 (forward) at +1.5, from side to side; the forward quay is cut by the slipway (y -5..5)' },
+      { id: 'doors', note: 'hub.doors: a pair in each side at x 32..40, 15.5 m tall; shut, a seam in the planking; open, the leaves stand in the water along x 32 and x 40, between the galleries' },
+      { id: 'bollards', every: 5, along: [[30, -17, 17], [46, -17, -6], [46, 6, 17]], r: 0.3, h: 0.6, note: 'on the quays’ edges (x, y from, y to)' },
+      { id: 'rung_ladders', at: [[30, 14], [30, -15], [46, -8], [46, 17]], note: 'from the water onto the quays (the D54 ladder); [x of the edge, y]' },
+      { id: 'fitting_berth', x: 43.9, y0: 6, y1: 16, heading: -90, note: 'along the forward quay (its edge x 46), bow to port: a boat that came in by the starboard doors slides alongside; the quay to her starboard (reach 2.1 m)' },
+      { id: 'fleet_berths', berths: [{ x: 32.1, y0: -14, y1: -4, boat: '10 m', reach: -2.1 }, { x: 32.3, y0: -2, y1: 12, boat: '14 m', reach: -2.3 }], heading: -90, note: 'along the aft quay (its edge x 30), bow to port, the quay to their port side' },
+      { id: 'crane', beam: [50, 44.2, 11, 12.6], hook_rope_x: 44.6, hand_chain: [45.8, 11], note: 'a runway beam under the ceiling from the forward wall out over the fitting berth (above the galleries and a mast), a trolley with a block; its hand chain hangs just off the quay’s edge' },
+      { id: 'galleries', levels: ['lower', 'middle', 'upper'], aft: [26, 30], fore: [46, 50], note: 'balconies over both quays on three decks, balustraded on the water side; the lower forward-starboard one (y 5..20) is open, with a door into the Tally House; the others belong to the rooms behind them' },
+      { id: 'lanterns', at: [[28, 10, 2.6], [28, -10, 2.6], [48, 12, 2.6], [48, -12, 2.6], [29.6, 0, 5.6], [46.4, 0, 5.6], [29.6, 0, 8.6], [46.4, 0, 8.6]], hook_z: 3.0, note: 'on the quays’ posts and on the galleries’ edge posts; none hang over the water (masts)' },
     ],
+    gates: ['L3 shuttered bays along the aft quay (x 26)', 'L2 doors at the aft quay’s ends'],
   },
   slip: {
     svc: 'S', level: 'quay', floor: 1.5, name: 'The Slip (shipwright)',
-    npc: { x: 51.4, y: 13.2, face: 180, note: 'behind the counter across the shop, facing aft to the door from the quay where customers come in; the workshop behind' },
+    npc: { x: 57.4, y: 13.2, face: 180, note: 'behind the counter across the shop, facing aft to the door from the quay' },
     e: [
-      { id: 'counter', x: 48.6, y: 13.2, prompt: 'Talk' },
-      { id: 'plans', x: 45.4, y: 16.6, prompt: 'Look at the plans' },
-      { id: 'display_boat', x: 57.5, y: -3.2, prompt: 'Look her over' },
-      { id: 'fitting_berth', x: 37, y: 11.2, prompt: 'Read the berth board', note: 'a board at the quay’s edge; the boat moors here from its own windlass' },
+      { id: 'counter', x: 54.6, y: 13.2, prompt: 'Talk' },
+      { id: 'plans', x: 50.6, y: 12, prompt: 'Look at the plans' },
+      { id: 'display_boat', x: 63.5, y: -3.2, prompt: 'Look her over' },
+      { id: 'fitting_berth', x: 47, y: 11, prompt: 'Read the berth board', note: 'a board at the quay’s edge by the fitting berth' },
     ],
     props: [
-      { id: 'hall', x0: 44, x1: 64, y0: -9, y1: 9, h: 12, note: 'open to the basin along x 44; ceiling is the upper deck' },
-      { id: 'shop', x0: 44, x1: 64, y0: 9, y1: 19, h: 4, note: 'open to the hall along y 9; the Tally House is above it' },
-      { id: 'counter', x0: 49.4, x1: 50.4, y0: 10.4, y1: 16.6, h: 0.95, note: 'across the shop facing aft; a flap at its hall end (y 9..10.4) for the shipwright' },
-      { id: 'plans_board', wall: 'x=44', y0: 14.6, y1: 18.6, z0: 0.9, z1: 2.5, note: 'pinned plans of the upgrades, by the door from the quay' },
-      { id: 'half_models', wall: 'x=64', y0: 11, y1: 17, z0: 2.5, z1: 3.1, note: 'three half-hull models: the boats for sale' },
-      { id: 'workbench', x0: 55, x1: 59, y0: 16.8, y1: 18.4, h: 0.9 },
-      { id: 'timber_racks', wall: 'x=64', y0: -8, y1: 4, z0: 0.6, z1: 3.5, note: 'four rows of planks on iron brackets' },
-      { id: 'display_boat', x0: 47, x1: 61, y: 0, beam: 4.4, keel_z: 0.6, note: 'the 14 m cutter (D51), unrigged, bow forward, on cradles at x 50, 54, 58' },
-      { id: 'mast_on_trestles', x0: 46, x1: 62, y: -5.5, z: 1.1, note: 'her mast lying on two trestles' },
-      { id: 'crane', x: 39, y: 10, bracket_z: 11, jib_to: [39, 8.6, 11], winch: [39, 12.6], note: 'the quay is roofed by the wing, so the crane is bracketed to the wing’s face over the arcade post at x 39: its jib 11 m above the quay (clear of a 10.5 m mast), the hook over the fitting berth’s side deck, the rope down to a winch under the arcade (was a 9 m derrick standing under the roof)' },
-      { id: 'hall_windows', wall: 'y=19', note: 'two windows in the shop, x 47..48.5 and x 60.5..62, z 1.6..3.2 (sills above the ancient hull, which reaches z +3)' },
-      { id: 'lanterns', at: [[58, 4, 8], [58, -4, 8], [50, 0, 8]], hook_z: 12 },
-      { id: 'sign', x: 44, y: 0, z: 13, text: 'SHIPWRIGHT', note: 'over the hall mouth, facing aft into the dock' },
+      { id: 'hall', x0: 50, x1: 68, y0: -10, y1: 10, h: 11.7, note: 'open to the Water Hall’s forward quay along x 50; its ceiling is the gun deck (a boat on the slipway keeps her mast)' },
+      { id: 'shop', x0: 50, x1: 68, y0: 10, y1: 20, h: 3, note: 'open to the hall along y 10; the Tally House above it; the dock stair in its aft-starboard corner' },
+      { id: 'counter', x0: 55.4, x1: 56.4, y0: 11.2, y1: 15.6, h: 0.95, note: 'across the shop facing aft' },
+      { id: 'plans_board', wall: 'x=50', y0: 10.6, y1: 13.6, z0: 0.9, z1: 2.4, note: 'pinned plans of the upgrades, by the door from the quay' },
+      { id: 'half_models', wall: 'x=68', y0: 12, y1: 18, z0: 1.9, z1: 2.5, note: 'three half-hull models: the boats for sale' },
+      { id: 'workbench', x0: 60, x1: 64, y0: 17.6, y1: 19, h: 0.9 },
+      { id: 'timber_racks', wall: 'x=68', y0: -9, y1: 4, z0: 0.6, z1: 3.5, note: 'four rows of planks on iron brackets' },
+      { id: 'display_boat', x0: 54, x1: 68, y: 0, beam: 4.4, keel_z: 0.6, note: 'the 14 m cutter (D51), unrigged, bow forward, on cradles at x 57, 61, 65' },
+      { id: 'mast_on_trestles', x0: 52, x1: 67, y: -6.5, z: 1.1, note: 'her mast lying on two trestles' },
+      { id: 'lanterns', at: [[63, 4, 7], [63, -4, 7], [56, 0, 7], [62, 15, 2.2]], hook_z: 11.7 },
+      { id: 'sign', x: 50, y: 0, z: 6.5, text: 'SHIPWRIGHT', note: 'over the hall mouth, facing aft over the Water Hall' },
     ],
-    gates: ['L5 door in the forward wall (x 64, y 5..7.5)', 'L4 grilles on the port side (y -9, x 48..60) and at the port landing (x 48)'],
+    gates: ['L5 door in the forward wall (x 68)', 'L4 grilles on the port side (y -10)'],
   },
   tally: {
-    svc: 'J', level: 'lower', floor: 5.5, name: 'Tally House (side jobs)',
-    npc: { x: 53, y: 18.8, face: 270, note: 'inside the pay booth, behind the hatch, facing into the room' },
+    svc: 'J', level: 'lower', floor: 4.5, name: 'Tally House (side jobs)',
+    npc: { x: 59, y: 18.8, face: 270, note: 'inside the pay booth, behind the hatch, facing into the room' },
     e: [
-      { id: 'pay_hatch', x: 53, y: 16.6, prompt: 'Talk' },
-      { id: 'job_board', x: 62.4, y: 15.6, prompt: 'Read the board' },
-      { id: 'weighing_bench', x: 59.5, y: 17.6, prompt: 'Deliver goods' },
+      { id: 'pay_hatch', x: 59, y: 16.6, prompt: 'Talk' },
+      { id: 'job_board', x: 66.4, y: 14.6, prompt: 'Read the board' },
+      { id: 'weighing_bench', x: 64.5, y: 17.6, prompt: 'Deliver goods' },
     ],
     props: [
-      { id: 'room', x0: 44, x1: 64, y0: 9, y1: 20, h: 4 },
-      { id: 'stair_door', wall: 'x=44', y0: 14, y1: 17, note: 'the dock stair arrives here' },
-      { id: 'lane_door', wall: 'x=64', y0: 9.2, y1: 12, note: 'to the lane and the Well' },
-      { id: 'job_board', wall: 'x=64', y0: 12.8, y1: 18.2, z0: 0.9, z1: 3.3, note: 'six slips; header board TALLY (y 13.6..17.4, z 3.35..3.85); a chalk slate under it' },
-      { id: 'pay_booth', x0: 50, x1: 56, y0: 17.4, y1: 20, h: 2.6, door: [18.0, 19.0], note: 'timber booth on the hull wall, roof at 2.8; grilled hatch x 51.5..54.5, z 1.0..2.0; ledge y 17.0..17.4 at z 1.0; sign PAY; a door in its forward side (x 56, y 18.0..19.0): the purser comes in from the stores' },
-      { id: 'weighing_bench', x0: 57, x1: 62, y0: 18.6, y1: 20, h: 0.9, note: 'a big balance on it; sacks and crates beside' },
-      { id: 'salt_cakes', x0: 48.6, x1: 49.4, y0: 18.8, y1: 19.6, h: 0.9, note: 'a stack of salt cakes by the booth' },
-      { id: 'table', x0: 49, x1: 58, y0: 12.6, y1: 13.8, h: 0.8, note: 'benches either side at y 14.2..14.6 and y 11.8..12.2, h 0.45' },
-      { id: 'hull_ports', wall: 'y=20', spans: [[46.4, 48], [59.4, 61]], z0: 0.8, z1: 2.0, note: 'open shutters; sills under the 1.4 m player’s eyes' },
-      { id: 'hall_windows', wall: 'y=9', spans: [[47, 50], [51, 54], [55, 58], [59, 62]], z0: 0.8, z1: 2.6, note: 'look down into the Slip' },
-      { id: 'lanterns', at: [[60, 15, 3], [53.5, 13.2, 3], [47, 15, 3], [65.5, 7.5, 3], [70.5, 10.5, 3]], hook_z: 4 },   // the last two in the lane (D62: it was dark)
+      { id: 'room', x0: 50, x1: 68, y0: 10, y1: 20, h: 3 },
+      { id: 'stair_hole', x0: 50.4, x1: 55.8, y0: 16.8, y1: 19.2, note: 'the dock stair arrives here, a rail round it' },
+      { id: 'gallery_door', wall: 'x=50', y0: 11, y1: 12.2, note: 'out onto the Water Hall gallery' },
+      { id: 'lane_door', wall: 'x=68', y0: 10.2, y1: 12, note: 'to the lane and the Well' },
+      { id: 'job_board', wall: 'x=68', y0: 12.8, y1: 17.2, z0: 0.8, z1: 2.4, note: 'six slips; header board TALLY over it; a chalk slate under it' },
+      { id: 'pay_booth', x0: 56.6, x1: 61.6, y0: 17.4, y1: 20, h: 2.4, door: [18.0, 19.0], note: 'timber booth on the hull wall; grilled hatch x 57.5..60.5, z 1.0..1.8; ledge at z 1.0; sign PAY; its door in the forward side' },
+      { id: 'weighing_bench', x0: 62.4, x1: 67, y0: 18.6, y1: 20, h: 0.9, note: 'a big balance on it; sacks and crates beside' },
+      { id: 'salt_cakes', x0: 55.6, x1: 56.4, y0: 15.6, y1: 16.4, h: 0.9 },
+      { id: 'table', x0: 56, x1: 64, y0: 12.6, y1: 13.8, h: 0.8, note: 'benches either side at y 14.2..14.6 and y 11.8..12.2, h 0.45' },
+      { id: 'hull_ports', wall: 'y=20', spans: [[62.4, 64], [65.2, 66.8]], z0: 0.8, z1: 1.8 },
+      { id: 'hall_windows', wall: 'y=10', spans: [[54, 57], [58, 61], [62, 65]], z0: 0.8, z1: 2.2, note: 'look down into the Slip' },
+      { id: 'lanterns', at: [[64, 15, 2.2], [59.5, 13.2, 2.2], [53, 13, 2.2], [70.5, 9, 2.2]], hook_z: 2.7 },
     ],
-    gates: ['L7 door in the forward wall (x 64, y 18.6..19.8)'],
+    gates: ['L7 door in the forward wall (x 68, y 18.6..19.8)'],
   },
   well: {
     level: 'lower..main', name: 'The Well',
     props: [
       { id: 'shaft', x0: 78, x1: 90, y0: -6, y1: 6, note: 'open from the Keelgate floor (+1.5) to the sky; rails 1.0 m round it on every gallery' },
-      { id: 'galleries', x0: 73, x1: 95, y0: -11, y1: 11, note: 'lower, middle, upper deck; walls on their outer edges with the gates' },
-      { id: 'hoist', x0: 78.2, x1: 80.8, y0: 3.2, y1: 5.8, stops: ['quay', 'lower', 'main'], door: 'aft (x 78.2): it opens on to the galleries’ rail gates and the chamber’s aft side', note: 'cage on ropes from the gantry, running between two guide posts at its aft corners (braced to each gallery’s edge); gates in the rails at its stops' },
-      { id: 'counterweight', x0: 78.2, x1: 79.0, y0: 1.6, y1: 2.8, h: 1.5, note: 'its rope over the gantry beam’s second sheave; at the bottom of its run it sits in a railed bay on the chamber floor (no one under it)' },
-      { id: 'hoist_brake', note: 'a lever in the cage on a hand line to the brake drum at the gantry’s head: the rider works it' },
-      { id: 'gantry', note: 'A-frame over the opening on the main deck, x 76.5..91.5 at y 0, top 7.5 m above the deck, a beam out to the hoist with two sheaves (the cage’s ropes, the counterweight’s)' },
-      { id: 'coaming', h: 0.3, note: 'a raised edge round the opening on the main deck, under the rail: rain and spray run off the deck, not down the Well' },
+      { id: 'galleries', x0: 73, x1: 95, y0: -11, y1: 11, note: 'lower, middle, upper and gun deck; walls on their outer edges with the gates' },
+      { id: 'hoist', x0: 78.2, x1: 80.8, y0: 3.2, y1: 5.8, stops: ['quay', 'lower', 'main'], door: 'aft (x 78.2)', note: 'cage on ropes from the gantry, between two guide posts at its aft corners; gates in the rails at its stops' },
+      { id: 'counterweight', x0: 78.2, x1: 79.0, y0: 1.6, y1: 2.8, h: 1.5, note: 'its rope over the gantry beam’s second sheave; at the bottom of its run it sits in a railed bay on the chamber floor' },
+      { id: 'gantry', note: 'A-frame over the opening on the main deck, x 76.5..91.5 at y 0, top 7.5 m above the deck, a beam out to the hoist with two sheaves' },
+      { id: 'coaming', h: 0.3, note: 'a raised edge round the opening on the main deck, under the rail' },
       { id: 'lanterns', note: 'one on each gallery corner, a ring lantern in the shaft at the middle deck on a chain from the gantry’s apex' },
     ],
   },
   keelgate: {
     svc: 'Q', level: 'quay', floor: 1.5, name: 'The Keelgate (main quest)',
-    npc: { x: 75.8, y: -9.4, face: 48, note: 'behind the reading desk by the port wall, the desk between them and the gate they face' },
+    npc: { x: 75.8, y: -9.4, face: 48, note: 'behind the reading desk by the port wall' },
     e: [
       { id: 'talk', x: 76.2, y: -5.6, prompt: 'Talk' },
       { id: 'gate', x: 81, y: 1.7, prompt: 'Look at the gate' },
       { id: 'hoist', x: 77.4, y: 4.5, prompt: 'Ride the hoist' },
     ],
     props: [
-      { id: 'chamber', x0: 72, x1: 96, y0: -12, y1: 12, h: 4, note: 'the middle 12 x 12 m (the shaft) open 16 m up to the sky' },
-      { id: 'keelgate', x: 84, y: 0, ring_r: 4.0, disc_r: 3.0, raised: 0.12, note: 'pale seamless ancient stone; turquoise lines: circles r 1.0 and 2.1, seven radial lines r 1.0..2.8; seven empty sockets at r 3.5 (an idea)' },
-      { id: 'desk', x0: 74, x1: 77.5, y0: -8.4, y1: -6.6, h: 0.85, chair: [75.4, 76.2, -10.4, -9.6], note: 'books, a brass lamp, rubbings; the chair behind it, on the wall side' },
-      { id: 'shelves', wall: 'y=-12', x0: 79, x1: 94, depth: 0.6, z0: 0, z1: 3.2, note: 'salvaged ancient pieces in jars; about a quarter faintly glowing (MI_AncientGlow, low)' },
-      { id: 'rubbings', wall: 'x=96', y0: -2.8, y1: 3, z0: 1.4, z1: 2.9, note: 'paper rubbings of the gate’s lines' },
-      { id: 'lanterns', at: [[94, 0, 3], [84, -10, 3]], hook_z: 4 },
-      { id: 'well_stair', x0: 79, x1: 86, y0: 8, y1: 11, note: 'down from the lower deck: top at x 79, foot at x 86' },
+      { id: 'chamber', x0: 72, x1: 96, y0: -12, y1: 12, h: 3, note: 'the middle 12 x 12 m (the shaft) open 15 m up to the sky' },
+      { id: 'keelgate', x: 84, y: 0, ring_r: 4.0, disc_r: 3.0, raised: 0.12, note: 'pale seamless ancient stone; turquoise lines: circles r 1.0 and 2.1, seven radial lines r 1.0..2.8; seven empty sockets at r 3.5' },
+      { id: 'desk', x0: 74, x1: 77.5, y0: -8.4, y1: -6.6, h: 0.85, chair: [75.4, 76.2, -10.4, -9.6], note: 'books, a brass lamp, rubbings' },
+      { id: 'shelves', wall: 'y=-12', x0: 79, x1: 94, depth: 0.6, z0: 0, z1: 2.6, note: 'salvaged ancient pieces in jars; about a quarter faintly glowing' },
+      { id: 'rubbings', wall: 'x=96', y0: -2.8, y1: 3, z0: 1.2, z1: 2.4, note: 'paper rubbings of the gate’s lines' },
+      { id: 'lanterns', at: [[94, 0, 2.2], [84, -10, 2.2]], hook_z: 2.7 },
     ],
-    gates: ['L5 door in the aft wall (x 72, y 5..7.5)', 'L6 grilles in the forward wall (x 96, y -7..-4 and 4..7)', 'L17 the Keelgate itself (G5)'],
+    gates: ['L5 door in the aft wall (x 72)', 'L6 grilles in the forward wall (x 96)', 'L17 the Keelgate itself (G5)'],
   },
   chandlery: {
-    svc: 'E', level: 'main', floor: 17.5, name: 'Chandlery (equipment)',
+    svc: 'E', level: 'main', floor: 16.5, name: 'Chandlery (equipment)',
     npc: { x: 105, y: -9.6, face: 90, note: 'behind the counter, facing out to the open deck and the main mast' },
     e: [
       { id: 'counter', x: 105, y: -6.6, prompt: 'Talk' },
@@ -274,76 +302,69 @@ const SPACES = {
       { id: 'try_compass', x: 110.4, y: -3.6, prompt: 'Try the compass' },
     ],
     props: [
-      { id: 'deckhouse', x0: 98, x1: 114, y0: -17.5, y1: -8, h: 4.2, ridge: 5.4, note: 'pitched roof, ridge along x at y -12.75; its back 1.5 m in from the bulwark, clear of the main mast’s port shrouds' },
-      { id: 'counter_front', x0: 99.5, x1: 110, y0: -8.4, y1: -8, h: 0.9, top: 0.95, note: 'the front wall is the counter; top board at 0.95 (under the 1.4 m player’s eyes); posts at x 98..99.5, 110..111, 113..114' },
+      { id: 'deckhouse', x0: 98, x1: 114, y0: -17.5, y1: -8, h: 4.2, ridge: 5.4, note: 'pitched roof, ridge along x at y -12.75' },
+      { id: 'counter_front', x0: 99.5, x1: 110, y0: -8.4, y1: -8, h: 0.9, top: 0.95, note: 'the front wall is the counter; posts at x 98..99.5, 110..111, 113..114' },
       { id: 'door', wall: 'y=-8', x0: 111, x1: 113 },
       { id: 'awning', x0: 99, x1: 110.5, from: [-8, 3.3], to: [-5.8, 2.75], note: 'canvas in muted oxblood and cream stripes on two posts at y -5.8' },
       { id: 'sign', wall: 'y=-8', x0: 101, x1: 109, z0: 3.5, z1: 4.4, text: 'CHANDLER' },
-      { id: 'shelves', runs: [[98.5, 113.5, -17.2, -16.6], [98.3, 98.9, -16.6, -9.2]], h: 3.6, note: 'along the back wall and the aft wall, depth 0.6; tins, jars, coils, boxes; a ladder on a rail' },
-      { id: 'display_table', x0: 103, x1: 108, y0: -14.5, y1: -12.5, h: 0.85, note: 'the tools of the wheel: compass, spyglass, lantern; room for more' },
+      { id: 'shelves', runs: [[98.5, 113.5, -17.2, -16.6], [98.3, 98.9, -16.6, -9.2]], h: 3.6, note: 'along the back wall and the aft wall; tins, jars, coils, boxes; a ladder on a rail' },
+      { id: 'display_table', x0: 103, x1: 108, y0: -14.5, y1: -12.5, h: 0.85, note: 'compass, spyglass, lantern; room for more' },
       { id: 'window', wall: 'x=114', y0: -15, y1: -12.5, z0: 0.9, z1: 2.3 },
       { id: 'beams', at_x: [102, 106, 110], z: 3.9, note: 'stock hangs from them: lanterns, coils, a net' },
-      { id: 'tripod_spyglass', x: 106, y: -4.5, h: 1.15, note: 'eyepiece at the 1.4 m player’s eye' },
-      { id: 'binnacle', x: 110, y: -4.5, h: 1.0, note: 'the bowl at waist height, looked down into' },
+      { id: 'tripod_spyglass', x: 106, y: -4.5, h: 1.15 },
+      { id: 'binnacle', x: 110, y: -4.5, h: 1.0 },
       { id: 'fife_rail', x0: 98, x1: 102, y0: -2, y1: 2, h: 0.9, note: 'round the main mast (x 100, r 1.0), with belaying pins' },
       { id: 'barrels_crates', x0: 112, x1: 114, y0: -7.6, y1: -6 },
     ],
     gates: [],
   },
   main_deck: {
-    level: 'main', floor: 17.5,
+    level: 'main', floor: 16.5,
     props: [
-      { id: 'bulwark', note: 'round the hull edge from x 44, 0.9 m with a cap rail (the 1.4 m player sees over it); inner face at 0.965 x the half-beam' },
-      { id: 'stair_hatch', x0: 73, x1: 76, y0: 0, y1: 7, note: 'the last flight from the upper deck arrives here (aft of the Well), a hooded companion with a rail' },
+      { id: 'bulwark', note: 'round the hull edge from x 48, 0.9 m with a cap rail; inner face at 0.965 x the half-beam' },
+      { id: 'stair_hatch', x0: 84.6, x1: 90, y0: 8, y1: 11, note: 'the last flight from the gun deck arrives here (starboard of the Well), a hooded companion with a rail' },
       { id: 'masts', at: [[68, 0], [100, 0], [140, 0]], r: 1.0, note: 'fife rails 4 x 4 m round each; channels on the hull sides for the shrouds' },
       { id: 'cargo_rope', x: 116, every: 4, note: 'G2: a rope across the deck on stanchions every 4 m, a board at y 0 (Cargo work, keep clear)' },
       { id: 'cargo_hatches', boxes: [[118, 122, -3, 3], [123, 127, -3, 3]], note: 'gratings, padlocked (G3)' },
       { id: 'ships_boats', boxes: [[119, 129, 12, 15], [119, 129, -15, -12]], note: 'on chocks, under the cargo rope (locked zone L15)' },
       { id: 'capstan', x: 131.5, y: 0, r: 1.1, note: 'heaves the bow cables, led aft from the hawse holes under the forecastle' },
       { id: 'galley_chimney', x: 120.8, y: 8, h: 4.5, note: 'smokes: the mess below (L9)' },
-      { id: 'bowsprit', from: [154, 0, 24.5], to: [188, 0, 31.5], note: 'absolute z' },
-      { id: 'bobstay', from: [186, 0, 31], to: [158.5, 0, 6], note: 'holds the bowsprit down against the forestays: from its end to the stem' },
-      { id: 'lanterns', at: [[72.4, 7.6, 2.2], [99, -5.6, 2.6], [110.5, -5.6, 2.6], [100, 2.3, 2.0]], hook_z: 2.8, note: 'at the companion, on the awning’s posts, on the main fife rail' },
+      { id: 'bowsprit', from: [154, 0, 23.5], to: [188, 0, 30.5], note: 'absolute z' },
+      { id: 'bobstay', from: [186, 0, 30], to: [158.5, 0, 5], note: 'holds the bowsprit down against the forestays: from its end to the stem' },
+      { id: 'lanterns', at: [[86, 7.6, 2.2], [99, -5.6, 2.6], [110.5, -5.6, 2.6], [100, 2.3, 2.0]], hook_z: 2.8 },
     ],
   },
 };
 
-/* Where the gates stand (plan positions, metres). zone = the locked zone behind it. */
+/* Gates the room layout cannot place itself (plan positions, metres): the cargo rope, the cargo hatch, the forecastle's ladders,
+   the shrouds, the Keelgate. The rest stand where a locked zone's corridor meets an open space (hub_layout.gate_marks). */
 const GATE_MARKS = [
-  { level: 'quay', x: 48, y: -11.5, g: 'G6', zone: 'L4' }, { level: 'quay', x: 54, y: -9, g: 'G6', zone: 'L4' },
-  { level: 'quay', x: 64, y: 6.2, g: 'G1', zone: 'L5' }, { level: 'quay', x: 72, y: 6.2, g: 'G1', zone: 'L5' },
-  { level: 'quay', x: 96, y: -5.5, g: 'G6', zone: 'L6' }, { level: 'quay', x: 96, y: 5.5, g: 'G6', zone: 'L6' },
-  { level: 'quay', x: 8, y: 14, g: 'G4', zone: 'L3' }, { level: 'quay', x: 22, y: 14, g: 'G4', zone: 'L3' }, { level: 'quay', x: 8, y: -14, g: 'G4', zone: 'L3' }, { level: 'quay', x: 26, y: -14, g: 'G4', zone: 'L3' },
   { level: 'quay', x: 84, y: 0, g: 'G5', zone: 'L17' },
-  { level: 'lower', x: 64, y: 19.2, g: 'G1', zone: 'L7' }, { level: 'lower', x: 73, y: -2.5, g: 'G1', zone: 'L7' },
-  { level: 'lower', x: 84, y: -11, g: 'G1', zone: 'L8' }, { level: 'lower', x: 95, y: 3.5, g: 'G1', zone: 'L9' }, { level: 'lower', x: 89.5, y: 11, g: 'G1', zone: 'L9' },
-  { level: 'middle', x: 73, y: 0, g: 'G1', zone: 'L10' }, { level: 'middle', x: 95, y: 3.5, g: 'G2', zone: 'L11' }, { level: 'middle', x: 88, y: -11, g: 'G4', zone: 'L11' }, { level: 'middle', x: 88, y: 11, g: 'G4', zone: 'L11' },
-  { level: 'upper', x: 73, y: -4, g: 'G1', zone: 'L12' }, { level: 'upper', x: 95, y: 0, g: 'G1', zone: 'L13' }, { level: 'upper', x: 88.5, y: -11, g: 'G1', zone: 'L13' }, { level: 'upper', x: 84, y: 11, g: 'G1', zone: 'L13' },
-  { level: 'main', x: 44, y: 14.5, g: 'G1', zone: 'L1' }, { level: 'main', x: 44, y: -14.5, g: 'G1', zone: 'L1' },
   { level: 'main', x: 116, y: 0, g: 'G2', zone: 'L15', line: 'Cargo work, keep clear.' }, { level: 'main', x: 122, y: 0, g: 'G3', zone: 'L6' },
-  { level: 'main', x: 134, y: 8, g: 'G1', zone: 'L14' }, { level: 'main', x: 134, y: -8, g: 'G1', zone: 'L14' }, { level: 'main', x: 134, y: 15, g: 'G3', zone: 'L14' }, { level: 'main', x: 134, y: -15, g: 'G3', zone: 'L14' },
+  { level: 'main', x: 134, y: 15, g: 'G3', zone: 'L14' }, { level: 'main', x: 134, y: -15, g: 'G3', zone: 'L14' },
   { level: 'main', x: 68, y: 17.6, g: 'G3', zone: 'L16' }, { level: 'main', x: 100, y: 17.6, g: 'G3', zone: 'L16' },
 ];
 const WHERE = {
-  L1: 'Main deck aft and three storeys above it; the arch over the dock; the poop with the great wheel',
-  L2: 'Both wings over the dock, lower and upper deck', L3: 'Quay deck, behind both arcades', L4: 'Quay deck, port of the Slip',
-  L5: 'Quay deck, between the Slip and the Keelgate', L6: 'Quay deck forward; round the Keelgate chamber', L7: 'Lower deck, between the Tally House and the Well',
-  L8: 'Lower deck, port side, 100 m long', L9: 'Lower deck forward', L10: 'Middle deck aft (over the Tally House, the Slip and the wings)',
-  L11: 'Middle deck forward', L12: 'Upper deck over the Slip', L13: 'Upper deck forward and round the Well', L14: 'Bow: two storeys and the bowsprit',
-  L15: 'Main deck between the Waist and the forecastle', L16: 'Three masts, their tops and yards', L17: 'Under the waterline, behind the Keelgate',
+  L1: 'Main deck aft and the sterncastle over it: the great cabin, the stern galleries, the quarterdeck, the poop',
+  L2: 'Lower and middle deck aft, over the Water Hall’s aft quay and the stern', L3: 'Dock deck aft of the Water Hall', L4: 'Dock deck, port of the Slip',
+  L5: 'Dock deck, between the Slip and the Keelgate', L6: 'Dock deck forward and round the Keelgate chamber; the hold under everything', L7: 'Lower deck, between the Tally House and the Well',
+  L8: 'Lower deck, port side, 120 m long', L9: 'Lower deck forward', L10: 'Middle deck aft (over the Water Hall and the Slip)',
+  L11: 'Middle deck forward', L12: 'Upper deck aft', L13: 'Upper deck forward and round the Well', L14: 'Bow: the forecastle and the bowsprit',
+  L15: 'Main deck between the Waist and the forecastle', L16: 'Three masts, their tops and yards', L17: 'The Deep, under the waterline, behind the Keelgate',
+  L18: 'Gun deck, all of it but the Well’s gallery',
 };
 
-/* The outside, for the build (from the sketches; metres, absolute z). */
+/* The outside, for the build (metres, absolute z). */
 const OUTSIDE = {
-  hull_section: 'Below +3 m the ancient hull: flat bottom +/-6 m at the keel (z -12), +/-16 m at z -6, +/-19 m at the waterline. Above it timber: widest +/-20 m at about z +6, tumblehome to +/-18.8 m at the main deck rail amidships (z 18.4) and +/-15.7 m at the poop rail aft (z 34.4). The deck outline is HUB.hb(x).',
-  stern: 'A galleon’s stern (D62): the sterncastle rises in two tiers, the quarterdeck over x 22..44 (rail 26.4) and the poop over x 0..22 (rail 34.4). The stern face (x 0) goes down to z -6. The dock mouth is +/-10 m wide from the basin floor (z -5) up, +/-14 m between the quay decks (z 1.5) and z 5.5 (the quays show; under them the quays are solid stone), its top an arch from z 21.5 at the sides to 25.5 in the middle. The Stern Arch (x 0..10) fills z 25.5..33.5: seven tall great windows on its aft face (z 26.2..31.5, 1.8 m wide, 2.8 m apart, pointed tops), a brass frieze with the name at z 32..33.3. The taffrail rises 1.0 m in the middle (z 34.4 to 35.4). Quarter galleries on both wings’ outer sides, x 3..13, z 21.5..32, standing out 2.4 m, two tiers of windows, a brass drop below and a small dome on top. Stern lanterns on the wing corners at z 37.6. The great wheel (r 1.8 m) on the arch’s top, lashed with a rope cross, shows above the taffrail; its ropes run down the wings to the tillers of twin rudders hung on the wings’ sternposts (hub.rudders). Stern moorings from both wings’ quarters, splayed out clear of the approach (hub.cables).',
-  sides: 'Dark tarred planking in strakes about 0.55 m wide with a gentle sheer (hub.sheer: the bands rise towards both ends) and heavy wales at the bands; ochre bands at z 5.5, 17.5, 33.5 (0.9 m) and thinner ones at the other deck lines; lidded square ports (1 m) below the main deck, cream-framed windows (1.3 x 2 m) above it; most shut, some lit at night. Channels with deadeyes at each mast. The ancient band (pale, two turquoise lines) from z -1.5 to +3 all round.',
-  masts: 'x 68, 100, 140 (hub.rig in numbers); 54, 76, 64 m above the main deck; the mizzen’s lowest yard a galleon’s lateen yard, slung fore and aft; 2.0 m thick at the deck tapering to 0.7; tops at 0.38 h (14 m wide) and crosstrees at 0.68 h (6.4 m); yards at 0.27, 0.47, 0.62, 0.80 h with half-lengths 0.42, 0.35, 0.26, 0.18 x 40 m (main; fore x 0.92, mizzen x 0.8); every sail furled on its yard with gaskets; shrouds to the channels, stays forward, a long oxblood-and-cream pennant at the main truck.',
-  bow: 'Forecastle x 134..160 up to z 25.5 with a rail; a plain stem with two hawse holes and their cables down to the anchors ahead (hub.cables); a galleon’s beakhead out from the stem under the bowsprit (hub.beakhead: a grated platform at z 19.5, headrails curving up to the forecastle, a carved figurehead at its tip); the bowsprit from (154, 24.5) to (188, 31.5) with its spritsail yard (hub.rig.spritsail), held down by its bobstay; the stem foot is ancient stone (the pale band rises a little at the bow).',
-  colours: 'Hull planking dark tarred brown (new MI); ochre bands (new MI, muted); window frames MI_Paint_Cream; carvings and frieze MI_Metal_Brass (muted); decks MI_Wood_Teak and its light/dark variants; canvas MI_Canvas; iron MI_Metal_Iron; the ancient hull a new pale stone MI with MI_AncientGlow lines (sparingly).',
+  hull_section: 'Planked all the way down (D64: no pale ancient band outside; the ancient hull shows only inside, at the Keelgate and the Deep): flat bottom +/-6 m at the keel (z -12), +/-16 m at z -6, +/-19 m at the waterline, widest +/-20 m at z +6, tumblehome to +/-18.8 m at the main deck rail and +/-17.4 m at the taffrail. Fine at the ends below the water (hub.form): the run aft narrows to the sternpost, the entry forward is finer than the deck outline.',
+  stern: 'A galleon’s stern (D64): the sterncastle rises in two tiers, the quarterdeck over x 24..48 (deck 22.5) and the poop over x 0..24 (three storeys, deck 28.5). Below the counter (z 8.5) the hull narrows to the sternpost and the one rudder; above it the stern is full width, round in plan (its corners 2.6 m forward of its middle) and leans aft a little. On its face: rows of tall cabin windows on each storey, open stern galleries with balustrades at sc1 and sc2 running round the corners into the quarter galleries (x 2..13, standing out 2.6 m, three storeys, domed), the name in carved brass letters under the taffrail, three great lanterns on the taffrail. The tiller comes in through the counter; the lashed great wheel is on the quarterdeck.',
+  sides: 'Dark tarred planking in strakes about 0.55 m wide with a lively sheer (hub.sheer: up 2.2 m at the stern, 2.6 m at the stem); heavy wales in a belt at the waterline and at the deck lines, standing out like mouldings; ochre bands; lidded square ports (1 m) on every deck below the main deck down to the dock deck, cream-framed windows above it; most shut, some lit at night. Channels with deadeyes at each mast. The hidden doors at x 32..40 on both sides, from under the water to 13 m: shut, the planking, wales and painted port lids run on across them; only a seam and the iron hinge straps show.',
+  masts: 'x 68, 100, 140 (hub.rig in numbers); 54, 76, 64 m above the main deck; the mizzen’s lowest yard a lateen yard; every sail furled on its yard; shrouds to the channels, stays forward, a long oxblood-and-cream pennant at the main truck.',
+  bow: 'Forecastle x 134..160, a storey over the main deck with a rail; a plain stem with two hawse holes and their cables to the anchors ahead; the beakhead out from the stem under the bowsprit (a grated platform, headrails curving up to the forecastle, a carved figurehead); the bowsprit from (154, 23.5) to (188, 30.5) with its spritsail yard, held down by its bobstay.',
+  colours: 'Hull planking dark tarred brown; ochre bands, muted; window frames cream; carvings and the name brass, muted; decks teak and its light and dark variants; canvas; iron.',
 };
 
-/* ---------- the area count (0.5 m cells) ---------- */
+/* ---------- the area count (0.5 m cells, on the deck outline; the build uses the hull's form) ---------- */
 const inR = (r, x, y) => x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1;
 function countAreas(step = 0.5) {
   const res = { levels: {}, open: {}, locked: {}, total: 0, openTotal: 0 };
@@ -358,15 +379,14 @@ function countAreas(step = 0.5) {
         if (Math.abs(y) >= hb) continue;
         if (L.only && !L.only.some(r => inR(r, x, y))) continue;
         if (L.voids && L.voids.some(r => inR(r, x, y))) continue;
+        if (L.water && L.water.some(r => inR(r, x, y))) continue;
         tot += cell;
-        const water = L.water && L.water.some(r => inR(r, x, y));
-        const o = water ? { id: 'dock' } : openHere.find(o => !o.inside && o.rects.some(r => inR(r, x, y)));
+        const o = openHere.find(o => !o.inside && o.rects.some(r => inR(r, x, y)));
         if (o) { op += cell; res.open[o.id] = (res.open[o.id] || 0) + cell; continue; }
         const z = lockedHere.find(z => z.levels[L.id].some(r => inR(r, x, y)));
         const id = z ? z.id : 'rest_' + L.id; res.locked[id] = (res.locked[id] || 0) + cell;
       }
     }
-    // A deckhouse counts with the deck it stands on; its own area is reported for the register.
     for (const o of openHere.filter(o => o.inside)) res.open[o.id] = o.rects.reduce((a, r) => a + (r.x1 - r.x0) * (r.y1 - r.y0), 0);
     res.levels[L.id] = { total: tot, open: op };
     res.total += tot; res.openTotal += op;
@@ -382,7 +402,7 @@ function exportData() {
   const a = countAreas(), r = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v)]));
   return {
     _comment: 'Saltbound hub ship, design data (generated from Docs/Design/HubShip/hub_data.js; do not edit, change hub_data.js and run Tools/design/render_hub_ship.py --data).',
-    frame: { units: 'metres', x: 'forward from the stern face (0) to the stem (160)', y: 'to starboard', z: 'up from the design waterline',
+    frame: { units: 'metres', x: 'forward from the stern (0) to the stem (160)', y: 'to starboard', z: 'up from the design waterline',
       unreal: 'cm; +X forward, +Y starboard, +Z up; the ship actor pivot at x 80, y 0, z 0: X_cm = (x - 80) * 100, Y_cm = y * 100, Z_cm = z * 100',
       face: 'degrees in plan: 0 = towards the bow (+x), 90 = to starboard (+y); equals Unreal yaw in the ship frame' },
     hub, levels: LEVELS, open: OPEN, locked: LOCKED, gates: GATES, gate_marks: GATE_MARKS, where: WHERE, spaces: SPACES, outside: OUTSIDE,

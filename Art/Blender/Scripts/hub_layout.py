@@ -100,14 +100,71 @@ def stem_x(z):
     return _interp(sorted(bow), z)
 
 
+FORM = HUB.get("form", {})
+
+
+def _smooth(e0, e1, v):
+    t = min(max((v - e0) / (e1 - e0), 0.0), 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def stern_lean(z):
+    """D64: how far aft of x 0 the stern face leans at height z (0 at the counter, `rake` at the taffrail)."""
+    st = FORM["stern"]
+    top = HUB["profile"][0][1]
+    return st["rake"] * min(max((z - st["counter"]) / max(top - st["counter"], 1.0), 0.0), 1.0)
+
+
+def stern_face_x(y, z, w):
+    """D64: where the stern face is at (y, z) above the counter: round in plan (its corners `round` m forward of its middle,
+    w the half-width there) and leaning aft towards the taffrail."""
+    return FORM["stern"]["round"] * (y / max(w, 1e-3)) ** 2 - stern_lean(z)
+
+
 def half_width(x, z):
     """The hull's half-width at (x, z): the amidships section scaled by the deck outline. Towards the bow the outline
-    is stretched so the stem at height z (stem_x) is where the deck outline's stem is."""
+    is stretched so the stem at height z (stem_x) is where the deck outline's stem is. D64 (`form`): below the counter the run
+    narrows the bottom aft to the sternpost, the entry is finer forward below the water, and above the counter the stern is
+    round in plan (stern_face_x)."""
     xs = stem_x(z)
     deck_stem = _STBD[-1][0]
+    xo = x
     if x > 100.0:
         x = 100.0 + (x - 100.0) * (deck_stem - 100.0) / max(xs - 100.0, 1.0)
-    return hb(x) * _interp(SECTION, z) / 20.0
+    w = hb(max(x, 0.0)) * _interp(SECTION, z) / 20.0
+    if not FORM:
+        return w if x >= 0.0 else 0.0
+    st = FORM["stern"]
+    run = FORM["run"]
+    if z < st["counter"]:
+        if xo < st["post_x"]:
+            return 0.0
+        if xo < run["x1"]:
+            t = min(max((run["x1"] - xo) / (run["x1"] - st["post_x"]), 0.0), 1.0)
+            below = 1.0 - _smooth(run["blend"][0], run["blend"][1], z)
+            w *= 1.0 - (1.0 - run["post"]) * t ** run["pow"] * below
+    else:
+        # Round in plan: at x the face spans |y| <= w sqrt((x + lean) / round).
+        lean = stern_lean(z)
+        if xo + lean < st["round"]:
+            if xo + lean <= 0.0:
+                return 0.0
+            w *= math.sqrt((xo + lean) / st["round"])
+    en = FORM["entry"]
+    if xo > en["x0"] and z < en["top"]:
+        t = min(max((xo - en["x0"]) / (deck_stem - en["x0"]), 0.0), 1.0)
+        below = 1.0 - _smooth(en["top"] - 6.0, en["top"], z)
+        w *= 1.0 - (1.0 - en["fine"]) * t ** en["pow"] * below
+    return w
+
+
+LINING = 0.35        # the hull's thickness inside its outer face (planking, frames, ceiling): floors stop there
+
+
+def floor_half(level_id, x):
+    """How far a floor reaches out at x: the hull's inside at the floor and a head's height above it (the narrower)."""
+    z = level_z(level_id)
+    return max(min(half_width(x, z + 0.1), half_width(x, z + 2.0)) - LINING, 0.0)
 
 
 def profile_top(x):
