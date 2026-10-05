@@ -28,7 +28,7 @@ part('T_UI_KeyScrap', KS_FRAME, KS_FRAME, 2, c => { const o = (KS_FRAME - KS) / 
 part('T_UI_KeyScrap_Paper', KS_FRAME, KS_FRAME, 2, c => { const o = (KS_FRAME - KS) / 2; c.fillStyle = '#fff'; c.fill(scrapPath(o, o, KS, KS, KSEED, 4)); });
 /* Key letters inked on the scrap (IM Fell English SC 32 px, ink with bleed), same frame: baseline 11 px below the centre.
    The light letter is what shows where the ink has soaked through (#EFDFB8). */
-for (const [k, label] of [['E', 'E'], ['F', 'F'], ['R', 'R'], ['G', 'G'], ['Q', 'Q'], ['PadX', 'X']]) {
+for (const [k, label] of [['E', 'E'], ['F', 'F'], ['R', 'R'], ['G', 'G'], ['Q', 'Q'], ['A', 'A'], ['D', 'D'], ['W', 'W'], ['S', 'S'], ['PadX', 'X']]) {
   part('T_UI_KeyLetter_' + k, KS_FRAME, KS_FRAME, 2, c => inkText(c, label, KS_FRAME / 2, KS_FRAME / 2 + 11, 32, { align: 'center', sc: true }));
   part('T_UI_KeyLetterLight_' + k, KS_FRAME, KS_FRAME, 2, c => txt(c, label, KS_FRAME / 2, KS_FRAME / 2 + 11, `400 32px ${FSC}`, '#efdfb8', { align: 'center' }));
 }

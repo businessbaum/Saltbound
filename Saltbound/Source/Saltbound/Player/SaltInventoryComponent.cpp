@@ -111,6 +111,53 @@ void USaltInventoryComponent::InitStore(FName InStorageId, const FText& InName, 
 	Slots.SetNum(FMath::Max(InCapacity, 1));
 }
 
+int32 USaltInventoryComponent::MoveToSlot(int32 Index, USaltInventoryComponent* To, int32 ToIndex, int32 MaxCount)
+{
+	if (!To || !Slots.IsValidIndex(Index) || Slots[Index].IsEmpty() || !To->Slots.IsValidIndex(ToIndex) || MaxCount <= 0
+		|| (To == this && ToIndex == Index))
+	{
+		return 0;
+	}
+	const FSaltItemDef* Def = SaltItems::Find(Slots[Index].Id);
+	if (!Def)
+	{
+		return 0;
+	}
+	FSaltItemStack& From = Slots[Index];
+	FSaltItemStack& Dest = To->Slots[ToIndex];
+	int32 Moved = 0;
+	if (Dest.IsEmpty())
+	{
+		Moved = FMath::Min3(From.Count, MaxCount, Def->MaxStack);
+		Dest = { From.Id, Moved };
+		From.Count -= Moved;
+	}
+	else if (Dest.Id == From.Id)
+	{
+		Moved = FMath::Min3(From.Count, MaxCount, FMath::Max(Def->MaxStack - Dest.Count, 0));
+		Dest.Count += Moved;
+		From.Count -= Moved;
+	}
+	else if (MaxCount >= From.Count)
+	{
+		Moved = From.Count;
+		Swap(From, Dest);
+	}
+	if (From.Count <= 0)
+	{
+		From = FSaltItemStack();
+	}
+	if (Moved > 0)
+	{
+		OnChanged.Broadcast();
+		if (To != this)
+		{
+			To->OnChanged.Broadcast();
+		}
+	}
+	return Moved;
+}
+
 int32 USaltInventoryComponent::MoveStack(int32 Index, USaltInventoryComponent* To, int32 MaxCount, int32* OutToSlot)
 {
 	if (OutToSlot)

@@ -45,7 +45,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station")
 	FText LeavePromptText;
 
-	/** Optional one-line hint about the station controls, shown while operating it. */
+	/** The station's controls, shown while operating it in the key-scrap prompt (D58): the keys (letters, e.g. A and D)
+	 *  and what they do ("Steer"). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station")
+	TArray<FString> ControlKeys;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station")
+	FText ControlAction;
+
+	/** Optional status line under the controls (the boat's speed, the sail and the wind). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station")
 	FText ControlsHintText;
 

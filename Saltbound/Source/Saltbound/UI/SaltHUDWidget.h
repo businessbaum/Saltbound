@@ -14,6 +14,7 @@ class UTextBlock;
 class USaltLandfallWidget;
 class USaltToolWheelWidget;
 class USaltPaintedText;
+class USaltKeyPrompt;
 
 /**
  * Builds its widget tree in code (no widget asset). Deliberately quiet: a small dot that brightens on usable objects,
@@ -40,6 +41,8 @@ public:
 	USaltToolWheelWidget* GetToolWheel() const { return ToolWheel; }
 	/** The spyglass's round view (its opacity follows the zoom). */
 	float GetSpyglassMaskOpacity() const;
+	/** The controls row as shown (tests): its action, empty when hidden. */
+	FText GetShownControls() const;
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -59,13 +62,17 @@ private:
 
 	void LayoutRow(int32 Index);
 	void TickPrompt(float DeltaSeconds);
+	/** D58: the controls in use (a station's, a ladder's) in the key-scrap prompt along the bottom, a status line under it. */
+	void TickControls(float DeltaSeconds);
 	void TickSaveSign(float DeltaSeconds);
 	void HandleSaveStarted();
 	void HandleSaveFinished();
 	void HandleLandfall(FName PlaceId);
 
+	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> HudRoot;
 	UPROPERTY(Transient) TObjectPtr<UImage> Dot;
-	UPROPERTY(Transient) TObjectPtr<UTextBlock> Hint;
+	UPROPERTY(Transient) TObjectPtr<USaltKeyPrompt> ControlsRow;
+	UPROPERTY(Transient) TObjectPtr<USaltPaintedText> StatusLine;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> Notice;
 	UPROPERTY(Transient) TArray<TObjectPtr<UCanvasPanel>> RowRoots;
 	UPROPERTY(Transient) TArray<TObjectPtr<UImage>> RowScraps;
@@ -83,8 +90,11 @@ private:
 	float Clock = 0.f;
 
 	float NoticeTime = 0.f;
-	float HintAlpha = 0.f;
 	float DotAlpha = 0.35f;
+	/** The controls row's keys (a new set makes a new row), whether it shows, and its opacity. */
+	TArray<FString> ControlKeys;
+	bool bControlsShowing = false;
+	float ControlsAlpha = 0.f;
 
 	// The save sign: shown while saving, at least 1.4 s, finishing its step before it fades.
 	bool bSaving = false;

@@ -27,6 +27,9 @@ namespace
 	constexpr float TailReach = 118.f;
 	constexpr float NameSize = 66.f;
 	constexpr float NameSpacing = 5.f;
+	/** D58 (owner: "the island discovery notification is a bit too big"): the whole banner at 75 %, its band's top where the
+	 *  design puts it (y 150). */
+	constexpr float BannerScale = 0.75f;
 
 	// The motion (s): unroll, seal, ink, line under it, hold, roll up.
 	constexpr float UnrollTime = 0.6f;
@@ -57,6 +60,8 @@ TSharedRef<SWidget> USaltLandfallWidget::RebuildWidget()
 	{
 		Root = WidgetTree->ConstructWidget<UCanvasPanel>();
 		Root->SetVisibility(ESlateVisibility::Collapsed);
+		Root->SetRenderTransformPivot(FVector2D(0.5f, BandTop / 1080.f));
+		Root->SetRenderScale(FVector2D(BannerScale, BannerScale));
 		WidgetTree->RootWidget = Root;
 		auto Layer = [this](UMaterialInstanceDynamic*& OutMaterial)
 		{

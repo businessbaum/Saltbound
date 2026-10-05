@@ -80,7 +80,9 @@ isle_zone.set_editor_property("center", unreal.Vector2D(*ISLE))
 isle_zone.set_editor_property("inner_radius", 8000.0)
 isle_zone.set_editor_property("outer_radius", 30000.0)
 isle_zone.set_editor_property("min_factor", 0.3)
-ocean.set_editor_property("calm_zones", [zone, isle_zone])
+# Home waters (D58, owner: "make the waves in the start area a bit more calm"): 70 % within 700 m (place_home_waters.py).
+import place_home_waters  # noqa: E402
+ocean.set_editor_property("calm_zones", place_home_waters.add_zone([zone, isle_zone]))
 # Wave height comes from the rig's sea state (StartSeaState below), not from the ocean actor.
 
 # --- seabed --------------------------------------------------------------------------------------------

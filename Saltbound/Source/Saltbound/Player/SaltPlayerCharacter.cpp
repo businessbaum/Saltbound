@@ -33,6 +33,27 @@ namespace
 	TAutoConsoleVariable<int32> CVarDeckKnees(TEXT("sb.Camera.DeckKnees"), 1,
 		TEXT("1: on a heaving deck the eyes take only part of the swell (default); 0: they ride the deck rigidly."));
 
+	/** D58 (owner: "feel the rocking"): the share of the deck's roll and pitch the view takes. */
+	TAutoConsoleVariable<float> CVarDeckTilt(TEXT("sb.Camera.DeckTilt"), 0.3f,
+		TEXT("Share of a deck's roll and pitch the view takes (0 = always level; default 0.3)."));
+
+	/** D58: sudden pops of the body against the deck (an edge under the feet as the deck heaves) are smoothed out of the
+	 *  view; 0 turns it off (A/B). */
+	TAutoConsoleVariable<int32> CVarEyeSteps(TEXT("sb.Camera.StepSmooth"), 1,
+		TEXT("1: smooth sudden vertical pops of the body against the deck out of the view (default); 0: off."));
+
+	/** D58: the knees' share of the swell (D56: 0.45; the owner wants to feel the ship move, so less). */
+	constexpr float KneeShare = 0.2f;
+	/** D58: the time constant of the spring that eases a pop against the deck out of the view (s; settled in ~0.3 s). */
+	constexpr float EyeStepTime = 0.07f;
+
+	/** Smoother step (zero first and second derivative at both ends). */
+	float SmootherStep(float T)
+	{
+		T = FMath::Clamp(T, 0.f, 1.f);
+		return T * T * T * (T * (T * 6.f - 15.f) + 10.f);
+	}
+
 	TAutoConsoleVariable<bool> CVarShowInteractionVolumes(
 		TEXT("sb.Dev.ShowInteractionVolumes"), false,
 		TEXT("Draw interaction focus probe hits."),
@@ -59,6 +80,8 @@ ASaltPlayerCharacter::ASaltPlayerCharacter(const FObjectInitializer& ObjectIniti
 	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - CapsuleHalfHeight));
 	Camera->bUsePawnControlRotation = true;
 	Camera->SetFieldOfView(FieldOfView);
+	ViewAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("ViewAnchor"));
+	ViewAnchor->SetupAttachment(Camera);
 
 	// No visible body for now.
 	GetMesh()->SetVisibility(false);
@@ -89,6 +112,10 @@ ASaltPlayerCharacter::ASaltPlayerCharacter(const FObjectInitializer& ObjectIniti
 	// deck (no floor of the same object below) releases the base and imparts its velocity.
 	Move->bStayBasedInAir = true;
 	Move->StayBasedInAirHeight = 300.f;
+	// D58 (owner: the camera "teleporting up and down really fast" by the edge of something on a heaving deck): next to a
+	// low step (a chest, a rail's foot) the capsule's round bottom rode up and down the step's edge as the deck rolled under
+	// it, 15-25 cm several times a second (sb.Dev.EdgeTest). A flat base stands on the step or beside it.
+	Move->bUseFlatBaseForFloorChecks = true;
 }
 
 void ASaltPlayerCharacter::OnConstruction(const FTransform& Transform)
@@ -193,6 +220,14 @@ void ASaltPlayerCharacter::Tick(float DeltaSeconds)
 		}
 	}
 
+	// D58: a close look glides there and back smoothly (zero speed at both ends).
+	ViewFocusLinear = FMath::Clamp(ViewFocusLinear + (bViewFocus ? 1.f : -1.f) * DeltaSeconds / ViewFocusBlend, 0.f, 1.f);
+	ViewFocusAlpha = SmootherStep(ViewFocusLinear);
+	if (!bViewFocus && ViewFocusLinear <= 0.f)
+	{
+		FocusBase = nullptr;
+	}
+
 	UpdateInteractionFocus();
 	TickHold(DeltaSeconds);
 }
@@ -232,17 +267,66 @@ bool ASaltPlayerCharacter::IsSwimming() const
 	return GetCharacterMovement() && GetCharacterMovement()->IsSwimming();
 }
 
+const USceneComponent* ASaltPlayerCharacter::GetDeck() const
+{
+	if (IsSwimming())
+	{
+		return nullptr;
+	}
+	const USceneComponent* Deck = ActiveStation ? static_cast<const USceneComponent*>(ActiveStation.Get())
+		: bOnLadder ? Ladder.Base.Get() : bClimbing ? ClimbBase.Get() : Cast<UPrimitiveComponent>(GetMovementBaseObject());
+	return Deck && Deck->Mobility == EComponentMobility::Movable ? Deck : nullptr;
+}
+
+float ASaltPlayerCharacter::GetViewTiltDeg() const
+{
+	return FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp((float)ViewUp.Z, -1.f, 1.f)));
+}
+
 void ASaltPlayerCharacter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
 {
 	Super::CalcCamera(DeltaTime, OutResult);
+	const USceneComponent* Deck = GetDeck();
+
+	// D58: a sudden pop of the body against the deck (faster than 1.5 m/s: a step up or down, the body pushed onto a rail's
+	// foot as the deck rolls) is taken out of the view and eased back in about 0.3 s by a critically damped spring (no jump,
+	// no overshoot); slower changes (a ramp) pass as they are. Only while standing or walking on the deck (and in the first
+	// moment of a slip): a jump, a real fall, a ladder and a climb move the view as they are.
+	const UCharacterMovementComponent* Move = GetCharacterMovement();
+	const bool bGround = Move && Move->IsMovingOnGround();
+	bEyeAirborne = !bGround && Move && (bEyeAirborne || FMath::Abs(Move->Velocity.Z) >= 120.f);
+	const bool bOnFoot = !ActiveStation && !bOnLadder && !bClimbing && Move && (bGround || (Move->IsFalling() && !bEyeAirborne));
+	if (Deck && Deck == EyeDeck.Get() && DeltaTime > 0.f)
+	{
+		const float EyeDeckZ = (float)Deck->GetComponentTransform().InverseTransformPosition(OutResult.Location).Z;
+		const float Step = EyeDeckZ - LastEyeDeckZ;
+		if (bOnFoot && FMath::Abs(Step) > 150.f * DeltaTime && FMath::Abs(Step) < 60.f && CVarEyeSteps.GetValueOnGameThread() != 0)
+		{
+			EyeStepOffset -= Step;
+		}
+		const float W = 1.f / EyeStepTime;
+		const float Decay = FMath::Exp(-W * DeltaTime);
+		const float Push = (EyeStepRate + W * EyeStepOffset) * DeltaTime;
+		EyeStepOffset = (EyeStepOffset + Push) * Decay;
+		EyeStepRate = (EyeStepRate - W * Push) * Decay;
+		LastEyeDeckZ = EyeDeckZ;
+	}
+	else
+	{
+		EyeDeck = Deck;
+		EyeStepOffset = 0.f;
+		EyeStepRate = 0.f;
+		LastEyeDeckZ = Deck ? (float)Deck->GetComponentTransform().InverseTransformPosition(OutResult.Location).Z : 0.f;
+	}
+	OutResult.Location.Z += EyeStepOffset;
+
 	// D56: on a deck in big waves (owner: "the camera is bugging up and down a lot") the eyes ride its average level but
 	// not all of each swell, as a sailor's knees take part of it: the level over the last few seconds is followed fully,
-	// of the motion about it the knees take 45 %, softly at most 32 cm (a storm's swell is metres). Smooth everywhere: no
-	// limits that kink the view, no lag at a steady rise. Off the deck it fades out; a teleport starts it afresh.
+	// of the motion about it the knees take a share (D58: 20 %, the owner wants to feel the ship), softly at most 24 cm.
+	// Smooth everywhere: no limits that kink the view, no lag at a steady rise. Off the deck it fades out; a teleport
+	// starts it afresh.
 	const float Target = (float)OutResult.Location.Z;
-	const UPrimitiveComponent* Base = Cast<UPrimitiveComponent>(GetMovementBaseObject());
-	const bool bDeck = !IsSwimming() && ((Base && Base->Mobility == EComponentMobility::Movable) || ActiveStation != nullptr)
-		&& CVarDeckKnees.GetValueOnGameThread() != 0;
+	const bool bDeck = Deck && CVarDeckKnees.GetValueOnGameThread() != 0;
 	if (!bDeckEyes || FMath::Abs(Target - DeckEyeTarget) > 300.f || DeltaTime <= 0.f)
 	{
 		DeckEyeZ = Target;
@@ -251,12 +335,62 @@ void ASaltPlayerCharacter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResu
 	}
 	else
 	{
-		// DeckEyeZ: the deck's level over the last ~2.5 s; DeckEyeRate: how much of the swell the knees take (0..0.45).
+		// DeckEyeZ: the deck's level over the last ~2.5 s; DeckEyeRate: how much of the swell the knees take.
 		DeckEyeZ += (Target - DeckEyeZ) * (1.f - FMath::Exp(-DeltaTime / 2.5f));
-		DeckEyeRate = FMath::FInterpConstantTo(DeckEyeRate, bDeck ? 0.45f : 0.f, DeltaTime, 1.f / 0.5f);
+		DeckEyeRate = FMath::FInterpConstantTo(DeckEyeRate, bDeck ? KneeShare : 0.f, DeltaTime, 1.f / 0.5f);
 	}
 	DeckEyeTarget = Target;
 	OutResult.Location.Z = Target - GetDeckEyeOffset();
+
+	// D58 (owner: "my character seems to be not influenced by the moving ship"): the view leans with the deck, a share of
+	// its roll and pitch (as the body standing on it would), eased so a slam does not jolt it. Level off the deck.
+	// The boat's up, not the floor part's (the gangway is a ramp).
+	const AActor* Vessel = Deck ? Deck->GetOwner() : nullptr;
+	const FVector DeckUp = Vessel ? Vessel->GetActorUpVector() : Deck ? Deck->GetUpVector() : FVector::UpVector;
+	TiltShare = FMath::FInterpConstantTo(TiltShare, Deck ? FMath::Clamp(CVarDeckTilt.GetValueOnGameThread(), 0.f, 1.f) : 0.f, DeltaTime, 1.f / 0.6f);
+	const FVector WantUp = FMath::Lerp(FVector::UpVector, DeckUp, TiltShare).GetSafeNormal();
+	ViewUp = DeltaTime > 0.f ? FMath::Lerp(ViewUp, WantUp, 1.f - FMath::Exp(-DeltaTime / 0.08f)).GetSafeNormal() : WantUp;
+	OutResult.Rotation = (FQuat::FindBetweenNormals(FVector::UpVector, ViewUp) * OutResult.Rotation.Quaternion()).Rotator();
+
+	// The held tools hang from the view as it is seen.
+	if (ViewAnchor)
+	{
+		ViewAnchor->SetWorldLocationAndRotation(OutResult.Location, OutResult.Rotation);
+	}
+
+	// D58: a close look glides from the eyes to the focused view (the chart on the mast) and back.
+	if (ViewFocusAlpha > 0.f)
+	{
+		if (const USceneComponent* Base = FocusBase.Get())
+		{
+			const FTransform Focus = FocusInBase * Base->GetComponentTransform();
+			OutResult.Location = FMath::Lerp(OutResult.Location, Focus.GetLocation(), (double)ViewFocusAlpha);
+			OutResult.Rotation = FQuat::Slerp(OutResult.Rotation.Quaternion(), Focus.GetRotation(), ViewFocusAlpha).Rotator();
+		}
+	}
+}
+
+void ASaltPlayerCharacter::FocusView(USceneComponent* Base, const FTransform& ViewInBase, float BlendTime)
+{
+	FocusBase = Base;
+	FocusInBase = ViewInBase;
+	ViewFocusBlend = FMath::Max(BlendTime, 0.01f);
+	bViewFocus = Base != nullptr;
+	FocusedInteractable = nullptr;
+	if (HeldTools)
+	{
+		HeldTools->SetSuppressed(bViewFocus);
+	}
+}
+
+void ASaltPlayerCharacter::ReleaseView(float BlendTime)
+{
+	bViewFocus = false;
+	ViewFocusBlend = FMath::Max(BlendTime, 0.01f);
+	if (HeldTools)
+	{
+		HeldTools->SetSuppressed(false);
+	}
 }
 
 void ASaltPlayerCharacter::SetHeldTool(FName Tool)
@@ -745,10 +879,12 @@ void ASaltPlayerCharacter::UpdateInteractionFocus()
 {
 	USaltInteractableComponent* NewFocus = nullptr;
 	UWorld* World = GetWorld();
-	if (!ActiveStation && !bOnLadder && Controller && World)
+	if (!ActiveStation && !bOnLadder && !bViewFocus && ViewFocusAlpha <= 0.f && Controller && World)
 	{
+		// Along the view as seen (the control rotation leaning with the deck, D58), so the dot is where the probe goes.
 		const FVector Start = Camera->GetComponentLocation();
-		const FVector End = Start + Controller->GetControlRotation().Vector() * InteractionRange;
+		const FVector Ahead = FQuat::FindBetweenNormals(FVector::UpVector, ViewUp).RotateVector(Controller->GetControlRotation().Vector());
+		const FVector End = Start + Ahead * InteractionRange;
 		FCollisionQueryParams Params(SCENE_QUERY_STAT(SaltInteractionProbe), false, this);
 
 		FHitResult Hit;
@@ -795,13 +931,23 @@ FText ASaltPlayerCharacter::GetPromptText() const
 	return FText::GetEmpty();
 }
 
-FText ASaltPlayerCharacter::GetHintText() const
+bool ASaltPlayerCharacter::GetControlsHint(TArray<FString>& OutKeys, FText& OutAction, FText& OutStatus) const
 {
+	OutKeys.Reset();
+	OutAction = FText::GetEmpty();
+	OutStatus = FText::GetEmpty();
 	if (bOnLadder)
 	{
-		return NSLOCTEXT("Saltbound", "LadderHint", "W / S  climb up and down");
+		OutKeys = { TEXT("W"), TEXT("S") };
+		OutAction = NSLOCTEXT("Saltbound", "LadderHint", "Climb up and down");
 	}
-	return ActiveStation ? ActiveStation->ControlsHintText : FText::GetEmpty();
+	else if (ActiveStation)
+	{
+		OutKeys = ActiveStation->ControlKeys;
+		OutAction = ActiveStation->ControlAction;
+		OutStatus = ActiveStation->ControlsHintText;
+	}
+	return OutKeys.Num() > 0 || !OutStatus.IsEmpty();
 }
 
 // --- Stations ------------------------------------------------------------------

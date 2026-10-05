@@ -897,6 +897,29 @@ float ASaltBoat::GetMastChartParameter(FName Name) const
 	return Value;
 }
 
+FTransform ASaltBoat::GetChartFaceLocal() const
+{
+	// build_boat.py (build_mast_chart): the sheet's middle 1.10 m above the deck, facing aft and to starboard (135 degrees),
+	// 0.194 m out from the mast's axis (the mast's 0.135 m there, the chocks 0.035, the board 0.022, the sheet 0.0015).
+	constexpr float FaceYaw = 135.f;
+	constexpr float FaceOut = 0.194f;
+	constexpr float FaceUp = 1.10f;
+	const float Yaw = FMath::DegreesToRadians(FaceYaw);
+	const FVector Out(FMath::Cos(Yaw), FMath::Sin(Yaw), 0.f);
+	const FVector At = FVector(SaltHull::MastX + Out.X * FaceOut, Out.Y * FaceOut, SaltHull::SheerZ(SaltHull::MastX) + FaceUp) * 100.0;
+	return FTransform(FRotationMatrix::MakeFromXZ(-Out, FVector::UpVector).ToQuat(), At);
+}
+
+FTransform ASaltBoat::GetChartViewLocal(float FieldOfView, float Aspect) const
+{
+	const float TanH = FMath::Tan(FMath::DegreesToRadians(FMath::Clamp(FieldOfView, 30.f, 120.f) * 0.5f));
+	const float TanV = TanH / FMath::Max(Aspect, 0.5f);
+	// The sheet 78 % of the view's height, and never more than 70 % of its width (narrow windows).
+	const float Back = 100.f * FMath::Max(SaltChart::SheetHeightM * 0.5f / (0.78f * TanV), SaltChart::SheetWidthM * 0.5f / (0.7f * TanH));
+	const FTransform Face = GetChartFaceLocal();
+	return FTransform(Face.GetRotation(), Face.GetLocation() - Face.GetUnitAxis(EAxis::X) * Back);
+}
+
 void ASaltBoat::UpdateMastChart()
 {
 	// The chart follows the boat: its window centred on her, north up, her arrow along her heading.
@@ -1506,10 +1529,12 @@ void ASaltBoat::UpdateHints()
 		WindText = FString::Printf(TEXT("wind %.0f kn %s"), TrueSpeed * MsToKnots, *Where);
 	}
 	const TCHAR* SailState = Hoist > 0.95f ? TEXT("sail down") : (Hoist < 0.05f ? TEXT("sail up") : TEXT("sail moving"));
-	const FString Line1 = TEXT("A / D  steer");
-	const FString Line2 = FString::Printf(TEXT("%.1f kn      %s      %s%s"), Speed * MsToKnots, SailState, *WindText,
-		Hold == ESaltBoatHold::Moored ? TEXT("      moored") : (Hold == ESaltBoatHold::Anchored ? TEXT("      at anchor") : TEXT("")));
-	Helm->ControlsHintText = FText::FromString(Line1 + TEXT("\n") + Line2);
+	// D58: the controls in the key-scrap prompt (A and D steer), the boat's state on a line under it.
+	Helm->ControlKeys = { TEXT("A"), TEXT("D") };
+	Helm->ControlAction = NSLOCTEXT("Saltbound", "BoatSteer", "Steer");
+	const FString Status = FString::Printf(TEXT("%.1f kn  ·  %s  ·  %s%s"), Speed * MsToKnots, SailState, *WindText,
+		Hold == ESaltBoatHold::Moored ? TEXT("  ·  moored") : (Hold == ESaltBoatHold::Anchored ? TEXT("  ·  at anchor") : TEXT("")));
+	Helm->ControlsHintText = FText::FromString(Status);
 }
 
 void ASaltBoat::EndPlay(const EEndPlayReason::Type EndPlayReason)

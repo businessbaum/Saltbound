@@ -1267,3 +1267,56 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Stage 2 (the map table on the bigger boat, D51)** waits for that boat's design, with the owner.
 - Dev: `sb.Dev.Chart [off]`. Tests: `MastChartFollowsBoat`, `MastChartLook`, the wheel's tests for five tools and no map
   key (`WheelOnQ`); `MapMarksPlayer` is gone. Inventory 35/35.
+
+### D58 · Owner review round: drag and drop, a camera glide to the chart, one prompt style, the ship's motion felt, steady edges, calmer home waters (Adopted)
+- **Owner (2026-10-05):** "1. i want drag and drop in inventorys. 2. [interaction] on the map on the mast: smooth but fast camera
+  to the mast, not a instant pop up menu with the map. 3. Match every design as we discussed, this design is not what we want use
+  the default interaction design [the chart's keycap 'put the chart back']. 4. the island discovery notification is a bit too
+  big. 5. if my charakter is on an edge of an physical object on the ship and the ship moves up and down because of the waves,
+  my camera sometimes startes bugging - teleporting up and down realy fast. 6. my charakter seems to be not influenced by the
+  moving ship in the waves? 7. Make the waves in the start area a bit more calm. 8. small but fast animation for opening the
+  satchel." Answers: item 6 = "feel the rocking"; an item dropped off the pockets flies back (nothing is lost by a drag).
+- **Drag and drop (satchel and stores):** the screens take the mouse themselves (the pockets' buttons are gone): hover chooses,
+  a press picks the item up and moving 6 px drags it, lifted (larger, its shadow further below, its coin with it) while a faint
+  trace stays in the pocket. Letting go on a pocket moves it there (`USaltInventoryComponent::MoveToSlot`): into an empty
+  one, onto the same item (as much as fits), or the two change places (whole stacks); the target is chosen (satchel) or outlined
+  with the dashed warm line (stores); what lands settles with a small drop. Off the pockets it flies back (0.15 s). In the
+  stores it works within and across both sides; Shift at the press drags one; a click still sends the stack across, flying.
+  Tests `SatchelDragDrop`, `StoreDragDrop`.
+- **Opening (satchel and stores):** 0.2 s: the world behind blurs and darkens in, the screen rises 36 px into place growing
+  from 97 %, eased out and fading in fast; the satchel's tag gets a swing (`SaltUI::ApplyOpening`). Closing stays instant.
+- **The chart on the mast, looked at:** E glides the eyes to the real sheet in 0.45 s (smoother step: no jolt at either
+  end) and they stay with it as the boat moves (`ASaltPlayerCharacter::FocusView`, a view fixed in the hull's space,
+  `ASaltBoat::GetChartViewLocal`: straight in front, the sheet 78 % of the view's height at the player's field of view); E /
+  Esc glide back in 0.35 s. No picture pops up: the place names, north and the 200 m scale ink in on the sheet once the eyes are
+  there (the overlay projects the sheet every frame); a tool in hand is lowered meanwhile; no cursor, no focus dot. Tests
+  `ChartGlides`, `ChartGlidesBack`.
+- **One prompt style:** "E Put the chart back" is the key-scrap prompt (section 7) along the bottom, not a leather keycap
+  (keycaps belong to the leather screens only). `USaltKeyPrompt` is the prompt as a widget (one or more keys, the action in
+  painted lettering, the HUD's fade-in); the helm's controls use it too ("A D Steer", key letters A, D, W, S added to the painted
+  parts) with the boat's state under it in plain painted lettering, instead of the old 14 px Roboto line; the ladder shows
+  "W S Climb up and down". Test `HelmControls`. Pickup notices and the pause menu keep their look (not designed yet).
+- **Landfall banner:** the whole banner at 75 % (its band's top stays at y 150).
+- **Edges on a heaving deck (diagnosed, `sb.Dev.EdgeTest`):** the deck has low steps (the chest's and the rails' feet, 15-25 cm).
+  Standing beside one at anchor in the open sea, the capsule's round bottom rode up and down the step's edge as the deck rolled:
+  the view jumped 15-25 cm from one frame to the next, dozens of times in 4 s (the crate's and the barrel's tops were fine).
+  CharacterMovement's flat base for floor checks (`bUseFlatBaseForFloorChecks`) stands the body on the step or beside it: the
+  bouncing stopped at most spots (jerk back to the deck's own 0.1 cm). What is left (the body pushed onto a rail's foot now and
+  then by the rolling bulwark) the view takes out: a sudden pop of the body against the deck (faster than 1.5 m/s) is eased
+  back by a critically damped spring in ~0.3 s; slow changes (a ramp) pass. 30 spots: the view's largest step per frame
+  2.9 cm (was 16-26 cm). Tried and not taken: a perch radius (most spots still bounced), moving with the deck without sweeps
+  (worse). `sb.Camera.StepSmooth 0` turns the smoothing off.
+- **Feeling the ship (owner's choice):** the view leans with the deck: 30 % of its roll and pitch, eased in 0.08 s
+  (`sb.Camera.DeckTilt`, 0 = level as before); the knees take 20 % of the swell instead of 45 % (softly at most 24 cm), so the
+  eyes follow the deck more. The held tools hang from the view as seen (`ViewAnchor`), so they lean with it, and the interaction
+  probe follows the leaning view.
+- **Home waters:** a third calm zone on the ocean round Saltbound Cove: the waves (swells and wind sea, on the GPU and for
+  buoyancy) are 70 % as high within 700 m, back to full height by 1.5 km (`Tools/ue_scripts/place_home_waters.py`); Ruin Isle
+  (1.7 km) keeps the open sea, the cove's own zone (15 %) still rules inside. It scales whatever sea the rig sets. A sea-state
+  zone (65 % towards Moderate) was tried first and dropped: it blends the whole sea towards its state, so it made a flat sea
+  rougher (the boat suite's flat-water checks failed).
+- **Tests:** inventory 42/42 (new: `SatchelDragDrop`, `SatchelPointerDrag`, `StoreDragDrop`, `StorePointerDrag`, `ChartGlides`,
+  `ChartGlidesBack`, `HelmControls`), edge 30/30 (`sb.Dev.EdgeTest`), movement 30/30 (drift split into sliding and height),
+  swim 5/5, save 5/5, menu 7/7. The boat suite ran 42/44 with the sea-state zone (its two flat-water checks); it was not run
+  again after the switch to the calm zone (owner: the long suites take too much time). Captures: `Docs/Evidence/D58/`.
+- Dev: `sb.Dev.Helm [off]`, `sb.Dev.Drag <x> <y> <x2> <y2> | up`, `sb.Dev.EdgeTest [s]`.

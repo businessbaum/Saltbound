@@ -9,6 +9,7 @@
 #include "Engine/Texture2D.h"
 #include "Styling/CoreStyle.h"
 
+class UBackgroundBlur;
 class UCanvasPanel;
 class UCanvasPanelSlot;
 class UMaterialInterface;
@@ -112,6 +113,13 @@ namespace SaltUI
 	/** Places a child of a centre-anchored full-screen canvas at 1080p design coordinates (the screen centre is 960, 540).
 	 *  A size of zero sizes it to its content. */
 	SALTBOUND_API UCanvasPanelSlot* At(UCanvasPanel* Canvas, UWidget* W, FVector2D Design, FVector2D Size, FVector2D Alignment = FVector2D::ZeroVector);
+
+	/** D58: a pointer (screen space) in a full-screen widget's 1080p design coordinates, as At places things. */
+	SALTBOUND_API FVector2D DesignPoint(const FGeometry& Geometry, const FVector2D& ScreenPosition);
+
+	/** D58: a screen opening (the satchel, a store), Progress 0..1 over its ~0.2 s: the world behind blurs and darkens in,
+	 *  the screen's contents rise 36 px into place and grow from 97 %, eased out, fading in quickly. */
+	SALTBOUND_API void ApplyOpening(UWidget* Contents, UWidget* Backdrop, UBackgroundBlur* Blur, float BlurStrength, float Progress);
 
 	/** An item's icon (T_Icon_X) and the soft shadow made from it (T_UI_IconShadow_X, Tools/textures/gen_ui_parts.py). */
 	SALTBOUND_API UTexture2D* ItemIcon(const FSaltItemDef* Item);

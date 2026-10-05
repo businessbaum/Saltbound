@@ -60,6 +60,9 @@ private:
 		FVector PrevDelta = FVector::ZeroVector;
 		double SumSqAccel = 0.0;
 		float MaxDrift = 0.f;
+		/** D58: drift along the deck (sliding) and across it (height: the flat base's corner on a tilted deck). */
+		float MaxPlanarDrift = 0.f;
+		float MaxHeightDrift = 0.f;
 		float MaxAccelStep = 0.f;
 		float LastSpeed = 0.f;
 	};

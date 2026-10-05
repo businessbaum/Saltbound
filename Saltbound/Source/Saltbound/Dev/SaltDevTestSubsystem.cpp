@@ -270,6 +270,8 @@ void USaltDevTestSubsystem::FDeckTrack::Add(const FVector& Local, float Dt)
 		Prev = Local;
 	}
 	MaxDrift = FMath::Max(MaxDrift, (Local - First).Size());
+	MaxPlanarDrift = FMath::Max(MaxPlanarDrift, (float)FVector::Dist2D(Local, First));
+	MaxHeightDrift = FMath::Max(MaxHeightDrift, (float)FMath::Abs(Local.Z - First.Z));
 	++Frames;
 }
 
@@ -443,10 +445,12 @@ void USaltDevTestSubsystem::RunMovementSuite(float MotionScale, float Speed, flo
 		[this]()
 		{
 			const float EyeRms = Eye.Frames > 2 ? FMath::Sqrt(Eye.SumSqAccel / (Eye.Frames - 2)) : 0.f;
-			const bool bPass = Feet.MaxDrift < 2.f && Eye.MaxAccelStep < 0.5f && OffDeckFrames == 0;
+			// No sliding (along the deck); the height may follow the deck's tilt by a few cm: the flat base for floor checks
+			// (D58) rests on its corner on a tilted deck (up to 0.71 x the radius x the sine of the tilt).
+			const bool bPass = Feet.MaxPlanarDrift < 2.f && Feet.MaxHeightDrift < 5.f && Eye.MaxAccelStep < 0.5f && OffDeckFrames == 0;
 			Report(TEXT("StandOnMovingDeck"), bPass, FString::Printf(
-				TEXT("frames=%d feetDrift=%.3fcm eyeJitterMax=%.4fcm eyeJitterRms=%.5fcm offDeckFrames=%d"),
-				Feet.Frames, Feet.MaxDrift, Eye.MaxAccelStep, EyeRms, OffDeckFrames));
+				TEXT("frames=%d feetDrift=%.3fcm (along the deck %.3f, height %.3f) eyeJitterMax=%.4fcm eyeJitterRms=%.5fcm offDeckFrames=%d"),
+				Feet.Frames, Feet.MaxDrift, Feet.MaxPlanarDrift, Feet.MaxHeightDrift, Eye.MaxAccelStep, EyeRms, OffDeckFrames));
 		}});
 
 	// 2) Walk forward, stop, strafe, stop: speed relative to deck matches input, no sliding after stopping.
@@ -474,8 +478,8 @@ void USaltDevTestSubsystem::RunMovementSuite(float MotionScale, float Speed, flo
 			[this](float Dt) { Feet.Add(FeetInDeckSpace(), Dt); OffDeckFrames += IsPlayerOnDeck() ? 0 : 1; },
 			[this, Name]()
 			{
-				const bool bPass = Feet.MaxDrift < 2.f && OffDeckFrames == 0;
-				Report(Name, bPass, FString::Printf(TEXT("slideAfterStop=%.3fcm offDeckFrames=%d"), Feet.MaxDrift, OffDeckFrames));
+				const bool bPass = Feet.MaxPlanarDrift < 2.f && Feet.MaxHeightDrift < 5.f && OffDeckFrames == 0;
+				Report(Name, bPass, FString::Printf(TEXT("slideAfterStop=%.3fcm (height %.3fcm) offDeckFrames=%d"), Feet.MaxPlanarDrift, Feet.MaxHeightDrift, OffDeckFrames));
 			}});
 	};
 	Steps.Add({TEXT("WalkSetup"), 0.f, [this]() { PlacePlayerOnDeck(FVector(-360.f, -100.f, 0.f), 0.f); }, nullptr, nullptr});

@@ -26,6 +26,10 @@ public:
 	/** Moves as much of the stack in slot Index as fits into To (at most MaxCount: 1 for Shift-click); returns how many
 	 *  moved. OutToSlot: the first slot in To that took some (INDEX_NONE if none). */
 	int32 MoveStack(int32 Index, USaltInventoryComponent* To, int32 MaxCount = MAX_int32, int32* OutToSlot = nullptr);
+	/** D58 (drag and drop): moves (at most MaxCount of) the stack in slot Index to slot ToIndex of To (To may be this): into
+	 *  an empty slot, onto the same item (as much as fits), or changing places with a different item (whole stacks only).
+	 *  Returns how many moved (0: nothing changed). */
+	int32 MoveToSlot(int32 Index, USaltInventoryComponent* To, int32 ToIndex, int32 MaxCount = MAX_int32);
 
 	/** Adds up to Count (filling stacks of the same item first); returns how many fitted. OutFirstSlot: the first slot that
 	 *  took some (INDEX_NONE if none). */

@@ -2,6 +2,7 @@
 
 #include "UI/SaltUIStyle.h"
 
+#include "Components/BackgroundBlur.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
@@ -214,6 +215,31 @@ UCanvasPanelSlot* SaltUI::At(UCanvasPanel* Canvas, UWidget* W, FVector2D Design,
 		S->SetAutoSize(true);
 	}
 	return S;
+}
+
+FVector2D SaltUI::DesignPoint(const FGeometry& Geometry, const FVector2D& ScreenPosition)
+{
+	return Geometry.AbsoluteToLocal(ScreenPosition) - Geometry.GetLocalSize() * 0.5f + FVector2D(960.f, 540.f);
+}
+
+void SaltUI::ApplyOpening(UWidget* Contents, UWidget* Backdrop, UBackgroundBlur* Blur, float BlurStrength, float Progress)
+{
+	const float P = FMath::Clamp(Progress, 0.f, 1.f);
+	const float E = 1.f - FMath::Pow(1.f - P, 3.f);
+	if (Contents)
+	{
+		Contents->SetRenderTransformPivot(FVector2D(0.5f, 0.6f));
+		Contents->SetRenderOpacity(FMath::Min(P / 0.6f, 1.f));
+		Contents->SetRenderTransform(FWidgetTransform(FVector2D(0.f, 36.f * (1.f - E)), FVector2D(0.97f + 0.03f * E), FVector2D::ZeroVector, 0.f));
+	}
+	if (Backdrop)
+	{
+		Backdrop->SetRenderOpacity(P);
+	}
+	if (Blur)
+	{
+		Blur->SetBlurStrength(BlurStrength * E);
+	}
 }
 
 UTexture2D* SaltUI::ItemIcon(const FSaltItemDef* Item)

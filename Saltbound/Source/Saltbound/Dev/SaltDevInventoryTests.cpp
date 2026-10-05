@@ -265,7 +265,50 @@ namespace
 					const float Fov = P->GetCamera()->FieldOfView;
 					Report(TEXT("HeldLantern"), H->GetRaise() > 0.99f && FMath::Abs(Fov - P->FieldOfView) < 0.5f && Hud->GetSpyglassMaskOpacity() < 0.01f,
 						FString::Printf(TEXT("lantern raised %.2f, field of view back to %.1f (%.1f)"), H->GetRaise(), Fov, P->FieldOfView));
+					// D58: E at the chart: the eyes glide to the sheet on the mast (the lantern in hand is lowered meanwhile).
+					PC->OpenChart(Boat);
+					Next();
+				}
+				break;
+			case 14:
+				if (T > 0.85f)
+				{
+					int32 SizeX = 0, SizeY = 0;
+					PC->GetViewportSize(SizeX, SizeY);
+					const FTransform Want = Boat->GetChartViewLocal(P->FieldOfView, SizeY > 0 ? (float)SizeX / SizeY : 16.f / 9.f) * Boat->Hull->GetComponentTransform();
+					const float Off = (float)FVector::Dist(PC->PlayerCameraManager->GetCameraLocation(), Want.GetLocation());
+					const float Turn = FMath::RadiansToDegrees(PC->PlayerCameraManager->GetCameraRotation().Quaternion().AngularDistance(Want.GetRotation()));
+					const USaltChartWidget* CW = PC->GetChartWidget();
+					const float Ink = CW ? CW->GetInkOpacity() : 0.f;
+					const FName Shown = P->GetHeldTools()->GetShownTool();
+					Report(TEXT("ChartGlides"), PC->IsChartOpen() && P->GetViewFocusAlpha() > 0.999f && Off < 6.f && Turn < 1.f && Ink > 0.99f && Shown.IsNone(),
+						FString::Printf(TEXT("after 0.85 s: at the chart %.1f cm, turned %.2f deg off, names inked %.2f, the lantern put away=%d"),
+							Off, Turn, Ink, Shown.IsNone() ? 1 : 0));
+					S->Value = (float)FVector::Dist(P->GetCamera()->GetComponentLocation(), Want.GetLocation());
+					PC->CloseChart();
+					Next();
+				}
+				break;
+			case 15:
+				if (T > 0.5f)
+				{
+					const float Back = (float)FVector::Dist(PC->PlayerCameraManager->GetCameraLocation(), P->GetCamera()->GetComponentLocation());
+					const FName Shown = P->GetHeldTools()->GetShownTool();
+					Report(TEXT("ChartGlidesBack"), !PC->IsChartOpen() && P->GetViewFocusAlpha() <= 0.f && Back < 40.f && !PC->bShowMouseCursor && Shown == TEXT("Lantern"),
+						FString::Printf(TEXT("0.5 s after putting it back: focus %.2f, view %.1f cm from the eyes (they were %.0f cm from the chart view), in hand again: %s"),
+							P->GetViewFocusAlpha(), Back, S->Value, *Shown.ToString()));
 					P->SetHeldTool(S->OwnTool);
+					// D58: at the steering oar the controls show in the key-scrap prompt.
+					P->EnterStation(Boat->GetHelm());
+					Next();
+				}
+				break;
+			case 16:
+				if (T > 0.6f)
+				{
+					const FString Controls = Hud->GetShownControls().ToString();
+					Report(TEXT("HelmControls"), Controls == TEXT("Steer"), FString::Printf(TEXT("controls shown at the helm: '%s'"), *Controls));
+					P->LeaveStation();
 					UE_LOG(LogSaltbound, Display, TEXT("SB_TEST InventorySuite DONE passed=%d failed=%d"), S->Passed, S->Failed);
 					return false;
 				}
@@ -368,6 +411,39 @@ namespace
 			}
 			Satchel->Remove(TEXT("Seashell"), 2);
 			W->SelectSlot(0);
+
+			// D58: drag and drop in the satchel: into an empty pocket, onto the same item (as much as fits), onto another item
+			// (they change places); and which pocket lies under a point.
+			const TArray<FSaltItemStack> Before = Satchel->GetSlots();
+			Satchel->SetSlots({ { TEXT("Seashell"), 3 }, { TEXT("Driftwood"), 2 }, {}, { TEXT("Seashell"), 28 } });
+			const TArray<FSaltItemStack>& Sl = Satchel->GetSlots();
+			const int32 IntoEmpty = W->DropOnSlot(1, 2);
+			const bool bEmpty = Sl[1].IsEmpty() && Sl[2].Id == TEXT("Driftwood") && Sl[2].Count == 2;
+			const int32 Merged = W->DropOnSlot(0, 3);
+			const bool bMerged = Sl[3].Count == 30 && Sl[0].Id == TEXT("Seashell") && Sl[0].Count == 1;
+			const int32 Swapped = W->DropOnSlot(0, 2);
+			const bool bSwapped = Sl[0].Id == TEXT("Driftwood") && Sl[0].Count == 2 && Sl[2].Id == TEXT("Seashell") && Sl[2].Count == 1;
+			const int32 Under = W->SlotAt(FVector2D(401.f + 124.f * 2.f + 20.f, 616.f + 140.f - 15.f));
+			const int32 Nothing = W->SlotAt(FVector2D(120.f, 120.f));
+			Report(TEXT("SatchelDragDrop"), IntoEmpty == 2 && bEmpty && Merged == 2 && bMerged && Swapped == 1 && bSwapped && Under == 10 && Nothing == INDEX_NONE
+				&& W->GetSelectedSlot() == 2, FString::Printf(TEXT("into an empty pocket %d (%d), merged %d (%d), changed places %d (%d), pocket under (669, 741) %d, "
+				"off the bag %d, chosen %d"), IntoEmpty, bEmpty ? 1 : 0, Merged, bMerged ? 1 : 0, Swapped, bSwapped ? 1 : 0, Under, Nothing, W->GetSelectedSlot()));
+			// The pointer's way (as the mouse): press on pocket 0, move to pocket 5 (it is dragged), let go there (it lies in 5);
+			// then a drag let go off the bag leaves it where it was.
+			Satchel->SetSlots({ { TEXT("Driftwood"), 2 } });
+			const bool bPicked = W->PointerDown(USaltSatchelWidget::PocketAt(0));
+			W->PointerMove(USaltSatchelWidget::PocketAt(5) + FVector2D(10.f, -8.f));
+			const bool bDragging = W->IsDragging();
+			W->PointerUp(USaltSatchelWidget::PocketAt(5) + FVector2D(10.f, -8.f));
+			const bool bInFive = Sl[5].Id == TEXT("Driftwood") && Sl[0].IsEmpty() && !W->IsDragging();
+			W->PointerDown(USaltSatchelWidget::PocketAt(5));
+			W->PointerMove(FVector2D(150.f, 150.f));
+			W->PointerUp(FVector2D(150.f, 150.f));
+			const bool bStays = Sl[5].Id == TEXT("Driftwood") && Sl[5].Count == 2;
+			Report(TEXT("SatchelPointerDrag"), bPicked && bDragging && bInFive && bStays, FString::Printf(TEXT("picked up=%d dragging=%d put in pocket 5=%d "
+				"let go off the bag, still in 5=%d"), bPicked ? 1 : 0, bDragging ? 1 : 0, bInFive ? 1 : 0, bStays ? 1 : 0));
+			Satchel->SetSlots(Before);
+			W->SelectSlot(0);
 		}
 		PC->SetSatchelOpen(false);
 		Report(TEXT("SatchelCloses"), !PC->IsSatchelOpen() && !PC->bShowMouseCursor, FString::Printf(TEXT("open=%d cursor=%d"),
@@ -443,6 +519,41 @@ namespace
 				SW->MoveCursor(FVector2D(-1.f, 0.f));
 				Report(TEXT("StoreCursor"), bOnStore && !SW->IsCursorOnStore(), FString::Printf(TEXT("right of dish 5 -> store=%d, back left -> satchel slot %d"),
 					bOnStore ? 1 : 0, SW->GetCursorSlot()));
+
+				// D58: drag and drop across: the stack into a chosen compartment, changing places inside the barrel, one (Shift)
+				// back into a chosen pocket; the slot under a point on either side.
+				const TArray<FSaltItemStack> SatchelBefore = Satchel->GetSlots();
+				Satchel->SetSlots({ { TEXT("Seashell"), 2 } });
+				Barrel->SetSlots({ {}, {}, {}, { TEXT("Driftwood"), 1 } });
+				const TArray<FSaltItemStack>& Bs = Barrel->GetSlots();
+				const int32 ToSeven = SW->DropOnSlot(false, 0, true, 7);
+				const bool bSeven = Bs[7].Id == TEXT("Seashell") && Bs[7].Count == 2 && Satchel->GetSlots()[0].IsEmpty();
+				const int32 Swap = SW->DropOnSlot(true, 7, true, 3);
+				const bool bSwap = Bs[3].Id == TEXT("Seashell") && Bs[7].Id == TEXT("Driftwood");
+				const int32 OneIn = SW->DropOnSlot(true, 3, false, 23, true);
+				const bool bOne = Satchel->GetSlots()[23].Id == TEXT("Seashell") && Satchel->GetSlots()[23].Count == 1 && Bs[3].Count == 1;
+				bool bSide = false, bSideB = true;
+				int32 At = INDEX_NONE, AtB = INDEX_NONE;
+				const bool bHitStore = SW->SlotAt(SW->SlotCentre(true, 4), bSide, At) && bSide && At == 4;
+				const bool bHitSatchel = SW->SlotAt(SW->SlotCentre(false, 9), bSideB, AtB) && !bSideB && AtB == 9;
+				Report(TEXT("StoreDragDrop"), ToSeven == 2 && bSeven && Swap == 2 && bSwap && OneIn == 1 && bOne && bHitStore && bHitSatchel,
+					FString::Printf(TEXT("into compartment 7: %d (%d), changed places: %d (%d), one into pocket 23: %d (%d), slot under compartment 4 / pocket 9: %d / %d"),
+						ToSeven, bSeven ? 1 : 0, Swap, bSwap ? 1 : 0, OneIn, bOne ? 1 : 0, bHitStore ? 1 : 0, bHitSatchel ? 1 : 0));
+				// The pointer's way: a drag from pocket 0 into compartment 6; a click (no move) on it sends it back, flying.
+				Satchel->SetSlots({ { TEXT("Seashell"), 2 } });
+				Barrel->SetSlots({});
+				const bool bPicked = SW->PointerDown(SW->SlotCentre(false, 0));
+				SW->PointerMove(SW->SlotCentre(true, 6) + FVector2D(12.f, 6.f));
+				const bool bDragging = SW->IsDragging();
+				SW->PointerUp(SW->SlotCentre(true, 6) + FVector2D(12.f, 6.f));
+				const bool bInSix = Bs[6].Id == TEXT("Seashell") && Bs[6].Count == 2 && !SW->IsDragging();
+				SW->PointerDown(SW->SlotCentre(true, 6));
+				SW->PointerUp(SW->SlotCentre(true, 6));
+				const bool bClickedBack = Bs[6].IsEmpty() && Satchel->CountOf(TEXT("Seashell")) == 2 && SW->IsFlying() && !SW->IsFlyingToStore();
+				Report(TEXT("StorePointerDrag"), bPicked && bDragging && bInSix && bClickedBack, FString::Printf(TEXT("picked up=%d dragging=%d into compartment 6=%d "
+					"a click sends it back=%d"), bPicked ? 1 : 0, bDragging ? 1 : 0, bInSix ? 1 : 0, bClickedBack ? 1 : 0));
+				Satchel->SetSlots(SatchelBefore);
+				Barrel->SetSlots({});
 			}
 			PC->CloseStore();
 			Report(TEXT("StoreCloses"), !PC->IsStoreOpen() && !PC->bShowMouseCursor, FString::Printf(TEXT("open=%d"), PC->IsStoreOpen() ? 1 : 0));
@@ -770,6 +881,33 @@ namespace
 				return;
 			}
 			PC->OpenChart(Boat);
+		}));
+
+	/** D58: a drag on the open satchel or store, for captures: sb.Dev.Drag <x> <y> <x2> <y2> presses at the first point
+	 *  (1080p design coordinates) and holds the item at the second; sb.Dev.Drag up lets go where it is. */
+	FAutoConsoleCommandWithWorldAndArgs CmdDrag(
+		TEXT("sb.Dev.Drag"),
+		TEXT("Drag on the open satchel or store (1080p coordinates): sb.Dev.Drag <x> <y> <x2> <y2> | up."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ASaltPlayerController* PC = World ? Cast<ASaltPlayerController>(UGameplayStatics::GetPlayerController(World, 0)) : nullptr;
+			USaltSatchelWidget* W = PC && PC->IsSatchelOpen() ? PC->GetSatchel() : nullptr;
+			USaltStoreWidget* SW = PC && PC->IsStoreOpen() ? PC->GetStoreWidget() : nullptr;
+			static FVector2D Last = FVector2D::ZeroVector;
+			if (Args.Num() == 1 && Args[0] == TEXT("up"))
+			{
+				if (W) { W->PointerUp(Last); }
+				if (SW) { SW->PointerUp(Last); }
+				return;
+			}
+			if (Args.Num() < 4)
+			{
+				return;
+			}
+			const FVector2D From(FCString::Atof(*Args[0]), FCString::Atof(*Args[1]));
+			Last = FVector2D(FCString::Atof(*Args[2]), FCString::Atof(*Args[3]));
+			if (W && W->PointerDown(From)) { W->PointerMove(Last); }
+			if (SW && SW->PointerDown(From)) { SW->PointerMove(Last); }
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdGive(

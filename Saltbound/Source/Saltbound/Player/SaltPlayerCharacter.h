@@ -52,8 +52,9 @@ public:
 	USaltInteractableComponent* GetFocusedInteractable() const { return FocusedInteractable.Get(); }
 	/** Prompt for the HUD (empty when there is nothing to do). */
 	FText GetPromptText() const;
-	/** Secondary hint for the HUD, e.g. station controls. */
-	FText GetHintText() const;
+	/** The controls in use for the HUD (D58: shown in the key-scrap prompt): the keys and what they do (at a station, on a
+	 *  ladder), and a status line (the boat's). False when there are none. */
+	bool GetControlsHint(TArray<FString>& OutKeys, FText& OutAction, FText& OutStatus) const;
 
 	// Stations ----------------------------------------------------------------
 	void EnterStation(USaltStationComponent* Station);
@@ -173,11 +174,27 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Interaction", meta = (Units = "s"))
 	float StationBlendTime = 0.45f;
 
-	/** D56: how far the knees take up a heaving deck (cm the eyes are below (+) or above (-) where they would be): 45 %
-	 *  of the swell about its recent level, softly at most 32 cm. */
-	float GetDeckEyeOffset() const { return 32.f * FMath::Tanh(DeckEyeRate * (DeckEyeTarget - DeckEyeZ) / 32.f); }
+	/** D56: how far the knees take up a heaving deck (cm the eyes are below (+) or above (-) where they would be): a share
+	 *  of the swell about its recent level (D58: 20 %), softly at most 24 cm. */
+	float GetDeckEyeOffset() const { return 24.f * FMath::Tanh(DeckEyeRate * (DeckEyeTarget - DeckEyeZ) / 24.f); }
+	/** D58: the view's tilt with the deck (degrees from level), and how far a sudden pop of the body against the deck is
+	 *  still being smoothed out of the view (cm). */
+	float GetViewTiltDeg() const;
+	float GetEyeStepOffset() const { return EyeStepOffset; }
 
 	virtual void CalcCamera(float DeltaTime, struct FMinimalViewInfo& OutResult) override;
+
+	// A close look (D58: the chart on the mast) -------------------------------------
+	/** The eyes glide to a view fixed in Base's space (cm; X looks ahead) in BlendTime, smoothly, and stay there while the
+	 *  base moves; the body stays where it stands. Held tools are lowered meanwhile. */
+	void FocusView(USceneComponent* Base, const FTransform& ViewInBase, float BlendTime);
+	/** Back to the eyes in BlendTime. */
+	void ReleaseView(float BlendTime);
+	bool IsViewFocused() const { return bViewFocus; }
+	/** 0 at the eyes .. 1 at the focused view (eased as the camera moves). */
+	float GetViewFocusAlpha() const { return ViewFocusAlpha; }
+	/** The scene component the held tools hang from: it follows the view as rendered (tilt and knees included). */
+	USceneComponent* GetViewAnchor() const { return ViewAnchor; }
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -189,13 +206,39 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class USaltHeldToolsComponent> HeldTools;
 
+	/** Follows the view as rendered (set in CalcCamera); the held tools hang from it. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<USceneComponent> ViewAnchor;
+
 private:
+	/** The deck the player is on, at its controls or climbing (it moves the view), or null. */
+	const USceneComponent* GetDeck() const;
+
 	/** The eyes on a moving deck: its level over a few seconds (world Z, cm), the share of the swell taken up, the last
 	 *  eye height before that. */
 	float DeckEyeZ = 0.f;
 	float DeckEyeRate = 0.f;
 	float DeckEyeTarget = 0.f;
 	bool bDeckEyes = false;
+
+	/** D58: the view takes a share of the deck's tilt (its up, smoothed) and smooths sudden pops of the body against the
+	 *  deck (an edge under the feet as the deck heaves): the eye's height in the deck's frame as last shown. */
+	FVector ViewUp = FVector::UpVector;
+	float TiltShare = 0.f;
+	TWeakObjectPtr<const USceneComponent> EyeDeck;
+	float EyeStepOffset = 0.f;
+	float EyeStepRate = 0.f;
+	float LastEyeDeckZ = 0.f;
+	/** In the air for real (a jump or a fall, not a moment's slip off an edge): the view follows it as it is. */
+	bool bEyeAirborne = false;
+
+	/** D58: a close look (FocusView): the view in its base's space, the blend's progress and its time. */
+	TWeakObjectPtr<USceneComponent> FocusBase;
+	FTransform FocusInBase = FTransform::Identity;
+	bool bViewFocus = false;
+	float ViewFocusLinear = 0.f;
+	float ViewFocusAlpha = 0.f;
+	float ViewFocusBlend = 0.4f;
 
 	FName HeldTool;
 	TSet<FName> OwnedTools;

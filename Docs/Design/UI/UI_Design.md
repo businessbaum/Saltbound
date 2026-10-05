@@ -195,6 +195,9 @@ The stores are the D52 barrel and crate, with 10 slots each.
 - **Motion:** fade in and rise 6 px in 0.15 s, while the scrap's rotation settles from −6° to −3°. Fade out in
   0.1 s; a new target cross-fades.
 - **Replaces** today's `[E]  …` text prompt in `USaltHUDWidget`.
+- **Every key hint over the world uses it** (owner, D58; `USaltKeyPrompt`): the chart's "E Put the chart back" along the
+  bottom, a station's controls ("A D Steer", one scrap per key, 10 px apart) with its status line under it in plain painted
+  lettering, the ladder's "W S Climb up and down". Keycaps stay on the leather screens.
 
 ## 8. Hold interaction
 

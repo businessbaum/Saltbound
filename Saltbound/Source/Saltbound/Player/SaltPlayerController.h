@@ -52,8 +52,11 @@ public:
 	bool IsStoreOpen() const;
 	USaltStoreWidget* GetStoreWidget() const { return StoreWidget; }
 
-	/** A close look at the chart on a boat's mast (D57): the same live chart, large. E / Esc put it back. */
+	/** A close look at the chart on a boat's mast (D57): the eyes glide to it (D58), the places in view are named on it.
+	 *  E / Esc put it back (the eyes glide back). */
 	void OpenChart(ASaltBoat* Boat);
+	static constexpr float ChartGlideIn = 0.45f;
+	static constexpr float ChartGlideOut = 0.35f;
 	void CloseChart();
 	bool IsChartOpen() const;
 	USaltChartWidget* GetChartWidget() const { return ChartWidget; }
@@ -87,8 +90,8 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USaltChartWidget> ChartWidget;
 
-	/** UI-only input with the cursor on (bOn), or back to the game. */
-	void SetUIInput(bool bOn, UUserWidget* Focus);
+	/** UI-only input (bOn) with or without the mouse cursor, or back to the game. */
+	void SetUIInput(bool bOn, UUserWidget* Focus, bool bCursor = true);
 
 	void OpenInventory() { SetSatchelOpen(true); }
 

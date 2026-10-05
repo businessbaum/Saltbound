@@ -46,7 +46,9 @@ namespace SaltChart
 	constexpr float SizeM = 12000.f;
 	/** The mast chart shows this much round the boat (m, across), on a sheet this much taller than wide (0.33 / 0.26 m). */
 	constexpr float WindowM = 1600.f;
-	constexpr float SheetAspect = 0.33f / 0.26f;
+	constexpr float SheetWidthM = 0.26f;
+	constexpr float SheetHeightM = 0.33f;
+	constexpr float SheetAspect = SheetHeightM / SheetWidthM;
 	/** Where a world position (cm) lies on the region chart (0..1: u east, v south). */
 	inline FVector2D ToUV(const FVector& WorldCm)
 	{

@@ -86,6 +86,233 @@ namespace
 			}));
 		}));
 
+	/** D58: take the steering oar (the helm) for captures of its controls row: sb.Dev.Helm [off]. */
+	FAutoConsoleCommandWithWorldAndArgs CmdHelm(
+		TEXT("sb.Dev.Helm"),
+		TEXT("Take the boat's helm (steering oar): sb.Dev.Helm [off]."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+			ASaltPlayerCharacter* P = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr;
+			ASaltBoat* Boat = nullptr;
+			for (TActorIterator<ASaltBoat> It(World); World && It; ++It) { Boat = *It; break; }
+			if (!P || !Boat)
+			{
+				return;
+			}
+			if (Args.Num() > 0 && Args[0] == TEXT("off"))
+			{
+				P->LeaveStation();
+				return;
+			}
+			P->EnterStation(Boat->GetHelm());
+		}));
+
+	/** D58 (owner: "if my character is on an edge of a physical object on the ship and the ship moves up and down because
+	 *  of the waves, my camera sometimes starts bugging"): finds the low steps on the deck (3-25 cm: the chest's and the
+	 *  rails' feet), stands the player beside them one spot after another while the boat lies at anchor in the open sea,
+	 *  and measures the view against the boat: its largest jump from one frame to the next, its jerk (the second difference,
+	 *  rms), and how often the body lost and found the floor. sb.Dev.EdgeTest [seconds per spot = 4] logs SB_TEST
+	 *  DeckEdgeSteady lines and SB_TEST EdgeSuite DONE; the boat goes back to its mooring after. */
+	FAutoConsoleCommandWithWorldAndArgs CmdEdgeTest(
+		TEXT("sb.Dev.EdgeTest"),
+		TEXT("Stand beside the low steps on the deck in open water and measure the view's jumps: sb.Dev.EdgeTest [seconds per spot=4]."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+			ASaltPlayerCharacter* P = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr;
+			ASaltBoat* Boat = nullptr;
+			for (TActorIterator<ASaltBoat> It(World); World && It; ++It) { Boat = *It; break; }
+			if (!P || !Boat || !Boat->Hull)
+			{
+				UE_LOG(LogSaltbound, Display, TEXT("SB_TEST EdgeSuite DONE passed=0 failed=1 (no player or boat)"));
+				return;
+			}
+			struct FSpot { FString Name; FVector Feet; float Top = 0.f; };
+			struct FState
+			{
+				TWeakObjectPtr<ASaltPlayerCharacter> Player;
+				TWeakObjectPtr<ASaltBoat> Boat;
+				TArray<FSpot> Spots;
+				int32 Spot = -2;
+				float T = 0.f;
+				float Seconds = 4.f;
+				TArray<float> Cam;
+				TArray<float> Cap;
+				int32 Flips = 0;
+				int32 OnTop = 0;
+				bool bLastGround = true;
+				float MaxStepOffset = 0.f;
+				int32 Passed = 0;
+				int32 Failed = 0;
+			};
+			TSharedRef<FState> S = MakeShared<FState>();
+			S->Player = P;
+			S->Boat = Boat;
+			S->Seconds = Args.Num() > 0 ? FMath::Max(1.f, FCString::Atof(*Args[0])) : 4.f;
+			// Open water, at anchor (it holds place and heading), in the rig's sea (Rough by default).
+			Boat->PlaceAt(FVector(250000.f, -80000.f, 0.f), 0.f);
+			Boat->SetHold(ESaltBoatHold::Anchored);
+			TWeakObjectPtr<UWorld> WeakWorld = World;
+			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S, WeakWorld](float Dt) -> bool
+			{
+				ASaltPlayerCharacter* Pl = S->Player.Get();
+				ASaltBoat* B = S->Boat.Get();
+				UWorld* W = WeakWorld.Get();
+				if (!Pl || !B || !W)
+				{
+					UE_LOG(LogSaltbound, Display, TEXT("SB_TEST EdgeSuite DONE passed=0 failed=1 (aborted)"));
+					return false;
+				}
+				S->T += Dt;
+				const FTransform Xf = B->Hull->GetComponentTransform();
+				if (S->Spot == -2)
+				{
+					// Let the boat settle at anchor, then find the spots: the deck's floor on a 5 cm grid, and the places beside a
+					// low step (3-25 cm, within the player's step height, inside the capsule's reach) with the highest steps.
+					if (S->T < 4.f)
+					{
+						return true;
+					}
+					FCollisionQueryParams Q(SCENE_QUERY_STAT(SaltEdgeTest), false, Pl);
+					constexpr int32 NX = 183;
+					constexpr int32 NY = 69;
+					constexpr float Cell = 5.f;
+					TArray<float> Floor;
+					Floor.Init(TNumericLimits<float>::Lowest(), NX * NY);
+					auto CellAt = [&](int32 IX, int32 IY) { return FVector2D(-455.f + IX * Cell, -170.f + IY * Cell); };
+					for (int32 IX = 0; IX < NX; ++IX)
+					{
+						for (int32 IY = 0; IY < NY; ++IY)
+						{
+							const FVector2D C = CellAt(IX, IY);
+							const float Deck = SaltHull::SheerZ(C.X * 0.01f) * 100.f;
+							FHitResult Hit;
+							if (W->LineTraceSingleByChannel(Hit, Xf.TransformPosition(FVector(C.X, C.Y, Deck + 250.f)), Xf.TransformPosition(FVector(C.X, C.Y, Deck - 40.f)),
+								ECC_Pawn, Q) && Hit.GetActor() == B)
+							{
+								Floor[IX * NY + IY] = (float)Xf.InverseTransformPosition(Hit.ImpactPoint).Z;
+							}
+						}
+					}
+					struct FStep { FVector2D At; float Z = 0.f; float Height = 0.f; };
+					TArray<FStep> Steps;
+					constexpr int32 Reach = 5;
+					for (int32 IX = Reach; IX < NX - Reach; ++IX)
+					{
+						for (int32 IY = Reach; IY < NY - Reach; ++IY)
+						{
+							const float Z = Floor[IX * NY + IY];
+							if (Z == TNumericLimits<float>::Lowest())
+							{
+								continue;
+							}
+							float Lo = Z, Hi = Z;
+							int32 N = 0;
+							for (int32 DX = -Reach; DX <= Reach; ++DX)
+							{
+								for (int32 DY = -Reach; DY <= Reach; ++DY)
+								{
+									const float V = Floor[(IX + DX) * NY + IY + DY];
+									if (DX * DX + DY * DY <= Reach * Reach && V != TNumericLimits<float>::Lowest())
+									{
+										Lo = FMath::Min(Lo, V);
+										Hi = FMath::Max(Hi, V);
+										++N;
+									}
+								}
+							}
+							if (N >= 60 && Hi - Lo >= 3.f && Hi - Lo <= 25.f && Z - Lo < 1.f)
+							{
+								Steps.Add({ CellAt(IX, IY), Z, Hi - Lo });
+							}
+						}
+					}
+					Steps.Sort([](const FStep& A, const FStep& Bs) { return A.Height > Bs.Height; });
+					TArray<FStep> Picked;
+					for (const FStep& St : Steps)
+					{
+						if (Picked.Num() < 6 && !Picked.ContainsByPredicate([&St](const FStep& Pk) { return FVector2D::Distance(Pk.At, St.At) < 30.f; }))
+						{
+							Picked.Add(St);
+						}
+					}
+					// Each spot and four around it (the step's edge lies somewhere under the capsule's rim).
+					for (const FStep& St : Picked)
+					{
+						for (const FVector2D Off : { FVector2D(0.f, 0.f), FVector2D(8.f, 0.f), FVector2D(-8.f, 0.f), FVector2D(0.f, 8.f), FVector2D(0.f, -8.f) })
+						{
+							S->Spots.Add({ FString::Printf(TEXT("(%.0f, %.0f) step %.0f cm"), St.At.X + Off.X, St.At.Y + Off.Y, St.Height),
+								FVector(St.At.X + Off.X, St.At.Y + Off.Y, St.Z + 2.f), St.Z });
+						}
+					}
+					UE_LOG(LogSaltbound, Display, TEXT("SB_EDGE START low steps=%d spots=%d %s"), Steps.Num(), S->Spots.Num(), *B->Describe());
+					S->Spot = -1;
+					S->T = 100.f;
+				}
+				const float Settle = 1.f;
+				if (S->Spot >= 0 && S->T >= Settle)
+				{
+					// Recording: the view as rendered and the body, in the boat's frame.
+					const APlayerController* Ctl = Cast<APlayerController>(Pl->GetController());
+					const FVector View = Ctl && Ctl->PlayerCameraManager ? Ctl->PlayerCameraManager->GetCameraLocation() : Pl->GetCamera()->GetComponentLocation();
+					S->Cam.Add((float)Xf.InverseTransformPosition(View).Z);
+					const float CapZ = (float)Xf.InverseTransformPosition(Pl->GetActorLocation()).Z;
+					S->Cap.Add(CapZ);
+					const bool bGround = Pl->GetCharacterMovement()->IsMovingOnGround();
+					S->Flips += bGround != S->bLastGround ? 1 : 0;
+					S->bLastGround = bGround;
+					S->OnTop += CapZ - Pl->GetCapsuleHalfHeightForClimb() > S->Spots[S->Spot].Top - 15.f ? 1 : 0;
+					S->MaxStepOffset = FMath::Max(S->MaxStepOffset, FMath::Abs(Pl->GetEyeStepOffset()));
+				}
+				if (S->T < Settle + S->Seconds)
+				{
+					return true;
+				}
+				// The spot is done: its numbers, then the next spot.
+				if (S->Spot >= 0 && S->Cam.Num() > 3)
+				{
+					float MaxStep = 0.f, MaxCapStep = 0.f, Jerk = 0.f, MaxJerk = 0.f;
+					for (int32 I = 1; I < S->Cam.Num(); ++I)
+					{
+						MaxStep = FMath::Max(MaxStep, FMath::Abs(S->Cam[I] - S->Cam[I - 1]));
+						MaxCapStep = FMath::Max(MaxCapStep, FMath::Abs(S->Cap[I] - S->Cap[I - 1]));
+						if (I + 1 < S->Cam.Num())
+						{
+							const float J = S->Cam[I + 1] - 2.f * S->Cam[I] + S->Cam[I - 1];
+							Jerk += J * J;
+							MaxJerk = FMath::Max(MaxJerk, FMath::Abs(J));
+						}
+					}
+					Jerk = FMath::Sqrt(Jerk / FMath::Max(S->Cam.Num() - 2, 1));
+					// Steady: the view never jumps more than 4 cm against the deck from one frame to the next (it was 15-25 cm
+					// before D58; the deck's own motion is about 1 cm a frame). A fall off the boat (into the sea) is not a jump.
+					const bool bAboard = S->Cap.Num() > 0 && S->Cap.Last() > 0.f;
+					const bool bPass = !bAboard || (MaxStep < 4.f && Jerk < 0.6f);
+					(bPass ? S->Passed : S->Failed)++;
+					UE_LOG(LogSaltbound, Display, TEXT("SB_TEST DeckEdgeSteady %s spot=\"%s\" frames=%d camMaxStep=%.2f camJerkRms=%.3f camMaxJerk=%.2f capMaxStep=%.2f floorFlips=%d onTop=%.2f maxStepOffset=%.2f aboard=%d"),
+						bPass ? TEXT("PASS") : TEXT("FAIL"), *S->Spots[S->Spot].Name, S->Cam.Num(), MaxStep, Jerk, MaxJerk, MaxCapStep, S->Flips, S->OnTop / (float)S->Cam.Num(),
+						S->MaxStepOffset, bAboard ? 1 : 0);
+				}
+				++S->Spot;
+				if (!S->Spots.IsValidIndex(S->Spot))
+				{
+					UE_LOG(LogSaltbound, Display, TEXT("SB_TEST EdgeSuite DONE passed=%d failed=%d spots=%d"), S->Passed, S->Failed, S->Spots.Num());
+					B->ResetToStart();
+					return false;
+				}
+				S->T = 0.f;
+				S->Cam.Reset();
+				S->Cap.Reset();
+				S->Flips = 0;
+				S->OnTop = 0;
+				S->MaxStepOffset = 0.f;
+				S->bLastGround = true;
+				Pl->TeleportFeetTo(Xf.TransformPosition(S->Spots[S->Spot].Feet), B->GetYawDeg());
+				return true;
+			}));
+		}));
+
 	/** Open water south-east of the test cove (about 15 m deep), clear of the pier, rocks and headlands. */
 	const FVector TestWater(7000.f, -2500.f, 0.f);
 

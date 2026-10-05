@@ -32,11 +32,15 @@ class SALTBOUND_API USaltItemSlotWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	/** Index of the slot, and what a click and a hover do with it (the satchel selects, a store moves the stack). */
-	void Setup(int32 InIndex, TFunction<void(int32)> InOnClicked, TFunction<void(int32)> InOnHovered, float InRadius = 50.f);
+	/** Index of the slot and the dish's radius. The screen it is on handles the mouse (hover, click, drag; D58). */
+	void Setup(int32 InIndex, float InRadius = 50.f);
 	void Show(const FSaltItemDef* Item, int32 Count, bool bSelected);
 	/** Turns the item in the hand (R): a slow turn of the icon. */
 	void Turn();
+	/** D58: the item is being dragged away: only a faint trace of it stays in the dish. */
+	void SetLifted(bool bInLifted);
+	/** D58: something was just put here: it drops in a little large and settles. */
+	void Land() { LandTime = 0.f; }
 	float GetRadius() const { return Radius; }
 
 protected:
@@ -44,12 +48,9 @@ protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
-	UFUNCTION() void HandleClicked();
-	UFUNCTION() void HandleHovered();
 	void Place(UWidget* W, FVector2D Centre, FVector2D Size);
 
 	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> Root;
-	UPROPERTY(Transient) TObjectPtr<USaltMenuButton> Button;
 	UPROPERTY(Transient) TObjectPtr<UImage> Glow;
 	UPROPERTY(Transient) TObjectPtr<UImage> Ring;
 	UPROPERTY(Transient) TObjectPtr<UImage> ShardGlow;
@@ -58,15 +59,15 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UImage> IconImage;
 	UPROPERTY(Transient) TObjectPtr<UOverlay> Coin;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> CoinText;
-	TFunction<void(int32)> OnClickedFn;
-	TFunction<void(int32)> OnHoveredFn;
 	int32 Index = 0;
 	float Radius = 50.f;
 	bool bSelected = false;
 	bool bAncient = false;
 	bool bHasItem = false;
+	bool bLifted = false;
 	float SelAlpha = 0.f;
 	float TurnTime = -1.f;
+	float LandTime = -1.f;
 	float Clock = 0.f;
 };
 
@@ -93,8 +94,24 @@ public:
 	void Refresh();
 	/** Drops one of the selected item in front of the player (G). */
 	bool DropSelected();
+	/** D58: drag and drop. Puts the stack in pocket From into pocket To (moves, merges or changes places) as letting go of
+	 *  a drag there does; returns how many moved. */
+	int32 DropOnSlot(int32 From, int32 To);
+	/** The pocket under a point (1080p design coordinates), or INDEX_NONE. */
+	int32 SlotAt(FVector2D Design) const;
+	bool IsDragging() const { return Drag.bDragging; }
+	/** The pointer at a point (1080p design coordinates), as the mouse does it (tests and captures drive these too): a press
+	 *  on a pocket picks its item up (true when a drag may start), moving drags it, letting go puts it down. */
+	bool PointerDown(FVector2D Design);
+	void PointerMove(FVector2D Design);
+	void PointerUp(FVector2D Design);
+	/** Where a pocket's dish is (1080p design coordinates). */
+	static FVector2D PocketAt(int32 Index);
+	/** D58: how far the opening has come (0..1, tests). */
+	float GetOpenProgress() const { return FMath::Clamp(OpenAge / OpenTime, 0.f, 1.f); }
 
 	static constexpr int32 Columns = 8;
+	static constexpr float OpenTime = 0.2f;
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -102,11 +119,44 @@ protected:
 	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 private:
 	UWidget* BuildSatchelScreen();
 	UWidget* BuildTag();
 	void RequestClose();
+	/** The pocket shown selected: the drag's target while dragging, else the selection. */
+	int32 HighlightSlot() const { return Drag.bDragging ? Drag.Target : Selected; }
+	void UpdateDragVisual();
+	void EndDrag();
+
+	/** A press on a pocket that becomes a drag once the pointer moves 6 px (D58). Positions in 1080p design coordinates. */
+	struct FDrag
+	{
+		bool bPressed = false;
+		bool bDragging = false;
+		int32 From = INDEX_NONE;
+		int32 Target = INDEX_NONE;
+		FVector2D PressAt = FVector2D::ZeroVector;
+		FVector2D Pointer = FVector2D::ZeroVector;
+	};
+	FDrag Drag;
+
+	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> Contents;
+	UPROPERTY(Transient) TObjectPtr<UWidget> Backdrop;
+	UPROPERTY(Transient) TObjectPtr<class UBackgroundBlur> BackdropBlur;
+	UPROPERTY(Transient) TObjectPtr<UImage> DragShadow;
+	UPROPERTY(Transient) TObjectPtr<UImage> DragIcon;
+	UPROPERTY(Transient) TObjectPtr<UOverlay> DragCoin;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> DragCoinText;
+	int32 DragCount = 0;
+	/** Let go off the pockets: the item goes back to ReturnSlot from ReturnFrom (time since letting go; < 0 when none). */
+	float ReturnTime = -1.f;
+	FVector2D ReturnFrom = FVector2D::ZeroVector;
+	int32 ReturnSlot = INDEX_NONE;
+	float OpenAge = 0.f;
 
 	UPROPERTY(Transient) TArray<TObjectPtr<USaltItemSlotWidget>> SlotWidgets;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> CountDark;

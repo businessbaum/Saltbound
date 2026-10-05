@@ -31,8 +31,13 @@ public:
 	/** The tool now in hand (None: empty hands). */
 	void SetTool(FName Tool);
 	FName GetTool() const { return Tool; }
+	/** Lowers the tool in hand (and widens the spyglass's view) while the eyes are elsewhere (D58: a close look at the
+	 *  chart); it comes back up afterwards. */
+	void SetSuppressed(bool bInSuppressed) { bSuppressed = bInSuppressed; }
 	/** 0 lowered .. 1 in view (the shown tool). */
 	float GetRaise() const { return Raise; }
+	/** The tool being shown (None while the hands are empty or the tool is lowered for a close look). */
+	FName GetShownTool() const { return Shown; }
 	/** How far the spyglass has narrowed the view (0..1). */
 	float GetSpyglass() const { return Spyglass; }
 	/** The field of view now (degrees), and the look speed's scale that goes with it. */
@@ -62,6 +67,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> LanternGlass;
 
 	FName Tool;
+	bool bSuppressed = false;
 	/** The tool being shown (it sinks out before the next one rises). */
 	FName Shown;
 	float Raise = 0.f;

@@ -26,18 +26,18 @@ class SALTBOUND_API USaltStoreSlotWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	void Setup(int32 InIndex, TFunction<void(int32)> InOnClicked, TFunction<void(int32)> InOnHovered, FVector2D InBoxSize, FVector2D InItemCentre,
-		FVector2D InCoinOffset, float InItemSize = 96.f);
+	/** The store screen handles the mouse (hover, click, drag; D58). */
+	void Setup(int32 InIndex, FVector2D InBoxSize, FVector2D InItemCentre, FVector2D InCoinOffset, float InItemSize = 96.f);
 	void Show(const FSaltItemDef* Item, int32 Count, bool bInHovered);
 	void Land();
+	/** D58: the item is being dragged away: only a faint trace of it stays. */
+	void SetLifted(bool bInLifted) { bLifted = bInLifted; }
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
-	UFUNCTION() void HandleClicked();
-	UFUNCTION() void HandleHovered();
 	void Place(UWidget* W, FVector2D Centre, FVector2D Size);
 
 	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> Root;
@@ -47,8 +47,6 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UImage> IconImage;
 	UPROPERTY(Transient) TObjectPtr<UOverlay> Coin;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> CoinText;
-	TFunction<void(int32)> OnClickedFn;
-	TFunction<void(int32)> OnHoveredFn;
 	int32 Index = 0;
 	FVector2D BoxSize = FVector2D(140.f, 140.f);
 	FVector2D ItemCentre = FVector2D(70.f, 70.f);
@@ -56,6 +54,7 @@ private:
 	float ItemSize = 96.f;
 	bool bHovered = false;
 	bool bAncient = false;
+	bool bLifted = false;
 	float HoverAlpha = 0.f;
 	float LandTime = -1.f;
 	float Clock = 0.f;
@@ -102,6 +101,20 @@ public:
 	void MoveCursor(FVector2D Direction);
 	/** Captures: hold a flight at this point of its arc (0..1), or let it fly (< 0). */
 	void HoldFlightAt(float Progress) { FlightHold = Progress; }
+	/** D58: drag and drop. Puts the stack (bOne: one of it) from a slot on one side into a slot on either side, as letting
+	 *  go of a drag there does: into an empty slot, onto the same item, or changing places. Returns how many moved. */
+	int32 DropOnSlot(bool bFromStore, int32 From, bool bToStore, int32 To, bool bOne = false);
+	/** The slot under a point (1080p design coordinates): false when none. */
+	bool SlotAt(FVector2D Design, bool& bOutStore, int32& OutIndex) const;
+	bool IsDragging() const { return Drag.bDragging; }
+	/** The pointer at a point (1080p design coordinates), as the mouse does it (tests and captures drive these too): a press
+	 *  on a slot picks its item up (true when a drag may start; Shift: one), moving drags it, letting go puts it down (or, without
+	 *  a drag, sends the stack across: a click). */
+	bool PointerDown(FVector2D Design, bool bShift = false);
+	void PointerMove(FVector2D Design);
+	void PointerUp(FVector2D Design, bool bShift = false);
+	float GetOpenProgress() const { return FMath::Clamp(OpenAge / OpenTime, 0.f, 1.f); }
+	static constexpr float OpenTime = 0.2f;
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -109,9 +122,37 @@ protected:
 	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 private:
 	int32 Click(bool bFromStore, int32 Index, bool bOne);
+	void SetLifted(bool bStoreSide, int32 Index, bool bLifted);
+	void UpdateDrag();
+	void PlaceTarget(bool bStoreSide, int32 Index);
+
+	/** A press on a slot that becomes a drag once the pointer moves 6 px (D58); Shift at the press drags one. */
+	struct FDrag
+	{
+		bool bPressed = false;
+		bool bDragging = false;
+		bool bOne = false;
+		bool bFromStore = false;
+		int32 From = INDEX_NONE;
+		bool bTargetStore = false;
+		int32 Target = INDEX_NONE;
+		FVector2D PressAt = FVector2D::ZeroVector;
+		FVector2D Pointer = FVector2D::ZeroVector;
+		/** Let go off the slots: it goes back (time since letting go; < 0 when not). */
+		float ReturnTime = -1.f;
+		FVector2D ReturnFrom = FVector2D::ZeroVector;
+	};
+	FDrag Drag;
+	UPROPERTY(Transient) TObjectPtr<UWidget> Backdrop;
+	UPROPERTY(Transient) TObjectPtr<class UBackgroundBlur> BackdropBlur;
+	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> Contents;
+	float OpenAge = 0.f;
 	void Land();
 	void Bind(bool bBind);
 	void UpdateFlight(float Dt);

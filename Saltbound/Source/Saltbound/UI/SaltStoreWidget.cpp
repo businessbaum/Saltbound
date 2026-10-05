@@ -79,13 +79,10 @@ namespace
 
 // --- A store's compartment ----------------------------------------------------------------------------------------
 
-void USaltStoreSlotWidget::Setup(int32 InIndex, TFunction<void(int32)> InOnClicked, TFunction<void(int32)> InOnHovered, FVector2D InBoxSize,
-	FVector2D InItemCentre, FVector2D InCoinOffset, float InItemSize)
+void USaltStoreSlotWidget::Setup(int32 InIndex, FVector2D InBoxSize, FVector2D InItemCentre, FVector2D InCoinOffset, float InItemSize)
 {
 	ItemSize = InItemSize;
 	Index = InIndex;
-	OnClickedFn = MoveTemp(InOnClicked);
-	OnHoveredFn = MoveTemp(InOnHovered);
 	BoxSize = InBoxSize;
 	ItemCentre = InItemCentre;
 	CoinOffset = InCoinOffset;
@@ -139,19 +136,8 @@ TSharedRef<SWidget> USaltStoreSlotWidget::RebuildWidget()
 			S->SetAlignment(FVector2D(23.f / 48.f, 22.f / 48.f));
 			S->SetPosition(ItemCentre + CoinOffset);
 		}
-		USaltMenuButton* Button = WidgetTree->ConstructWidget<USaltMenuButton>();
-		FButtonStyle Style;
-		FSlateBrush None;
-		None.DrawAs = ESlateBrushDrawType::NoDrawType;
-		Style.SetNormal(None).SetHovered(None).SetPressed(None).SetDisabled(None);
-		Button->SetStyle(Style);
-		Button->OnClicked.AddDynamic(this, &USaltStoreSlotWidget::HandleClicked);
-		Button->OnHovered.AddDynamic(this, &USaltStoreSlotWidget::HandleHovered);
-		if (UCanvasPanelSlot* S = Root->AddChildToCanvas(Button))
-		{
-			S->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
-			S->SetOffsets(FMargin(0.f));
-		}
+		// The store screen takes the mouse (hover, click, drag: D58).
+		Root->SetVisibility(ESlateVisibility::HitTestInvisible);
 		Show(nullptr, 0, false);
 	}
 	return Super::RebuildWidget();
@@ -204,22 +190,10 @@ void USaltStoreSlotWidget::NativeTick(const FGeometry& MyGeometry, float InDelta
 		LandTime = U >= 1.f ? -1.f : LandTime;
 	}
 	IconImage->SetRenderScale(FVector2D(Scale, Scale));
-}
-
-void USaltStoreSlotWidget::HandleClicked()
-{
-	if (OnClickedFn)
-	{
-		OnClickedFn(Index);
-	}
-}
-
-void USaltStoreSlotWidget::HandleHovered()
-{
-	if (OnHoveredFn)
-	{
-		OnHoveredFn(Index);
-	}
+	// Being dragged away (D58): a faint trace stays, the coin goes with the item.
+	IconImage->SetRenderOpacity(bLifted ? 0.25f : 1.f);
+	IconShadow->SetRenderOpacity(bLifted ? 0.f : 1.f);
+	Coin->SetRenderOpacity(bLifted ? 0.f : 1.f);
 }
 
 // --- The store screen ---------------------------------------------------------------------------------------------
@@ -265,8 +239,8 @@ TSharedRef<SWidget> USaltStoreWidget::RebuildWidget()
 {
 	if (WidgetTree && !WidgetTree->RootWidget)
 	{
-		UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>();
-		WidgetTree->RootWidget = Canvas;
+		UCanvasPanel* Screen = WidgetTree->ConstructWidget<UCanvasPanel>();
+		WidgetTree->RootWidget = Screen;
 		auto FullScreen = [](UCanvasPanel* Into, UWidget* W)
 		{
 			UCanvasPanelSlot* S = Into->AddChildToCanvas(W);
@@ -280,14 +254,22 @@ TSharedRef<SWidget> USaltStoreWidget::RebuildWidget()
 			I->SetVisibility(ESlateVisibility::HitTestInvisible);
 			return I;
 		};
-		// The world behind: blurred, darkened, a vignette (as the satchel).
+		// The world behind: blurred, darkened, a vignette (as the satchel; they fade in as it opens, D58).
+		UCanvasPanel* Behind = WidgetTree->ConstructWidget<UCanvasPanel>();
+		FullScreen(Screen, Behind);
+		Backdrop = Behind;
 		UBackgroundBlur* Blur = WidgetTree->ConstructWidget<UBackgroundBlur>();
 		Blur->SetBlurStrength(8.f);
-		FullScreen(Canvas, Blur);
+		FullScreen(Behind, Blur);
+		BackdropBlur = Blur;
 		UImage* Dark = WidgetTree->ConstructWidget<UImage>();
 		Dark->SetColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.45f));
-		FullScreen(Canvas, Dark);
-		FullScreen(Canvas, Picture(TEXT("T_UI_Vignette"), FVector2D(256.f, 144.f)));
+		FullScreen(Behind, Dark);
+		FullScreen(Behind, Picture(TEXT("T_UI_Vignette"), FVector2D(256.f, 144.f)));
+		// The satchel and the store (they rise into place as the screen opens).
+		UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>();
+		FullScreen(Screen, Canvas);
+		Contents = Canvas;
 
 		// Left, the satchel: the panel with its dishes, "N / 24" debossed (right-aligned at x 842, baseline 272), the pockets.
 		At(Canvas, Picture(TEXT("T_UI_StoreSatchel"), FVector2D(900.f, 910.f)), FVector2D(60.f, 130.f), FVector2D(900.f, 910.f));
@@ -297,8 +279,7 @@ TSharedRef<SWidget> USaltStoreWidget::RebuildWidget()
 		for (int32 I = 0; I < USaltInventoryComponent::Capacity; ++I)
 		{
 			USaltItemSlotWidget* W = CreateWidget<USaltItemSlotWidget>(this, USaltItemSlotWidget::StaticClass());
-			W->Setup(I, [this](int32 SlotIndex) { ClickSatchelSlot(SlotIndex, FSlateApplication::Get().GetModifierKeys().IsShiftDown()); },
-				[this](int32 SlotIndex) { SetCursor(false, SlotIndex); }, StoreDishRadius);
+			W->Setup(I, StoreDishRadius);
 			SatchelSlots.Add(W);
 			At(Canvas, W, StoreDish(I), FVector2D(4.f, 4.f) * StoreDishRadius, FVector2D(0.5f, 0.5f));
 		}
@@ -318,16 +299,14 @@ TSharedRef<SWidget> USaltStoreWidget::RebuildWidget()
 		for (int32 I = 0; I < SlotCount(true); ++I)
 		{
 			USaltStoreSlotWidget* W = CreateWidget<USaltStoreSlotWidget>(this, USaltStoreSlotWidget::StaticClass());
-			auto OnClick = [this](int32 SlotIndex) { ClickStoreSlot(SlotIndex, FSlateApplication::Get().GetModifierKeys().IsShiftDown()); };
-			auto OnHover = [this](int32 SlotIndex) { SetCursor(true, SlotIndex); };
 			if (bCrate)
 			{
-				W->Setup(I, OnClick, OnHover, CrateCellSize, CrateItemInCell, FVector2D(102.f, 131.f) - CrateItemInCell);
+				W->Setup(I, CrateCellSize, CrateItemInCell, FVector2D(102.f, 131.f) - CrateItemInCell);
 				At(Canvas, W, CrateCell(I), CrateCellSize);
 			}
 			else
 			{
-				W->Setup(I, OnClick, OnHover, BarrelBox, BarrelBox * 0.5f, FVector2D(31.f, 35.f), BarrelItemSize);
+				W->Setup(I, BarrelBox, BarrelBox * 0.5f, FVector2D(31.f, 35.f), BarrelItemSize);
 				At(Canvas, W, BarrelItem(I) - BarrelBox * 0.5f, BarrelBox);
 			}
 			StoreSlots.Add(W);
@@ -336,10 +315,11 @@ TSharedRef<SWidget> USaltStoreWidget::RebuildWidget()
 		// Along the bottom: "Click: move the stack . Shift-click: move one . [E] close the lid".
 		At(Canvas, Picture(TEXT("T_UI_StoreHints"), FVector2D(860.f, 80.f)), FVector2D(540.f, 1000.f), FVector2D(860.f, 80.f));
 
-		// On top, the flight: the dotted path, the target's outline, the item with its shadow and its coin.
+		// On top, the flight (and a dragged item, D58): the dotted path, the target's outline, the item with its shadow and its
+		// coin.
 		FlightLayer = WidgetTree->ConstructWidget<UCanvasPanel>();
 		FlightLayer->SetVisibility(ESlateVisibility::HitTestInvisible);
-		FullScreen(Canvas, FlightLayer);
+		FullScreen(Screen, FlightLayer);
 		PathDots.Reset();
 		for (int32 I = 0; I < StoreMaxDots; ++I)
 		{
@@ -399,12 +379,18 @@ void USaltStoreWidget::Bind(bool bBind)
 void USaltStoreWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	// The screen takes the mouse itself: hover, click and drag (D58).
+	SetVisibility(ESlateVisibility::Visible);
 	Bind(true);
+	// D58: it opens as the satchel does (rising into place in 0.2 s).
+	OpenAge = 0.f;
+	ApplyOpening(Contents, Backdrop, BackdropBlur, 8.f, 0.f);
 	Refresh();
 }
 
 void USaltStoreWidget::NativeDestruct()
 {
+	Drag = FDrag();
 	Bind(false);
 	Super::NativeDestruct();
 }
@@ -463,7 +449,8 @@ int32 USaltStoreWidget::Click(bool bFromStore, int32 Index, bool bOne)
 {
 	USaltInventoryComponent* From = bFromStore ? Store.Get() : Satchel.Get();
 	USaltInventoryComponent* To = bFromStore ? Satchel.Get() : Store.Get();
-	if (!From || !To || !From->GetSlots().IsValidIndex(Index) || From->GetSlots()[Index].IsEmpty())
+	// Not while something is being dragged (or going back after a drag).
+	if (!From || !To || !From->GetSlots().IsValidIndex(Index) || From->GetSlots()[Index].IsEmpty() || Drag.bDragging || Drag.ReturnTime >= 0.f)
 	{
 		return 0;
 	}
@@ -592,8 +579,12 @@ void USaltStoreWidget::UpdateFlight(float Dt)
 		Flight.OutlineFade = FMath::Max(0.f, Flight.OutlineFade - Dt / 0.15f);
 		Flight.PathFade = FMath::Max(0.f, Flight.PathFade - Dt / 0.35f);
 	}
-	TargetOutline->SetRenderOpacity(Flight.OutlineFade);
-	TargetOutline->SetVisibility(Flight.OutlineFade > 0.f ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	// A drag shows its own target (UpdateDrag).
+	if (!Drag.bDragging)
+	{
+		TargetOutline->SetRenderOpacity(Flight.OutlineFade);
+		TargetOutline->SetVisibility(Flight.OutlineFade > 0.f ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
 	// The path: 70 %, a little fainter behind the item, and all of it fading after the landing.
 	for (int32 I = 0; I < PathPoints.Num() && I < PathDots.Num(); ++I)
 	{
@@ -607,7 +598,298 @@ void USaltStoreWidget::UpdateFlight(float Dt)
 void USaltStoreWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (OpenAge < OpenTime)
+	{
+		OpenAge = FMath::Min(OpenAge + InDeltaTime, OpenTime);
+		ApplyOpening(Contents, Backdrop, BackdropBlur, 8.f, OpenAge / OpenTime);
+	}
 	UpdateFlight(InDeltaTime);
+	// A dragged thing let go off the slots goes back where it came from (0.15 s).
+	if (Drag.ReturnTime >= 0.f)
+	{
+		Drag.ReturnTime += InDeltaTime;
+		if (Drag.ReturnTime >= 0.15f)
+		{
+			SetLifted(Drag.bFromStore, Drag.From, false);
+			if (Drag.bFromStore && StoreSlots.IsValidIndex(Drag.From))
+			{
+				StoreSlots[Drag.From]->Land();
+			}
+			else if (!Drag.bFromStore && SatchelSlots.IsValidIndex(Drag.From))
+			{
+				SatchelSlots[Drag.From]->Land();
+			}
+			Drag = FDrag();
+			FlyIcon->SetVisibility(ESlateVisibility::Collapsed);
+			FlyShadow->SetVisibility(ESlateVisibility::Collapsed);
+			FlyCoin->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		UpdateDrag();
+	}
+}
+
+// --- Drag and drop (D58) ------------------------------------------------------------------------------------------
+
+bool USaltStoreWidget::SlotAt(FVector2D Design, bool& bOutStore, int32& OutIndex) const
+{
+	for (int32 I = 0; I < SlotCount(false); ++I)
+	{
+		if (FVector2D::DistSquared(Design, StoreDish(I)) < FMath::Square(56.f))
+		{
+			bOutStore = false;
+			OutIndex = I;
+			return true;
+		}
+	}
+	for (int32 I = 0; I < SlotCount(true); ++I)
+	{
+		const bool bIn = bCrate ? (Design.X >= CrateCell(I).X && Design.Y >= CrateCell(I).Y && Design.X < CrateCell(I).X + CrateCellSize.X
+			&& Design.Y < CrateCell(I).Y + CrateCellSize.Y) : FVector2D::DistSquared(Design, BarrelItem(I)) < FMath::Square(60.f);
+		if (bIn)
+		{
+			bOutStore = true;
+			OutIndex = I;
+			return true;
+		}
+	}
+	return false;
+}
+
+void USaltStoreWidget::SetLifted(bool bStoreSide, int32 Index, bool bLifted)
+{
+	if (bStoreSide && StoreSlots.IsValidIndex(Index))
+	{
+		StoreSlots[Index]->SetLifted(bLifted);
+	}
+	else if (!bStoreSide && SatchelSlots.IsValidIndex(Index))
+	{
+		SatchelSlots[Index]->SetLifted(bLifted);
+	}
+}
+
+void USaltStoreWidget::PlaceTarget(bool bStoreSide, int32 Index)
+{
+	// As a flight's target: the compartment's outline (crate), or a ring round the item (barrel: radius 56; dish: 50).
+	if (bStoreSide && bCrate)
+	{
+		MoveTo(TargetOutline, CrateCell(Index) + CrateCellSize * 0.5f, FVector2D(160.f, 185.f));
+	}
+	else
+	{
+		const float D = bStoreSide ? 160.f : 160.f * 50.f / 56.f;
+		MoveTo(TargetOutline, bStoreSide ? BarrelItem(Index) : StoreDish(Index), FVector2D(D, D));
+	}
+}
+
+int32 USaltStoreWidget::DropOnSlot(bool bFromStore, int32 From, bool bToStore, int32 To, bool bOne)
+{
+	USaltInventoryComponent* FromInv = bFromStore ? Store.Get() : Satchel.Get();
+	USaltInventoryComponent* ToInv = bToStore ? Store.Get() : Satchel.Get();
+	if (!FromInv || !ToInv || To < 0 || To >= SlotCount(bToStore) || !FromInv->GetSlots().IsValidIndex(From) || !ToInv->GetSlots().IsValidIndex(To))
+	{
+		return 0;
+	}
+	if (Flight.bActive)
+	{
+		Land();
+	}
+	const bool bSwap = !ToInv->GetSlots()[To].IsEmpty() && ToInv->GetSlots()[To].Id != FromInv->GetSlots()[From].Id;
+	const int32 Moved = FromInv->MoveToSlot(From, ToInv, To, bOne ? 1 : MAX_int32);
+	if (Moved > 0)
+	{
+		auto Settle = [this](bool bStoreSide, int32 Index)
+		{
+			if (bStoreSide && StoreSlots.IsValidIndex(Index))
+			{
+				StoreSlots[Index]->Land();
+			}
+			else if (!bStoreSide && SatchelSlots.IsValidIndex(Index))
+			{
+				SatchelSlots[Index]->Land();
+			}
+		};
+		Settle(bToStore, To);
+		if (bSwap)
+		{
+			Settle(bFromStore, From);
+		}
+		SetCursor(bToStore, To);
+	}
+	Refresh();
+	return Moved;
+}
+
+void USaltStoreWidget::UpdateDrag()
+{
+	const bool bReturning = Drag.ReturnTime >= 0.f;
+	if (!Drag.bDragging && !bReturning)
+	{
+		return;
+	}
+	// The item follows the pointer lifted above the leather and the wood (larger, its shadow further below), with its coin;
+	// going back, it sinks into its slot.
+	FVector2D Where = Drag.Pointer;
+	float Lift = 1.f;
+	if (bReturning)
+	{
+		const float U = 1.f - FMath::Square(1.f - FMath::Clamp(Drag.ReturnTime / 0.15f, 0.f, 1.f));
+		Where = FMath::Lerp(Drag.ReturnFrom, SlotCentre(Drag.bFromStore, Drag.From), U);
+		Lift = 1.f - U;
+	}
+	const float Size = ItemSize(Drag.bFromStore) * (1.f + 0.15f * Lift);
+	MoveTo(FlyIcon, Where - FVector2D(0.f, 6.f * Lift), FVector2D(Size, Size));
+	MoveTo(FlyShadow, Where + FVector2D(4.f, 8.f) + FVector2D(6.f, 22.f) * Lift, FVector2D(Size, Size));
+	FlyShadow->SetRenderOpacity(1.f - 0.15f * Lift);
+	MoveTo(FlyCoin, Where + FVector2D(48.f, 48.f) * Size / 132.f, FVector2D::ZeroVector);
+	const bool bTarget = Drag.bDragging && Drag.Target != INDEX_NONE && !(Drag.bTargetStore == Drag.bFromStore && Drag.Target == Drag.From);
+	if (bTarget)
+	{
+		PlaceTarget(Drag.bTargetStore, Drag.Target);
+	}
+	TargetOutline->SetRenderOpacity(1.f);
+	TargetOutline->SetVisibility(bTarget ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+}
+
+bool USaltStoreWidget::PointerDown(FVector2D P, bool bShift)
+{
+	bool bStoreSide = false;
+	int32 I = INDEX_NONE;
+	if (Drag.ReturnTime >= 0.f || !SlotAt(P, bStoreSide, I))
+	{
+		return false;
+	}
+	SetCursor(bStoreSide, I);
+	const USaltInventoryComponent* Inv = bStoreSide ? Store.Get() : Satchel.Get();
+	if (!Inv || !Inv->GetSlots().IsValidIndex(I) || Inv->GetSlots()[I].IsEmpty())
+	{
+		return false;
+	}
+	Drag = FDrag();
+	Drag.bPressed = true;
+	Drag.bOne = bShift;
+	Drag.bFromStore = bStoreSide;
+	Drag.From = I;
+	Drag.PressAt = P;
+	Drag.Pointer = P;
+	return true;
+}
+
+void USaltStoreWidget::PointerMove(FVector2D P)
+{
+	bool bStoreSide = false;
+	int32 I = INDEX_NONE;
+	const bool bOnSlot = SlotAt(P, bStoreSide, I);
+	if (!Drag.bPressed)
+	{
+		// Hovering moves the cursor to the slot under the mouse.
+		if (bOnSlot && Drag.ReturnTime < 0.f)
+		{
+			SetCursor(bStoreSide, I);
+		}
+		return;
+	}
+	Drag.Pointer = P;
+	if (!Drag.bDragging && FVector2D::Distance(P, Drag.PressAt) > 6.f)
+	{
+		// The thing comes up out of its slot and follows the mouse (Shift held at the press: one of the stack).
+		if (Flight.bActive)
+		{
+			Land();
+		}
+		const USaltInventoryComponent* Inv = Drag.bFromStore ? Store.Get() : Satchel.Get();
+		const FSaltItemStack Stack = Inv && Inv->GetSlots().IsValidIndex(Drag.From) ? Inv->GetSlots()[Drag.From] : FSaltItemStack();
+		const FSaltItemDef* Def = Stack.IsEmpty() ? nullptr : SaltItems::Find(Stack.Id);
+		Drag.bDragging = true;
+		UTexture2D* Icon = ItemIcon(Def);
+		UTexture2D* Shadow = ItemIconShadow(Def);
+		FlyIcon->SetBrush(ImageBrush(Icon, FVector2D(96.f, 96.f)));
+		FlyShadow->SetBrush(ImageBrush(Shadow, FVector2D(96.f, 96.f)));
+		FlyIcon->SetVisibility(Icon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		FlyShadow->SetVisibility(Shadow ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		SetCoinCount(FlyCoin, FlyCoinText, Drag.bOne ? 1 : Stack.Count);
+		// The whole stack lifts out; one of several leaves the rest lying there.
+		if (!Drag.bOne || Stack.Count <= 1)
+		{
+			SetLifted(Drag.bFromStore, Drag.From, true);
+		}
+	}
+	if (Drag.bDragging)
+	{
+		Drag.bTargetStore = bStoreSide;
+		Drag.Target = bOnSlot ? I : INDEX_NONE;
+		if (bOnSlot)
+		{
+			SetCursor(bStoreSide, I);
+		}
+		UpdateDrag();
+	}
+}
+
+void USaltStoreWidget::PointerUp(FVector2D P, bool bShift)
+{
+	if (!Drag.bPressed)
+	{
+		return;
+	}
+	bool bStoreSide = false;
+	int32 I = INDEX_NONE;
+	const bool bOnSlot = SlotAt(P, bStoreSide, I);
+	if (!Drag.bDragging)
+	{
+		// A click: the stack (Shift: one) goes to the other side, flying there.
+		const bool bFromStore = Drag.bFromStore;
+		const int32 From = Drag.From;
+		Drag = FDrag();
+		Click(bFromStore, From, bShift);
+		return;
+	}
+	const bool bSame = bOnSlot && bStoreSide == Drag.bFromStore && I == Drag.From;
+	if (bOnSlot && !bSame && DropOnSlot(Drag.bFromStore, Drag.From, bStoreSide, I, Drag.bOne) > 0)
+	{
+		SetLifted(Drag.bFromStore, Drag.From, false);
+		Drag = FDrag();
+		FlyIcon->SetVisibility(ESlateVisibility::Collapsed);
+		FlyShadow->SetVisibility(ESlateVisibility::Collapsed);
+		FlyCoin->SetVisibility(ESlateVisibility::Collapsed);
+		TargetOutline->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	else
+	{
+		// Let go off the slots (or where it cannot go): it goes back (owner, D58: nothing is lost by a drag).
+		Drag.bDragging = false;
+		Drag.bPressed = false;
+		Drag.ReturnTime = 0.f;
+		Drag.ReturnFrom = P;
+		TargetOutline->SetVisibility(ESlateVisibility::Collapsed);
+		UpdateDrag();
+	}
+}
+
+FReply USaltStoreWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (InMouseEvent.GetEffectingButton() != EKeys::LeftMouseButton)
+	{
+		return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+	}
+	return PointerDown(DesignPoint(InGeometry, InMouseEvent.GetScreenSpacePosition()), InMouseEvent.IsShiftDown())
+		? FReply::Handled().CaptureMouse(TakeWidget()) : FReply::Handled();
+}
+
+FReply USaltStoreWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	const bool bDrag = Drag.bPressed;
+	PointerMove(DesignPoint(InGeometry, InMouseEvent.GetScreenSpacePosition()));
+	return bDrag ? FReply::Handled() : Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+FReply USaltStoreWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (InMouseEvent.GetEffectingButton() != EKeys::LeftMouseButton || !Drag.bPressed)
+	{
+		return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+	}
+	PointerUp(DesignPoint(InGeometry, InMouseEvent.GetScreenSpacePosition()), InMouseEvent.IsShiftDown());
+	return FReply::Handled().ReleaseMouseCapture();
 }
 
 void USaltStoreWidget::SetCursor(bool bStoreSide, int32 Index)

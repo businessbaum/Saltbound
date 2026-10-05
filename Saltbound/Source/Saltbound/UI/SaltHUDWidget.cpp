@@ -15,6 +15,7 @@
 #include "Player/SaltHeldTools.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Styling/CoreStyle.h"
+#include "UI/SaltKeyPrompt.h"
 #include "UI/SaltLandfallWidget.h"
 #include "UI/SaltPaintedText.h"
 #include "UI/SaltToolWheelWidget.h"
@@ -35,6 +36,10 @@ namespace
 	constexpr float TextCentreY = 12.f - 0.271f * PromptSize;
 	constexpr float FadeIn = 0.15f;
 	constexpr float FadeOut = 0.1f;
+
+	// D58: the controls row (key scraps and action) and the status line under it, above the bottom edge.
+	constexpr float ControlsRowUp = 112.f;
+	constexpr float ControlsStatusUp = 50.f;
 
 	// The save sign (section 14): 96 px, centre 88 px from the right and the bottom edge; one 45 degree step every 0.7 s.
 	constexpr float SignSize = 96.f;
@@ -76,6 +81,7 @@ TSharedRef<SWidget> USaltHUDWidget::RebuildWidget()
 	{
 		UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Root"));
 		WidgetTree->RootWidget = Root;
+		HudRoot = Root;
 
 		Dot = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Dot"));
 		FSlateBrush Brush;
@@ -145,13 +151,19 @@ TSharedRef<SWidget> USaltHUDWidget::RebuildWidget()
 			S->SetPosition(FVector2D(0.f, 48.f));
 		}
 
-		Hint = MakeText(WidgetTree, TEXT("Hint"), 14);
-		if (UCanvasPanelSlot* S = Root->AddChildToCanvas(Hint))
+		// D58: the status line under the controls row (the row itself is made for its keys, TickControls): plain lettering
+		// with the soft halo, as the tool wheel's smaller lines.
+		StatusLine = WidgetTree->ConstructWidget<USaltPaintedText>(USaltPaintedText::StaticClass());
+		StatusLine->Setup(ESaltFace::AlegreyaItalic, 26.f, ETextJustify::Center);
+		StatusLine->SetPlainColor(SaltUI::SRGB(0xE3, 0xD3, 0xB2));
+		StatusLine->SetRenderOpacity(0.f);
+		StatusLine->SetVisibility(ESlateVisibility::HitTestInvisible);
+		if (UCanvasPanelSlot* S = Root->AddChildToCanvas(StatusLine))
 		{
 			S->SetAnchors(FAnchors(0.5f, 1.f));
-			S->SetAlignment(FVector2D(0.5f, 1.f));
+			S->SetAlignment(FVector2D(0.5f, 0.5f));
 			S->SetAutoSize(true);
-			S->SetPosition(FVector2D(0.f, -56.f));
+			S->SetPosition(FVector2D(0.f, -ControlsStatusUp));
 		}
 
 		// The save sign: the knotted ring stays still, the rose turns over it (same 256 px frame, pivot in the middle).
@@ -440,21 +452,70 @@ void USaltHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 		SpyglassMask->SetRenderOpacity(FMath::SmoothStep(0.f, 1.f, Spy));
 		SpyglassMask->SetVisibility(Spy > 0.f ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	}
-	const FText HintText = Player ? Player->GetHintText() : FText::GetEmpty();
-	const bool bAtStation = Player && Player->IsAtStation();
+	// No dot at a station, or while the eyes are on something close (the chart, D58).
+	const bool bNoDot = Player && (Player->IsAtStation() || Player->GetViewFocusAlpha() > 0.f);
 	const bool bFocus = Player && Player->GetFocusedInteractable() != nullptr;
-	if (!HintText.IsEmpty())
-	{
-		Hint->SetText(HintText);
-	}
 	const float Speed = 8.f;
-	HintAlpha = FMath::FInterpTo(HintAlpha, HintText.IsEmpty() ? 0.f : 0.8f, InDeltaTime, Speed * 0.5f);
-	DotAlpha = FMath::FInterpTo(DotAlpha, bAtStation ? 0.f : (bFocus ? 0.95f : 0.3f), InDeltaTime, Speed * 1.5f);
-	Hint->SetRenderOpacity(HintAlpha);
+	DotAlpha = FMath::FInterpTo(DotAlpha, bNoDot ? 0.f : (bFocus ? 0.95f : 0.3f), InDeltaTime, Speed * 1.5f);
 	Dot->SetRenderOpacity(DotAlpha);
 	const float DotScale = bFocus ? 1.4f : 1.f;
 	Dot->SetRenderScale(FVector2D(DotScale, DotScale));
 
 	TickPrompt(InDeltaTime);
+	TickControls(InDeltaTime);
 	TickSaveSign(InDeltaTime);
+}
+
+void USaltHUDWidget::TickControls(float DeltaSeconds)
+{
+	const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn());
+	TArray<FString> Keys;
+	FText Action;
+	FText Status;
+	const bool bAny = Player && Player->GetControlsHint(Keys, Action, Status);
+	// A new set of keys makes a new row (each key is a scrap with its letter); the same keys keep theirs.
+	if (bAny && Keys.Num() > 0 && (!ControlsRow || Keys != ControlKeys) && HudRoot)
+	{
+		if (ControlsRow)
+		{
+			ControlsRow->RemoveFromParent();
+		}
+		ControlKeys = Keys;
+		ControlsRow = CreateWidget<USaltKeyPrompt>(this, USaltKeyPrompt::StaticClass());
+		ControlsRow->Setup(Keys, Action);
+		if (UCanvasPanelSlot* S = HudRoot->AddChildToCanvas(ControlsRow))
+		{
+			S->SetAnchors(FAnchors(0.5f, 1.f));
+			S->SetAlignment(FVector2D::ZeroVector);
+			S->SetSize(FVector2D(1.f, 1.f));
+			S->SetPosition(FVector2D(0.f, -ControlsRowUp));
+		}
+		bControlsShowing = false;
+	}
+	const bool bRow = bAny && Keys.Num() > 0;
+	if (ControlsRow && bRow)
+	{
+		ControlsRow->SetAction(Action);
+		if (!bControlsShowing)
+		{
+			ControlsRow->PlayIn();
+		}
+	}
+	bControlsShowing = bRow;
+	if (bAny && !Status.EqualTo(StatusLine->GetText()))
+	{
+		StatusLine->SetText(Status);
+	}
+	ControlsAlpha = FMath::FInterpTo(ControlsAlpha, bAny ? 1.f : 0.f, DeltaSeconds, 10.f);
+	if (ControlsRow)
+	{
+		ControlsRow->SetRenderOpacity(bRow ? 1.f : ControlsAlpha);
+		ControlsRow->SetVisibility(ControlsAlpha > 0.01f || bRow ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	StatusLine->SetRenderOpacity(0.9f * ControlsAlpha * (Status.IsEmpty() && bAny ? 0.f : 1.f));
+}
+
+FText USaltHUDWidget::GetShownControls() const
+{
+	return ControlsRow && bControlsShowing ? ControlsRow->GetAction() : FText::GetEmpty();
 }

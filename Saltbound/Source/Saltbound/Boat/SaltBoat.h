@@ -151,6 +151,11 @@ public:
 	USaltInteractableComponent* GetMastChartUse() const { return MastChartUse; }
 	/** The value the chart's material shows (tests). */
 	float GetMastChartParameter(FName Name) const;
+	/** D58: the chart sheet's face in the hull's space (cm): its middle, X looking into it, Y to the viewer's right, Z up. */
+	FTransform GetChartFaceLocal() const;
+	/** D58: where the eyes go to look at the chart closely (hull space): straight in front of the sheet and so far back that
+	 *  it fills 78 % of the view's height at this horizontal field of view (degrees) and aspect (width / height). */
+	FTransform GetChartViewLocal(float FieldOfView, float Aspect) const;
 	UPointLightComponent* GetLanternLight() const { return LanternLight; }
 	UCableComponent* GetHalyard(bool bPeak) const { return bPeak ? PeakHalyard : ThroatHalyard; }
 	USceneComponent* GetGaffHalyardPoint(bool bPeak) const { return bPeak ? GaffSpanBlock : GaffThroatEye; }

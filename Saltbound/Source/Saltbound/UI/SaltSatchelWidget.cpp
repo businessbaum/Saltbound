@@ -38,12 +38,15 @@ namespace
 
 // --- Pocket -------------------------------------------------------------------------------------------------------
 
-void USaltItemSlotWidget::Setup(int32 InIndex, TFunction<void(int32)> InOnClicked, TFunction<void(int32)> InOnHovered, float InRadius)
+void USaltItemSlotWidget::Setup(int32 InIndex, float InRadius)
 {
 	Index = InIndex;
-	OnClickedFn = MoveTemp(InOnClicked);
-	OnHoveredFn = MoveTemp(InOnHovered);
 	Radius = InRadius;
+}
+
+void USaltItemSlotWidget::SetLifted(bool bInLifted)
+{
+	bLifted = bInLifted;
 }
 
 void USaltItemSlotWidget::Place(UWidget* W, FVector2D Centre, FVector2D Size)
@@ -99,17 +102,8 @@ TSharedRef<SWidget> USaltItemSlotWidget::RebuildWidget()
 			S->SetAlignment(FVector2D(23.f / 48.f, 22.f / 48.f));
 			S->SetPosition(FVector2D(2.f * Radius + 38.f * K, 2.f * Radius + 36.f * K));
 		}
-		// The pocket itself is the button (hover and click), round as the dish.
-		Button = WidgetTree->ConstructWidget<USaltMenuButton>();
-		FButtonStyle Style;
-		FSlateBrush None;
-		None.DrawAs = ESlateBrushDrawType::NoDrawType;
-		Style.SetNormal(None).SetHovered(None).SetPressed(None).SetDisabled(None);
-		Button->SetStyle(Style);
-		Button->OnClicked.AddDynamic(this, &USaltItemSlotWidget::HandleClicked);
-		Button->OnHovered.AddDynamic(this, &USaltItemSlotWidget::HandleHovered);
-		Root->AddChildToCanvas(Button);
-		Place(Button, FVector2D::ZeroVector, FVector2D(2.f * Radius, 2.f * Radius));
+		// The screen it lies on takes the mouse (hover, click, drag: D58).
+		Root->SetVisibility(ESlateVisibility::HitTestInvisible);
 		Show(nullptr, 0, false);
 	}
 	return Super::RebuildWidget();
@@ -162,12 +156,25 @@ void USaltItemSlotWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaT
 	const float E = FMath::InterpEaseInOut(0.f, 1.f, SelAlpha, 2.f);
 	Glow->SetRenderOpacity(E);
 	Ring->SetRenderOpacity(E);
-	const float Size = FMath::Lerp(86.f, 96.f, E) * K;
+	// Something put here drops in a little large and settles (0.18 s, D58).
+	float Settle = 1.f;
+	if (LandTime >= 0.f)
+	{
+		LandTime += InDeltaTime;
+		const float U = FMath::Clamp(LandTime / 0.18f, 0.f, 1.f);
+		Settle = 1.f + 0.12f * FMath::Square(1.f - U);
+		LandTime = U >= 1.f ? -1.f : LandTime;
+	}
+	const float Size = FMath::Lerp(86.f, 96.f, E) * K * Settle;
 	const float Lift = 14.f * K * E;
 	const FVector2D IconCentre(0.f, -2.f * K - Lift);
 	Place(IconImage, IconCentre, FVector2D(Size, Size));
 	Place(IconShadow, IconCentre + FVector2D(3.f, 6.f + 12.f * E) * K, FVector2D(Size, Size));
-	IconShadow->SetRenderOpacity(FMath::Lerp(1.f, 0.8f, E));
+	IconShadow->SetRenderOpacity(FMath::Lerp(1.f, 0.8f, E) * (bLifted ? 0.f : 1.f));
+	// Being dragged away (D58): a faint trace stays in the dish, the coin goes with the item.
+	IconImage->SetRenderOpacity(bLifted ? 0.25f : 1.f);
+	Contact->SetRenderOpacity(bLifted ? 0.f : 1.f);
+	Coin->SetRenderOpacity(bLifted ? 0.f : 1.f);
 	// The shard's own slow turquoise glow (about 2.5 s).
 	if (bAncient)
 	{
@@ -192,22 +199,6 @@ void USaltItemSlotWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaT
 	}
 }
 
-void USaltItemSlotWidget::HandleClicked()
-{
-	if (OnClickedFn)
-	{
-		OnClickedFn(Index);
-	}
-}
-
-void USaltItemSlotWidget::HandleHovered()
-{
-	if (OnHoveredFn)
-	{
-		OnHoveredFn(Index);
-	}
-}
-
 // --- Satchel ------------------------------------------------------------------------------------------------------
 
 USaltSatchelWidget::USaltSatchelWidget(const FObjectInitializer& ObjectInitializer)
@@ -227,23 +218,32 @@ TSharedRef<SWidget> USaltSatchelWidget::RebuildWidget()
 
 UWidget* USaltSatchelWidget::BuildSatchelScreen()
 {
-	UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>();
-	auto FullScreen = [Canvas](UWidget* W)
+	UCanvasPanel* Screen = WidgetTree->ConstructWidget<UCanvasPanel>();
+	auto FullScreen = [](UCanvasPanel* Into, UWidget* W)
 	{
-		UCanvasPanelSlot* S = Canvas->AddChildToCanvas(W);
+		UCanvasPanelSlot* S = Into->AddChildToCanvas(W);
 		S->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
 		S->SetOffsets(FMargin(0.f));
 	};
-	// The world behind: blurred, darkened, a vignette.
+	// The world behind: blurred, darkened, a vignette (they fade in as the satchel opens, D58).
+	UCanvasPanel* Behind = WidgetTree->ConstructWidget<UCanvasPanel>();
+	FullScreen(Screen, Behind);
+	Backdrop = Behind;
 	UBackgroundBlur* Blur = WidgetTree->ConstructWidget<UBackgroundBlur>();
 	Blur->SetBlurStrength(8.f);
-	FullScreen(Blur);
+	FullScreen(Behind, Blur);
+	BackdropBlur = Blur;
 	UImage* Dark = WidgetTree->ConstructWidget<UImage>();
 	Dark->SetColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.45f));
-	FullScreen(Dark);
+	FullScreen(Behind, Dark);
 	UImage* Vignette = WidgetTree->ConstructWidget<UImage>();
 	Vignette->SetBrush(ImageBrush(Tex(TEXT("T_UI_Vignette")), FVector2D(256.f, 144.f)));
-	FullScreen(Vignette);
+	FullScreen(Behind, Vignette);
+
+	// The satchel itself (it rises into place as it opens).
+	UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>();
+	FullScreen(Screen, Canvas);
+	Contents = Canvas;
 
 	// The bag (everything that does not change), then the count, the pockets and the tag.
 	UImage* Bag = WidgetTree->ConstructWidget<UImage>();
@@ -261,7 +261,7 @@ UWidget* USaltSatchelWidget::BuildSatchelScreen()
 	for (int32 I = 0; I < USaltInventoryComponent::Capacity; ++I)
 	{
 		USaltItemSlotWidget* W = CreateWidget<USaltItemSlotWidget>(this, USaltItemSlotWidget::StaticClass());
-		W->Setup(I, [this](int32 SlotIndex) { SelectSlot(SlotIndex); }, [this](int32 SlotIndex) { SelectSlot(SlotIndex); }, 50.f);
+		W->Setup(I, 50.f);
 		SlotWidgets.Add(W);
 		At(Canvas, W, PocketCentre(I), FVector2D(200.f, 200.f), FVector2D(0.5f, 0.5f));
 	}
@@ -272,7 +272,25 @@ UWidget* USaltSatchelWidget::BuildSatchelScreen()
 	Twine->SetBrush(ImageBrush(Tex(TEXT("T_UI_TagTwineFront")), FVector2D(80.f, 80.f)));
 	Twine->SetVisibility(ESlateVisibility::HitTestInvisible);
 	At(Canvas, Twine, TagHole - FVector2D(40.f, 52.f), FVector2D(80.f, 80.f));
-	return Canvas;
+
+	// D58: the item being dragged, on top: lifted above the leather (larger, its shadow further below), with its coin.
+	UCanvasPanel* DragLayer = WidgetTree->ConstructWidget<UCanvasPanel>();
+	DragLayer->SetVisibility(ESlateVisibility::HitTestInvisible);
+	FullScreen(Screen, DragLayer);
+	DragShadow = WidgetTree->ConstructWidget<UImage>();
+	DragIcon = WidgetTree->ConstructWidget<UImage>();
+	for (UImage* I : { DragShadow.Get(), DragIcon.Get() })
+	{
+		I->SetVisibility(ESlateVisibility::Collapsed);
+		At(DragLayer, I, FVector2D::ZeroVector, FVector2D(106.f, 106.f), FVector2D(0.5f, 0.5f));
+	}
+	DragShadow->SetRenderOpacity(0.8f);
+	UTextBlock* CoinLabel = nullptr;
+	DragCoin = CountCoin(WidgetTree, &CoinLabel, 17.f);
+	DragCoinText = CoinLabel;
+	DragCoin->SetVisibility(ESlateVisibility::Collapsed);
+	At(DragLayer, DragCoin, FVector2D::ZeroVector, FVector2D::ZeroVector, FVector2D(23.f / 48.f, 22.f / 48.f));
+	return Screen;
 }
 
 UWidget* USaltSatchelWidget::BuildTag()
@@ -351,6 +369,8 @@ UWidget* USaltSatchelWidget::BuildTag()
 void USaltSatchelWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	// The screen takes the mouse itself: hover, click and drag on the pockets (D58).
+	SetVisibility(ESlateVisibility::Visible);
 	if (const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn()))
 	{
 		if (USaltInventoryComponent* Satchel = Player->GetInventory())
@@ -358,11 +378,17 @@ void USaltSatchelWidget::NativeConstruct()
 			InventoryChanged = Satchel->OnChanged.AddUObject(this, &USaltSatchelWidget::Refresh);
 		}
 	}
+	// D58 (owner: "a small but fast animation for opening the satchel"): it rises into place in 0.2 s, the tag swinging.
+	OpenAge = 0.f;
+	TagSwingRate += 55.f;
+	ApplyOpening(Contents, Backdrop, BackdropBlur, 8.f, 0.f);
 	Refresh();
 }
 
 void USaltSatchelWidget::NativeDestruct()
 {
+	EndDrag();
+	ReturnTime = -1.f;
 	if (const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn()))
 	{
 		if (USaltInventoryComponent* Satchel = Player->GetInventory())
@@ -371,6 +397,105 @@ void USaltSatchelWidget::NativeDestruct()
 		}
 	}
 	Super::NativeDestruct();
+}
+
+FVector2D USaltSatchelWidget::PocketAt(int32 Index)
+{
+	return PocketCentre(Index);
+}
+
+int32 USaltSatchelWidget::SlotAt(FVector2D Design) const
+{
+	for (int32 I = 0; I < USaltInventoryComponent::Capacity; ++I)
+	{
+		// The pocket's stitched ring (radius 60) and a little more.
+		if (FVector2D::DistSquared(Design, PocketCentre(I)) < FMath::Square(64.f))
+		{
+			return I;
+		}
+	}
+	return INDEX_NONE;
+}
+
+int32 USaltSatchelWidget::DropOnSlot(int32 From, int32 To)
+{
+	const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn());
+	USaltInventoryComponent* Satchel = Player ? Player->GetInventory() : nullptr;
+	if (!Satchel || From == To || !SlotWidgets.IsValidIndex(From) || !SlotWidgets.IsValidIndex(To))
+	{
+		return 0;
+	}
+	const bool bSwap = !Satchel->GetSlots()[To].IsEmpty() && Satchel->GetSlots()[To].Id != Satchel->GetSlots()[From].Id;
+	// The pocket it went to is chosen (the tag tells what lies there now).
+	if (To != Selected)
+	{
+		Selected = To;
+		TagSwingRate += (To % 2 ? -1.f : 1.f) * 70.f;
+	}
+	const int32 Moved = Satchel->MoveToSlot(From, Satchel, To);
+	if (Moved > 0)
+	{
+		SlotWidgets[To]->Land();
+		if (bSwap)
+		{
+			SlotWidgets[From]->Land();
+		}
+	}
+	Refresh();
+	return Moved;
+}
+
+void USaltSatchelWidget::EndDrag()
+{
+	if (Drag.bDragging && SlotWidgets.IsValidIndex(Drag.From) && ReturnTime < 0.f)
+	{
+		SlotWidgets[Drag.From]->SetLifted(false);
+	}
+	Drag = FDrag();
+	Refresh();
+}
+
+void USaltSatchelWidget::UpdateDragVisual()
+{
+	if (!DragIcon)
+	{
+		return;
+	}
+	const bool bReturning = ReturnTime >= 0.f;
+	const bool bShow = Drag.bDragging || bReturning;
+	FVector2D Where = Drag.Pointer;
+	float Lift = 1.f;
+	if (bReturning)
+	{
+		// Let go off the pockets: it goes back where it came from (0.15 s, eased out) and settles there.
+		const float U = 1.f - FMath::Square(1.f - FMath::Clamp(ReturnTime / 0.15f, 0.f, 1.f));
+		Where = FMath::Lerp(ReturnFrom, PocketCentre(ReturnSlot) - FVector2D(0.f, 2.f), U);
+		Lift = 1.f - U;
+	}
+	for (UImage* I : { DragShadow.Get(), DragIcon.Get() })
+	{
+		I->SetVisibility(bShow && I->GetBrush().GetResourceObject() ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	DragCoin->SetVisibility(bShow && DragCount >= 2 ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	if (!bShow)
+	{
+		return;
+	}
+	const float Size = FMath::Lerp(86.f, 106.f, Lift);
+	auto Move = [](UWidget* W, FVector2D P, float S)
+	{
+		if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(W->Slot))
+		{
+			Slot->SetPosition(P - FVector2D(960.f, 540.f));
+			if (S > 0.f)
+			{
+				Slot->SetSize(FVector2D(S, S));
+			}
+		}
+	};
+	Move(DragIcon, Where - FVector2D(0.f, 6.f * Lift), Size);
+	Move(DragShadow, Where + FVector2D(3.f, 6.f) + FVector2D(6.f, 22.f) * Lift, Size);
+	Move(DragCoin, Where + FVector2D(38.f, 36.f) * Size / 86.f, 0.f);
 }
 
 void USaltSatchelWidget::SelectSlot(int32 Index)
@@ -410,7 +535,7 @@ void USaltSatchelWidget::Refresh()
 		const FSaltItemStack Stack = Slots.IsValidIndex(I) ? Slots[I] : FSaltItemStack();
 		const FSaltItemDef* Def = Stack.IsEmpty() ? nullptr : SaltItems::Find(Stack.Id);
 		Used += Def ? 1 : 0;
-		SlotWidgets[I]->Show(Def, Def ? Stack.Count : 0, I == Selected);
+		SlotWidgets[I]->Show(Def, Def ? Stack.Count : 0, I == HighlightSlot());
 	}
 	const FText CountText = FText::Format(NSLOCTEXT("Saltbound", "SatchelUsed", "{0} / {1}"), FText::AsNumber(Used),
 		FText::AsNumber(USaltInventoryComponent::Capacity));
@@ -478,6 +603,27 @@ bool USaltSatchelWidget::DropSelected()
 void USaltSatchelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	// Opening (D58).
+	if (OpenAge < OpenTime)
+	{
+		OpenAge = FMath::Min(OpenAge + InDeltaTime, OpenTime);
+		ApplyOpening(Contents, Backdrop, BackdropBlur, 8.f, OpenAge / OpenTime);
+	}
+	// A dragged item let go off the pockets goes back to its own.
+	if (ReturnTime >= 0.f)
+	{
+		ReturnTime += InDeltaTime;
+		if (ReturnTime >= 0.15f)
+		{
+			ReturnTime = -1.f;
+			if (SlotWidgets.IsValidIndex(ReturnSlot))
+			{
+				SlotWidgets[ReturnSlot]->SetLifted(false);
+				SlotWidgets[ReturnSlot]->Land();
+			}
+		}
+		UpdateDragVisual();
+	}
 	// The tag swings on its twine: a damped spring (it settles in about 0.8 s).
 	const float Dt = FMath::Min(InDeltaTime, 0.05f);
 	const float Omega = 12.f;
@@ -547,4 +693,119 @@ FReply USaltSatchelWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FK
 		return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 	}
 	return FReply::Handled();
+}
+
+// --- Mouse: hover chooses a pocket, a press picks the item up, moving drags it, letting go puts it down (D58) ---------
+
+bool USaltSatchelWidget::PointerDown(FVector2D P)
+{
+	const int32 I = SlotAt(P);
+	const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn());
+	const USaltInventoryComponent* Satchel = Player ? Player->GetInventory() : nullptr;
+	if (I == INDEX_NONE || !Satchel || ReturnTime >= 0.f)
+	{
+		return false;
+	}
+	SelectSlot(I);
+	if (!Satchel->GetSlots().IsValidIndex(I) || Satchel->GetSlots()[I].IsEmpty())
+	{
+		return false;
+	}
+	Drag = FDrag();
+	Drag.bPressed = true;
+	Drag.From = I;
+	Drag.PressAt = P;
+	Drag.Pointer = P;
+	return true;
+}
+
+void USaltSatchelWidget::PointerMove(FVector2D P)
+{
+	if (!Drag.bPressed)
+	{
+		// Hovering chooses the pocket under the mouse.
+		const int32 I = SlotAt(P);
+		if (I != INDEX_NONE && ReturnTime < 0.f)
+		{
+			SelectSlot(I);
+		}
+		return;
+	}
+	Drag.Pointer = P;
+	if (!Drag.bDragging && FVector2D::Distance(P, Drag.PressAt) > 6.f)
+	{
+		// The item comes up out of its pocket and follows the mouse.
+		const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn());
+		const USaltInventoryComponent* Satchel = Player ? Player->GetInventory() : nullptr;
+		const FSaltItemStack Stack = Satchel && Satchel->GetSlots().IsValidIndex(Drag.From) ? Satchel->GetSlots()[Drag.From] : FSaltItemStack();
+		const FSaltItemDef* Def = Stack.IsEmpty() ? nullptr : SaltItems::Find(Stack.Id);
+		Drag.bDragging = true;
+		DragCount = Stack.Count;
+		DragIcon->SetBrush(ImageBrush(ItemIcon(Def), FVector2D(96.f, 96.f)));
+		DragShadow->SetBrush(ImageBrush(ItemIconShadow(Def), FVector2D(96.f, 96.f)));
+		SetCoinCount(DragCoin, DragCoinText, DragCount);
+		SlotWidgets[Drag.From]->SetLifted(true);
+	}
+	if (Drag.bDragging)
+	{
+		const int32 Target = SlotAt(P);
+		if (Target != Drag.Target)
+		{
+			Drag.Target = Target;
+			Refresh();
+		}
+		UpdateDragVisual();
+	}
+}
+
+void USaltSatchelWidget::PointerUp(FVector2D P)
+{
+	if (!Drag.bPressed)
+	{
+		return;
+	}
+	const bool bWasDragging = Drag.bDragging;
+	const int32 From = Drag.From;
+	const int32 To = SlotAt(P);
+	if (bWasDragging && (To == INDEX_NONE || To == From || DropOnSlot(From, To) <= 0))
+	{
+		// Let go off the pockets (or where it cannot go): it goes back (owner, D58: nothing is lost by a drag).
+		ReturnTime = 0.f;
+		ReturnFrom = P;
+		ReturnSlot = From;
+		Drag = FDrag();
+		Refresh();
+		UpdateDragVisual();
+	}
+	else
+	{
+		EndDrag();
+		UpdateDragVisual();
+	}
+}
+
+FReply USaltSatchelWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (InMouseEvent.GetEffectingButton() != EKeys::LeftMouseButton)
+	{
+		return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+	}
+	return PointerDown(DesignPoint(InGeometry, InMouseEvent.GetScreenSpacePosition())) ? FReply::Handled().CaptureMouse(TakeWidget()) : FReply::Handled();
+}
+
+FReply USaltSatchelWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	const bool bDrag = Drag.bPressed;
+	PointerMove(DesignPoint(InGeometry, InMouseEvent.GetScreenSpacePosition()));
+	return bDrag ? FReply::Handled() : Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+FReply USaltSatchelWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (InMouseEvent.GetEffectingButton() != EKeys::LeftMouseButton || !Drag.bPressed)
+	{
+		return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+	}
+	PointerUp(DesignPoint(InGeometry, InMouseEvent.GetScreenSpacePosition()));
+	return FReply::Handled().ReleaseMouseCapture();
 }

@@ -3,6 +3,7 @@
 #include "Player/SaltPlayerController.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Boat/SaltBoat.h"
 #include "Core/SaltSaveSubsystem.h"
 #include "Core/SaltTools.h"
 #include "EnhancedInputComponent.h"
@@ -94,14 +95,14 @@ bool ASaltPlayerController::IsStoreOpen() const
 	return StoreWidget && StoreWidget->IsInViewport();
 }
 
-void ASaltPlayerController::SetUIInput(bool bOn, UUserWidget* Focus)
+void ASaltPlayerController::SetUIInput(bool bOn, UUserWidget* Focus, bool bCursor)
 {
 	FlushPressedKeys();
 	if (ASaltPlayerCharacter* SaltCharacter = Cast<ASaltPlayerCharacter>(GetPawn()))
 	{
 		SaltCharacter->ResetHeldInput();
 	}
-	bShowMouseCursor = bOn;
+	bShowMouseCursor = bOn && bCursor;
 	if (bOn)
 	{
 		FInputModeUIOnly Mode;
@@ -135,14 +136,22 @@ bool ASaltPlayerController::IsChartOpen() const
 
 void ASaltPlayerController::OpenChart(ASaltBoat* Boat)
 {
-	if (!IsLocalController() || !Boat || IsMenuOpen() || IsSatchelOpen() || IsStoreOpen() || IsChartOpen() || bToolWheel)
+	ASaltPlayerCharacter* SaltCharacter = Cast<ASaltPlayerCharacter>(GetPawn());
+	if (!IsLocalController() || !Boat || !SaltCharacter || IsMenuOpen() || IsSatchelOpen() || IsStoreOpen() || IsChartOpen() || bToolWheel)
 	{
 		return;
 	}
+	// D58 (owner: "smooth but fast camera to the mast, not an instant pop up"): the eyes glide to the chart on the mast and
+	// stay with it as the boat moves; the names, north and the scale are inked over the sheet once there.
+	int32 SizeX = 0;
+	int32 SizeY = 0;
+	GetViewportSize(SizeX, SizeY);
+	const float Aspect = SizeY > 0 ? (float)SizeX / (float)SizeY : 16.f / 9.f;
+	SaltCharacter->FocusView(Boat->Hull, Boat->GetChartViewLocal(SaltCharacter->FieldOfView, Aspect), ChartGlideIn);
 	ChartWidget = CreateWidget<USaltChartWidget>(this, USaltChartWidget::StaticClass());
 	ChartWidget->SetBoat(Boat);
 	ChartWidget->AddToViewport(8);
-	SetUIInput(true, ChartWidget);
+	SetUIInput(true, ChartWidget, false);
 }
 
 void ASaltPlayerController::CloseChart()
@@ -152,6 +161,10 @@ void ASaltPlayerController::CloseChart()
 		ChartWidget->RemoveFromParent();
 		ChartWidget = nullptr;
 		SetUIInput(false, nullptr);
+		if (ASaltPlayerCharacter* SaltCharacter = Cast<ASaltPlayerCharacter>(GetPawn()))
+		{
+			SaltCharacter->ReleaseView(ChartGlideOut);
+		}
 	}
 }
 

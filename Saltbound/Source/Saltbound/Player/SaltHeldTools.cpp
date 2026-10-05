@@ -63,10 +63,13 @@ void USaltHeldToolsComponent::EnsureParts()
 		M->RegisterComponent();
 		return M;
 	};
-	auto Hand = [Owner, this](const TCHAR* Name)
+	// The hands hang from the view as it is seen (D58: it leans with the deck), else from the camera.
+	const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(Owner);
+	USceneComponent* View = Player && Player->GetViewAnchor() ? Player->GetViewAnchor() : Camera.Get();
+	auto Hand = [Owner, View](const TCHAR* Name)
 	{
 		USceneComponent* H = NewObject<USceneComponent>(Owner, Name);
-		H->SetupAttachment(Camera);
+		H->SetupAttachment(View);
 		H->RegisterComponent();
 		return H;
 	};
@@ -162,13 +165,14 @@ void USaltHeldToolsComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	{
 		BaseFOV = Player->FieldOfView;
 	}
-	// The shown tool sinks out before the next one rises in.
-	if (Shown != Tool)
+	// The shown tool sinks out before the next one rises in (and while the eyes are elsewhere).
+	const FName Wanted = bSuppressed ? FName() : Tool;
+	if (Shown != Wanted)
 	{
 		Raise = FMath::Max(0.f, Raise - DeltaTime / RaiseTime);
 		if (Raise <= 0.f)
 		{
-			Shown = Tool;
+			Shown = Wanted;
 			if (Shown == TEXT("Compass"))
 			{
 				// The needle starts where it lay (pointing along the case) and swings to north.
@@ -205,7 +209,7 @@ void USaltHeldToolsComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		}
 	}
 	// The spyglass narrows the view (in 0.35 s) and widens it again when put away.
-	const bool bSpyglass = Tool == TEXT("Spyglass");
+	const bool bSpyglass = Wanted == TEXT("Spyglass");
 	Spyglass = FMath::Clamp(Spyglass + (bSpyglass ? 1.f : -1.f) * DeltaTime / SpyglassTime, 0.f, 1.f);
 	Camera->SetFieldOfView(GetFieldOfView());
 }
