@@ -229,7 +229,7 @@ const SPACES = {
       { id: 'table', x0: 49, x1: 58, y0: 12.6, y1: 13.8, h: 0.8, note: 'benches either side at y 14.2..14.6 and y 11.8..12.2, h 0.45' },
       { id: 'hull_ports', wall: 'y=20', spans: [[46.4, 48], [59.4, 61]], z0: 0.8, z1: 2.0, note: 'open shutters; sills under the 1.4 m player’s eyes' },
       { id: 'hall_windows', wall: 'y=9', spans: [[47, 50], [51, 54], [55, 58], [59, 62]], z0: 0.8, z1: 2.6, note: 'look down into the Slip' },
-      { id: 'lanterns', at: [[60, 15, 3], [53.5, 13.2, 3], [47, 15, 3]], hook_z: 4 },
+      { id: 'lanterns', at: [[60, 15, 3], [53.5, 13.2, 3], [47, 15, 3], [65.5, 7.5, 3], [70.5, 10.5, 3]], hook_z: 4 },   // the last two in the lane (D62: it was dark)
     ],
     gates: ['L7 door in the forward wall (x 64, y 18.6..19.8)'],
   },

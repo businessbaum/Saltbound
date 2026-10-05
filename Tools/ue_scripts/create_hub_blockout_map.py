@@ -43,6 +43,7 @@ PARTS = ["ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow", "Basin", "Quay"
 SHIP_ZONE = (12000.0, 30000.0, 0.2)
 LANTERN_CD = 60.0          # a lantern below decks (the game's ASaltLantern is 28 cd)
 INTERIOR_MIN_EV = 3.0      # how far the eye opens up below decks (the Day preset stops at EV 11, Dusk at 5)
+INTERIOR_MAX_EV = 7.5      # and how far it may close there (the shaft's daylight and the doorways would black the rooms out)
 BASIN_ZONE = (2500.0, 4000.0, 0.07)
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -223,7 +224,7 @@ print("SB_HUB_LANTERNS", len(lamps))
 
 # The eye adapts below decks: each enclosed space gets its own exposure range (the rig's presets clamp it for the open sea).
 INTERIORS = {"Slip": (44.0, 64.0, -9.0, 19.0, 1.5, 13.5), "TallyStair": (30.0, 73.0, 6.0, 20.0, 1.5, 9.5),
-             "KeelgateWell": (72.0, 96.0, -12.0, 12.0, 1.5, 17.5)}
+             "KeelgateWell": (72.0, 96.0, -12.0, 12.0, 1.5, 17.5), "Chandlery": (98.0, 114.0, -17.5, -8.0, 17.5, 22.9)}
 if ART:                                       # under the arcades the eye opens a little (the quays are deep under the wings)
     INTERIORS.update({"QuayS": (0.5, 44.0, 10.0, 14.0, 1.5, 5.5), "QuayP": (0.5, 44.0, -14.0, -10.0, 1.5, 5.5)})
 for name, (x0, x1, y0, y1, z0, z1) in INTERIORS.items():
@@ -235,6 +236,9 @@ for name, (x0, x1, y0, y1, z0, z1) in INTERIORS.items():
     ps = v.get_editor_property("settings")
     ps.set_editor_property("override_auto_exposure_min_brightness", True)
     ps.set_editor_property("auto_exposure_min_brightness", 6.0 if name.startswith("Quay") else INTERIOR_MIN_EV)
+    # ... and does not close again for the bright doorways and the Well's daylight (D62: the lane read black).
+    ps.set_editor_property("override_auto_exposure_max_brightness", True)
+    ps.set_editor_property("auto_exposure_max_brightness", 9.0 if name.startswith("Quay") else INTERIOR_MAX_EV)
     v.set_editor_property("settings", ps)
 
 # --- the player's boat at the fitting berth, the player on the starboard quay --------------------------------------------

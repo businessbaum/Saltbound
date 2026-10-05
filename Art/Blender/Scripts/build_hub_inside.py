@@ -1362,8 +1362,8 @@ def build_main():
         fife_rail(p, mx, my, zb)
         g = next(m for m in HUB["masts"] if m["x"] == mx)
         r = HUB["rig"]["thick"][0] * 0.5 * (0.85 + 0.15 * g["h"] / 76.0)
-        p.lathe([(r + 0.35, 0.0), (r + 0.3, 0.12), (r + 0.12, 0.3), (r + 0.04, 0.5), (r + 0.02, 0.55)], Vector((mx, my, zb)), UP, "MI_Canvas", sides=16,
-                caps=False, wear=0.0)
+        p.lathe([(r + 0.22, 0.0), (r + 0.2, 0.08), (r + 0.1, 0.22), (r + 0.03, 0.4), (r + 0.015, 0.45)], Vector((mx, my, zb)), UP, "MI_Wood_Tarred",
+                sides=16, caps=False, wear=0.0)                                    # the mast's coat: tarred canvas
         for k in range(12):                                                         # wedges round the mast at the partners
             a = 2 * math.pi * k / 12
             d = Vector((math.cos(a), math.sin(a), 0.0))
@@ -1392,7 +1392,8 @@ def build_main():
     capstan_big(p, Vector((cp["x"], cp["y"], zm)), cp["r"])
     gc = md["galley_chimney"]
     c = Vector((gc["x"], gc["y"], zm))
-    p.block(c.x - 0.55, c.x + 0.55, c.y - 0.55, c.y + 0.55, zm, zm + 0.5, STONE, nseed(), axis="z")
+    p.block(c.x - 0.55, c.x + 0.55, c.y - 0.55, c.y + 0.55, zm, zm + 0.35, "MI_Wood_TeakDark", nseed(), axis="z")   # the timber collar
+    p.block(c.x - 0.48, c.x + 0.48, c.y - 0.48, c.y + 0.48, zm + 0.35, zm + 0.4, "MI_Metal_Iron", nseed(), axis="x")       # its iron plate
     p.lathe([(0.32, 0.5), (0.3, 1.0), (0.28, gc["h"] - 0.6), (0.34, gc["h"] - 0.55), (0.36, gc["h"] - 0.3), (0.2, gc["h"] - 0.15), (0.0, gc["h"])], c, UP,
             "MI_Metal_Iron", sides=12, wear=0.8)
     for zz in (1.4, 2.6, 3.6):
@@ -1649,6 +1650,11 @@ def build_gates():
         n = (X if ax == "x" else Y) * s
         t = Y if ax == "x" else X
         face = ln + s * (WALL * 0.5)
+        if gm["level"] == "main" and ax == "x":                                   # on the castles' fronts (build_hub_ends)
+            if abs(ln - HUB["basin"]["x1"]) < 1.0:
+                face = HE.FRONT_X + 0.12
+            elif abs(ln - HUB["fcX"]) < 1.0:
+                face = HUB["fcX"] + 0.6 - 0.12
         org = Vector((face, along, z0)) if ax == "x" else Vector((along, face, z0))
         F = (org, t, UP, n)
         if g == "G1":                                                            # a barred door: planks, a frame, two bars

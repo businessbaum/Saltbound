@@ -58,6 +58,9 @@ Every number from `Docs/Design/HubShip/HubShip_Data.json` (generated from `hub_d
 | Her berth | (81, 415) m, bow to 92 degrees | off the lagoon's channel, held by two bow cables and two stern moorings |
 | Calm zones | 20 % within 120 m of her (full by 300 m), 10 % → 7 % in the basin | Storm: +1.06 m under the hull, +0.34 m in the basin |
 | Lanterns below decks | 60 cd, 2100 K, lit by day | exposure down to EV 3 inside |
+| Sea gate (D62) | portcullis 20 x 9 m, raised 26.5 m in 24 s (eased), capstans 8 turns | starts open; `sb.Hub.SeaGate`; points at 21.5 m when up |
+| Rig (D62) | masts 54 / 76 / 64 m over the main deck; round tops 14 m (main); shrouds 5 / 8 / 6 a side | ratlines every 0.5 m; lateen yard 34 m on the mizzen |
+| Art (D62) | about 26 000 hand-made boards and timbers in 26 meshes (Nanite) | built in about 2 min (`build_hub_*.py`); the blockout collides |
 
 ## Player
 
