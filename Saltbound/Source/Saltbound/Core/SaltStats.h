@@ -14,8 +14,13 @@ struct FSaltBoatStats
 	FText Name;
 
 	// Speed ------------------------------------------------------------------------------------------------------
-	/** Forward force of the full sail in a 7 m/s breeze (N). Top speed is where it meets the resistance below. */
+	/** Forward force of the full sail in a 7 m/s breeze with the wind astern (N). Top speed is where it meets the resistance
+	 *  below. */
 	float SailThrust = 7800.f;
+	/** D65 ("always pulls"): the share of SailThrust the sail gives with the apparent wind abeam and head to wind (it never
+	 *  stops pulling); a smooth curve between, the whole of it with the wind astern. */
+	float SailDriveAbeam = 0.6f;
+	float SailDriveHeadToWind = 0.28f;
 	/** Hull speed (m/s) and the resistance there (N): past it the resistance climbs steeply (a wall near hull speed). */
 	float HullSpeed = 3.75f;
 	float HullResistance = 1700.f;

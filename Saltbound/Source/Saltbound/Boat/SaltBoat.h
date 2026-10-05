@@ -47,9 +47,9 @@ enum class ESaltBoatHold : uint8
  * - Hull: forward resistance rising steeply past hull speed; the keel as a low-aspect wing (lateral resistance,
  *   leeway); crossflow drag along the hull; yaw damping.
  * - Rudder: a foil at the stern (no steerage without speed, plus a little "sculling" at rest).
- * - Sail (simple, D41): set, it drives the boat forward (the wind only shades the force a little and heels the boat
- *   to leeward); taken in, the boat slows down. The boom trims itself to the wind. Later engines will drive the
- *   same way.
+ * - Sail (D65, "always pulls"): a square sail on a yard fixed square to the boat. Set, it drives the boat along its
+ *   heading whatever the wind's angle: strongest with the wind astern, weaker with it abeam, never stuck head to wind;
+ *   it heels the boat to leeward; taken in, the boat slows down. Later engines will drive the same way.
  * - Lines: mooring (bow and stern) or anchor (bow), horizontal springs with slack.
  * - Collision: capsules along the hull (two rings and the keel) against static geometry (pier, rocks, seabed):
  *   contact planes found once per frame push back as stiff damped springs with friction inside the substeps, and
@@ -78,7 +78,7 @@ public:
 	virtual FVector GetKinematicPivot() const override { return GetActorLocation(); }
 
 	// Controls -----------------------------------------------------------------
-	/** Set the sail (let it down: the boat sails) or take it in (raised to the gaff: the boat slows down). */
+	/** Set the sail (let it fall: the boat sails) or take it in (rolled up under the yard: the boat slows down). */
 	void SetSailSet(bool bSet);
 	void ToggleSail() { SetSailSet(!bSailSet); }
 	/** D59: how much sail to set, 0 (taken in) .. 1 (full): W / S at the helm move it; the sail follows at its set rate. */
@@ -126,7 +126,8 @@ public:
 	float GetYawRateDeg() const { return FMath::RadiansToDegrees((float)W.Z); }
 	float GetMass() const { return Mass; }
 	float GetRudderAngleDeg() const { return RudderAngle; }
-	float GetBoomAngleDeg() const { return BoomAngle; }
+	/** D65: the share of the full drive the set sail gives at the apparent wind's angle now (1 astern .. the floor ahead). */
+	float GetSailDriveFactor() const { return SailDriveFactor; }
 	/** Deepest penetration of the collision capsules into static geometry this frame (cm). */
 	float GetContactDepth() const { return MaxContactDepth * 100.f; }
 	int32 GetContactCount() const { return Contacts.Num(); }
@@ -169,16 +170,21 @@ public:
 	 *  it fills 78 % of the view's height at this horizontal field of view (degrees) and aspect (width / height). */
 	FTransform GetChartViewLocal(float FieldOfView, float Aspect) const;
 	UPointLightComponent* GetLanternLight() const { return LanternLight; }
-	UCableComponent* GetHalyard(bool bPeak) const { return bPeak ? PeakHalyard : ThroatHalyard; }
-	USceneComponent* GetGaffHalyardPoint(bool bPeak) const { return bPeak ? GaffSpanBlock : GaffThroatEye; }
+	/** D65: the sheets (from the pin rails to the clews) and the brails (from their blocks under the yard to the foot), and
+	 *  the points on the sail their ends follow. */
+	UCableComponent* GetSheet(bool bStarboard) const { return bStarboard ? SheetStarboard : SheetPort; }
+	USceneComponent* GetClew(bool bStarboard) const { return bStarboard ? ClewStarboard : ClewPort; }
+	UCableComponent* GetBrail(bool bStarboard) const { return bStarboard ? BrailStarboard : BrailPort; }
+	USceneComponent* GetBrailFoot(bool bStarboard) const { return bStarboard ? BrailFootStarboard : BrailFootPort; }
 
 	// Components ---------------------------------------------------------------
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Hull;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> BoomPivot;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Boom;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Sail;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> GaffPivot;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Gaff;
+	/** D65: the yard, slung across the mast's front and fixed square to the boat; the square sail hangs from it (both are
+	 *  built in the yard's frame, SaltHullShape.h YardX / YardHeight). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> YardPivot;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Yard;
+	/** D65: a new name (component and property): the levels' saved boats still point their old "Sail" at the gaff sail. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> SquareSail;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> RudderPivot;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Rudder;
 	/** The steering oar (D45): its pivot sits in the boss, raked aft; the oar turns about its shaft. */
@@ -213,14 +219,17 @@ public:
 	/** Where the anchor rope leaves the hull (a hawse hole in the starboard bow, D52). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> Hawse;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> AnchorLine;
-	/** The halyards (D53): from their blocks on the mast down to the gaff's throat eye and its span block; the gaff hangs
-	 *  from them (their falls to the pin rails are part of the hull). */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> ThroatBlockPoint;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> PeakBlockPoint;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> GaffThroatEye;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> GaffSpanBlock;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> ThroatHalyard;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> PeakHalyard;
+	/** D65: the sheets, from the pin rails' forward pins to the sail's clews, and the brails, from their blocks under the
+	 *  yard down to the foot (hauled, they roll the sail up): their sail ends follow the cloth (UpdateRopes). The yard's
+	 *  halyard, lifts and braces and the brails' falls never move: they are part of the hull. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> ClewPort;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> ClewStarboard;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> SheetPort;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> SheetStarboard;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> BrailFootPort;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> BrailFootStarboard;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> BrailPort;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UCableComponent> BrailStarboard;
 	/** The bell (D53): it hangs in the ring under the bell arm and swings with the boat; its clapper swings inside it. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltSwingComponent> BellSwing;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Bell;
@@ -246,11 +255,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Boat|Mass", meta = (Units = "m")) float CentreOfMassHeight = 0.15f;
 	/** Radii of gyration for roll, pitch, yaw. */
 	UPROPERTY(EditAnywhere, Category = "Boat|Mass", meta = (Units = "m")) FVector Gyration = FVector(1.35, 2.6, 2.7);
-	/** Added mass of the water moving with the hull: heave, roll, pitch (fractions of the mass / inertia). */
-	UPROPERTY(EditAnywhere, Category = "Boat|Mass") FVector AddedMass = FVector(0.6, 0.25, 0.6);
+	/** Added mass of the water moving with the hull: heave, roll, pitch (fractions of the mass / inertia). D65: more (was 0.6,
+	 *  0.25, 0.6), with the damping below: calmer in the waves (sb.Dev.BoatMotion). */
+	UPROPERTY(EditAnywhere, Category = "Boat|Mass") FVector AddedMass = FVector(1.0, 0.5, 1.0);
 
-	/** Vertical damping of the hull columns (N s/m per m2 of column area). */
-	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float VerticalDamping = 1400.f;
+	/** Vertical damping of the hull columns (N s/m per m2 of column area; D65: was 1400). */
+	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float VerticalDamping = 2400.f;
 	/** The last step's vertical forces (N), for the sudden-heave diagnosis (D56). */
 	double KickBuoyancy = 0.0, KickDamping = 0.0, KickTotal = 0.0;
 	/** Forward resistance at hull speed (N), and hull speed (m/s; about 7.3 kn for 9 m on the waterline). */
@@ -264,8 +274,22 @@ public:
 	/** Yaw damping: constant part (N m s) and part per m/s of speed. */
 	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float YawDamping = 9000.f;
 	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float YawDampingPerSpeed = 16000.f;
-	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float RollDamping = 25000.f;
-	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float PitchDamping = 20000.f;
+	/** Roll and pitch damping (N m s; D65: was 25 000 and 20 000; more roll damping and she barely rolls back after a kick). */
+	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float RollDamping = 50000.f;
+	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float PitchDamping = 120000.f;
+	/** D65 (owner: "make the starter ship calmer in the waves"): heave damping against the boat's own vertical speed (N s/m),
+	 *  beside the hull columns' damping against the water's (VerticalDamping). */
+	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float HeaveDamping = 30000.f;
+	/** D65: how far the water the hull columns feel is blended towards a plane (0 = the sea as it is, 1 = only the plane): its
+	 *  height is the sea's under the hull, its slope the sea's over WaveFootprint times the hull's length and beam (nine samples).
+	 *  The long swell's slope is the same over a wider area, a short wind sea's averages out: she rides the swell and rocks
+	 *  less on the short waves. */
+	UPROPERTY(EditAnywhere, Category = "Boat|Hydro", meta = (ClampMin = "0", ClampMax = "1")) float WaveFilter = 1.f;
+	UPROPERTY(EditAnywhere, Category = "Boat|Hydro", meta = (ClampMin = "1", ClampMax = "4")) float WaveFootprint = 1.6f;
+	/** D65: how slowly the water the hull feels follows the sea (time constants, s): its height (0 = at once) and its vertical
+	 *  speed, which the columns' damping works against (D56: 0.06 s). */
+	UPROPERTY(EditAnywhere, Category = "Boat|Hydro", meta = (Units = "s")) float WaterHeightSmoothing = 0.f;
+	UPROPERTY(EditAnywhere, Category = "Boat|Hydro", meta = (Units = "s")) float WaterVelocitySmoothing = 0.06f;
 
 	/** Rudder blade area (m2). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Rudder") float RudderArea = 0.65f;
@@ -280,17 +304,20 @@ public:
 	/** How the boat is steered: the steering oar (first boat) or the wheel and sternpost rudder. */
 	UPROPERTY(EditAnywhere, Category = "Boat|Rudder") ESaltSteering Steering = ESaltSteering::SteeringOar;
 
-	/** Forward force of the set sail in a 7 m/s breeze (N): about 7.5 kn at full sail, reached in about 20 s. */
+	/** Forward force of the full sail in a 7 m/s breeze with the wind astern (N; D65: the most it gives). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Sail") float SailThrust = 7800.f;
+	/** D65 (owner: "always pulls"): the share of SailThrust the square sail gives with the apparent wind abeam, and head to wind
+	 *  (the floor: she is never stuck). In between it follows a smooth curve, the whole thrust with the wind astern. */
+	UPROPERTY(EditAnywhere, Category = "Boat|Sail", meta = (ClampMin = "0", ClampMax = "1")) float SailDriveAbeam = 0.6f;
+	UPROPERTY(EditAnywhere, Category = "Boat|Sail", meta = (ClampMin = "0", ClampMax = "1")) float SailDriveHeadToWind = 0.28f;
 	/** Extra forward drag per m/s (N s/m), so the boat slows down within about 15 s once the sail is taken in
 	 *  (simple, arcade-friendly handling; engines will drive the same way). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float CoastDrag = 1500.f;
 	/** Sideways share of the sail force (heels the boat to leeward). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Sail") float SailHeel = 0.22f;
-	/** How strongly the wind shades the drive: 0 = always the same force, 1 = force with wind speed and angle. */
+	/** How strongly the wind's speed shades the drive: 0 = the same force in any breeze, 1 = force with the wind's speed. */
 	UPROPERTY(EditAnywhere, Category = "Boat|Sail") float WindInfluence = 0.35f;
-	UPROPERTY(EditAnywhere, Category = "Boat|Sail", meta = (Units = "deg/s")) float BoomSwingRate = 70.f;
-	/** Time to let the sail down or raise it. */
+	/** Time to let the sail fall or roll it up. */
 	UPROPERTY(EditAnywhere, Category = "Boat|Sail", meta = (Units = "s")) float SetTime = 2.5f;
 	/** Hull and rig drag in the wind (sail lowered): side and frontal area (m2). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Sail") FVector2D WindageArea = FVector2D(2.5, 7.0);
@@ -327,8 +354,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Boat") FName BoatClass = TEXT("DoubleEnder");
 	/** Seconds for W / S at the helm to let the sail out from nothing to full (D59). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Sail", meta = (Units = "s")) float TrimTime = 3.f;
-	/** How deep the sail bellies beyond its cut shape in a fresh breeze (cm, D59). */
+	/** How deep the sail bellies beyond its cut shape in a fresh breeze (cm, D59), and its cut shape's own belly when it fills
+	 *  (cm, D65: the square sail hangs flat when slack). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Sail", meta = (Units = "cm")) float SailBelly = 70.f;
+	UPROPERTY(EditAnywhere, Category = "Boat|Sail", meta = (Units = "cm")) float SailCutBelly = 30.f;
 
 	/** The sea is cut out inside this boat's hull (MPC_Ocean Boat*, D42): no waves inside the boat or on its deck. */
 	UPROPERTY(EditAnywhere, Category = "Boat") bool bMasksOcean = true;
@@ -408,7 +437,12 @@ private:
 	void UpdateTrail(float DeltaSeconds);
 	void ClearTrail();
 	static float TrailStrengthAt(float SpeedMs);
-	void UpdateBoomCapsule();
+	/** D65: how far the sail hangs down from its head now (m): what is set, at least SailCutMin; below it the cloth is rolled. */
+	float SailCut() const;
+	/** D65: where M_SB_SquareSail puts a clew (the roll's end once it is rolled) and the brail's end on the foot (the cloth's
+	 *  aft face at the cut), in the yard's frame (cm). */
+	FVector SailClewLocal(bool bStarboard) const;
+	FVector SailBrailFootLocal(bool bStarboard) const;
 	void UpdateRopes(float DeltaSeconds);
 	void UpdateAnchor(float DeltaSeconds);
 	void SetupSailMaterials();
@@ -425,9 +459,8 @@ private:
 	float DesignVolume = 1.f;
 	FVector KeelPoint = FVector::ZeroVector;
 	float KeelArea = 0.f;
-	/** Sail centre of effort: distance aft along the boom and height above it (set). */
-	float SailCEAft = 2.f;
-	float SailCEUp = 2.5f;
+	/** D65: the square sail's centre of effort above the deck at the mast (its centroid, set). */
+	float SailCEHeight = 5.4f;
 
 	// Rigid body state (world, SI): centre of mass, orientation, velocities.
 	FVector X = FVector::ZeroVector;
@@ -442,9 +475,9 @@ private:
 	bool bSailSet = false;
 	float SailTarget = 0.f;                  // D59: how much sail is wanted (0..1)
 	float Hoist = 0.f;                       // 0 taken in .. 1 set
-	float BoomAngle = 0.f;                   // deg, + = boom to starboard
-	float SailSide = 1.f;                    // leeward side of the belly (visual)
-	float SailSideVisual = 1.f;
+	float SailLean = 0.f;                    // D65: the cloth leans to leeward (-1 port .. 1 starboard, visual)
+	float SailBellyShown = 0.f;              // D65: the belly the material shows now (cm)
+	float SailDriveFactor = 0.f;             // D65: share of the full drive at the apparent wind's angle (last step)
 	float PennantYaw = 180.f;                  // deg in the hull's frame (streaming aft)
 	float PennantWind = 0.f;                   // 0 = hanging .. 1 = streaming out
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> PennantMaterial;
@@ -470,7 +503,6 @@ private:
 	bool bHoldSet = false;                     // the boat has come to rest: hold this place and heading
 	float WindlassAngle = 0.f;
 	float AnchorDepth = 500.f;                 // cm of rode paid out at the bottom
-	int32 BoomCapsule = INDEX_NONE;
 	// Trail (D45): the stern's path, one sample a second, newest first (world cm), and the speed there (0..1).
 	TArray<FVector2D> TrailPoints;
 	TArray<float> TrailStrength;

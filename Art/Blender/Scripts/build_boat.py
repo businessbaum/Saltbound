@@ -9,21 +9,21 @@ chunky rope rigging with deadeyes, a canvas sail with sewn panels, boltropes, re
 The hull follows Saltbound/Source/Saltbound/Boat/SaltHullShape.h exactly (same formulas and constants), because
 ASaltBoat floats on columns computed from that shape: keep both in sync. The planking lies on that surface.
 
-  SM_Boat_Hull    hull, deck, bulwarks with boarding gaps midship, keel, stem, mast, standing rigging, the steering
-                  oar's boss (or the wheel pedestal)
-                  pedestal, bitts, hatch; UCX collision (walkable deck, bulwarks, keel, mast foot). Pivot: midship,
+  SM_Boat_Hull    hull, deck, bulwarks with boarding gaps midship, keel, stem, mast, standing rigging, the yard's
+                  halyard, lifts and braces, the brails' falls, the steering oar's boss (or the wheel pedestal),
+                  bitts, hatch; UCX collision (walkable deck, bulwarks, keel, mast foot). Pivot: midship,
                   design waterline. Nanite.
-  SM_Boat_Boom    pivot at the gooseneck, spar along -X
-  SM_Boat_Gaff    pivot at the jaws, spar along -X (the actor raises it to the gaff angle)
-  SM_Boat_Sail    gaff mainsail in the boom's frame (X/Z plane), bellied towards +Y; the actor scales Y to leeward
-                  and Z to lower it (the mast hoops are part of it and stack up on the boom)
+  SM_Boat_Yard    D65: the yard slung across the mast's front, fixed square to the boat; pivot on its axis in the
+                  middle, the spar along Y; its parrel round the mast, the slings, the yardarms' and the brails' bands
+  SM_Boat_Sail    D65: the square sail in the yard's frame, hanging flat (Y/Z plane) from under the yard, laced to it;
+                  M_SB_SquareSail bellies it forward and rolls it up from the foot to under the yard (ASaltBoat)
   SM_Boat_Rudder  pivot at the heel of the stock, stock along +Z, blade aft (-X)
   SM_Boat_Wheel   pivot at the hub, axle along X (wheel steering, kept for later boats)
   SM_Boat_SteeringOar  pivot in the boss, +Z up along the raked shaft, blade aft (-X), handle inboard (-Y)
 
 Coordinates below are Unreal body coordinates in metres (x forward, y starboard, z up); U() converts to Blender,
 where starboard is -Y.
-Run: Tools/Build-BlenderAsset.ps1 build_boat [hull] [spars] [sail] [rudder] [wheel]
+Run: Tools/Build-BlenderAsset.ps1 build_boat [hull] [yard] [sail] [rudder] [wheel] ...
 """
 import math
 import os
@@ -43,7 +43,17 @@ HALF_LENGTH, HALF_BEAM, FREEBOARD, SHEER_RISE, DRAFT = 5.0, 1.7, 0.75, 0.3, 0.65
 BILGE_EXP, ENDS_START_X = 0.8, 3.0
 KEEL_AFT_X, KEEL_AFT_Z, KEEL_FORE_X, KEEL_HALF_T = -4.3, -1.45, 3.6, 0.14
 BULWARK_H, GATE_HALF = 0.45, 0.5
-MAST_X, MAST_H, BOOM_H, BOOM_L, THROAT_H, GAFF_L, GAFF_ANGLE = 1.2, 10.5, 2.05, 5.0, 6.8, 4.6, 35.0
+MAST_X, MAST_H = 1.2, 10.5
+HOUNDS_H = 7.55                          # the shrouds' eyes over the hounds, above the deck at the mast
+# D65 (owner: "a normal sail, so both sides with the same amount of sail, not rotatable"): a square sail on a yard slung across
+# the mast's front, fixed square to the boat (SaltHullShape.h Yard* / Sail*). The yard's axis lies YARD_X along the boat and
+# YARD_H above the deck at the mast: SM_Boat_Yard's and SM_Boat_Sail's origin. The sail's head is laced under the yard
+# (SAIL_HEAD_Z below its axis); it hangs SAIL_DROP down to its foot, which spreads a little wider than its head; the foot
+# hangs 2.2 m over the deck, so one walks under it.
+YARD_X, YARD_H, YARD_HALF, YARD_R, YARD_END_R = 1.46, 9.0, 2.6, 0.1, 0.062
+SAIL_HEAD_Z, SAIL_DROP, SAIL_HALF_HEAD, SAIL_HALF_FOOT = -0.15, 6.65, 2.3, 2.6
+YARDARM_Y, BRAIL_Y = 2.42, 1.2          # the yardarms' bands (lifts and braces) and the brails' blocks under the yard
+BRACE_X = -1.2                           # the braces are made fast on cleats inside the bulwark here
 WHEEL_X, WHEEL_H = -3.2, 0.68
 # Anchor rope (D52): the hawse pipe in the deck (x, y) and the hawse hole in the starboard bow planking (x, z).
 HAWSE_DECK, HAWSE_HULL = (4.1, 0.55), (4.2, 0.66)
@@ -132,8 +142,8 @@ def mats():
     for n, c in {"MI_Paint_Hull": (0.45, 0.12, 0.08), "MI_Paint_Cream": (0.9, 0.85, 0.7), "MI_Paint_Boottop": (0.1, 0.1, 0.1),
                  "MI_Wood_Teak": (0.55, 0.35, 0.18), "MI_Wood_Varnish": (0.4, 0.2, 0.08), "MI_Metal_Iron": (0.1, 0.1, 0.1),
                  "MI_Caulk_Dark": (0.05, 0.05, 0.05), "MI_Canvas": (0.85, 0.8, 0.7), "MI_Rope_Hemp": (0.6, 0.5, 0.3),
-                 "MI_Wood_DockWeathered": (0.5, 0.45, 0.4), "MI_SailCloth": (0.85, 0.8, 0.7), "MI_SailRope": (0.6, 0.5, 0.3),
-                 "MI_SailHoop": (0.4, 0.2, 0.08), "MI_Pennant": (0.5, 0.1, 0.07),
+                 "MI_Wood_DockWeathered": (0.5, 0.45, 0.4), "MI_SquareSailCloth": (0.85, 0.8, 0.7),
+                 "MI_SquareSailRope": (0.6, 0.5, 0.3), "MI_Pennant": (0.5, 0.1, 0.07),
                  # D52: every board a bit different (two more teaks, faded and dark hull paint, aged cream).
                  "MI_Wood_TeakLight": (0.62, 0.42, 0.22), "MI_Wood_TeakDark": (0.42, 0.26, 0.13),
                  "MI_Paint_HullFaded": (0.55, 0.2, 0.14), "MI_Paint_HullDark": (0.35, 0.08, 0.06),
@@ -598,14 +608,14 @@ def rig_and_fittings():
     parts = mast_and_fittings()
     deck_m = sheer_z(MAST_X)
     top = deck_m + MAST_H
-    # Shrouds on deadeyes over chain wales (forward of the mast: the boom swings aft of them); their eyes lie over the
-    # hounds cheeks, so each ends at the mast's side at the hounds.
+    # Shrouds on deadeyes over chain wales, aft of the mast (D65: the square sail hangs forward of it, clear of them); their
+    # eyes lie over the hounds cheeks, so each ends at the mast's side at the hounds.
     for side in (-1, 1):
-        x_w = MAST_X + 0.35
+        x_w = MAST_X - 0.325
         _, out = sheer_dirs(x_w, side)
         wale_p = Vector((x_w, side * half_beam(x_w), sheer_z(x_w) - 0.03)) + out * 0.11
-        parts.append(block("chainwale", (1.1, 0.2, 0.07), tuple(wale_p), "MI_Wood_Varnish", 0.02))
-        for dx in (0.12, 0.55):
+        parts.append(block("chainwale", (0.75, 0.2, 0.07), tuple(wale_p), "MI_Wood_Varnish", 0.02))
+        for dx in (-0.15, -0.5):
             x = MAST_X + dx
             along, out = sheer_dirs(x, side)
             upv = Vector((0.0, 0.0, 1.0))
@@ -639,6 +649,7 @@ def rig_and_fittings():
             parts.append(ring("strap", r_de + 0.012, 0.011, tuple(low), tuple(out), "MI_Metal_Iron"))
             parts.append(block("chainplate", (0.06, 0.03, 0.8), (edge.x - out.x * 0.01, edge.y - out.y * 0.01, sheer_z(x) + 0.07), "MI_Metal_Iron", 0.008))
     parts += rope("forestay", sagging(MAST_INFO["forestay"], (HALF_LENGTH + 0.02, 0, sheer_z(HALF_LENGTH) + 0.55), 0.12, 10), 0.022)
+    parts += yard_running_rigging()
     if STEERING == "wheel":
         # Wheel pedestal: a chunky square post with a head block.
         hub_z = sheer_z(WHEEL_X) + WHEEL_H
@@ -664,18 +675,16 @@ def rig_and_fittings():
 
 # --- the mast and its fittings (D53) -------------------------------------------------------------------------
 # The mast is a worked spar, not a turned pole (owner, D53): its head is bent a little aft and to port by years of the
-# peak halyard's pull (SaltHullShape.h MastHeadAft / MastHeadPort move the pennant's swivel with it) and the hoist is
-# bowed a little. It stays true where the boom's and the gaff's jaws ride and fair where the sail's hoops slide
-# (BOOM_H .. THROAT_H): nothing on the mast stands proud there.
+# stay's and the rig's pull (SaltHullShape.h MastHeadAft / MastHeadPort move the pennant's swivel with it) and its middle
+# is bowed a little.
 MAST_HEAD_OFFSET = (-0.07, -0.02)       # Unreal metres at the truck: aft, to port
-HOOP_R = 0.19                           # the sail's mast hoops (loose round the mast)
 MAST_INFO = {}                          # filled by mast_and_fittings(): points other parts and ASaltBoat attach to
 
 
 def mast_offset(h):
     """Unreal (dx, dy) of the mast's axis h metres above the deck."""
     head = smooth01((h - 6.95) / (MAST_H - 6.95))
-    bow = math.sin(math.pi * clamp((h - BOOM_H - 0.15) / (THROAT_H - 0.15 - BOOM_H - 0.15)))
+    bow = math.sin(math.pi * clamp((h - 2.2) / 4.45))
     return MAST_HEAD_OFFSET[0] * head ** 1.4, MAST_HEAD_OFFSET[1] * head + 0.012 * bow
 
 
@@ -795,10 +804,11 @@ def mast_and_fittings():
     - an old repair just above the partners (where masts spring): fish splints fore and aft, rope seizings, two bands;
     - the bell on a hewn arm with a knee and an eye bolt (SM_Boat_Bell hangs there and swings), the lantern's forged
       hook on the aft face (SM_Boat_Lantern), each on its own band;
-    - a wooden saddle for the boom's jaws; the hoist above it bare for the sail's hoops;
-    - a band over the gaff's throat, hounds cheeks carrying the shrouds' eyes, eye bolts with the throat and peak
-      halyard blocks (their halyards go down to the gaff, ASaltBoat; their falls to pin rails at the shrouds);
-    - the forestay's eye, a masthead band and a round truck with the pennant's iron spindle."""
+    - hounds cheeks carrying the shrouds' eyes (D65: below the yard, which hangs on the mast's front);
+    - the forestay's eye; a masthead band with the yard's lifts' eye bolts; the halyard's sheave through the masthead
+      (the yard hangs from it, SM_Boat_Yard); a round truck with the pennant's iron spindle;
+    - pin rails inside the bulwark by the mast, where the halyard, the brails and the sheets are made fast (E sets and
+      takes in the sail there)."""
     parts = []
     deck_m = sheer_z(MAST_X)
     top = deck_m + MAST_H
@@ -809,7 +819,7 @@ def mast_and_fittings():
         dx, dy = mast_offset(v.co.z - deck_m)
         v.co.x += dx
         v.co.y -= dy                                       # Unreal -> Blender
-    hounds_z = deck_m + THROAT_H + 0.75
+    hounds_z = deck_m + HOUNDS_H
     mast.data.materials.append(M["MI_Wood_Tarred"])
     mast.data.materials.append(M["MI_Paint_CreamAged"])
     for poly in mast.data.polygons:
@@ -893,19 +903,6 @@ def mast_and_fittings():
     parts.append(ring("lantern_hook_curl", 0.018, 0.007, (x_back - 0.15 + 0.018, ayl, zl - 0.05), (0, 1, 0), "MI_Metal_Iron", 12))
     MAST_INFO["lantern_pivot"] = (x_back - 0.15 + 0.018, ayl, zl - 0.056 - deck_m)   # the handle round the hook's wire
 
-    # The boom's saddle: a wooden collar the jaws rest on.
-    zs = deck_m + BOOM_H - 0.12
-    axs, ays = axis_at(zs)
-    rs = girth_at(mast, zs, 0.04)
-    parts.append(lathe("saddle", [(rs - 0.01, -0.045), (rs + 0.05, -0.035), (rs + 0.065, 0.0), (rs + 0.06, 0.03), (rs - 0.01, 0.035)],
-                       (axs, ays, zs), "MI_Wood_TeakDark", 28))
-    for k in range(4):
-        a = k * math.pi / 2 + 0.4
-        parts.append(nail((axs + (rs + 0.05) * math.cos(a), ays + (rs + 0.05) * math.sin(a), zs + 0.03), (0, 0, 1)))
-
-    # A band over the gaff's throat (above the jaws and the hoops' highest place).
-    parts += iron_band("band_throat", mast, deck_m + THROAT_H + 0.22, h=0.06)
-
     # Hounds: cheeks on both sides, the shrouds' eyes over them; a band under them.
     axh, ayh = axis_at(hounds_z - 0.24)
     rh = girth_at(mast, hounds_z - 0.24, 0.24)
@@ -920,16 +917,10 @@ def mast_and_fittings():
         parts.append(sb.add_torus("shroud_eyes", girth_at(mast, ze, 0.03) + 0.03, 0.021, U((axe, aye, ze)), (0, 0, 0), 28, 8, M["MI_Rope_Hemp"]))
     MAST_INFO["hounds"] = lambda side: (axh, ayh + side * (rh + 0.07), hounds_z + 0.06)
 
-    # Throat halyard: an eye bolt aft and to port by the hounds, clear of the cheeks; its block hangs there.
-    zt = hounds_z - 0.05
-    p_, eye = eye_bolt("throat_eye", mast, zt, math.radians(-140))
-    parts += p_
-    p_, throat_rope = tackle_block("throat_block", tuple(eye), (0.45, -0.89))
-    parts += p_
-    MAST_INFO["throat_block"] = tuple(throat_rope - Vector((MAST_X, 0.0, deck_m)))
-
-    # Masthead: the forestay's eye; a band with the peak halyard's eye bolt above it, aft and to starboard.
-    zfe = top - 0.75
+    # Masthead (D65): the forestay's eye just under the truck; the halyard's sheave through the mast below it (the yard
+    # hangs from the halyard, which comes out of the mast's back and goes down to the starboard pin rail); a band with the
+    # lifts' eye bolts, one either side, below the sheave.
+    zfe = top - 0.12
     axe, aye = axis_at(zfe)
     rfe = girth_at(mast, zfe, 0.03)
     parts.append(sb.add_torus("forestay_eye", rfe + 0.026, 0.021, U((axe, aye, zfe)), (0, 0, 0), 28, 8, M["MI_Rope_Hemp"]))
@@ -938,13 +929,23 @@ def mast_and_fittings():
     for k in range(3):                                  # the eye's seizing, just below the mast
         parts.append(ring("forestay_seizing", 0.032, 0.009, tuple(Vector(MAST_INFO["forestay"]) + stay * (0.08 + k * 0.035)), tuple(stay),
                           "MI_Rope_Hemp", 12))
-    parts += iron_band("band_head", mast, top - 0.48, h=0.06)
-    zp = top - 0.38
-    p_, eye = eye_bolt("peak_eye", mast, zp, math.radians(140))
-    parts += p_
-    p_, peak_rope = tackle_block("peak_block", tuple(eye), (0.45, 0.89))
-    parts += p_
-    MAST_INFO["peak_block"] = tuple(peak_rope - Vector((MAST_X, 0.0, deck_m)))
+    zh = top - 0.36
+    axh_, ayh_ = axis_at(zh)
+    rh_ = girth_at(mast, zh, 0.12)
+    for s_ in (-1, 1):                                  # the sheave's slot, cut fore and aft through the masthead
+        slot = block("sheave_slot", (0.03, 0.05, 0.22), (axh_ + s_ * (rh_ - 0.012), ayh_, zh), "MI_Caulk_Dark", 0.006)
+        parts.append(slot)
+        parts.append(disc("sheave_pin", 0.022, 0.012, (axh_, ayh_ + s_ * (rh_ + 0.002), zh), (0, 1, 0), "MI_Metal_Iron", 10, 0.003))
+    parts.append(disc("sheave", 0.092, 0.036, (axh_, ayh_, zh), (0, 1, 0), "MI_Wood_TeakDark", 24, 0.006))
+    # Where the halyard runs over the sheave: up into the slot in front, over the top, out at the back.
+    over = [(axh_ + 0.078 * math.cos(a), ayh_, zh + 0.078 * math.sin(a)) for a in [math.radians(d) for d in range(0, 181, 30)]]
+    MAST_INFO["halyard_over"] = over
+    zb_ = top - 0.6
+    parts += iron_band("band_head", mast, zb_, h=0.07)
+    for s_ in (-1, 1):
+        p_, eye = eye_bolt("lift_eye", mast, zb_, s_ * math.radians(70))
+        parts += p_
+        MAST_INFO["lift_eye", s_] = tuple(eye)
 
     # The truck, with the pennant's iron spindle (SM_Boat_Pennant swivels on it, D44).
     axt, ayt = axis_at(top)
@@ -953,32 +954,29 @@ def mast_and_fittings():
     parts.append(rod("pennant_spindle", (axt, ayt, top + 0.05), (axt, ayt, top + PENNANT_H + 0.06), 0.012, "MI_Metal_Iron", 8))
     parts.append(ring("spindle_knob", 0.014, 0.013, (axt, ayt, top + PENNANT_H + 0.07), (0, 0, 1), "MI_Metal_Iron", 10))
 
-    # Pin rails inside the bulwark at the shrouds; each halyard's fall comes down to its pin and hangs there coiled.
-    for side, fall in ((-1, throat_rope), (1, peak_rope)):
+    # Pin rails inside the bulwark by the mast (D65): three belaying pins each. Aft pins: the brails' falls; middle pin: the
+    # halyard's fall (starboard) or a spare coil (port); forward pins: the sheets (ASaltBoat's ropes from the clews). Each line
+    # is made fast with a few turns round its pin, the rest coiled and hung over it inboard.
+    for side in (-1, 1):
         xr = MAST_X + 0.35
         yr = side * (half_beam(xr) - BULWARK_T - 0.055)
         zr = sheer_z(xr) + 0.36
-        parts.append(tb.rough_plank("shroud_pinrail", 0.62, 0.09, 0.06, U((xr, yr, zr)), (0, 0, 0), M["MI_Wood_Varnish"], nseed(),
+        parts.append(tb.rough_plank("pinrail", 0.62, 0.09, 0.06, U((xr, yr, zr)), (0, 0, 0), M["MI_Wood_Varnish"], nseed(),
                                     wear=0.5, grooves=(1, 1), split_chance=0.0))
         for xb in (xr - 0.22, xr + 0.22):                # knees under it, against the bulwark
             parts.append(block("pinrail_knee", (0.05, 0.05, 0.16), (xb, yr + side * 0.02, zr - 0.11), "MI_Wood_Varnish", 0.01))
-        for xp in (xr - 0.15, xr + 0.15):
+        for k, xp in enumerate((xr - 0.17, xr, xr + 0.17)):
             parts.append(rod("belaying_pin", (xp, yr, zr - 0.09), (xp, yr, zr + 0.16), 0.014, "MI_Wood_TeakDark", 8))
             parts.append(lathe("pin_head", [(0.0, 0.0), (0.02, 0.0), (0.024, 0.03), (0.016, 0.05), (0.0, 0.055)], (xp, yr, zr + 0.16),
                                "MI_Wood_TeakDark", 10))
-        pin = (xr - 0.15, yr, zr + 0.12)
-        parts += rope("halyard_fall", [tuple(fall), pin], 0.012)
-        # Made fast: a few turns round the pin, the rest coiled and hung over it, inboard of the rail.
-        for k in range(3):
-            parts.append(ring("halyard_turn", 0.024, 0.009, (pin[0], pin[1], zr + 0.045 + k * 0.022), (0.0, 0.0, 1.0), "MI_Rope_Hemp", 10))
-        for k in range(3):
-            parts.append(ring("halyard_coil", 0.13 - k * 0.012, 0.014, (pin[0] + 0.006 * k, yr - side * 0.065, zr - 0.03 - k * 0.012),
-                              (0.0, 1.0, 0.0), "MI_Rope_Hemp", 24))
-    print("SB_MAST bell", MAST_INFO["bell_pivot"], "lantern", MAST_INFO["lantern_pivot"], "throat block", MAST_INFO["throat_block"],
-          "peak block", MAST_INFO["peak_block"], "head offset", MAST_HEAD_OFFSET)
-    # The hoops must clear the mast where they slide (between the boom's saddle and the gaff's throat).
-    luff = [math.hypot(v.co.x - MAST_X, v.co.y) for v in mast.data.vertices if deck_m + BOOM_H + 0.1 < v.co.z < deck_m + THROAT_H]
-    print("SB_MAST hoist max radius from the straight axis %.3f (hoops inside %.3f)" % (max(luff), HOOP_R - 0.026))
+            MAST_INFO["pin", side, k] = (xp, yr, zr + 0.12)
+            for t in range(3):
+                parts.append(ring("pin_turn", 0.024, 0.009, (xp, yr, zr + 0.045 + t * 0.022), (0.0, 0.0, 1.0), "MI_Rope_Hemp", 10))
+            for t in range(3):
+                parts.append(ring("pin_coil", 0.075 - t * 0.008, 0.012, (xp + 0.005 * t, yr - side * (0.055 + 0.012 * k), zr - 0.04 - t * 0.012),
+                                  (0.0, 1.0, 0.0), "MI_Rope_Hemp", 20))
+    print("SB_MAST bell", MAST_INFO["bell_pivot"], "lantern", MAST_INFO["lantern_pivot"], "head offset", MAST_HEAD_OFFSET)
+    print("SB_RIG sheet pins", MAST_INFO["pin", -1, 2], MAST_INFO["pin", 1, 2])
     return parts
 
 
@@ -1487,158 +1485,179 @@ def build_hull():
     export(obj, cols)
 
 
-# --- moving parts -------------------------------------------------------------------------------------------
-def spar_section(spar, x, half=0.05):
-    """Centre (Unreal y, z) and largest radius of a spar built along X, near x."""
-    pts = [v.co for v in spar.data.vertices if abs(v.co.x - x) < half]
-    cy = sum(-p.y for p in pts) / len(pts)
+# --- the yard and the square sail (D65) ------------------------------------------------------------------------
+# Owner (D65): "make the sail of the starter ship a normal sail, so both sides with the same amount of sail, not rotatable".
+# A square sail as the Nordland boats carry it: a hewn yard slung on the mast's front by its halyard, held to the mast by a
+# parrel and steadied by lifts from the masthead and braces made fast aft; the sail laced under it; brails from blocks under
+# the yard to its foot roll it up; sheets from its clews to the pin rails (ASaltBoat's ropes). SM_Boat_Yard and SM_Boat_Sail
+# are built in the yard's frame (origin on its axis in the middle, Unreal axes), which lies at YARD_POS in the hull's.
+YARD_SEEDS = (5301, 5302)
+YARD_POS = Vector((YARD_X, 0.0, sheer_z(MAST_X) + YARD_H))
+SLING_H, ARM_H, BRAIL_H = 0.14, 0.06, 0.05      # the iron bands' widths: slings, yardarms, brails
+BRAIL_DIR = (-0.75, -0.66)                      # the brails' eyes stand out aft and down (Unreal x, z)
+
+
+def yard_spars():
+    """The yard's two halves: hewn spars from the slings out to the yardarms along Y, tapering both ways. Fixed seeds, so the
+    hull's ropes reach the same yard SM_Boat_Yard is built from."""
+    halves = []
+    for side, seed in ((1, YARD_SEEDS[0]), (-1, YARD_SEEDS[1])):
+        halves.append(tb.spar("yard_half", YARD_HALF, YARD_R, YARD_END_R, M["MI_Wood_Varnish"], seed, sides=28, sweep=0.02,
+                              axis=(0, -side, 0), facets=8, checks=2))   # spar axes are Blender space: +Y = Unreal -Y
+    return halves
+
+
+def yard_section(spars, y, half=0.04):
+    """Centre (as an Unreal point at y) and largest radius of the hewn yard near y (its rings lie 0.1 m apart)."""
+    half = max(half, 0.06)
+    pts = [v.co for s in spars for v in s.data.vertices if abs(-v.co.y - y) < half]
+    cx = sum(p.x for p in pts) / len(pts)
     cz = sum(p.z for p in pts) / len(pts)
-    return cy, cz, max(math.hypot(-p.y - cy, p.z - cz) for p in pts)
+    return Vector((cx, y, cz)), max(math.hypot(p.x - cx, p.z - cz) for p in pts)
 
 
-def spar_band(name, spar, x, eye_dir=None, h=0.05):
-    """An iron band round a spar at x, with an eye standing out towards eye_dir (Unreal (y, z)); returns (parts, eye)."""
-    cy, cz, r = spar_section(spar, x, h / 2 + 0.03)
+def band_eye(spars, y, h, d):
+    """The eye of an iron band of width h round the yard at y, standing out towards d (Unreal (x, z))."""
+    c, r = yard_section(spars, y, h / 2 + 0.03)
+    dv = Vector((d[0], 0.0, d[1])).normalized()
+    return c + dv * (r + 0.006 + 0.035)
+
+
+def yard_band(name, spars, y, h, eye_dirs=()):
+    """An iron band round the yard at y with eyes standing out towards eye_dirs (Unreal (x, z)); returns (parts, eyes)."""
+    c, r = yard_section(spars, y, h / 2 + 0.03)
     r += 0.006
-    parts = [sb.add_cylinder(name, r, h, U((x, cy, cz)), "X", 24, M["MI_Metal_Iron"])]
-    for dx in (-h / 2, h / 2):
-        parts.append(sb.add_torus(name + "_edge", r, 0.006, U((x + dx, cy, cz)), (0, math.pi / 2, 0), 24, 6, M["MI_Metal_Iron"]))
-    eye = None
-    if eye_dir:
-        d = Vector((0.0, eye_dir[0], eye_dir[1])).normalized()
-        c = Vector((x, cy, cz))
-        eye = c + d * (r + 0.035)
-        parts.append(rod(name + "_neck", tuple(c + d * (r - 0.004)), tuple(eye - d * 0.018), 0.009, "MI_Metal_Iron", 8))
-        parts.append(ring(name + "_eye", 0.022, 0.008, tuple(eye), (0.0, -d.z, d.y) if abs(d.y) > 0.5 else (0.0, 1.0, 0.0), "MI_Metal_Iron", 12))
-    return parts, eye
+    parts = [sb.add_cylinder(name, r, h, U(tuple(c)), "Y", 24, M["MI_Metal_Iron"])]
+    for dy in (-h / 2, h / 2):
+        parts.append(ring(name + "_edge", r, 0.006, tuple(c + Vector((0.0, dy, 0.0))), (0, 1, 0), "MI_Metal_Iron", 24))
+    eyes = []
+    for d in eye_dirs:
+        dv = Vector((d[0], 0.0, d[1])).normalized()
+        eye = c + dv * (r + 0.035)
+        parts.append(rod(name + "_neck", tuple(c + dv * (r - 0.004)), tuple(eye - dv * 0.018), 0.009, "MI_Metal_Iron", 8))
+        parts.append(ring(name + "_eye", 0.022, 0.008, tuple(eye), tuple(dv.cross(Vector((0.0, 1.0, 0.0)))), "MI_Metal_Iron", 12))
+        eyes.append(eye)
+    return parts, eyes
 
 
-def build_spar(name, length, radius, end_radius, jaw_gap, kind):
-    """A hewn spar along -X from its pivot on the mast's axis (D53, "think about the meaning of the objects"):
-    - its heel stops at the mast; the jaws are bolted to its sides and their horns reach round the mast, lined with
-      leather where they rub; a parrel line threaded with wooden beads closes them round the mast's front;
-    - an iron band with an eye at the outer end;
-    - the gaff (built in its own frame, tilted GAFF_ANGLE) carries the throat halyard's eye behind the jaws and the
-      peak halyard's span with its block; ASaltBoat runs the halyards from the mast's blocks to them."""
-    ang = math.radians(GAFF_ANGLE) if kind == "gaff" else 0.0
-    ca, sa = math.cos(ang), math.sin(ang)
-    deck_m = sheer_z(MAST_X)
-    h_jaws = THROAT_H if kind == "gaff" else BOOM_H
-    r_m = mast_r(h_jaws) + 0.012                        # the mast at the jaws, with its knots
-    heel = r_m + 0.012 + radius * math.tan(ang)         # the heel just clears the mast (the gaff's is cut on the slant)
+def yard_points(spars):
+    """Where the ropes reach the yard (its frame, Unreal metres): the slings' eye (the halyard), the yardarms' eyes (lifts up,
+    braces aft) and the rope's point under each brail block (tackle_block hangs it 0.225 m under its eye)."""
+    p = {"sling": band_eye(spars, 0.0, SLING_H, (0.0, 1.0))}
+    for side in (-1, 1):
+        p["lift", side] = band_eye(spars, side * YARDARM_Y, ARM_H, (0.0, 1.0))
+        p["brace", side] = band_eye(spars, side * YARDARM_Y, ARM_H, (-1.0, 0.0))
+        p["brail", side] = band_eye(spars, side * BRAIL_Y, BRAIL_H, BRAIL_DIR) - Vector((0.0, 0.0, 0.225))
+    return p
 
-    def to_local(p):                                    # the mast's frame (z up) at the pivot -> the spar's frame
-        return (ca * p[0] - sa * p[2], p[1], sa * p[0] + ca * p[2])
 
-    spar = tb.spar("spar", length - heel, radius, end_radius, M["MI_Wood_Varnish"], nseed(), sides=28, sweep=0.035, facets=8)
-    spar.data.transform(Matrix.Translation((-heel, 0.0, 0.0)))
-    parts = [spar]
-    # Jaws: two cheeks from the spar's sides out round the mast; the horns end a little past the mast's widest point.
-    x_tip = 0.55 * r_m / ca
-    x_aft = -heel - 0.34
-    for s_ in (-1, 1):
-        def cheek(sf, s_=s_):
-            x = x_aft + (x_tip - x_aft) * sf
-            y = (radius * 0.9 + 0.025) + (jaw_gap - radius * 0.9) * smooth01((x - (-heel - 0.14)) / 0.15)
-            dy = (jaw_gap - radius * 0.9) * (smooth01((x + 0.001 - (-heel - 0.14)) / 0.15) - smooth01((x - 0.001 - (-heel - 0.14)) / 0.15)) / 0.002
-            t = Vector((1.0, s_ * dy, 0.0)).normalized()
-            n = Vector((-t.y, t.x, 0.0)) * s_
-            if n.y * s_ < 0.0:
-                n = -n
-            return Vector((x, s_ * y, 0.0)), Vector((0.0, 0.0, 1.0)), n, 1.0
-        parts.append(laid_board("jaw", path_length(cheek), 0.17, 0.05, cheek, "MI_Wood_Varnish", wear=0.5, grooves=(0, 1)))
-        # Leather on the inside of the horn where it rubs the mast.
-        parts.append(tb.rough_plank("jaw_leather", x_tip + heel - 0.02, 0.15, 0.006, U(((x_tip - heel) / 2, s_ * (jaw_gap - 0.002), 0.0)),
-                                    (math.pi / 2, 0, 0), M["MI_Canvas"], nseed(), wear=0.2, grooves=(0, 0), split_chance=0.0))
-        # Two bolts through cheek and spar, heads on the outside.
-        for xb in (-heel - 0.1, -heel - 0.25):
-            for zb in (-0.04, 0.04):
-                parts.append(nail((xb, s_ * (radius * 0.9 + 0.052), zb), (0, s_, 0)))
-    # The parrel: a line through holes in the horns' tips, round the mast's front, threaded with beads (horizontal in
-    # the mast's frame, whatever the spar's angle).
-    z_w = -x_tip * sa
-    R_p = r_m + 0.012
-    th_t = math.radians(68.0)
-    tip_w = [(x_tip * ca, s_ * (jaw_gap + 0.025), z_w) for s_ in (-1, 1)]
-    arc = [(R_p * math.cos(th), R_p * math.sin(th), z_w) for th in [-th_t + 2 * th_t * i / 10 for i in range(11)]]
-    parts += rope("parrel", [to_local(p) for p in [tip_w[0]] + arc + [tip_w[1]]], 0.008)
-    for i in range(7):
-        th = -math.radians(54.0) + math.radians(108.0) * i / 6
-        c = (R_p * math.cos(th), R_p * math.sin(th), z_w)
-        tang = (-math.sin(th), math.cos(th), 0.0)
-        parts.append(lathe("parrel_bead", [(0.0, -0.022), (0.012, -0.022), (0.019, -0.012), (0.021, 0.0), (0.019, 0.012), (0.012, 0.022),
-                                            (0.0, 0.022)], to_local(c), "MI_Wood_TeakDark", 12, axis=to_local(tang)))
-    # The outer end: a band with an eye (the boom's underneath, the gaff's on its end).
-    p_, _ = spar_band("end_band", spar, -length + 0.16, (0.0, -1.0) if kind == "boom" else (0.0, 1.0))
+def build_yard():
+    """SM_Boat_Yard (D65) in its own frame: the hewn yard in two halves meeting under the slings' band, whose eye takes the
+    halyard, with a cleat either side; the parrel round the mast's back, threaded with beads, its ends taken round the yard;
+    the yardarms' bands with the lifts' and the braces' eyes; the brails' bands with their blocks hanging aft."""
+    spars = yard_spars()
+    parts = list(spars)
+    p_, _ = yard_band("sling_band", spars, 0.0, SLING_H, [(0.0, 1.0)])
     parts += p_
-    if kind == "gaff":
-        # The throat halyard's eye bolt through the heel, between the jaws' cheeks, its nut underneath.
-        cy, cz, r_ = spar_section(spar, -heel - 0.09, 0.04)
-        xe_ = -heel - 0.09
-        parts.append(rod("throat_eyebolt", (xe_, cy, cz - r_ - 0.012), (xe_, cy, cz + r_ + 0.02), 0.009, "MI_Metal_Iron", 8))
-        parts.append(disc("throat_nut", 0.018, 0.012, (xe_, cy, cz - r_ - 0.004), (0, 0, 1), "MI_Metal_Iron", 6))
-        parts.append(disc("throat_washer", 0.024, 0.006, (xe_, cy, cz + r_ + 0.001), (0, 0, 1), "MI_Metal_Iron", 10))
-        eye = Vector((xe_, cy, cz + r_ + 0.042))
-        parts.append(ring("throat_eye", 0.022, 0.008, tuple(eye), (0.0, 1.0, 0.0), "MI_Metal_Iron", 12))
-        throat = tuple(eye)
-        # The peak halyard's span: a rope between eyes on two bands, its block hooked into a thimble at the apex and
-        # turned towards the masthead block.
-        xa_, xb_ = -1.6, -4.0
-        p_, ea = spar_band("span_band", spar, xa_, (0.0, 1.0))
+    for s_ in (-1, 1):
+        c, r = yard_section(spars, s_ * 0.13, 0.03)
+        parts.append(block("sling_cleat", (0.07, 0.06, 0.05), tuple(c + Vector((0.0, 0.0, r + 0.014))), "MI_Wood_TeakDark", 0.01))
+        parts.append(nail(tuple(c + Vector((0.0, 0.0, r + 0.04))), (0, 0, 1)))
+    # The parrel: from the yard's aft face either side of the slings round the mast's back, beads on it where it rubs.
+    mdx, mdy = mast_offset(YARD_H)
+    mc = Vector((MAST_X + mdx - YARD_X, mdy, 0.0))
+    rp = mast_r(YARD_H) + 0.034
+    arc = [mc + Vector((rp * math.cos(a), rp * math.sin(a), 0.0)) for a in [math.radians(80.0 + 200.0 * i / 20) for i in range(21)]]
+    ends = []
+    for s_ in (1, -1):
+        c, r = yard_section(spars, s_ * 0.22, 0.03)
+        ends.append(c + Vector((-r - 0.006, 0.0, 0.0)))
+        for k in range(2):
+            parts.append(ring("parrel_turn", r + 0.012, 0.009, tuple(c + Vector((0.0, s_ * (k * 0.02 - 0.01), 0.0))), (0, 1, 0), "MI_Rope_Hemp", 16))
+    parts += rope("parrel", [tuple(ends[0])] + [tuple(a) for a in arc] + [tuple(ends[1])], 0.009)
+    for i in range(7):
+        a = math.radians(120.0 + 120.0 * i / 6)
+        c = mc + Vector((rp * math.cos(a), rp * math.sin(a), 0.0))
+        parts.append(lathe("parrel_bead", [(0.0, -0.022), (0.012, -0.022), (0.019, -0.012), (0.021, 0.0), (0.019, 0.012), (0.012, 0.022),
+                                            (0.0, 0.022)], tuple(c), "MI_Wood_TeakDark", 12, axis=(-math.sin(a), math.cos(a), 0.0)))
+    for s_ in (-1, 1):
+        p_, _ = yard_band("yardarm_band", spars, s_ * YARDARM_Y, ARM_H, [(0.0, 1.0), (-1.0, 0.0)])
         parts += p_
-        p_, eb = spar_band("span_band", spar, xb_, (0.0, 1.0))
+        p_, eyes = yard_band("brail_band", spars, s_ * BRAIL_Y, BRAIL_H, [BRAIL_DIR])
         parts += p_
-        apex = Vector((-2.75, 0.0, max(ea.z, eb.z) + 0.2))
-        parts += rope("span", [tuple(ea), tuple(apex), tuple(eb)], 0.011)
-        parts.append(ring("span_thimble", 0.02, 0.007, tuple(apex), (0.0, 1.0, 0.0), "MI_Metal_Iron", 12))
-        # Where the peak halyard leads: the masthead block (mast_and_fittings) seen from the pivot, in this frame.
-        top_h = MAST_H - 0.38
-        bx_, by_ = mast_offset(top_h)
-        lead_w = Vector((bx_ - 0.75 * (mast_r(top_h) + 0.08), by_ + 0.64 * (mast_r(top_h) + 0.08), top_h - THROAT_H - 0.22))
-        lead = Vector(to_local(tuple(lead_w))) - apex
-        lead.normalize()
-        c = apex + lead * 0.13
-        shell = sb.add_box("span_block", (0.06, 0.08, 0.13), (0, 0, 0), M["MI_Wood_Varnish"])
-        sb.soften(shell, 0.025, 3)
-        rot = Vector((0, 0, 1)).rotation_difference(U(tuple(lead))).to_matrix().to_4x4()
-        shell.data.transform(Matrix.Translation(U(tuple(c))) @ rot)
-        parts.append(shell)
-        parts.append(disc("span_sheave", 0.045, 0.066, tuple(c), (0.0, 1.0, 0.0), "MI_Wood_TeakDark", 14, 0.004))
-        parts.append(rod("span_hook", tuple(apex), tuple(c - lead * 0.06), 0.008, "MI_Metal_Iron", 8))
-        span_top = c + lead * 0.075
-        print("SB_GAFF throat eye (local, m)", tuple(round(v, 3) for v in throat), "span block top", tuple(round(v, 3) for v in span_top))
-    print("SB_SPAR", name, "heel", round(heel, 3), "horn tip", round(x_tip, 3))
-    obj = finish(parts, name)
+        p_, _ = tackle_block("brail_block", tuple(eyes[0]), (1.0, 0.0))
+        parts += p_
+    pts = yard_points(spars)
+    print("SB_YARD sling", tuple(round(v, 3) for v in pts["sling"]), "brail rope", tuple(round(v, 3) for v in pts["brail", 1]),
+          "lift", tuple(round(v, 3) for v in pts["lift", 1]), "brace", tuple(round(v, 3) for v in pts["brace", 1]),
+          "mid radius", round(yard_section(spars, 0.0, 0.1)[1], 3), "arm radius", round(yard_section(spars, YARDARM_Y)[1], 3))
+    obj = finish(parts, "SM_Boat_Yard", wear=0.6)
     export(obj)
 
 
+def cleat(name, x, side, z):
+    """A cleat on the inside of the bulwark at x (a block and a horn along the boat); returns (parts, the horn's middle)."""
+    y = side * (half_beam(x) - BULWARK_T - 0.02)
+    parts = [block(name, (0.09, 0.04, 0.06), (x, y, z), "MI_Wood_Varnish", 0.01)]
+    horn = Vector((x, y - side * 0.045, z + 0.01))
+    parts.append(rod(name + "_horn", tuple(horn - Vector((0.12, 0.0, 0.0))), tuple(horn + Vector((0.12, 0.0, 0.0))), 0.02, "MI_Wood_Varnish", 10))
+    parts.append(nail((x, y - side * 0.021, z + 0.015), (0, -side, 0)))
+    return parts, horn
+
+
+def yard_running_rigging():
+    """D65, the ropes between the hull and the yard (in the hull's frame): the halyard from the yard's slings up over the
+    masthead's sheave and down to the starboard pin rail; the lifts from the masthead band's eye bolts out to the yardarms; the
+    braces from the yardarms aft to cleats inside the bulwark (they hold the yard square); the brails' falls from their blocks
+    under the yard down to the pin rails."""
+    spars = yard_spars()
+    pts = yard_points(spars)
+    for s in spars:
+        bpy.data.objects.remove(s, do_unlink=True)
+
+    def at(v):
+        return tuple(Vector(v) + YARD_POS)
+    parts = []
+    sling = Vector(at(pts["sling"]))
+    over = MAST_INFO["halyard_over"]
+    parts += rope("halyard", [tuple(sling + Vector((0.0, 0.0, 0.02)))] + over + [MAST_INFO["pin", 1, 1]], 0.016)
+    lead = (Vector(over[0]) - sling).normalized()
+    parts.append(ring("halyard_splice", 0.03, 0.01, tuple(sling + Vector((0.0, 0.0, 0.01))), (1, 0, 0), "MI_Rope_Hemp", 12))
+    for k in range(3):                                  # the eye's seizing
+        parts.append(ring("halyard_seizing", 0.022, 0.008, tuple(sling + lead * (0.07 + k * 0.03)), tuple(lead), "MI_Rope_Hemp", 10))
+    for side in (-1, 1):
+        parts += rope("lift", [MAST_INFO["lift_eye", side], at(pts["lift", side])], 0.013)
+        p_, horn = cleat("brace_cleat", BRACE_X, side, sheer_z(BRACE_X) + BULWARK_H - 0.12)
+        parts += p_
+        parts += rope("brace", [at(pts["brace", side]), tuple(horn + Vector((0.06, 0.0, 0.02)))], 0.013)
+        for k in range(3):
+            parts.append(ring("brace_turn", 0.03, 0.009, tuple(horn + Vector((-0.06 + k * 0.05, 0.0, 0.0))), (1, 0, 0), "MI_Rope_Hemp", 10))
+        parts += rope("brail_fall", [at(pts["brail", side] - Vector((0.02, 0.0, 0.0))), MAST_INFO["pin", side, 0]], 0.012)
+    print("SB_RIG yard at", tuple(round(v, 3) for v in YARD_POS), "brail fall from", at(pts["brail", 1]))
+    return parts
+
+
 def build_sail():
-    """Gaff mainsail in the boom's frame (aft distance, height above the boom): eight sewn panels parallel to the
-    leech with raised seams, a belly of 8 % of the chord towards +Y (Unreal), a hollow leech, a chunky boltrope
-    round the edges, a row of reef points and wooden mast hoops along the luff."""
-    g = math.radians(GAFF_ANGLE)
-    rise = THROAT_H - BOOM_H
-    tack, throat = Vector((0.0, 0.0)), Vector((0.0, rise))
-    peak = Vector((GAFF_L * math.cos(g), rise + GAFF_L * math.sin(g)))
-    clew = Vector((BOOM_L - 0.18, 0.0))
-    panels, nv = 8, 22
+    """The square sail (D65) in the yard's frame: nine cloths sewn side by side with raised seams, a little wider at the foot
+    than at the head; laced to the yard with robands, the head's ends stretched out to the yardarms with earings; a chunky
+    boltrope round its edges with rope cringles at the corners (the sheets go to the clews, ASaltBoat), two rows of reef points
+    near the foot and two sewn patches. It hangs flat: M_SB_SquareSail bellies it forward and rolls it up from the foot (its
+    geometry is the material's parameters and SaltHullShape.h Sail*)."""
+    panels, nv = 9, 72
     us = []
     for k in range(panels):
         a = k / panels
-        us += [a, a + 0.012, a + 0.5 / panels, a + 1.0 / panels - 0.012]
+        us += [a, a + 0.008, a + 0.5 / panels, a + 1.0 / panels - 0.008]
     us.append(1.0)
 
+    def half_w(v):
+        return SAIL_HALF_HEAD + (SAIL_HALF_FOOT - SAIL_HALF_HEAD) * v
+
     def point(u, v):
-        luff = tack.lerp(throat, v)
-        leech = clew.lerp(peak, v)
-        leech = leech - Vector((0.13 * math.sin(math.pi * v), 0.0))          # hollow leech
-        p = luff.lerp(leech, u)
-        chord = (leech - luff).length
-        belly = 0.08 * chord * (u / 0.4 if u < 0.4 else (1.0 - u) / 0.6) ** 0.8 * (1.0 - 0.3 * v)
         seam = 0.0
         for k in range(1, panels):
-            seam = max(seam, 0.009 * clamp(1.0 - abs(u - k / panels) / 0.012))
-        return (-p.x, belly + seam, p.y)
+            seam = max(seam, 0.009 * clamp(1.0 - abs(u - k / panels) / 0.008))
+        return (seam, (2.0 * u - 1.0) * half_w(v), SAIL_HEAD_Z - SAIL_DROP * v)
 
     bm = bmesh.new()
     grid = [[bm.verts.new(U(point(u, j / nv))) for u in us] for j in range(nv + 1)]
@@ -1646,8 +1665,8 @@ def build_sail():
         for i in range(len(us) - 1):
             f = bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
             f.smooth = True
-    # Two patches sewn on where the cloth wore through (both sides), a little offset from the cloth.
-    for (u0, u1, v0, v1) in ((0.56, 0.68, 0.34, 0.44), (0.2, 0.3, 0.62, 0.7)):
+    # Two patches sewn on where the cloth wore through (both faces), a little proud of the cloth.
+    for (u0, u1, v0, v1) in ((0.57, 0.66, 0.3, 0.36), (0.23, 0.31, 0.55, 0.6)):
         for f_side in (-1, 1):
             n_u, n_v = 4, 4
             pg = []
@@ -1655,38 +1674,62 @@ def build_sail():
                 row = []
                 for i in range(n_u + 1):
                     q = point(u0 + (u1 - u0) * i / n_u, v0 + (v1 - v0) * j / n_v)
-                    row.append(bm.verts.new(U((q[0], q[1] + f_side * 0.011, q[2]))))
+                    row.append(bm.verts.new(U((q[0] + f_side * 0.011, q[1], q[2]))))
                 pg.append(row)
             for j in range(n_v):
                 for i in range(n_u):
                     face = (pg[j][i], pg[j][i + 1], pg[j + 1][i + 1], pg[j + 1][i])
-                    fc = bm.faces.new(face if f_side > 0 else tuple(reversed(face)))
+                    fc = bm.faces.new(face if f_side < 0 else tuple(reversed(face)))
                     fc.smooth = True
-    sail = mesh_object("cloth", bm, ["MI_SailCloth"])
-    solid = sail.modifiers.new("Solidify", "SOLIDIFY")
+    cloth = mesh_object("cloth", bm, ["MI_SquareSailCloth"])
+    solid = cloth.modifiers.new("Solidify", "SOLIDIFY")
     solid.thickness = 0.016
     solid.offset = 0.0
-    sb.apply_modifiers(sail)
-    parts = [sail]
-    # Boltrope round the edges.
-    edge = [point(0.0, j / nv) for j in range(nv + 1)] + [point(u, 1.0) for u in us[1:]] + \
-           [point(1.0, j / nv) for j in range(nv - 1, -1, -1)] + [point(u, 0.0) for u in reversed(us[:-1])]
-    parts += rope("boltrope", edge, 0.024, "MI_SailRope")
-    # Reef points: short ties through the cloth along a line a fifth of the way up.
-    for k in range(panels):
-        u = (k + 0.5) / panels
-        p = Vector(point(u, 0.2))
-        parts.append(rod("reef", tuple(p - Vector((0, 0.07, 0.0))), tuple(p + Vector((0, 0.07, -0.08))), 0.01, "MI_SailRope", 6))
-    # Mast hoops (centred on the mast axis at the sail's luff).
-    n_hoops = int(rise / 0.55)
-    for k in range(n_hoops):
-        z = 0.35 + (rise - 0.5) * k / max(n_hoops - 1, 1)
-        hoop = sb.add_torus("hoop", HOOP_R, 0.026, U((0.0, 0.0, z)), (0, 0, 0), 24, 8, M["MI_SailHoop"])
-        parts.append(hoop)
+    sb.apply_modifiers(cloth)
+    parts = [cloth]
+    # Boltrope round the edges: the head, the starboard leech, the foot, the port leech.
+    edge = [point(u, 0.0) for u in us] + [point(1.0, j / nv) for j in range(1, nv + 1)] + \
+           [point(u, 1.0) for u in reversed(us[:-1])] + [point(0.0, j / nv) for j in range(nv - 1, -1, -1)]
+    parts += rope("boltrope", edge, 0.024, "MI_SquareSailRope")
+    # Rope cringles at the four corners.
+    for v_ in (0.0, 1.0):
+        for u_ in (0.0, 1.0):
+            parts.append(ring("cringle", 0.04, 0.013, point(u_, v_), (1, 0, 0), "MI_SquareSailRope", 14))
+    # Reef points: two rows of short ties through the cloth near the foot, hanging on both faces.
+    for v_ in (0.8, 0.9):
+        for k in range(panels):
+            p = Vector(point((k + 0.5) / panels, v_))
+            for f_side in (-1, 1):
+                parts.append(rod("reef", tuple(p + Vector((f_side * 0.01, 0.0, 0.0))), tuple(p + Vector((f_side * 0.03, 0.0, -0.13))), 0.009,
+                                 "MI_SquareSailRope", 6))
+    # Robands lace the head to the yard (round the yard and the head rope), and the earings stretch the head's ends out to the
+    # yardarms (a few turns round the yard inside its band).
+    spars = yard_spars()
+    for y in (-2.1, -1.75, -1.4, -0.95, -0.65, -0.3, 0.3, 0.65, 0.95, 1.4, 1.75, 2.1):
+        c, r = yard_section(spars, y, 0.03)
+        top, bot = c.z + r + 0.012, SAIL_HEAD_Z - 0.03
+        rb = sb.add_torus("roband", 1.0, 0.008, (0, 0, 0), (0, 0, 0), 20, 6, M["MI_SquareSailRope"])
+        for v in rb.data.vertices:
+            d = math.hypot(v.co.x, v.co.y)
+            off = d - 1.0
+            v.co.x, v.co.y = v.co.x / d * (r + 0.014 + off), v.co.y / d * ((top - bot) / 2 + off)
+        rb.data.transform(Matrix.Translation(U((c.x, y, (top + bot) / 2))) @ Matrix.Rotation(math.pi / 2, 4, "X"))
+        parts.append(rb)
+    for s_ in (-1, 1):
+        corner = Vector(point(0.5 + 0.5 * s_, 0.0))
+        for k in range(3):
+            c, r = yard_section(spars, s_ * (SAIL_HALF_HEAD + 0.035 + k * 0.022), 0.02)
+            parts.append(ring("earing", r + 0.012, 0.009, tuple(c), (0, 1, 0), "MI_SquareSailRope", 14))
+        c, r = yard_section(spars, s_ * (SAIL_HALF_HEAD + 0.035), 0.02)
+        parts += rope("earing_lead", [tuple(corner), tuple(c + Vector((0.0, 0.0, -r - 0.01)))], 0.01, "MI_SquareSailRope")
+    for s in spars:
+        bpy.data.objects.remove(s, do_unlink=True)
+    print("SB_SAIL head z %.2f drop %.2f half head %.2f half foot %.2f" % (SAIL_HEAD_Z, SAIL_DROP, SAIL_HALF_HEAD, SAIL_HALF_FOOT))
     obj = finish(parts, "SM_Boat_Sail", wear=0.0, chips=0.0)
     export(obj)
 
 
+# --- moving parts -------------------------------------------------------------------------------------------
 def build_rudder():
     """Rudder in the stock frame: three thick vertical boards with iron straps, a square head post above."""
     hx, hz = RUDDER_HEEL
@@ -2029,12 +2072,9 @@ def build_anchor():
 
 
 def main():
-    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway", "anchor", "windlass", "pennant", "oar", "ensign", "bell", "lantern",
+    args = sb.script_args() or ["hull", "yard", "sail", "rudder", "wheel", "gangway", "anchor", "windlass", "pennant", "oar", "ensign", "bell", "lantern",
                                 "mastchart"]
-    builds = [("hull", build_hull),
-              ("spars", lambda: build_spar("SM_Boat_Boom", BOOM_L, 0.085, 0.068, 0.14, "boom")),
-              ("spars", lambda: build_spar("SM_Boat_Gaff", GAFF_L, 0.075, 0.06, 0.13, "gaff")),
-              ("sail", build_sail), ("rudder", build_rudder), ("wheel", build_wheel), ("gangway", build_gangway),
+    builds = [("hull", build_hull), ("yard", build_yard), ("sail", build_sail), ("rudder", build_rudder), ("wheel", build_wheel), ("gangway", build_gangway),
               ("anchor", build_anchor), ("windlass", build_windlass), ("pennant", build_pennant), ("oar", build_steering_oar), ("ensign", build_ensign),
               ("bell", build_bell), ("lantern", build_lantern), ("mastchart", build_mast_chart)]
     for part, fn in builds:

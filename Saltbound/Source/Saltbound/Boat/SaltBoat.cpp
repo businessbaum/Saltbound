@@ -211,14 +211,13 @@ ASaltBoat::ASaltBoat()
 		return C;
 	};
 
-	BoomPivot = Pivot(TEXT("BoomPivot"), Hull, FVector(MastX, 0.f, SheerZ(MastX) + BoomHeight));
-	Boom = Part(TEXT("Boom"), BoomPivot);
-	Sail = Part(TEXT("Sail"), BoomPivot);
-	GaffPivot = Pivot(TEXT("GaffPivot"), BoomPivot, FVector(0.f, 0.f, ThroatHeight - BoomHeight));
-	GaffPivot->SetRelativeRotation(FRotator(-GaffAngleDeg, 0.f, 0.f));
-	Gaff = Part(TEXT("Gaff"), GaffPivot);
-	// The sail's own vertex animation (furl, fill, flutter) moves it beyond the mesh bounds.
-	Sail->SetBoundsScale(2.f);
+	// D65: the square sail hangs from its yard, slung across the mast's front and fixed square to the boat.
+	YardPivot = Pivot(TEXT("YardPivot"), Hull, FVector(YardX, 0.f, SheerZ(MastX) + YardHeight));
+	Yard = Part(TEXT("Yard"), YardPivot);
+	// A new name (SaltBoat.h): the levels' saved boats kept the old sail's attachment to the boom (gone) and its pointer.
+	SquareSail = Part(TEXT("SquareSail"), YardPivot);
+	// The sail's own vertex animation (belly, rolling up) moves it beyond the mesh bounds (the import widens them too).
+	SquareSail->SetBoundsScale(1.5f);
 	// The rudder turns about its raked stock: the pivot's +Z runs along the stock.
 	RudderPivot = Pivot(TEXT("RudderPivot"), Hull, FVector(RudderHeelX, 0.f, RudderHeelZ));
 	RudderPivot->SetRelativeRotation(FRotator(FMath::RadiansToDegrees(FMath::Atan2(RudderHeelX - RudderHeadX, RudderHeadZ - RudderHeelZ)), 0.f, 0.f));
@@ -321,22 +320,28 @@ ASaltBoat::ASaltBoat()
 	MooringLineFore = Rope(TEXT("MooringLineFore"), Pivot(TEXT("BittFore"), Hull, FVector(4.0f, 0.22f, SheerZ(4.0f) + 0.38f)));
 	MooringLineAft = Rope(TEXT("MooringLineAft"), Pivot(TEXT("BittAft"), Hull, FVector(-4.15f, 0.22f, SheerZ(4.15f) + 0.38f)));
 
-	// The halyards (D53): the gaff hangs from them, from the blocks on the mast to its throat eye and its span block.
-	// Taut lines: almost no slack or gravity, many solver passes.
-	ThroatBlockPoint = Pivot(TEXT("ThroatBlockPoint"), Hull, ThroatBlock());
-	PeakBlockPoint = Pivot(TEXT("PeakBlockPoint"), Hull, PeakBlock());
-	GaffThroatEye = Pivot(TEXT("GaffThroatEye"), Gaff, SaltHull::GaffThroatEye());
-	GaffSpanBlock = Pivot(TEXT("GaffSpanBlock"), Gaff, SaltHull::GaffSpanBlock());
-	ThroatHalyard = Rope(TEXT("ThroatHalyard"), ThroatBlockPoint);
-	PeakHalyard = Rope(TEXT("PeakHalyard"), PeakBlockPoint);
-	for (UCableComponent* C : { ThroatHalyard.Get(), PeakHalyard.Get() })
+	// D65: the sheets from the pin rails' forward pins to the clews, and the brails from their blocks under the yard down to
+	// the foot (hauled, they roll the sail up); their sail ends follow the cloth (UpdateRopes). The brails hang taut.
+	ClewPort = Pivot(TEXT("ClewPort"), YardPivot, FVector::ZeroVector);
+	ClewStarboard = Pivot(TEXT("ClewStarboard"), YardPivot, FVector::ZeroVector);
+	SheetPort = Rope(TEXT("SheetPort"), Pivot(TEXT("SheetPinPort"), Hull, SheetPin(-1.f)));
+	SheetStarboard = Rope(TEXT("SheetStarboard"), Pivot(TEXT("SheetPinStarboard"), Hull, SheetPin(1.f)));
+	BrailFootPort = Pivot(TEXT("BrailFootPort"), YardPivot, FVector::ZeroVector);
+	BrailFootStarboard = Pivot(TEXT("BrailFootStarboard"), YardPivot, FVector::ZeroVector);
+	BrailPort = Rope(TEXT("BrailPort"), Pivot(TEXT("BrailBlockPort"), YardPivot, BrailBlock(-1.f)));
+	BrailStarboard = Rope(TEXT("BrailStarboard"), Pivot(TEXT("BrailBlockStarboard"), YardPivot, BrailBlock(1.f)));
+	for (UCableComponent* C : { SheetPort.Get(), SheetStarboard.Get() })
 	{
 		C->CableWidth = 2.4f;
-		C->NumSegments = 8;
-		C->SolverIterations = 16;
-		C->CableGravityScale = 0.04f;   // the gaff's weight hangs on them: no visible sag
+		C->NumSegments = 12;
 	}
-	ThroatHalyard->NumSegments = 3;
+	for (UCableComponent* C : { BrailPort.Get(), BrailStarboard.Get() })
+	{
+		C->CableWidth = 2.f;
+		C->NumSegments = 10;
+		C->SolverIterations = 16;
+		C->CableGravityScale = 0.1f;
+	}
 
 	// The bell (D53) hangs in the ring under its arm forward of the mast and swings with the boat; its clapper swings
 	// inside it on the staple and strikes the bell. Pull the bell rope to ring it.
@@ -418,9 +423,8 @@ void ASaltBoat::ResolveContent()
 		}
 	};
 	Resolve(Hull, TEXT("Hull"));
-	Resolve(Boom, TEXT("Boom"));
-	Resolve(Sail, TEXT("Sail"));
-	Resolve(Gaff, TEXT("Gaff"));
+	Resolve(Yard, TEXT("Yard"));
+	Resolve(SquareSail, TEXT("Sail"));
 	Resolve(Rudder, TEXT("Rudder"));
 	Resolve(Wheel, TEXT("Wheel"));
 	Resolve(Anchor, TEXT("Anchor"));
@@ -435,7 +439,8 @@ void ASaltBoat::ResolveContent()
 	Resolve(Lantern, TEXT("Lantern"));
 	Resolve(MastChart, TEXT("MastChart"));
 	UMaterialInterface* RopeMaterial = LoadObject<UMaterialInterface>(nullptr, SaltContent::RopeMaterial);
-	for (UCableComponent* C : { AnchorLine.Get(), MooringLineFore.Get(), MooringLineAft.Get(), ThroatHalyard.Get(), PeakHalyard.Get() })
+	for (UCableComponent* C : { AnchorLine.Get(), MooringLineFore.Get(), MooringLineAft.Get(), SheetPort.Get(), SheetStarboard.Get(),
+		BrailPort.Get(), BrailStarboard.Get() })
 	{
 		if (C && RopeMaterial && C->GetMaterial(0) != RopeMaterial)
 		{
@@ -447,9 +452,9 @@ void ASaltBoat::ResolveContent()
 void ASaltBoat::SetupSailMaterials()
 {
 	SailMaterials.Reset();
-	for (int32 I = 0; I < Sail->GetNumMaterials(); ++I)
+	for (int32 I = 0; SquareSail && I < SquareSail->GetNumMaterials(); ++I)
 	{
-		UMaterialInterface* Base = Sail->GetMaterial(I);
+		UMaterialInterface* Base = SquareSail->GetMaterial(I);
 		if (!Base)
 		{
 			continue;
@@ -458,8 +463,17 @@ void ASaltBoat::SetupSailMaterials()
 		if (!Mid)
 		{
 			Mid = UMaterialInstanceDynamic::Create(Base, this);
-			Sail->SetMaterial(I, Mid);
+			SquareSail->SetMaterial(I, Mid);
 		}
+		// D65: the sail's shape as SaltHullShape.h has it (the sheets' and brails' ends are put where these move the cloth).
+		using namespace SaltHull;
+		Mid->SetScalarParameterValue(TEXT("HeadZ"), SailHeadZ * 100.f);
+		Mid->SetScalarParameterValue(TEXT("Drop"), SailDrop * 100.f);
+		Mid->SetScalarParameterValue(TEXT("HalfHead"), SailHalfHead * 100.f);
+		Mid->SetScalarParameterValue(TEXT("HalfFoot"), SailHalfFoot * 100.f);
+		Mid->SetScalarParameterValue(TEXT("RollLayer"), SailRollLayer * 100.f);
+		Mid->SetScalarParameterValue(TEXT("RollCore"), SailRollCore * 100.f);
+		Mid->SetScalarParameterValue(TEXT("CutMin"), SailCutMin * 100.f);
 		SailMaterials.Add(Mid);
 	}
 	PennantMaterial = Pennant->GetMaterial(0) ? Pennant->CreateAndSetMaterialInstanceDynamic(0) : nullptr;
@@ -478,6 +492,8 @@ void ASaltBoat::ApplyStats()
 	// D59: the boat's numbers come from its row in the stats table (Core/SaltStats, Docs/Stats.md).
 	const FSaltBoatStats& S = SaltStats::Boat(BoatClass);
 	SailThrust = S.SailThrust;
+	SailDriveAbeam = S.SailDriveAbeam;
+	SailDriveHeadToWind = S.SailDriveHeadToWind;
 	HullSpeed = S.HullSpeed;
 	HullSpeedResistance = S.HullResistance;
 	CoastDrag = S.CoastDrag;
@@ -595,30 +611,12 @@ void ASaltBoat::BuildHullModel()
 	}
 	KeelPoint = KeelArea > 0.f ? Sum / KeelArea : FVector::ZeroVector;
 
-	// Sail centre of effort: centroid of the gaff sail (tack, throat, peak, clew) in the boom's frame.
+	// D65: the square sail's centre of effort: the centroid of its cloth (a trapezoid from the head to the wider foot).
 	{
-		const float GaffRad = FMath::DegreesToRadians(GaffAngleDeg);
-		const FVector2D P[4] = { FVector2D(0.0, 0.0), FVector2D(0.0, ThroatHeight - BoomHeight),
-			FVector2D(GaffLength * FMath::Cos(GaffRad), ThroatHeight - BoomHeight + GaffLength * FMath::Sin(GaffRad)),
-			FVector2D(BoomLength - 0.15f, 0.0) };
-		double Area2 = 0.0;
-		FVector2D C = FVector2D::ZeroVector;
-		for (int32 K = 0; K < 4; ++K)
-		{
-			const FVector2D& A = P[K];
-			const FVector2D& B = P[(K + 1) % 4];
-			const double Cross = A.X * B.Y - B.X * A.Y;
-			Area2 += Cross;
-			C += (A + B) * Cross;
-		}
-		if (FMath::Abs(Area2) > 1e-6)
-		{
-			C /= 3.0 * Area2;
-			SailCEAft = C.X;
-			SailCEUp = C.Y;
-		}
-		UE_LOG(LogSaltbound, Log, TEXT("Boat sail: area %.1f m2, centre of effort %.2f m aft, %.2f m up"),
-			FMath::Abs(Area2) * 0.5, SailCEAft, SailCEUp);
+		const float Below = SailDrop * (SailHalfHead + 2.f * SailHalfFoot) / (3.f * (SailHalfHead + SailHalfFoot));
+		SailCEHeight = YardHeight + SailHeadZ - Below;
+		UE_LOG(LogSaltbound, Log, TEXT("Boat sail: area %.1f m2, centre of effort %.2f m above the deck"),
+			SailDrop * (SailHalfHead + SailHalfFoot), SailCEHeight);
 	}
 
 	// Collision capsules: a ring just above the waterline, a ring at the bulwark, the keel and the bilges. Each
@@ -668,7 +666,8 @@ void ASaltBoat::BuildHullModel()
 		Capsules.Add({FVector(Bx, Side * Y, BilgeZ), FVector(-Bx, Side * Y, BilgeZ), BilgeR});
 	}
 	// Everything that stands out collides too (D43: "the boat is one thing"): stem head, cathead with the stowed
-	// anchor, rudder blade and head, chain wales and deadeyes, fenders, ladders, and the boom wherever it swings.
+	// anchor, rudder blade and head, chain wales and deadeyes, fenders, ladders. The rig aloft does not (the mast, and since
+	// D65 the yard and the square sail, which hang over the deck and never swing out).
 	Capsules.Add({FVector(4.92f, 0.f, 1.0f), FVector(5.0f, 0.f, 1.62f), 0.1f});
 	if (Steering == ESaltSteering::Wheel)
 	{
@@ -684,8 +683,9 @@ void ASaltBoat::BuildHullModel()
 	}
 	for (float Side : { -1.f, 1.f })
 	{
-		const float Cx0 = MastX - 0.05f, Cx1 = MastX + 0.85f;
-		const float Cy = Side * (HalfBeamAtSheer(MastX + 0.35f) + 0.16f);
+		// D65: the chain wales and deadeyes lie aft of the mast (build_boat.py rig_and_fittings).
+		const float Cx0 = MastX - 0.75f, Cx1 = MastX + 0.05f;
+		const float Cy = Side * (HalfBeamAtSheer(MastX - 0.325f) + 0.16f);
 		Capsules.Add({FVector(Cx0, Cy, SheerZ(MastX)), FVector(Cx1, Cy, SheerZ(MastX)), 0.1f});
 		Capsules.Add({FVector(Cx0, Cy, SheerZ(MastX) + 0.8f), FVector(Cx1, Cy, SheerZ(MastX) + 0.8f), 0.12f});
 		const float Ly = Side * (HalfBeamAtSheer(LadderX) + LadderOut);
@@ -696,22 +696,6 @@ void ASaltBoat::BuildHullModel()
 		const float Fy = HalfBeamAtSheer(Fx) + 0.14f;
 		Capsules.Add({FVector(Fx, Fy, SheerZ(Fx) - 0.45f), FVector(Fx, Fy, SheerZ(Fx) - 0.15f), 0.12f});
 	}
-	BoomCapsule = Capsules.Num();
-	Capsules.Add({FVector::ZeroVector, FVector::ZeroVector, 0.12f});
-	UpdateBoomCapsule();
-}
-
-void ASaltBoat::UpdateBoomCapsule()
-{
-	using namespace SaltHull;
-	if (!Capsules.IsValidIndex(BoomCapsule))
-	{
-		return;
-	}
-	const double Phi = FMath::DegreesToRadians(BoomAngle);
-	const FVector Goose(MastX, 0.f, SheerZ(MastX) + BoomHeight);
-	Capsules[BoomCapsule].A = Goose + FVector(-FMath::Cos(Phi), FMath::Sin(Phi), 0.0) * 0.4;
-	Capsules[BoomCapsule].B = Goose + FVector(-FMath::Cos(Phi), FMath::Sin(Phi), 0.0) * (BoomLength - 0.1);
 }
 
 void ASaltBoat::SetPose(const FVector& OriginWorldM, const FQuat& Rotation)
@@ -785,7 +769,7 @@ void ASaltBoat::MoorAt(const FSaltMooring& InMooring)
 	Hoist = 0.f;
 	Fill = FillVel = 0.f;
 	RudderAngle = 0.f;
-	BoomAngle = 0.f;
+	SailLean = 0.f;
 	SetHold(ESaltBoatHold::Moored);
 	UE_LOG(LogSaltbound, Display, TEXT("Boat moored at %s"), *Mooring.Id.ToString());
 }
@@ -831,7 +815,7 @@ void ASaltBoat::ResetToStart()
 	Hoist = 0.f;
 	Fill = FillVel = 0.f;
 	RudderAngle = 0.f;
-	BoomAngle = 0.f;
+	SailLean = 0.f;
 	SetHold(ESaltBoatHold::Moored);
 	UE_LOG(LogSaltbound, Display, TEXT("Boat reset to its mooring"));
 }
@@ -1175,7 +1159,6 @@ void ASaltBoat::Tick(float DeltaSeconds)
 	LastTrueWind = Wind;
 
 	UpdateControls(Dt);
-	UpdateBoomCapsule();
 	SampleWater(Dt);
 	FindContacts();
 
@@ -1220,18 +1203,93 @@ void ASaltBoat::Tick(float DeltaSeconds)
 void ASaltBoat::SampleWater(float DeltaSeconds)
 {
 	const USaltOceanSubsystem* Sub = GetWorld()->GetSubsystem<USaltOceanSubsystem>();
-	for (FColumn& C : Columns)
+	// The sea under each column's middle: world X, Y and the water's height (m).
+	TArray<FVector, TInlineAllocator<96>> Sea;
+	Sea.SetNumUninitialized(Columns.Num());
+	for (int32 I = 0; I < Columns.Num(); ++I)
 	{
+		const FColumn& C = Columns[I];
 		const FVector Mid = BodyToWorld(C.Bottom + FVector(0.0, 0.0, C.Height * 0.5));
-		const double Z = Sub ? Sub->SampleWater(FVector2D(Mid.X * 100.0, Mid.Y * 100.0)).Location.Z * 0.01 : 0.0;
+		Sea[I] = FVector(Mid.X, Mid.Y, Sub ? Sub->SampleWater(FVector2D(Mid.X * 100.0, Mid.Y * 100.0)).Location.Z * 0.01 : 0.0);
+	}
+	// D65: the water the hull feels, blended towards a plane: at the height of the columns' water (weighted by their area), with
+	// the slope of the sea over WaveFootprint times the hull's size (a wider footprint averages the short waves' slopes out
+	// and keeps the long swell's).
+	if (WaveFilter > 0.f && Columns.Num() >= 3)
+	{
+		double Sw = 0.0, Sx = 0.0, Sy = 0.0, Sz = 0.0;
+		for (int32 I = 0; I < Columns.Num(); ++I)
+		{
+			const double Wt = Columns[I].Area;
+			Sw += Wt;
+			Sx += Wt * Sea[I].X;
+			Sy += Wt * Sea[I].Y;
+			Sz += Wt * Sea[I].Z;
+		}
+		const double Mx = Sx / Sw, My = Sy / Sw, Mz = Sz / Sw;
+		double Sxx = 0.0, Sxy = 0.0, Syy = 0.0, Sxz = 0.0, Syz = 0.0;
+		for (int32 I = 0; I < Columns.Num(); ++I)
+		{
+			const double Wt = Columns[I].Area;
+			const double Dx = Sea[I].X - Mx, Dy = Sea[I].Y - My, Dz = Sea[I].Z - Mz;
+			Sxx += Wt * Dx * Dx;
+			Sxy += Wt * Dx * Dy;
+			Syy += Wt * Dy * Dy;
+			Sxz += Wt * Dx * Dz;
+			Syz += Wt * Dy * Dz;
+		}
+		if (WaveFootprint > 1.01f && Sub)
+		{
+			// The slope over the wider footprint: nine samples on a grid round the hull's middle, along its heading.
+			const FVector2D Fwd = FVector2D(Q.GetForwardVector()).GetSafeNormal();
+			const FVector2D Right(-Fwd.Y, Fwd.X);
+			const FVector2D Mid(Mx, My);
+			Sxx = Sxy = Syy = Sxz = Syz = 0.0;
+			double Mean = 0.0;
+			FVector Wide[9];
+			for (int32 K = 0; K < 9; ++K)
+			{
+				const FVector2D P = Mid + Fwd * ((K % 3 - 1) * SaltHull::HalfLength * WaveFootprint) + Right * ((K / 3 - 1) * SaltHull::HalfBeam * WaveFootprint);
+				Wide[K] = FVector(P.X, P.Y, Sub->SampleWater(P * 100.0).Location.Z * 0.01);
+				Mean += Wide[K].Z / 9.0;
+			}
+			for (const FVector& S : Wide)
+			{
+				const double Dx = S.X - Mx, Dy = S.Y - My, Dz = S.Z - Mean;
+				Sxx += Dx * Dx;
+				Sxy += Dx * Dy;
+				Syy += Dy * Dy;
+				Sxz += Dx * Dz;
+				Syz += Dy * Dz;
+			}
+		}
+		const double Det = Sxx * Syy - Sxy * Sxy;
+		if (Det > 1e-9)
+		{
+			const double Bx = (Sxz * Syy - Syz * Sxy) / Det;
+			const double By = (Syz * Sxx - Sxz * Sxy) / Det;
+			for (int32 I = 0; I < Columns.Num(); ++I)
+			{
+				const double Plane = Mz + Bx * (Sea[I].X - Mx) + By * (Sea[I].Y - My);
+				Sea[I].Z = FMath::Lerp(Sea[I].Z, Plane, (double)WaveFilter);
+			}
+		}
+	}
+	const double KeepZ = WaterHeightSmoothing > 0.f && DeltaSeconds > 0.f ? FMath::Exp(-DeltaSeconds / WaterHeightSmoothing) : 0.0;
+	const double KeepVz = DeltaSeconds > 0.f ? FMath::Exp(-DeltaSeconds / FMath::Max(WaterVelocitySmoothing, 0.001f)) : 1.0;
+	for (int32 I = 0; I < Columns.Num(); ++I)
+	{
+		FColumn& C = Columns[I];
+		double Z = Sea[I].Z;
 		// Along the column's path: includes the slope the hull moves over (encounter velocity). D56: the sampled surface
 		// can jump from one frame to the next where steep storm crests fold (the search for the water under a point lands
 		// elsewhere); such a jump is not water moving, and through the heave damping it kicked the whole boat (the view
-		// "bugging up and down" in big waves). Bounded to what a sea moves (2.5 m/s) and eased in over ~60 ms.
+		// "bugging up and down" in big waves). Bounded to what a sea moves (2.5 m/s) and eased in (WaterVelocitySmoothing).
 		if (C.bHasWater && DeltaSeconds > 0.f)
 		{
+			Z = FMath::Lerp(Z, C.WaterZ, KeepZ);
 			const double Raw = FMath::Clamp((Z - C.WaterZ) / DeltaSeconds, -2.5, 2.5);
-			C.WaterVz += (Raw - C.WaterVz) * (1.0 - FMath::Exp(-DeltaSeconds / 0.06));
+			C.WaterVz += (Raw - C.WaterVz) * (1.0 - KeepVz);
 		}
 		else
 		{
@@ -1251,8 +1309,7 @@ void ASaltBoat::FindContacts()
 	const FCollisionObjectQueryParams Objects(ECC_WorldStatic);
 	// Broad phase: one box around the whole boat (with room for a frame's motion). In open water nothing is near.
 	const FVector BoxCentre = BodyToWorld(FVector(0.0, 0.0, -0.1)) * 100.0;
-	const float BoomReach = FMath::Abs(FMath::Sin(FMath::DegreesToRadians(BoomAngle))) * SaltHull::BoomLength;
-	const FCollisionShape Box = FCollisionShape::MakeBox(FVector(SaltHull::HalfLength + 0.8, FMath::Max(SaltHull::HalfBeam, BoomReach) + 0.8, 3.3) * 100.0);
+	const FCollisionShape Box = FCollisionShape::MakeBox(FVector(SaltHull::HalfLength + 0.8, SaltHull::HalfBeam + 0.8, 3.3) * 100.0);
 	bNearStatic = World->OverlapAnyTestByObjectType(BoxCentre, Q, Objects, Box, Params);
 	if (!bNearStatic)
 	{
@@ -1350,6 +1407,9 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 	}
 	Immersion = FMath::Clamp((float)(Submerged / DesignVolume), 0.f, 1.f);
 	const double Wet = Immersion;
+	// D65: heave damping against the boat's own vertical speed (calms the short, quick heave; the swell still lifts it).
+	AddForceAt(FVector(0.0, 0.0, -HeaveDamping * V.Z * Wet), X);
+	KickDamping += -HeaveDamping * V.Z * Wet;
 
 	// Hull, keel and rudder in body space.
 	const FVector Vb = Inv.RotateVector(V);
@@ -1399,32 +1459,33 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 		T.Z += ((bHoldSet ? AnchorYawSpring * YawError : 0.f) - AnchorYawBrake * W.Z) * AnchorHold;
 	}
 
-	// Sail (simple, D41): the set sail pushes the boat forward. The wind only shades the force a little (stronger
-	// wind a bit faster, wind from ahead a bit slower) and its sideways share heels the boat to leeward.
+	// Sail (D65, owner: "always pulls"): the square sail, fixed square, drives the boat along its heading whatever the wind's
+	// angle: the whole SailThrust with the apparent wind astern, SailDriveAbeam of it with the wind abeam and never less than
+	// SailDriveHeadToWind (head to wind: she is never stuck), on a smooth curve between. The wind's speed shades it a little
+	// (WindInfluence: a fresher breeze is a bit faster). Its sideways share heels the boat to leeward as before D65 (the full
+	// sail's force on the beam). Both act on the centreline at the sail's centre of effort (heel and pitch, no twist: D56).
 	const FVector AirWorld(WindWorld.X, WindWorld.Y, 0.0);
-	const double Phi = FMath::DegreesToRadians(BoomAngle);
-	const FVector BoomDir(-FMath::Cos(Phi), FMath::Sin(Phi), 0.0);
-	const FVector Tack(MastX, 0.f, SheerZ(MastX) + BoomHeight);
-	const FVector CE = Tack + BoomDir * SailCEAft + FVector(0.0, 0.0, SailCEUp);
+	const FVector CE(YardX, 0.f, SheerZ(MastX) + SailCEHeight);
 	const FVector Apparent = Inv.RotateVector(AirWorld - PointVelocity(BodyToWorld(CE)));
 	LastApparentWind = FVector2D(Apparent.X, Apparent.Y);
 	SailDrive = 0.f;
+	SailDriveFactor = 0.f;
 	if (Hoist > 0.01f)
 	{
-		const double TrueSpeed = AirWorld.Size();
-		const FVector TrueB = Inv.RotateVector(AirWorld);
-		// 0 = wind from dead ahead, 180 = from astern.
-		const double FromDeg = TrueSpeed > 0.1 ? FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(-TrueB.X / TrueSpeed, -1.0, 1.0))) : 90.0;
-		const double AngleFactor = 0.6 + 0.4 * FMath::SmoothStep(15.0, 80.0, FromDeg) - 0.1 * FMath::SmoothStep(140.0, 180.0, FromDeg);
-		const double SpeedFactor = FMath::Clamp(TrueSpeed / 7.0, 0.3, 1.5);
-		const double Factor = FMath::Lerp(1.0, SpeedFactor * AngleFactor, (double)WindInfluence);
-		const double Fx = SailThrust * Hoist * Factor * (1.0 - AnchorHold);
 		const double AppSpeed = FMath::Max(LastApparentWind.Size(), 0.1);
-		const double Fy = Fx * SailHeel * FMath::Clamp(Apparent.Y / AppSpeed, -1.0, 1.0);
-		// Applied on the centreline at the sail's height (heel, no twist): with the boom far out, the real centre of
-		// effort would turn the strong drive into a yaw the rudder cannot hold.
-		AddForceAtNoTurn(Q.RotateVector(FVector(Fx, Fy, 0.0)), BodyToWorld(FVector(MastX - 0.8f, 0.f, SheerZ(MastX) + BoomHeight + SailCEUp)));
+		// 0 = the apparent wind from dead ahead .. 1 = from dead astern (the air moving forward over the boat).
+		const double Astern = FMath::Clamp(0.5 * (1.0 + Apparent.X / AppSpeed), 0.0, 1.0);
+		const double Floor = FMath::Clamp((double)SailDriveHeadToWind, 0.0, 0.95);
+		const double Beam = FMath::Clamp((double)SailDriveAbeam, Floor + 0.01, 0.99);
+		const double Shape = FMath::Loge((Beam - Floor) / (1.0 - Floor)) / FMath::Loge(0.5);
+		const double AngleFactor = Floor + (1.0 - Floor) * FMath::Pow(Astern, Shape);
+		const double SpeedFactor = FMath::Clamp(AirWorld.Size() / 7.0, 0.3, 1.5);
+		const double Shade = FMath::Lerp(1.0, SpeedFactor, (double)WindInfluence) * (1.0 - AnchorHold);
+		const double Fx = SailThrust * Hoist * AngleFactor * Shade;
+		const double Fy = SailThrust * Hoist * Shade * SailHeel * FMath::Clamp(Apparent.Y / AppSpeed, -1.0, 1.0);
+		AddForceAtNoTurn(Q.RotateVector(FVector(Fx, Fy, 0.0)), BodyToWorld(CE));
 		SailDrive = (float)Fx;
+		SailDriveFactor = (float)AngleFactor;
 	}
 
 	// Windage of hull and rig.
@@ -1569,24 +1630,21 @@ void ASaltBoat::UpdateControls(float DeltaSeconds)
 	}
 	Hoist = FMath::FInterpConstantTo(Hoist, SailTarget, DeltaSeconds, 1.f / FMath::Max(SetTime, 0.1f));
 
-	// The boom trims itself: about half the angle the wind blows past (abeam 45 degrees, running 75), centred when
-	// the sail is taken in. Dead downwind it stays on its side until the wind is 15 degrees on the other side.
-	float Target = 0.f;
+	// D65: the square sail stays square. With the apparent wind well forward of the beam it cannot fill and shivers (Luff);
+	// the cloth leans to leeward with the wind's sideways share (SailLean, the material's Lean).
+	float LeanTarget = 0.f;
 	const double AppSpeed = LastApparentWind.Size();
 	if (Hoist > 0.05f && AppSpeed > 0.3)
 	{
-		const float Free = FMath::RadiansToDegrees(FMath::Atan2(LastApparentWind.Y, -LastApparentWind.X));
-		const bool bByTheLee = FMath::Abs(Free) > 165.f && FMath::Sign(Free) != FMath::Sign(BoomAngle) && FMath::Abs(BoomAngle) > 1.f;
-		const float Side = bByTheLee ? FMath::Sign(BoomAngle) : FMath::Sign(Free);
-		Target = Side * FMath::Min(FMath::Abs(Free) * 0.45f + 5.f, 75.f) * Hoist;
-		// Wind from ahead: the sail cannot fill and shivers.
-		Luff = 1.f - FMath::SmoothStep(18.f, 40.f, FMath::Abs(Free));
+		const float FromDeg = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp((float)(-LastApparentWind.X / AppSpeed), -1.f, 1.f)));
+		Luff = 1.f - FMath::SmoothStep(20.f, 75.f, FromDeg);
+		LeanTarget = FMath::Clamp((float)(LastApparentWind.Y / AppSpeed), -1.f, 1.f) * FMath::SmoothStep(0.3f, 3.f, (float)AppSpeed);
 	}
 	else
 	{
 		Luff = 0.f;
 	}
-	BoomAngle = FMath::FInterpConstantTo(BoomAngle, Target, DeltaSeconds, BoomSwingRate);
+	SailLean = FMath::FInterpTo(SailLean, LeanTarget, DeltaSeconds, 1.5f);
 
 	// Belly fill: a spring with little damping, so the sail pops full when it catches the wind and breathes with
 	// the gusts (the wind speed against its own slow average). D59 (owner: "too little reaction in the sail"): how full
@@ -1606,25 +1664,17 @@ void ASaltBoat::UpdateControls(float DeltaSeconds)
 void ASaltBoat::UpdateVisuals(float DeltaSeconds)
 {
 	using namespace SaltHull;
-	BoomPivot->SetRelativeRotation(FRotator(0.f, -BoomAngle, 0.f));
-	// The sail bellies out to leeward: the side the apparent wind pushes it to (in the boom's frame).
-	const double Phi = FMath::DegreesToRadians(BoomAngle);
-	const double Push = FVector2D::DotProduct(LastApparentWind, FVector2D(FMath::Sin(Phi), FMath::Cos(Phi)));
-	if (FMath::Abs(Push) > 0.2)
-	{
-		SailSide = Push > 0.0 ? 1.f : -1.f;
-	}
-	SailSideVisual = FMath::FInterpConstantTo(SailSideVisual, SailSide, DeltaSeconds, 3.f);
-	// The sail material moves the cloth (M_SB_Sail): brailed up to the gaff when taken in, the belly filled to
-	// leeward, a shiver along the leech when the wind comes from ahead and a little life always.
-	const float Furl = 1.f - FMath::SmoothStep(0.f, 1.f, Hoist);
+	// D65: the sail material moves the cloth (M_SB_SquareSail): it hangs down from the yard as far as it is set, the rest
+	// rolled up under it; the belly fills forward (its cut and, D59, the wind pressing it out deeper as it freshens, never
+	// as far as the forestay), leans to leeward, shivers when the wind comes from ahead and always has a little life.
+	SailBellyShown = FMath::Min(FMath::Max(Fill, 0.f) * (SailCutBelly + SailBelly * FMath::Lerp(0.35f, 1.f, SailPress)) * (1.f - 0.5f * Luff),
+		SailMaxBelly * 100.f);
 	for (UMaterialInstanceDynamic* Mid : SailMaterials)
 	{
-		Mid->SetScalarParameterValue(TEXT("Furl"), Furl);
+		Mid->SetScalarParameterValue(TEXT("Set"), Hoist);
 		Mid->SetScalarParameterValue(TEXT("Fill"), FMath::Max(Fill, 0.f));
-		// D59: the wind presses the cloth out beyond its cut shape, deeper as it freshens.
-		Mid->SetScalarParameterValue(TEXT("Belly"), SailBelly * FMath::Max(Fill, 0.f) * FMath::Lerp(0.35f, 1.f, SailPress) * (1.f - Luff));
-		Mid->SetScalarParameterValue(TEXT("Side"), SailSideVisual);
+		Mid->SetScalarParameterValue(TEXT("Belly"), SailBellyShown);
+		Mid->SetScalarParameterValue(TEXT("Lean"), SailLean);
 		Mid->SetScalarParameterValue(TEXT("Flutter"), 0.15f + 0.85f * Luff * Hoist);
 	}
 	Rudder->SetRelativeRotation(FRotator(0.f, -RudderAngle, 0.f));
@@ -1870,16 +1920,58 @@ void ASaltBoat::UpdateRopes(float DeltaSeconds)
 	Fit(MooringLineAft, MooringPierAft, 1.05f, bMoored);
 	// Anchor rode from the cathead down to the anchor.
 	Fit(AnchorLine, Anchor, 1.08f, AnchorAlpha > 0.01f);
-	// The halyards hold the gaff up: taut, a centimetre to spare.
-	for (UCableComponent* C : { ThroatHalyard.Get(), PeakHalyard.Get() })
+	// D65: the sheets go from the pin rails to the clews (a little slack), the brails hang taut from their blocks down to the
+	// foot; their sail ends follow the cloth as it is let fall or rolled up (the material's own sums).
+	for (const bool bStarboard : { false, true })
 	{
-		USceneComponent* End = C == PeakHalyard ? GaffSpanBlock.Get() : GaffThroatEye.Get();
-		Fit(C, End, 1.f, true);
-		if (C && End)
+		USceneComponent* Clew = GetClew(bStarboard);
+		USceneComponent* Foot = GetBrailFoot(bStarboard);
+		UCableComponent* Brail = GetBrail(bStarboard);
+		if (!Clew || !Foot || !Brail)
 		{
-			C->CableLength = (float)FVector::Dist(C->GetComponentLocation(), End->GetComponentLocation()) + 1.f;
+			continue;
 		}
+		Clew->SetRelativeLocation(SailClewLocal(bStarboard));
+		Foot->SetRelativeLocation(SailBrailFootLocal(bStarboard));
+		Fit(GetSheet(bStarboard), Clew, 1.03f, true);
+		Fit(Brail, Foot, 1.f, true);
+		Brail->CableLength = (float)FVector::Dist(Brail->GetComponentLocation(), Foot->GetComponentLocation()) + 1.f;
 	}
+}
+
+float ASaltBoat::SailCut() const
+{
+	using namespace SaltHull;
+	return FMath::Max(FMath::Clamp(Hoist, 0.f, 1.f) * SailDrop, SailCutMin);
+}
+
+FVector ASaltBoat::SailClewLocal(bool bStarboard) const
+{
+	// M_SB_SquareSail (setup_boat_sail.py): the leeches never belly, so a clew lies on the leech's line; once the sail is
+	// rolled up from the foot, the clew is in the roll, whose end's middle lies Rout forward of the cut.
+	using namespace SaltHull;
+	const float Cut = SailCut();
+	const float Rout = FMath::Sqrt(SailRollCore * SailRollCore + SailRollLayer * (SailDrop - Cut) / PI);
+	const float Half = FMath::Lerp(SailHalfHead, SailHalfFoot, Cut / SailDrop);
+	return FVector(Rout, (bStarboard ? 1.f : -1.f) * Half, SailHeadZ - Cut) * 100.f;
+}
+
+FVector ASaltBoat::SailBrailFootLocal(bool bStarboard) const
+{
+	// M_SB_SquareSail at the cut (the foot when it is set), under the brail's block: the belly there (Across, Hang, Breath)
+	// and the lean to leeward, on the cloth's aft face, where the brail goes round under the roll.
+	using namespace SaltHull;
+	const float Cut = SailCut();
+	const float Half = FMath::Lerp(SailHalfHead, SailHalfFoot, Cut / SailDrop);
+	const float Y = (bStarboard ? 1.f : -1.f) * BrailAcross * Half;
+	const float U = 0.5f + Y / (2.f * Half);
+	const float Up = 0.5f + 0.18f * SailLean;
+	const float Ua = U < Up ? 0.5f * U / Up : 0.5f + 0.5f * (U - Up) / (1.f - Up);
+	const float ZhCm = (SailHeadZ - Cut) * 100.f;
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;   // the material's Time
+	const float Breath = FMath::Sin(Now * 1.6f + ZhCm * 0.012f) * 0.08f * FMath::Clamp(Fill, 0.f, 1.f);
+	const float DepthCm = SailBellyShown * FMath::Sqrt(Cut / SailDrop) * FMath::Sin(PI * Ua) * (1.f + Breath);
+	return FVector(DepthCm * FMath::Sin(2.4f) - 2.f, Y * 100.f + SailLean * 0.3f * DepthCm * FMath::Sin(2.83f), ZhCm);
 }
 
 void ASaltBoat::UpdateAnchor(float DeltaSeconds)
@@ -2003,9 +2095,9 @@ FString ASaltBoat::Describe() const
 	const float FromYaw = FMath::RadiansToDegrees(FMath::Atan2(-LastTrueWind.Y, -LastTrueWind.X));
 	const TCHAR* HoldName = Hold == ESaltBoatHold::Moored ? TEXT("Moored") : (Hold == ESaltBoatHold::Anchored ? TEXT("Anchored") : TEXT("Free"));
 	return FString::Printf(TEXT("SB_BOAT pos=(%.0f,%.0f,%.1f) yaw=%.1f course=%.1f speed=%.2fkn surge=%.2f sway=%.3f yawRate=%.2f heel=%.2f pitch=%.2f ")
-		TEXT("rudder=%.1f drive=%.0fN boom=%.1f fill=%.2f sail=%.2f hold=%s immersion=%.2f waterline=%.1fcm contacts=%d depth=%.1fcm ")
+		TEXT("rudder=%.1f drive=%.0fN driveShare=%.2f lean=%.2f fill=%.2f sail=%.2f hold=%s immersion=%.2f waterline=%.1fcm contacts=%d depth=%.1fcm ")
 		TEXT("twa=%.1f tws=%.2f aws=%.2f mass=%.0f"),
 		L.X, L.Y, L.Z, Yaw, CourseYaw, GetSpeedKnots(), Vb.X, Vb.Y, FMath::RadiansToDegrees(W.Z), GetHeelDeg(), GetPitchDeg(),
-		RudderAngle, SailDrive, BoomAngle, Fill, Hoist, HoldName, Immersion, GetWaterlineOffset(), Contacts.Num(), GetContactDepth(),
+		RudderAngle, SailDrive, SailDriveFactor, SailLean, Fill, Hoist, HoldName, Immersion, GetWaterlineOffset(), Contacts.Num(), GetContactDepth(),
 		FRotator::NormalizeAxis(FromYaw - Yaw), LastTrueWind.Size(), LastApparentWind.Size(), Mass);
 }

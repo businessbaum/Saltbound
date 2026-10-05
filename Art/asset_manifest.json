@@ -123,17 +123,12 @@
     "collision": "ucx",
     "_note": "Hand-made starter boat (D36, D38): planked hull, deck, bulwarks, rig. Hull shape mirrors Source/Saltbound/Boat/SaltHullShape.h; ASaltBoat moves the other parts."
   },
-  "SM_Boat_Boom": {
-    "fbx": "Boat/SM_Boat_Boom.fbx",
+  "SM_Boat_Yard": {
+    "fbx": "Boat/SM_Boat_Yard.fbx",
     "dest": "/Game/Saltbound/Boat",
     "nanite": false,
-    "collision": "none"
-  },
-  "SM_Boat_Gaff": {
-    "fbx": "Boat/SM_Boat_Gaff.fbx",
-    "dest": "/Game/Saltbound/Boat",
-    "nanite": false,
-    "collision": "none"
+    "collision": "none",
+    "_note": "D65: the square sail's yard, fixed square on the mast's front."
   },
   "SM_Boat_Sail": {
     "fbx": "Boat/SM_Boat_Sail.fbx",

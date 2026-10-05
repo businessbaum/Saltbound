@@ -28,10 +28,33 @@ namespace SaltHull
 	/** Boarding gaps in the bulwark on both sides, midship (|X| below this). */
 	constexpr float GateHalfWidth = 0.5f;
 
-	/** Rig (the gaff mainsail is the only sail): mast, boom and gaff, heights above the deck at the mast. */
+	/** Rig: the mast (its height above the deck at the mast). */
 	constexpr float MastX = 1.2f;
 	constexpr float MastHeight = 10.5f;
 	constexpr float PennantHeight = 0.42f;    // the wind pennant's swivel above the mast top
+
+	/** D65 (owner: "a normal sail, so both sides with the same amount of sail, not rotatable"): a square sail on a yard slung
+	 *  across the mast's front, fixed square to the boat (build_boat.py YARD_* and SAIL_*). The yard's axis lies at YardX and
+	 *  YardHeight above the deck at the mast; SM_Boat_Yard and SM_Boat_Sail are built in its frame. The sail's head is laced
+	 *  SailHeadZ under the yard's axis; it hangs SailDrop down to its foot, SailHalfHead (head) to SailHalfFoot (foot) wide on
+	 *  either side. M_SB_SquareSail (setup_boat_sail.py) lets it fall from the head as far as it is set and rolls the rest up
+	 *  from the foot, just forward of the cloth: SailRollLayer more radius a turn round a SailRollCore; taken in, the cloth
+	 *  still hangs SailCutMin under the head before the roll. Its belly never goes deeper than SailMaxBelly (the forestay). */
+	constexpr float YardX = 1.46f;
+	constexpr float YardHeight = 9.0f;
+	constexpr float SailHeadZ = -0.15f;
+	constexpr float SailDrop = 6.65f;
+	constexpr float SailHalfHead = 2.3f;
+	constexpr float SailHalfFoot = 2.6f;
+	constexpr float SailRollLayer = 0.025f;
+	constexpr float SailRollCore = 0.04f;
+	constexpr float SailCutMin = 0.3f;
+	constexpr float SailMaxBelly = 1.2f;
+	/** The brails (they roll the sail up): the ropes' point under their blocks below the yard (yard frame, build_boat.py
+	 *  SB_YARD "brail rope", the part to the foot a little forward), and where they meet the foot (this share of its half
+	 *  width out from the middle, straight under the blocks at the head). */
+	inline FVector BrailBlock(float Side) { return FVector(-0.067f, Side * 1.2f, -0.32f); }
+	constexpr float BrailAcross = 1.2f / SailHalfHead;
 
 	/** D52: the anchor rope leaves through a hawse hole in the starboard bow planking (the anchor itself is never seen),
 	 *  and the ensign flies from a staff on the stern deck (build_boat.py HAWSE_HULL, ENSIGN_X / ENSIGN_H). */
@@ -39,11 +62,6 @@ namespace SaltHull
 	constexpr float HawseZ = 0.66f;
 	constexpr float EnsignX = -4.62f;
 	constexpr float EnsignHeight = 1.45f;     // staff above the deck
-	constexpr float BoomHeight = 2.05f;
-	constexpr float BoomLength = 5.0f;
-	constexpr float ThroatHeight = 6.8f;
-	constexpr float GaffLength = 4.6f;
-	constexpr float GaffAngleDeg = 35.f;
 
 	/** Wheel steering (D36-D43, ESaltSteering::Wheel, kept for later boats): the wheel on its pedestal and the
 	 *  rudder stock (raked, from its heel up to the deck). The first boat steers with an oar (below). */
@@ -159,19 +177,15 @@ namespace SaltHull
 		return FVector(-FMath::Cos(Rake), 0.f, FMath::Sin(Rake));
 	}
 
-	/** D53, the mast and what hangs on it (build_boat.py MAST_HEAD_OFFSET and its SB_MAST / SB_GAFF prints): the mast's
-	 *  head is worked aft and to port, so the pennant's swivel sits there; the throat and peak halyards' blocks on the
-	 *  mast (where their ropes leave them); the bell's and the lantern's pivots; on the gaff (its own frame, m), the throat
-	 *  halyard's eye and the top of the peak halyard's span block. */
+	/** D53, the mast and what hangs on it (build_boat.py MAST_HEAD_OFFSET and its SB_MAST prints): the mast's head is worked
+	 *  aft and to port, so the pennant's swivel sits there; the bell's and the lantern's pivots. */
 	constexpr float MastHeadAft = 0.07f;
 	constexpr float MastHeadPort = 0.02f;
-	inline FVector ThroatBlock() { return FVector(MastX - 0.134f, -0.113f, SheerZ(MastX) + 7.275f); }
-	inline FVector PeakBlock() { return FVector(MastX - 0.189f, 0.083f, SheerZ(MastX) + 9.895f); }
-	inline FVector BellPivot() { return FVector(1.686f, 0.f, SheerZ(MastX) + 1.494f); }
-	inline FVector LanternPivot() { return FVector(0.937f, 0.f, SheerZ(MastX) + 1.704f); }
-	inline FVector GaffThroatEye() { return FVector(-0.271f, 0.f, 0.117f); }
-	inline FVector GaffSpanBlock() { return FVector(-2.676f, 0.f, 0.503f); }
-	/** The halyards' falls are made fast on pin rails inside the bulwark at the shrouds (the sail is let go there). */
+	inline FVector BellPivot() { return FVector(1.694f, 0.f, SheerZ(MastX) + 1.494f); }
+	inline FVector LanternPivot() { return FVector(0.934f, 0.f, SheerZ(MastX) + 1.704f); }
+	/** The halyard, the brails and the sheets are made fast on pin rails inside the bulwark by the mast (the sail is set and
+	 *  taken in there, D53, D65): the sheets on their forward pins (build_boat.py SB_RIG "sheet pins"). */
 	constexpr float PinRailX = MastX + 0.35f;
 	inline float PinRailY() { return HalfBeamAtSheer(PinRailX) - 0.165f; }
+	inline FVector SheetPin(float Side) { return FVector(PinRailX + 0.17f, Side * PinRailY(), SheerZ(PinRailX) + 0.48f); }
 }

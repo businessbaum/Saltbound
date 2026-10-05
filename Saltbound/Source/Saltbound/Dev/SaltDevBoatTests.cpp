@@ -19,6 +19,8 @@
 #include "Interaction/SaltStationComponent.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialParameterCollection.h"
+#include "Ocean/SaltOcean.h"
+#include "Ocean/SaltOceanSubsystem.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Props/SaltSwingComponent.h"
 #include "Saltbound.h"
@@ -83,6 +85,141 @@ namespace
 					*Clock, Dt, Cam.Z, Xf.InverseTransformPosition(Cam).Z, Xf.InverseTransformPosition(Pl->GetActorLocation()).Z, Xf.GetLocation().Z,
 					Base && Base->GetOwner() == B ? 1 : 0, B->GetVelocity().Z, Wd.X, Wd.Y, Wd.Z, B->GetHeelDeg(), B->GetPitchDeg(), B->GetContactDepth());
 				return *Clock < Seconds;
+			}));
+		}));
+
+	/** D65 (owner: "make the starter ship calmer in the waves"): the boat's motion at anchor in the open sea, in the rig's sea
+	 *  (Rough in L_VisualTest). The ocean's clock is set to the same time on every run (the same waves); the boat lies at
+	 *  anchor at the heading for 10 s, then for the given seconds it measures roll and pitch about their mean (rms, the most)
+	 *  and their rates (rms), the vertical acceleration of the deck midship and at the helm (rms, the most), and the boat's
+	 *  heave against the water's under it (rms; near 1 = riding the swells), and how low the rail comes to the water at the
+	 *  stem, the stern and midship (m; below 0 the sea is over it) with the share of frames it is. sb.Dev.BoatMotion
+	 *  [seconds=60] [yaw=0] [oceanTime=200] logs one SB_MOTION line; the boat stays at anchor. */
+	FAutoConsoleCommandWithWorldAndArgs CmdBoatMotion(
+		TEXT("sb.Dev.BoatMotion"),
+		TEXT("Measure the boat's motion at anchor in the open sea: sb.Dev.BoatMotion [seconds=60] [yaw=0] [oceanTime=200]. Logs SB_MOTION."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ASaltBoat* Boat = nullptr;
+			for (TActorIterator<ASaltBoat> It(World); World && It; ++It) { Boat = *It; break; }
+			if (!Boat || !Boat->Hull)
+			{
+				UE_LOG(LogSaltbound, Display, TEXT("SB_MOTION none (no boat)"));
+				return;
+			}
+			struct FState
+			{
+				TWeakObjectPtr<ASaltBoat> Boat;
+				TWeakObjectPtr<UWorld> World;
+				FString Sea;
+				float Seconds = 60.f;
+				float Yaw = 0.f;
+				double Start = 0.0;
+				double Last = -1.0;
+				bool bHavePrev = false;
+				FVector PrevDeck = FVector::ZeroVector;
+				FVector PrevHelm = FVector::ZeroVector;
+				TArray<float> Roll, Pitch, RollRate, PitchRate, DeckAcc, HelmAcc, Heave, Water;
+				// The rail's lowest height over the water at the stem, the stern and midship either side (m), and the frames with
+				// the water over it anywhere: does she still ride the waves, or plough into them?
+				float BowFree = 99.f, SternFree = 99.f, SideFree = 99.f;
+				int32 WetFrames = 0;
+			};
+			TSharedRef<FState> S = MakeShared<FState>();
+			S->Boat = Boat;
+			S->World = World;
+			S->Seconds = Args.Num() > 0 ? FMath::Max(5.f, FCString::Atof(*Args[0])) : 60.f;
+			S->Yaw = Args.Num() > 1 ? FCString::Atof(*Args[1]) : 0.f;
+			const double OceanTime = Args.Num() > 2 ? FCString::Atod(*Args[2]) : 200.0;
+			for (TActorIterator<ASaltOcean> It(World); It; ++It)
+			{
+				It->SetOceanTime(OceanTime);
+			}
+			for (TActorIterator<ASaltLightingRig> It(World); It; ++It)
+			{
+				S->Sea = It->CurrentSeaState.ToString();
+				break;
+			}
+			Boat->SetHold(ESaltBoatHold::Free);
+			Boat->PlaceAt(FVector(250000.f, -80000.f, 0.f), S->Yaw);
+			Boat->SetSailSet(false);
+			Boat->SetHold(ESaltBoatHold::Anchored);
+			S->Start = World->GetTimeSeconds();
+			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float) -> bool
+			{
+				ASaltBoat* B = S->Boat.Get();
+				UWorld* W = S->World.Get();
+				if (!B || !W)
+				{
+					UE_LOG(LogSaltbound, Display, TEXT("SB_MOTION none (aborted)"));
+					return false;
+				}
+				const double Now = W->GetTimeSeconds();
+				if (Now <= S->Last)
+				{
+					return true;
+				}
+				const float Dt = S->Last < 0.0 ? 0.f : (float)(Now - S->Last);
+				S->Last = Now;
+				// Vertical speed of two points on deck (m/s): midship and where the helmsman stands.
+				const FTransform Xf = B->Hull->GetComponentTransform();
+				const FVector Vo = B->GetVelocity() * 0.01;
+				const FVector Wr = B->GetKinematicAngularVelocity();
+				auto PointV = [&](float X, float Y) { return Vo + FVector::CrossProduct(Wr, (Xf.TransformPosition(FVector(X, Y, SaltHull::SheerZ(X)) * 100.0) - Xf.GetLocation()) * 0.01); };
+				const FVector Deck = PointV(0.f, 0.f);
+				const FVector Helm = PointV(SaltHull::OarHelmsmanX, SaltHull::OarHelmsmanY);
+				if (Now - S->Start > 10.0 && S->bHavePrev && Dt > 0.f)
+				{
+					const FVector Wb = Xf.InverseTransformVectorNoScale(Wr);
+					S->Roll.Add(B->GetHeelDeg());
+					S->Pitch.Add(B->GetPitchDeg());
+					S->RollRate.Add(FMath::RadiansToDegrees((float)Wb.X));
+					S->PitchRate.Add(FMath::RadiansToDegrees((float)Wb.Y));
+					S->DeckAcc.Add((float)(Deck.Z - S->PrevDeck.Z) / Dt);
+					S->HelmAcc.Add((float)(Helm.Z - S->PrevHelm.Z) / Dt);
+					S->Heave.Add((float)Xf.GetLocation().Z * 0.01f);
+					const USaltOceanSubsystem* Ocean = W->GetSubsystem<USaltOceanSubsystem>();
+					S->Water.Add(Ocean ? (float)Ocean->SampleWater(FVector2D(Xf.GetLocation())).Location.Z * 0.01f : 0.f);
+					auto Free = [&](float X, float Y)
+					{
+						const FVector P = Xf.TransformPosition(FVector(X, Y, SaltHull::SheerZ(X)) * 100.0);
+						return Ocean ? (float)(P.Z - Ocean->SampleWater(FVector2D(P)).Location.Z) * 0.01f : 99.f;
+					};
+					const float Bow = Free(SaltHull::HalfLength - 0.4f, 0.f), Stern = Free(-SaltHull::HalfLength + 0.4f, 0.f);
+					const float Side = FMath::Min(Free(0.f, SaltHull::HalfBeam), Free(0.f, -SaltHull::HalfBeam));
+					S->BowFree = FMath::Min(S->BowFree, Bow);
+					S->SternFree = FMath::Min(S->SternFree, Stern);
+					S->SideFree = FMath::Min(S->SideFree, Side);
+					S->WetFrames += FMath::Min3(Bow, Stern, Side) < 0.f ? 1 : 0;
+				}
+				S->PrevDeck = Deck;
+				S->PrevHelm = Helm;
+				S->bHavePrev = true;
+				if (Now - S->Start < 10.0 + S->Seconds)
+				{
+					return true;
+				}
+				// Rms about the mean (or about zero) and the largest absolute value.
+				auto Rms = [](const TArray<float>& A, bool bAboutMean)
+				{
+					double Mean = 0.0, Sum = 0.0;
+					for (float V : A) { Mean += V; }
+					Mean = bAboutMean && A.Num() > 0 ? Mean / A.Num() : 0.0;
+					for (float V : A) { Sum += FMath::Square(V - Mean); }
+					return A.Num() > 0 ? (float)FMath::Sqrt(Sum / A.Num()) : 0.f;
+				};
+				auto Most = [](const TArray<float>& A)
+				{
+					float M = 0.f;
+					for (float V : A) { M = FMath::Max(M, FMath::Abs(V)); }
+					return M;
+				};
+				const float HeaveRms = Rms(S->Heave, true), WaterRms = Rms(S->Water, true);
+				UE_LOG(LogSaltbound, Display, TEXT("SB_MOTION sea=%s seconds=%.0f yaw=%.0f frames=%d rollRms=%.2f rollMax=%.2f rollRateRms=%.2f pitchRms=%.2f pitchMax=%.2f pitchRateRms=%.2f deckAccRms=%.3f deckAccMax=%.2f helmAccRms=%.3f helmAccMax=%.2f heaveRms=%.3f waterRms=%.3f follow=%.2f bowFree=%.2f sternFree=%.2f sideFree=%.2f wetPct=%.1f"),
+					*S->Sea, S->Seconds, S->Yaw, S->Roll.Num(), Rms(S->Roll, true), Most(S->Roll), Rms(S->RollRate, false), Rms(S->Pitch, true), Most(S->Pitch),
+					Rms(S->PitchRate, false), Rms(S->DeckAcc, false), Most(S->DeckAcc), Rms(S->HelmAcc, false), Most(S->HelmAcc), HeaveRms, WaterRms,
+					WaterRms > 0.f ? HeaveRms / WaterRms : 0.f, S->BowFree, S->SternFree, S->SideFree, S->Roll.Num() > 0 ? 100.f * S->WetFrames / S->Roll.Num() : 0.f);
+				return false;
 			}));
 		}));
 
@@ -493,13 +630,14 @@ void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 				Period, Peaks.Num() > 1 ? Peaks[1] : 0.f, Decay, Crossings.Num()));
 		}});
 
-	// 3) Simple sailing (D41) in a steady 7 m/s (13.6 kn) wind, the autopilot holding a heading of 90 deg (+Y): the set
-	// sail drives the boat whatever the wind's angle (the wind only shades the speed a little).
+	// 3) Sailing (D65, "always pulls") in a steady 7 m/s (13.6 kn) wind, the autopilot holding a heading of 90 deg (+Y): the
+	// square sail drives the boat at every angle of the wind, fastest with it astern, slowest head to wind (never stuck).
 	struct FPoint { const TCHAR* Name; float WindFrom; float MinKn; float MaxKn; };
 	const FPoint Points[] = {
-		{ TEXT("WindAbeam"), 0.f, 6.f, 9.5f },        // 90 deg on the port side
-		{ TEXT("WindAhead"), 80.f, 4.5f, 9.f },       // 10 deg off the bow
-		{ TEXT("WindAstern"), 275.f, 5.5f, 9.5f },    // 175 deg
+		{ TEXT("WindAbeam"), 0.f, 4.5f, 7.f },        // 90 deg on the port side
+		{ TEXT("WindAhead"), 80.f, 2.5f, 4.5f },      // 10 deg off the bow
+		{ TEXT("WindQuarter"), 315.f, 6.f, 8.5f },    // 135 deg, on the port quarter
+		{ TEXT("WindAstern"), 275.f, 7.f, 9.5f },     // 175 deg
 	};
 	for (const FPoint& Pt : Points)
 	{
@@ -810,29 +948,48 @@ void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 		[this]() { return FString::Printf(TEXT("hold=%d (2 = anchored)"), TestBoat.IsValid() ? (int32)TestBoat->GetHold() : -1); });
 	Steps.Add({TEXT("PointsTidy"), 0.f, [this]() { if (ASaltBoat* Bt = TestBoat.Get()) { Bt->SetSailSet(false); Bt->SetHold(ESaltBoatHold::Free); } }, nullptr, nullptr});
 
-	// 9d) D53: the gaff hangs from its halyards; the bell, its clapper and the lantern swing with the boat and settle;
+	// 9d) D65: the square sail's ropes follow the cloth: the sheets run from the pin rails to the clews and the brails hang
+	// taut from their blocks under the yard to the foot; taken in, the clews and the foot are rolled up under the yard, set,
+	// they hang at the foot, outboard of the sides. D53: the bell, its clapper and the lantern swing with the boat and settle;
 	// the bell rope rings the bell, the player bumps it aside, the lantern lights and douses.
-	Steps.Add({TEXT("RigSetup"), 0.f, [=, this]() { SetWind(0.f, 0.f); Place(TestWater, 90.f, 0.f, false, false); }, nullptr, nullptr});
-	Wait(TEXT("RigSettle"), 4.f);
-	Steps.Add({TEXT("Halyards"), 0.f, [this]()
+	auto CheckRig = [this](const FString& Name, bool bSet)
 	{
 		const ASaltBoat* Bt = TestBoat.Get();
 		bool bOk = Bt != nullptr;
 		FString State;
-		for (const bool bPeak : { false, true })
+		for (const bool bStarboard : { false, true })
 		{
-			const UCableComponent* C = Bt ? Bt->GetHalyard(bPeak) : nullptr;
-			const USceneComponent* End = Bt ? Bt->GetGaffHalyardPoint(bPeak) : nullptr;
-			const float Dist = C && End ? (float)FVector::Dist(C->GetComponentLocation(), End->GetComponentLocation()) : 0.f;
-			const bool bAttached = C && End && C->GetAttachedComponent() == End && C->IsVisible();
-			const bool bTaut = C && C->CableLength >= Dist && C->CableLength < Dist + 5.f;
-			const bool bReach = bPeak ? (Dist > 150.f && Dist < 260.f) : (Dist > 10.f && Dist < 45.f);
-			bOk = bOk && bAttached && bTaut && bReach;
-			State += FString::Printf(TEXT("%s: attached=%d dist=%.0fcm length=%.0fcm  "), bPeak ? TEXT("peak") : TEXT("throat"), bAttached ? 1 : 0, Dist,
-				C ? C->CableLength : 0.f);
+			const UCableComponent* Sheet = Bt ? Bt->GetSheet(bStarboard) : nullptr;
+			const USceneComponent* Clew = Bt ? Bt->GetClew(bStarboard) : nullptr;
+			const UCableComponent* Brail = Bt ? Bt->GetBrail(bStarboard) : nullptr;
+			const USceneComponent* Foot = Bt ? Bt->GetBrailFoot(bStarboard) : nullptr;
+			if (!Sheet || !Clew || !Brail || !Foot)
+			{
+				bOk = false;
+				continue;
+			}
+			const bool bAttached = Sheet->GetAttachedComponent() == Clew && Brail->GetAttachedComponent() == Foot && Sheet->IsVisible() && Brail->IsVisible();
+			const float BrailDist = (float)FVector::Dist(Brail->GetComponentLocation(), Foot->GetComponentLocation());
+			const bool bTaut = Brail->CableLength >= BrailDist && Brail->CableLength < BrailDist + 5.f;
+			// In the yard's frame (cm): set, the clew and the brail's end hang at the foot (6.8 m under the yard); taken in, they are
+			// rolled up within a metre under it.
+			const FVector C = Clew->GetRelativeLocation(), F = Foot->GetRelativeLocation();
+			const float FootZ = (SaltHull::SailHeadZ - SaltHull::SailDrop) * 100.f;
+			const bool bPlace = bSet ? (FMath::Abs(C.Z - FootZ) < 15.f && FMath::Abs(F.Z - FootZ) < 15.f) : (C.Z > -100.f && F.Z > -100.f);
+			const bool bSide = (bStarboard ? C.Y : -C.Y) > 200.f && (bStarboard ? F.Y : -F.Y) > 100.f;
+			bOk = bOk && bAttached && bTaut && bPlace && bSide;
+			State += FString::Printf(TEXT("%s: attached=%d clew=(%.0f, %.0f, %.0f) brailEnd=(%.0f, %.0f, %.0f) brail=%.0f/%.0fcm  "),
+				bStarboard ? TEXT("starboard") : TEXT("port"), bAttached ? 1 : 0, C.X, C.Y, C.Z, F.X, F.Y, F.Z, Brail->CableLength, BrailDist);
 		}
-		Report(TEXT("BoatHalyardsHoldGaff"), bOk, State);
-	}, nullptr, nullptr});
+		Report(Name, bOk, State);
+	};
+	Steps.Add({TEXT("RigSetup"), 0.f, [=, this]() { SetWind(0.f, 0.f); Place(TestWater, 90.f, 0.f, false, false); }, nullptr, nullptr});
+	Wait(TEXT("RigSettle"), 4.f);
+	Steps.Add({TEXT("RigTakenIn"), 0.f, [=]() { CheckRig(TEXT("BoatSailRiggedTakenIn"), false); }, nullptr, nullptr});
+	Steps.Add({TEXT("RigLetFall"), 3.5f, [this]() { if (ASaltBoat* Bt = TestBoat.Get()) { Bt->SetSailSet(true); } }, nullptr,
+		[=]() { CheckRig(TEXT("BoatSailRiggedSet"), true); }});
+	Steps.Add({TEXT("RigTidy"), 0.f, [this]() { if (ASaltBoat* Bt = TestBoat.Get()) { Bt->SetSailSet(false); } }, nullptr, nullptr});
+	Wait(TEXT("RigRolledUp"), 3.f);
 	Steps.Add({TEXT("SwingRoll"), 2.5f, [this]()
 	{
 		MaxValue = MinValue = 0.f;
@@ -1119,8 +1276,9 @@ void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 	Steps.Add({TEXT("FlatAgain"), 0.f, [WeakRig]() { if (ASaltLightingRig* R = WeakRig.Get()) { R->SetSeaState(TEXT("Flat"), 0.f); } }, nullptr, nullptr});
 
 	// 10b) Sailing onto Ruin Isle (D47) from the west: the boat runs aground on the beach shelf (the coast is about
-	// 47 m west of the island's centre at X = 1600 m), stays on top of the sand, and stops once the sail is in.
-	Steps.Add({TEXT("IsleSetup"), 0.f, [=, this]() { SetWind(0.f, 7.f); Place(FVector(146000.f, 60000.f, 0.f), 0.f, 3.f, true, true); }, nullptr, nullptr});
+	// 47 m west of the island's centre at X = 1600 m), stays on top of the sand, and stops once the sail is in. D65: with the
+	// wind astern (her fastest, as fast as she came in before the square sail).
+	Steps.Add({TEXT("IsleSetup"), 0.f, [=, this]() { SetWind(180.f, 7.f); Place(FVector(146000.f, 60000.f, 0.f), 0.f, 3.f, true, true); }, nullptr, nullptr});
 	Steps.Add({TEXT("IsleApproach"), 45.f, [this]() { MaxValue = 0.f; },
 		[this](float) { if (const ASaltBoat* Bt = TestBoat.Get()) { MaxValue = FMath::Max(MaxValue, Bt->GetContactDepth()); } }, nullptr});
 	Steps.Add({TEXT("IsleLanding"), 12.f, [this]() { if (ASaltBoat* Bt = TestBoat.Get()) { Bt->SetSailSet(false); } },
@@ -1180,14 +1338,17 @@ void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 		UE_LOG(LogSaltbound, Display, TEXT("SB_TEST BoatSuite DONE passed=%d failed=%d"), Passed, Failed);
 	}, nullptr, nullptr});
 
-	// D59: a part on its own (its steps, the set-up and the finish).
+	// D59: a part on its own (its steps, the set-up and the finish). D65: several parts, comma-separated (Float,RollKick).
 	if (!Only.IsEmpty())
 	{
-		const FString Part = Only;
-		Steps.RemoveAll([&Part](const FStep& S)
+		TArray<FString> Parts;
+		Only.ParseIntoArray(Parts, TEXT(","));
+		Steps.RemoveAll([&Parts](const FStep& S)
 		{
-			return !S.Name.Contains(Part) && S.Name != TEXT("BoatSetup") && S.Name != TEXT("BoatFinish");
+			return !Parts.ContainsByPredicate([&S](const FString& P) { return S.Name.Contains(P); })
+				&& S.Name != TEXT("BoatSetup") && S.Name != TEXT("BoatFinish");
 		});
+		const FString& Part = Only;
 		UE_LOG(LogSaltbound, Display, TEXT("SB_TEST BoatSuite only '%s': %d steps"), *Part, Steps.Num());
 	}
 

@@ -9,11 +9,13 @@ namespace SaltStats
 		static const TArray<FSaltBoatStats> Table = []()
 		{
 			TArray<FSaltBoatStats> T;
-			// The first boat: a 10 m gaff-rigged double-ender, 10.9 t, steered with an oar.
+			// The first boat: a 10 m double-ender with a square sail (D65; gaff-rigged before), 10.9 t, steered with an oar.
 			FSaltBoatStats Starter;
 			Starter.Id = TEXT("DoubleEnder");
 			Starter.Name = NSLOCTEXT("SaltStats", "DoubleEnder", "Double-ender");
-			Starter.SailThrust = 10000.f;   // D59 (owner: "a bit faster"): about 8.4 kn on a reach (was 7800 N, 7.4 kn)
+			Starter.SailThrust = 10000.f;   // D59 (owner: "a bit faster"); D65: with the wind astern, about 8.4 kn as the best before
+			Starter.SailDriveAbeam = 0.6f;          // D65 ("always pulls"): 0.6 of it with the apparent wind abeam
+			Starter.SailDriveHeadToWind = 0.28f;    // and 0.28 head to wind: never stuck
 			Starter.HullSpeed = 3.75f;
 			Starter.HullResistance = 1700.f;
 			Starter.CoastDrag = 1500.f;
