@@ -7,6 +7,7 @@
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
+#include "Core/SaltSaveSubsystem.h"
 #include "Interaction/SaltInteractableComponent.h"
 #include "Saltbound.h"
 
@@ -122,7 +123,8 @@ void ASaltSeaGate::BeginPlay()
 {
 	Super::BeginPlay();
 	Resolve();
-	SetOpenAmountNow(bStartOpen ? 1.f : 0.f);
+	const USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this);
+	SetOpenAmountNow((Saves ? Saves->bSeaGateOpen : bStartOpen) ? 1.f : 0.f);
 	for (USaltInteractableComponent* Use : Handles)
 	{
 		Use->OnInteract.AddDynamic(this, &ASaltSeaGate::HandleInteract);
@@ -237,6 +239,10 @@ void ASaltSeaGate::HandleInteract(USaltInteractableComponent* Interactable, ASal
 	if (!IsMoving())
 	{
 		Toggle();
+		if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
+		{
+			Saves->bSeaGateOpen = Target >= 0.5f;
+		}
 		UE_LOG(LogSaltbound, Log, TEXT("SB_SEAGATE %s"), Target >= 0.5f ? TEXT("raising") : TEXT("lowering"));
 		Apply();
 	}

@@ -8,9 +8,9 @@ lanterns where the data hangs them (and on the Well's gallery corners and in the
 
     python Tools/ue_exec.py Tools/ue_scripts/create_hub_blockout_map.py [art]
 
-With `art` it builds the art pass's review map instead, /Game/Saltbound/Maps/L_HubReview (D62): the art meshes
-(SM_Hub_*, build_hub_hull.py / build_hub_ends.py) where they exist, the blockout parts they replace kept as hidden collision
-(so the D61 measurements hold), the rest of the blockout as it is until its art is built; no labels or markers.
+With `art` it builds the art pass's review map instead, /Game/Saltbound/Maps/L_HubReview (D62, D63): the ship as the game
+streams her in (hub_place.py, shared with L_Hub: the art over the blockout as hidden collision, the sea gate, the gates, the E
+points, the hoist, the ladders, the moorings), no labels or markers.
 """
 import math
 import os
@@ -21,30 +21,13 @@ import unreal
 sys.path.insert(0, os.path.dirname(__file__))
 import sb_ue  # noqa: E402
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "Art", "Blender", "Scripts"))
-import hub_layout as H  # noqa: E402  (pure Python: every number from HubShip_Data.json)
 import importlib  # noqa: E402
-importlib.reload(H)                # the editor keeps modules: always read the current data
+import hub_place  # noqa: E402
+importlib.reload(hub_place)        # the editor keeps modules (and hub_place reloads the data)
+H = hub_place.H
 
 ART = "art" in sys.argv[1:]
 MAP = "/Game/Saltbound/Maps/L_HubReview" if ART else "/Game/Saltbound/Maps/L_HubBlockout"
-BLK = "/Game/Saltbound/Hub/Blockout/"
-ART_DIR = "/Game/Saltbound/Hub/Art/"
-ART_PARTS = ["HullStern", "HullWaistS", "HullWaistP", "HullBow", "Ancient", "Stern", "Galleries", "Castles", "Head",
-             "MastMizzen", "MastMain", "MastFore", "Spritsail", "Dock", "Slip", "Tally", "Well", "Keelgate", "MainDeck", "Chandlery", "Gates"]
-# Every blockout part stays, as collision only: the art draws the whole ship.
-ART_REPLACES = {"ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow", "Basin", "Quay", "Lower", "Middle", "Upper", "Main", "Stairs",
-                "Gates", "Props", "Masts", "Markers"}
-PARTS = ["ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow", "Basin", "Quay", "Lower", "Middle", "Upper", "Main", "Stairs",
-         "Gates", "Props", "Masts", "Markers"]
-# Calm zones (prompt section 4; not in the data): round the ship within 120 m (full by 300 m), in the basin. Measured in the
-# Storm sea (D61, hub_checks.water): the prompt's 30 % and 10 % let the sea reach +1.56 m under the hull and +0.51 m in
-# the basin; 20 % and 7 % keep it under +1.2 m and +0.4 m.
-SHIP_ZONE = (12000.0, 30000.0, 0.2)
-LANTERN_CD = 60.0          # a lantern below decks (the game's ASaltLantern is 28 cd)
-INTERIOR_MIN_EV = 3.0      # how far the eye opens up below decks (the Day preset stops at EV 11, Dusk at 5)
-INTERIOR_MAX_EV = 7.5      # and how far it may close there (the shaft's daylight and the doorways would black the rooms out)
-BASIN_ZONE = (2500.0, 4000.0, 0.07)
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -90,16 +73,7 @@ pp.set_editor_property("unbound", True)
 rig = spawn(unreal.SaltLightingRig, (0, 0, 300), label="LightingRig")
 
 ocean = spawn(unreal.SaltOcean, (0, 0, 0), label="Ocean")
-zones = []
-for centre, (inner, outer, factor) in ((world(H.PIVOT_X, 0.0, 0.0), SHIP_ZONE),
-                                       (world(0.5 * (H.HUB["basin"]["x0"] + H.HUB["basin"]["x1"]), 0.0, 0.0), BASIN_ZONE)):
-    z = unreal.SaltCalmZone()
-    z.set_editor_property("center", unreal.Vector2D(centre[0], centre[1]))
-    z.set_editor_property("inner_radius", inner)
-    z.set_editor_property("outer_radius", outer)
-    z.set_editor_property("min_factor", factor)
-    zones.append(z)
-ocean.set_editor_property("calm_zones", zones)
+ocean.set_editor_property("calm_zones", hub_place.calm_zones(local=False, berth=((BX, BY, BZ), YAW, BERTH_ID)))
 print("SB_HUB_ZONES ship", [round(c) for c in world(H.PIVOT_X, 0, 0)[:2]], "basin", [round(c) for c in world(22.0, 0, 0)[:2]])
 # The far floor, 60 m down under her (the visual test map's floor; it is not under her whole hull there).
 floor = spawn(unreal.StaticMeshActor, (BX, BY, -6000), label="Seabed")
@@ -109,51 +83,9 @@ floor.static_mesh_component.set_material(0, unreal.load_asset("/Game/Saltbound/M
 floor.static_mesh_component.set_editor_property("visible_in_ray_tracing", False)
 
 # --- the ship ----------------------------------------------------------------------------------------------------------------
-for part in PARTS:
-    if ART and part == "Markers":
-        continue
-    a = spawn(unreal.StaticMeshActor, (BX, BY, BZ), (0, YAW, 0), "Hub_" + part, "HubShip/Collision" if ART and part in ART_REPLACES else "HubShip")
-    a.static_mesh_component.set_static_mesh(unreal.load_asset(BLK + "SM_HubBlk_" + part))
-    if part == "Markers":
-        a.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
-        a.static_mesh_component.set_editor_property("cast_shadow", False)
-    if ART and part in ART_REPLACES:
-        a.static_mesh_component.set_visibility(False, False)           # collision only: the art draws this part
-if ART:
-    for part in ART_PARTS:
-        mesh = unreal.load_asset(ART_DIR + "SM_Hub_" + part)
-        if mesh is None:
-            continue
-        a = spawn(unreal.StaticMeshActor, (BX, BY, BZ), (0, YAW, 0), "HubArt_" + part, "HubShip/Art")
-        a.static_mesh_component.set_static_mesh(mesh)
-        a.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
-    # The pennant at the main truck (build_hub_rig.py writes where): it streams aft, she lies head to wind on her anchors.
-    rig_json = os.path.join(os.path.dirname(__file__), "..", "..", "Art", "Generated", "hub_rig.json")
-    pennant = unreal.load_asset(ART_DIR + "SM_Hub_Pennant")
-    if pennant is not None and os.path.exists(rig_json):
-        import json
-        with open(rig_json, encoding="utf-8") as fh:
-            px, py, pz = json.load(fh)["pennant"]
-        a = spawn(unreal.StaticMeshActor, H.ship_to_world(px, py, pz), (0, YAW + 180.0, 0), "HubArt_Pennant", "HubShip/Art")
-        a.static_mesh_component.set_static_mesh(pennant)
-        a.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
-        a.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
-    # The sea gate (hub.seagate): its fixed frame (the grooves collide: the boat must not pass through them) and the
-    # portcullis on its ropes and capstans (ASaltSeaGate; it starts open). Local frame: the gate's bottom centre, closed.
-    sg = H.HUB["seagate"]
-    frame = unreal.load_asset(ART_DIR + "SM_Hub_SeaGateFrame")
-    if frame is not None and hasattr(unreal, "SaltSeaGate"):
-        a = spawn(unreal.StaticMeshActor, (BX, BY, BZ), (0, YAW, 0), "HubArt_SeaGateFrame", "HubShip/Art")
-        a.static_mesh_component.set_static_mesh(frame)
-        g = spawn(unreal.SaltSeaGate, H.ship_to_world(sg["x"], 0.0, sg["z0"]), (0, YAW, 0), "SeaGate", "HubShip/Art")
-        g.set_editor_property("raise_cm", sg["raise"] * 100.0)
-        g.set_editor_property("gate_height_cm", (sg["h"] + 0.1) * 100.0)
-        g.set_editor_property("travel_seconds", float(sg["seconds"]))
-        g.set_editor_property("capstan_turns", float(sg["turns"]))
-        g.set_editor_property("rope_tops", [unreal.Vector(0.0, y * 100.0, (30.4 - sg["z0"]) * 100.0) for y in sg["ropes"]])
-        g.set_editor_property("capstan_spots", [unreal.Vector((cx - sg["x"]) * 100.0, cy * 100.0, (H.Z["quay"] - sg["z0"]) * 100.0)
-                                                for cx, cy in sg["capstans"]])
-        g.rerun_construction_scripts() if hasattr(g, "rerun_construction_scripts") else None
+placer = hub_place.Placer(eas, (BX, BY, BZ), YAW, "HubShip")
+counts = hub_place.everything(placer, under_art=ART)
+print("SB_HUB_PLACED", counts)
 
 
 def label(text, x, y, z, face_deg, colour, size=34.0):
@@ -194,52 +126,6 @@ def open_side(gm):
 for gm in ([] if ART else H.GATE_MARKS):
     zl = H.level_z(gm["level"])
     label("%s %s" % (gm["g"], gm["zone"]), gm["x"], gm["y"], zl + 2.6, open_side(gm), unreal.Color(r=255, g=70, b=50, a=255), size=28.0)
-
-# --- light: lanterns where the data hangs them ----------------------------------------------------------------------------
-lamps = []
-for name, fl in (("slip", H.Z["quay"]), ("tally", H.Z["lower"]), ("keelgate", H.Z["quay"])):
-    pr = H.prop(name, "lanterns")
-    lamps += [(x, y, fl + z - 0.4) for x, y, z in pr["at"]]
-for name, fl in (("dock", H.Z["quay"]), ("main_deck", H.Z["main"])):          # on the arcade posts; on the main deck
-    pr = H.prop(name, "lanterns")
-    lamps += [(x, y, fl + z - 0.4) for x, y, z in pr["at"]]
-ring = H.R(H.HUB["ring"])
-for lvl in ("lower", "middle", "upper"):                                      # the Well's gallery corners (its note)
-    lamps += [(x, y, H.Z[lvl] + 3.0) for x in (ring[0] + 0.6, ring[1] - 0.6) for y in (ring[2] + 0.6, ring[3] - 0.6)]
-lamps.append((0.5 * (H.HUB["shaft"]["x0"] + H.HUB["shaft"]["x1"]), 0.0, H.Z["middle"] + 2.0))   # the ring lantern in the shaft
-beams = H.prop("chandlery", "beams")
-lamps += [(bx, -13.5, H.Z["main"] + beams["z"] - 0.5) for bx in beams["at_x"][::2]]                # stock lanterns from the beams
-# Below decks the lanterns burn by day as well (the rig puts ASaltLantern out by day): plain warm lights at the lanterns' spots
-# (D61 review: with the game's outdoor exposure and the lanterns out, the Tally House measured black by day).
-for k, (x, y, z) in enumerate(lamps):
-    lamp = spawn(unreal.PointLight, world(x, y, z), (0, YAW, 0), "Lantern_%02d" % k, "HubShip/Lanterns")
-    lc = lamp.get_component_by_class(unreal.PointLightComponent)
-    lc.set_editor_property("intensity_units", unreal.LightUnits.CANDELAS)
-    lc.set_editor_property("intensity", LANTERN_CD)
-    lc.set_editor_property("use_temperature", True)
-    lc.set_editor_property("temperature", 2100.0)
-    lc.set_editor_property("attenuation_radius", 1600.0)
-    lc.set_mobility(unreal.ComponentMobility.MOVABLE)
-print("SB_HUB_LANTERNS", len(lamps))
-
-# The eye adapts below decks: each enclosed space gets its own exposure range (the rig's presets clamp it for the open sea).
-INTERIORS = {"Slip": (44.0, 64.0, -9.0, 19.0, 1.5, 13.5), "TallyStair": (30.0, 73.0, 6.0, 20.0, 1.5, 9.5),
-             "KeelgateWell": (72.0, 96.0, -12.0, 12.0, 1.5, 17.5), "Chandlery": (98.0, 114.0, -17.5, -8.0, 17.5, 22.9)}
-if ART:                                       # under the arcades the eye opens a little (the quays are deep under the wings)
-    INTERIORS.update({"QuayS": (0.5, 44.0, 10.0, 14.0, 1.5, 5.5), "QuayP": (0.5, 44.0, -14.0, -10.0, 1.5, 5.5)})
-for name, (x0, x1, y0, y1, z0, z1) in INTERIORS.items():
-    v = spawn(unreal.PostProcessVolume, world(0.5 * (x0 + x1), 0.5 * (y0 + y1), 0.5 * (z0 + z1)), (0, YAW, 0), "Exposure_" + name, "HubShip")
-    v.set_actor_scale3d(unreal.Vector((x1 - x0) * 0.5, (y1 - y0) * 0.5, (z1 - z0) * 0.5))      # the brush is 2 m (200 cm) across
-    v.set_editor_property("unbound", False)
-    v.set_editor_property("priority", 1.0)
-    v.set_editor_property("blend_radius", 300.0)
-    ps = v.get_editor_property("settings")
-    ps.set_editor_property("override_auto_exposure_min_brightness", True)
-    ps.set_editor_property("auto_exposure_min_brightness", 6.0 if name.startswith("Quay") else INTERIOR_MIN_EV)
-    # ... and does not close again for the bright doorways and the Well's daylight (D62: the lane read black).
-    ps.set_editor_property("override_auto_exposure_max_brightness", True)
-    ps.set_editor_property("auto_exposure_max_brightness", 9.0 if name.startswith("Quay") else INTERIOR_MAX_EV)
-    v.set_editor_property("settings", ps)
 
 # --- the player's boat at the fitting berth, the player on the starboard quay --------------------------------------------
 fb = H.prop("dock", "fitting_berth")

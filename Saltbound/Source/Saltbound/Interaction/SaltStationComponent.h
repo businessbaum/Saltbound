@@ -54,6 +54,9 @@ public:
 	/** Prompt shown while operating the station. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station")
 	FText LeavePromptText;
+	/** False while the player may not step out (D62: the hoist between two decks). */
+	UPROPERTY(Transient, BlueprintReadWrite, Category = "Station")
+	bool bLeaveAllowed = true;
 
 	/** The station's controls, shown while operating it in the key-scrap prompt (D58), side by side: keys (letters, e.g.
 	 *  A and D) and what they do ("Steer"). */

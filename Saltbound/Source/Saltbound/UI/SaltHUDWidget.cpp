@@ -281,6 +281,11 @@ void USaltHUDWidget::ShowNotice(const FText& Text)
 	}
 }
 
+FText USaltHUDWidget::GetNoticeText() const
+{
+	return Notice && NoticeTime > 0.f ? Notice->GetText() : FText::GetEmpty();
+}
+
 FText USaltHUDWidget::GetShownPrompt() const
 {
 	const FPromptRow& Row = Rows[ActiveRow];

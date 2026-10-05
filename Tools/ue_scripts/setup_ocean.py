@@ -45,7 +45,8 @@ WAVE_PARAMS = ["W%d" % i for i in range(12)]
 PHASE_PARAMS = ["Phase0123", "Phase4567", "Phase891011"]
 PREV_PARAMS = ["PrevPhase0123", "PrevPhase4567", "PrevPhase891011"]
 CASCADE_PARAMS = ["Cascade0", "Cascade1", "Cascade2"]
-FIELD_PARAMS = PHASE_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals"] + CASCADE_PARAMS
+CALM_PARAMS = ["Calm%d" % i for i in range(8)] + ["CalmMin", "CalmMin2"]      # eight calm zones (D62: the hub's berth)
+FIELD_PARAMS = PHASE_PARAMS + CALM_PARAMS + ["Chop", "Globals"] + CASCADE_PARAMS
 LOOK_PARAMS = ["LookAbsorption", "LookScattering", "LookCrest"]
 # Underwater look shared by M_OceanUnder and M_PP_Underwater (D28):
 #   UnderwaterFog = (view fog scale, in-scatter brightness, light-path scale, sun forward scatter)
@@ -71,7 +72,8 @@ def cascade_default(i):
 # MPC defaults = Shores of Plenty, Rough (the rig overwrites them at runtime and in the editor).
 MPC_DEFAULTS = {
     "Calm0": (1.0e9, 1.0e9, 0, 1), "Calm1": (1.0e9, 1.0e9, 0, 1), "Calm2": (1.0e9, 1.0e9, 0, 1), "Calm3": (1.0e9, 1.0e9, 0, 1),
-    "CalmMin": (1, 1, 1, 1), "Chop": (1, 0, 3, 250),
+    "Calm4": (1.0e9, 1.0e9, 0, 1), "Calm5": (1.0e9, 1.0e9, 0, 1), "Calm6": (1.0e9, 1.0e9, 0, 1), "Calm7": (1.0e9, 1.0e9, 0, 1),
+    "CalmMin": (1, 1, 1, 1), "CalmMin2": (1, 1, 1, 1), "Chop": (1, 0, 3, 250),
     "Cascade0": cascade_default(0), "Cascade1": cascade_default(1), "Cascade2": cascade_default(2),
     "LookAbsorption": (1.35, 0.26, 0.15, 1), "LookScattering": (0.01, 0.065, 0.1, 1),
     "BoatPos": (0, 0, -1.0e9, 0), "BoatAxisX": (1, 0, 0, 0), "BoatAxisY": (0, 1, 0, 0), "BoatAxisZ": (0, 0, 1, 0),
@@ -84,7 +86,7 @@ MPC_DEFAULTS = {
 # --- MPC and render targets -------------------------------------------------------------------
 def make_mpc():
     mpc = sb_ue.get_or_create_asset("MPC_Ocean", DIR, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
-    names = (WAVE_PARAMS + PHASE_PARAMS + PREV_PARAMS + ["Calm0", "Calm1", "Calm2", "Calm3", "CalmMin", "Chop", "Globals", "RippleOffsets"]
+    names = (WAVE_PARAMS + PHASE_PARAMS + PREV_PARAMS + CALM_PARAMS + ["Chop", "Globals", "RippleOffsets"]
              + CASCADE_PARAMS + LOOK_PARAMS + UNDER_PARAMS + BOAT_PARAMS + ["BoatWake", "BoatWakeExtent"] + TRAIL_PARAMS)
     # Keep existing entries: each has an ID that materials reference. Recreated entries get new IDs and every
     # material not rebuilt in the same run fails to compile ("invalid parameter") and renders the default material.
@@ -161,7 +163,7 @@ F4 = unreal.CustomMaterialOutputType.CMOT_FLOAT4
 
 INIT = """FSaltOcean O;
 O.Init(W0, W1, W2, W3, W4, W5, W6, W7, W8, W9, W10, W11, Phase0123, Phase4567, Phase891011,
-       Calm0, Calm1, Calm2, Calm3, CalmMin, Chop, Globals.x);
+       Calm0, Calm1, Calm2, Calm3, Calm4, Calm5, Calm6, Calm7, CalmMin, CalmMin2, Chop, Globals.x);
 """
 
 VS_CODE = INIT + """

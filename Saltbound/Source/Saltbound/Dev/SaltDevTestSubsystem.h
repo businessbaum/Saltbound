@@ -32,6 +32,9 @@ public:
 	/** Sailing tests (SaltDevBoatTests.cpp): buoyancy, points of sail, turning, collision, grounding, player aboard. */
 	/** Only: a part of the suite on its own (D59: "ladder"); empty runs it all. */
 	void RunBoatSuite(const FString& Only = FString());
+	/** The hub ship's tests (SaltDevHubTests.cpp, D63): placed, sea, floors, headroom, routes, gates, boat, slipway, hoist,
+	 *  follow rule, save, ladder. Only: one part (e.g. "Hoist"); empty runs them all. */
+	void RunHubSuite(const FString& Only = FString());
 	void ConfigurePlatform(float MotionScale, bool bForce, float Speed, float TurnRate);
 	void ResetPlayer();
 	void StartPerf(float Seconds);

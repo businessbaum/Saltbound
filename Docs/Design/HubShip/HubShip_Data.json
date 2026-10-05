@@ -1913,22 +1913,30 @@
   "G1": {
    "name": "Barred door",
    "why": "Somebody’s room or business, not open to you yet.",
-   "how": "A timber door with an iron bar and a padlock. E: a short line of why."
+   "how": "A timber door with an iron bar and a padlock. E: a short line of why.",
+   "prompt": "Try the door",
+   "line": "Barred from inside."
   },
   "G2": {
    "name": "Rope and board",
    "why": "Work going on, or closed for now.",
-   "how": "A rope across the way on stanchions (or between the door posts), a hand-painted board on it."
+   "how": "A rope across the way on stanchions (or between the door posts), a hand-painted board on it.",
+   "prompt": "Read the board",
+   "line": "Closed for now."
   },
   "G3": {
    "name": "Chained ladder or hatch",
    "why": "Up or down: masts, forecastle, cargo hatches.",
-   "how": "A chain through the rungs or the grating, padlocked."
+   "how": "A chain through the rungs or the grating, padlocked.",
+   "prompt": "Try the chain",
+   "line": "Chained and padlocked."
   },
   "G4": {
    "name": "Shutters",
    "why": "Windows and bays of locked rooms.",
-   "how": "Closed shutters: nothing inside to see, nothing inside to build."
+   "how": "Closed shutters: nothing inside to see, nothing inside to build.",
+   "prompt": "Try the shutters",
+   "line": "Shuttered from inside."
   },
   "G5": {
    "name": "Ancient seal",
@@ -1938,7 +1946,9 @@
   "G6": {
    "name": "Iron grille",
    "why": "A glimpse: stores and holds.",
-   "how": "Bars you see through into a shallow set, 2 to 3 m deep, and no further."
+   "how": "Bars you see through into a shallow set, 2 to 3 m deep, and no further.",
+   "prompt": "Look through the grille",
+   "line": "Stacked timber, and no way in."
   }
  },
  "gate_marks": [
@@ -2129,7 +2139,8 @@
    "x": 116,
    "y": 0,
    "g": "G2",
-   "zone": "L15"
+   "zone": "L15",
+   "line": "Cargo work, keep clear."
   },
   {
    "level": "main",

@@ -28,6 +28,7 @@
 #include "Player/SaltPlayerController.h"
 #include "Props/SaltSwingComponent.h"
 #include "Saltbound.h"
+#include "UObject/UObjectIterator.h"
 #include "World/SaltWindSubsystem.h"
 
 namespace
@@ -400,6 +401,8 @@ void ASaltBoat::OnConstruction(const FTransform& Transform)
 	ResolveContent();
 	ApplySteeringLayout();
 	StartTransform = Transform;
+	UpdateHomeMooring();
+	Mooring = Home;
 	// The editor shows the boat as it starts: moored, the sail taken in (the material's default).
 	UpdateVisuals(0.f);
 	UpdateRopes(0.f);
@@ -494,6 +497,8 @@ void ASaltBoat::BeginPlay()
 	ApplySteeringLayout();
 	BuildHullModel();
 	StartTransform = GetActorTransform();
+	UpdateHomeMooring();
+	Mooring = Home;
 	SetPose(GetActorLocation() * 0.01, GetActorQuat());
 	SailRopePort->OnInteract.AddDynamic(this, &ASaltBoat::HandleSailRope);
 	SailRopeStarboard->OnInteract.AddDynamic(this, &ASaltBoat::HandleSailRope);
@@ -738,11 +743,65 @@ void ASaltBoat::PlaceAt(const FVector& Location, float Yaw, float ForwardSpeed)
 	ApplyTransform(0.f);
 }
 
-void ASaltBoat::RestoreState(const FVector& Location, float Yaw, ESaltBoatHold InHold, bool bSail)
+void ASaltBoat::UpdateHomeMooring()
+{
+	Home.Id = TEXT("Home");
+	Home.Pose = FTransform(FRotator(0.0, StartTransform.Rotator().Yaw, 0.0), StartTransform.GetLocation());
+	Home.Reach = MooringReach;
+	Home.PierHeight = MooringPierHeight;
+}
+
+bool ASaltBoat::FindMooring(FSaltMooring& Out, double* OutDistanceM) const
+{
+	double Best = FVector::Dist2D(GetActorLocation(), Home.Pose.GetLocation()) * 0.01;
+	Out = Home;
+	for (TObjectIterator<USaltMooringPointComponent> It; It; ++It)
+	{
+		if (It->GetWorld() != GetWorld() || !It->IsRegistered())
+		{
+			continue;
+		}
+		const double D = FVector::Dist2D(GetActorLocation(), It->GetComponentLocation()) * 0.01;
+		if (D < Best)
+		{
+			Best = D;
+			Out = It->GetMooring();
+		}
+	}
+	if (OutDistanceM)
+	{
+		*OutDistanceM = Best;
+	}
+	return Best < MooringRadius;
+}
+
+void ASaltBoat::MoorAt(const FSaltMooring& InMooring)
+{
+	SetHold(ESaltBoatHold::Free);
+	Mooring = InMooring.IsValid() ? InMooring : Home;
+	PlaceAt(Mooring.Pose.GetLocation(), Mooring.Pose.Rotator().Yaw);
+	bSailSet = false;
+	SailTarget = 0.f;
+	Hoist = 0.f;
+	Fill = FillVel = 0.f;
+	RudderAngle = 0.f;
+	BoomAngle = 0.f;
+	SetHold(ESaltBoatHold::Moored);
+	UE_LOG(LogSaltbound, Display, TEXT("Boat moored at %s"), *Mooring.Id.ToString());
+}
+
+void ASaltBoat::RestoreState(const FVector& Location, float Yaw, ESaltBoatHold InHold, bool bSail, const FSaltMooring& InMooring)
 {
 	if (InHold == ESaltBoatHold::Moored)
 	{
-		ResetToStart();
+		if (InMooring.IsValid() && InMooring.Id != Home.Id)
+		{
+			MoorAt(InMooring);
+		}
+		else
+		{
+			ResetToStart();
+		}
 	}
 	else
 	{
@@ -765,6 +824,7 @@ void ASaltBoat::RestoreState(const FVector& Location, float Yaw, ESaltBoatHold I
 void ASaltBoat::ResetToStart()
 {
 	SetHold(ESaltBoatHold::Free);
+	Mooring = Home;
 	PlaceAt(StartTransform.GetLocation(), StartTransform.Rotator().Yaw);
 	bSailSet = false;
 	SailTarget = 0.f;
@@ -778,8 +838,8 @@ void ASaltBoat::ResetToStart()
 
 void ASaltBoat::Recover()
 {
-	FVector Origin = StartTransform.GetLocation();
-	float Yaw = StartTransform.Rotator().Yaw;
+	FVector Origin = Mooring.Pose.GetLocation();
+	float Yaw = Mooring.Pose.Rotator().Yaw;
 	if (SafePoses.Num() > 0)
 	{
 		Origin = SafePoses.Last().Origin;
@@ -818,7 +878,7 @@ void ASaltBoat::MoorAtStart()
 	using namespace SaltHull;
 	const FVector Bow(HalfLength - 0.3f, 0.f, SheerZ(HalfLength - 0.3f));
 	const FVector Stern(-HalfLength + 0.3f, 0.f, SheerZ(HalfLength - 0.3f));
-	const FTransform StartM(StartTransform.GetRotation(), StartTransform.GetLocation() * 0.01);
+	const FTransform StartM(Mooring.Pose.GetRotation(), Mooring.Pose.GetLocation() * 0.01);
 	Lines.Reset();
 	Lines.Add({Bow, StartM.TransformPosition(Bow), 0.25f});
 	Lines.Add({Stern, StartM.TransformPosition(Stern), 0.25f});
@@ -863,8 +923,14 @@ void ASaltBoat::ToggleHold()
 		return;
 	}
 	const double Speed = V.Size2D();
-	const double ToMooring = FVector::Dist2D(GetActorLocation(), StartTransform.GetLocation()) * 0.01;
-	SetHold(Speed < 1.5 && ToMooring < MooringRadius ? ESaltBoatHold::Moored : ESaltBoatHold::Anchored);
+	FSaltMooring Near;
+	if (Speed < 1.5 && FindMooring(Near))
+	{
+		Mooring = Near;
+		SetHold(ESaltBoatHold::Moored);
+		return;
+	}
+	SetHold(ESaltBoatHold::Anchored);
 }
 
 void ASaltBoat::HandleSailRope(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
@@ -1590,14 +1656,15 @@ void ASaltBoat::UpdateVisuals(float DeltaSeconds)
 void ASaltBoat::UpdateHints()
 {
 	const double Speed = V.Size2D();
-	const double ToMooring = FVector::Dist2D(GetActorLocation(), StartTransform.GetLocation()) * 0.01;
+	FSaltMooring Near;
+	const bool bNearMooring = FindMooring(Near);
 	FText WindlassText;
 	switch (Hold)
 	{
 	case ESaltBoatHold::Moored: WindlassText = NSLOCTEXT("Saltbound", "BoatCastOff", "Cast off"); break;
 	case ESaltBoatHold::Anchored: WindlassText = NSLOCTEXT("Saltbound", "BoatRaiseAnchor", "Hold to raise the anchor"); break;
 	default:
-		WindlassText = Speed < 1.5 && ToMooring < MooringRadius ? NSLOCTEXT("Saltbound", "BoatMoor", "Moor the boat")
+		WindlassText = Speed < 1.5 && bNearMooring ? NSLOCTEXT("Saltbound", "BoatMoor", "Moor the boat")
 			: NSLOCTEXT("Saltbound", "BoatDropAnchor", "Drop the anchor");
 		break;
 	}
@@ -1786,16 +1853,18 @@ void ASaltBoat::UpdateRopes(float DeltaSeconds)
 	};
 	// Mooring lines to the pier (their pier ends stay where the boat was moored).
 	using namespace SaltHull;
-	const FVector Reach = StartTransform.GetRotation().RotateVector(FVector(0.0, MooringReach, 0.0));
-	const FVector PierZ(0.0, 0.0, StartTransform.GetLocation().Z + MooringPierHeight + 4.0);
+	// D62: to the mooring in use (the pier, or a quay of the hub to starboard or port).
+	const FVector Reach = Mooring.Pose.GetRotation().RotateVector(FVector(0.0, Mooring.Reach, 0.0));
+	const FVector PierZ(0.0, 0.0, Mooring.Pose.GetLocation().Z + Mooring.PierHeight + 4.0);
+	const double Side = Mooring.Side();
 	auto PierPoint = [&](const FVector& BittBody)
 	{
-		FVector P = StartTransform.TransformPosition(BittBody * 100.0) + Reach;
+		FVector P = Mooring.Pose.TransformPosition(BittBody * 100.0) + Reach;
 		P.Z = PierZ.Z;
 		return P;
 	};
-	MooringPierFore->SetWorldLocation(PierPoint(FVector(4.0, 0.22, 0.0)));
-	MooringPierAft->SetWorldLocation(PierPoint(FVector(-4.15, 0.22, 0.0)));
+	MooringPierFore->SetWorldLocation(PierPoint(FVector(4.0, 0.22 * Side, 0.0)));
+	MooringPierAft->SetWorldLocation(PierPoint(FVector(-4.15, 0.22 * Side, 0.0)));
 	const bool bMoored = Hold == ESaltBoatHold::Moored;
 	Fit(MooringLineFore, MooringPierFore, 1.05f, bMoored);
 	Fit(MooringLineAft, MooringPierAft, 1.05f, bMoored);
@@ -1867,9 +1936,10 @@ void ASaltBoat::UpdateGangway()
 	{
 		return;
 	}
-	FVector Pier = StartTransform.TransformPosition(FVector(LadderX * 100.f, MooringReach + 15.f, 0.f));
-	Pier.Z = StartTransform.GetLocation().Z + MooringPierHeight;
-	const FVector OnBoat = Hull->GetComponentTransform().TransformPosition(FVector(LadderX, HalfBeamAtSheer(LadderX) - 0.2f, SheerZ(LadderX) + 0.03f) * 100.0);
+	const float Side = Mooring.Side();
+	FVector Pier = Mooring.Pose.TransformPosition(FVector(LadderX * 100.f, Mooring.Reach + 15.f * Side, 0.f));
+	Pier.Z = Mooring.Pose.GetLocation().Z + Mooring.PierHeight;
+	const FVector OnBoat = Hull->GetComponentTransform().TransformPosition(FVector(LadderX, Side * (HalfBeamAtSheer(LadderX) - 0.2f), SheerZ(LadderX) + 0.03f) * 100.0);
 	Gangway->SetWorldLocationAndRotation(Pier, (OnBoat - Pier).Rotation());
 }
 

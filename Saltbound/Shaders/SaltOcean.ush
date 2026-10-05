@@ -19,22 +19,25 @@ struct FSaltOcean
 {
 	float4 WA[12];   // Kx, Ky, Amplitude, Horizontal amplitude
 	float  Ph[12];   // phases
-	float4 Calm[4];  // centre X, centre Y, inner radius, outer radius
-	float4 CalmMin;  // amplitude factor at each zone centre
+	float4 Calm[8];  // centre X, centre Y, inner radius, outer radius
+	float4 CalmMin;  // amplitude factor at each zone centre (zones 0-3)
+	float4 CalmMin2; // (zones 4-7)
 	float4 Chop;     // x: factor in calm patches, y: 2pi / patch size, z: swell count, w: swell height (cm)
 	int    Count;
 
 	void Init(float4 W0, float4 W1, float4 W2, float4 W3, float4 W4, float4 W5, float4 W6, float4 W7,
 		float4 W8, float4 W9, float4 W10, float4 W11, float4 P0123, float4 P4567, float4 P891011,
-		float4 C0, float4 C1, float4 C2, float4 C3, float4 CMin, float4 InChop, float WaveCount)
+		float4 C0, float4 C1, float4 C2, float4 C3, float4 C4, float4 C5, float4 C6, float4 C7, float4 CMin, float4 CMin2,
+		float4 InChop, float WaveCount)
 	{
 		WA[0] = W0; WA[1] = W1; WA[2] = W2; WA[3] = W3; WA[4] = W4; WA[5] = W5;
 		WA[6] = W6; WA[7] = W7; WA[8] = W8; WA[9] = W9; WA[10] = W10; WA[11] = W11;
 		Ph[0] = P0123.x; Ph[1] = P0123.y; Ph[2] = P0123.z; Ph[3] = P0123.w;
 		Ph[4] = P4567.x; Ph[5] = P4567.y; Ph[6] = P4567.z; Ph[7] = P4567.w;
 		Ph[8] = P891011.x; Ph[9] = P891011.y; Ph[10] = P891011.z; Ph[11] = P891011.w;
-		Calm[0] = C0; Calm[1] = C1; Calm[2] = C2; Calm[3] = C3;
+		Calm[0] = C0; Calm[1] = C1; Calm[2] = C2; Calm[3] = C3; Calm[4] = C4; Calm[5] = C5; Calm[6] = C6; Calm[7] = C7;
 		CalmMin = CMin;
+		CalmMin2 = CMin2;
 		Chop = InChop;
 		Count = (int)clamp(WaveCount, 0.0, 12.0);
 	}
@@ -42,12 +45,13 @@ struct FSaltOcean
 	float Attenuation(float2 P)
 	{
 		float Att = 1.0;
-		[unroll] for (int j = 0; j < 4; j++)
+		[unroll] for (int j = 0; j < 8; j++)
 		{
 			const float R = length(P - Calm[j].xy);
 			const float T = saturate((R - Calm[j].z) / max(Calm[j].w - Calm[j].z, 1.0));
 			const float S = T * T * (3.0 - 2.0 * T);
-			Att = min(Att, lerp(CalmMin[j], 1.0, S));
+			const float M = j < 4 ? CalmMin[j & 3] : CalmMin2[j & 3];   // (?: evaluates both sides in HLSL)
+			Att = min(Att, lerp(M, 1.0, S));
 		}
 		return Att;
 	}

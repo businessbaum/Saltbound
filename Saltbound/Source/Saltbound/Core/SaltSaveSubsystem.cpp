@@ -7,6 +7,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Hub/SaltSeaGate.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerCharacter.h"
@@ -33,6 +34,23 @@ namespace
 	{
 		return UWorld::RemovePIEPrefix(World->GetMapName());
 	}
+}
+
+void USaltSaveSubsystem::SetUnlocked(FName ZoneId, bool bUnlocked)
+{
+	if (ZoneId.IsNone())
+	{
+		return;
+	}
+	if (bUnlocked)
+	{
+		Unlocked.Add(ZoneId);
+	}
+	else
+	{
+		Unlocked.Remove(ZoneId);
+	}
+	OnHubChanged.Broadcast();
 }
 
 USaltSaveSubsystem* USaltSaveSubsystem::Get(const UObject* WorldContext)
@@ -72,6 +90,7 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 		Save->BoatYaw = Boat->GetYawDeg();
 		Save->BoatHold = Boat->GetHold();
 		Save->bBoatSail = Boat->IsSailSet();
+		Save->BoatMooring = Boat->GetMooring();
 	}
 
 	APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
@@ -114,6 +133,15 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 	}
 	Save->Collected = Collected.Array();
 	Save->FoundPlaces = Found.Array();
+	// The hub (D62).
+	Save->HubBerth = HubBerth;
+	Save->HubUnlocked = Unlocked.Array();
+	Save->Salt = Salt;
+	if (const ASaltSeaGate* Gate = FindFirst<ASaltSeaGate>(World))
+	{
+		bSeaGateOpen = Gate->GetOpenAmount() >= 0.5f;
+	}
+	Save->bSeaGateOpen = bSeaGateOpen;
 	for (TObjectIterator<USaltInventoryComponent> It; It; ++It)
 	{
 		if (It->GetWorld() == World && !It->GetStorageId().IsNone())
@@ -172,7 +200,7 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 	ASaltBoat* Boat = FindFirst<ASaltBoat>(World);
 	if (Boat && Save->bHasBoat)
 	{
-		Boat->RestoreState(Save->BoatLocation, Save->BoatYaw, Save->BoatHold, Save->bBoatSail);
+		Boat->RestoreState(Save->BoatLocation, Save->BoatYaw, Save->BoatHold, Save->bBoatSail, Save->Version >= 5 ? Save->BoatMooring : FSaltMooring());
 	}
 
 	APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
@@ -210,6 +238,14 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 	// Pickups taken in that game stay gone; the others are back.
 	Collected = TSet<FName>(Save->Collected);
 	Found = TSet<FName>(Save->FoundPlaces);
+	HubBerth = Save->HubBerth;
+	Unlocked = TSet<FName>(Save->HubUnlocked);
+	Salt = Save->Salt;
+	bSeaGateOpen = Save->Version >= 5 ? Save->bSeaGateOpen : true;
+	if (ASaltSeaGate* Gate = FindFirst<ASaltSeaGate>(World))
+	{
+		Gate->SetOpenAmountNow(bSeaGateOpen ? 1.f : 0.f);
+	}
 	for (TActorIterator<ASaltPickup> It(World); It; ++It)
 	{
 		It->SetCollected(IsCollected(It->PickupId));
@@ -217,6 +253,8 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 	UE_LOG(LogSaltbound, Display, TEXT("SB_SAVE loaded slot=%s from=%s boat=(%.0f, %.0f) hold=%d aboard=%d"),
 		*Slot, *Save->SavedAt.ToString(), Save->BoatLocation.X, Save->BoatLocation.Y, (int32)Save->BoatHold, Save->bPlayerAboard ? 1 : 0);
 	Notify(World, NSLOCTEXT("Saltbound", "GameLoaded", "Game loaded"));
+	OnGameLoaded.Broadcast();
+	OnHubChanged.Broadcast();
 	return true;
 }
 

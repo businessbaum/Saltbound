@@ -32,6 +32,8 @@ public:
 
 	/** A short notice at the top of the screen ("Game saved"). */
 	void ShowNotice(const FText& Text);
+	/** The notice the HUD shows now (tests). */
+	FText GetNoticeText() const;
 
 	/** Pause menu with the settings (Esc in the game, F10 in the editor, Start on a gamepad): pauses the game. */
 	void SetMenuOpen(bool bOpen);

@@ -50,6 +50,11 @@ void ASaltPlayerController::ShowNotice(const FText& Text)
 	}
 }
 
+FText ASaltPlayerController::GetNoticeText() const
+{
+	return HUDWidget ? HUDWidget->GetNoticeText() : FText::GetEmpty();
+}
+
 bool ASaltPlayerController::IsMenuOpen() const
 {
 	return MenuWidget && MenuWidget->IsInViewport();

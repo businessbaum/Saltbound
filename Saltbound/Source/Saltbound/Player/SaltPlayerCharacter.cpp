@@ -759,8 +759,8 @@ void ASaltPlayerCharacter::HandleInteract()
 	}
 	if (ActiveStation)
 	{
-		// Ignore the press that may still be bouncing from entering.
-		if (StationTime > 0.2f)
+		// Ignore the press that may still be bouncing from entering; some stations hold the player for a while (the hoist).
+		if (StationTime > 0.2f && ActiveStation->bLeaveAllowed)
 		{
 			LeaveStation();
 		}

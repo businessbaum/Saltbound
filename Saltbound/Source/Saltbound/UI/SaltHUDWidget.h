@@ -30,6 +30,7 @@ class SALTBOUND_API USaltHUDWidget : public UUserWidget
 public:
 	/** A short notice at the top of the screen that fades after a few seconds (pickups). */
 	void ShowNotice(const FText& Text);
+	FText GetNoticeText() const;
 
 	/** For tests: the prompt text shown now (empty when none), its hold progress and opacity; the save sign's opacity. */
 	FText GetShownPrompt() const;

@@ -1037,9 +1037,10 @@ def build_well():
 
 
 def gantry_and_hoist(p):
-    """The hoist (well.hoist and its notes): the cage at its quay stop between two guide posts, its ropes up to the
-    gantry's sheaves, the counterweight up there (the cage is down) over its railed bay; the gantry an A-frame over the
-    opening on the main deck with guys to the deck, its beam out over the hoist, the brake drum at its head."""
+    """The hoist's fixed parts (well.hoist and its notes): the gantry an A-frame over the opening on the main deck with guys
+    to the deck, its beam out over the hoist with the two sheaves, the brake drum at its head; the guide posts at the cage's
+    aft corners; the counterweight's railed bay. The cage and the counterweight move (SM_Hub_HoistCage, SM_Hub_HoistWeight,
+    ASaltHubHoist hangs their ropes)."""
     zq, zm = Z["quay"], Z["main"]
     hs = H.R(HUB["hoist"])
     top = zm + 7.5
@@ -1060,7 +1061,46 @@ def gantry_and_hoist(p):
     for c in (end, Vector((cwx, cwy, top))):
         p.lathe([(0.0, -0.12), (0.45, -0.12), (0.5, -0.04), (0.42, 0.0), (0.5, 0.04), (0.45, 0.12), (0.0, 0.12)], c - UP * 0.25, X, "MI_Wood_Varnish", sides=14)
     p.lathe([(0.0, -0.4), (0.35, -0.4), (0.38, 0.4), (0.0, 0.4)], apex - UP * 0.6, Y, "MI_Metal_Iron", sides=14)            # the brake drum
-    # The cage at the quay stop: four posts, a floor, rails to the shoulder, a roof frame; its aft side open (the door).
+    # The guide posts at the cage's aft corners, braced to each gallery's edge.
+    for gy in (hs[2], hs[3] - 0.1):
+        p.beam(T.straight((hs[0] - 0.08, gy + 0.05, zq), (hs[0] - 0.08, gy + 0.05, top - 1.0), X, Y), top - 1.0 - zq, 0.16, 0.12, "MI_Wood_TeakDark",
+               nseed(), seg=1.0)
+        for lv in ("lower", "middle", "upper", "main"):
+            zz = Z[lv] - 0.4
+            a, b = Vector((hs[0] - 0.08, gy + 0.05, zz)), Vector((H.R(HUB["shaft"])[0] - 0.05, gy + 0.05, zz))
+            if (a - b).length > 0.05:
+                p.beam(T.straight(a, b, UP, Y), (a - b).length, 0.1, 0.08, "MI_Metal_Iron", nseed())
+    # The counterweight's bay on the chamber floor (it sits there when the cage is at the main deck).
+    for (ax, ln, a0, a1) in (("y", cw["y0"] - 0.2, cw["x0"] - 0.2, cw["x1"] + 0.3), ("x", cw["x1"] + 0.3, cw["y0"] - 0.2, cw["y1"]),
+                             ("x", cw["x0"] - 0.2, cw["y0"] - 0.2, cw["y1"])):
+        rail(p, ax, ln, a0, a1, zq)
+
+
+def hoist_pivots():
+    """The moving parts' pivots (ship metres): the cage's floor centre at the quay stop, the counterweight's bottom centre
+    in its bay. ASaltHubHoist stands at the cage's pivot (build_hub_level.py)."""
+    hs = H.R(HUB["hoist"])
+    cw = H.prop("well", "counterweight")
+    return ((0.5 * (hs[0] + hs[1]), 0.5 * (hs[2] + hs[3]), Z["quay"]),
+            (0.5 * (cw["x0"] + cw["x1"]), 0.5 * (cw["y0"] + cw["y1"]), Z["quay"]))
+
+
+def export_pivoted(p, pivot):
+    objs = p.finish(HH.material, ucx=bool(p.ucx), pivot=pivot)
+    sb.save_blend(p.name)
+    sb.export_fbx(objs, os.path.join("Hub", p.name + ".fbx"))
+
+
+def build_hoist():
+    """The cage (well.hoist): four posts, a floor, rails to the shoulder on three sides, a roof frame, its aft side open (the
+    door); the four ropes up to a yoke; the brake's lever by the door. The counterweight (well.counterweight): stone blocks in
+    an iron frame with an eye for its rope. Both built where they stand with the cage at the quay stop and the weight in its
+    bay, then pivoted there."""
+    cage_pivot, weight_pivot = hoist_pivots()
+    zq = Z["quay"]
+    hs = H.R(HUB["hoist"])
+    hx, hy = cage_pivot[0], cage_pivot[1]
+    p = T.Part("SM_Hub_HoistCage")
     z0 = zq
     cz = z0 + 2.4
     for cx in (hs[0] + 0.06, hs[1] - 0.06):
@@ -1075,35 +1115,30 @@ def gantry_and_hoist(p):
     pa, pb = Vector((hs[0] + 0.06, hs[2] + 0.06, cz - 0.06)), Vector((hs[0] + 0.06, hs[3] - 0.06, cz - 0.06))
     p.beam(T.straight(pa, pb, UP, X), (pb - pa).length, 0.1, 0.08, "MI_Wood_Varnish", nseed())
     for zz in (z0 + 0.5, z0 + 0.8):                                              # lattice under the rails
-        for (a, b) in (((hs[1] - 0.06, hs[2] + 0.06), (hs[1] - 0.06, hs[3] - 0.06)),):
-            p.beam(T.straight((a[0], a[1], zz), (b[0], b[1], zz), UP, X), hs[3] - hs[2] - 0.12, 0.05, 0.04, "MI_Wood_TeakDark", nseed())
-    for k in range(4):                                                            # the ropes up to the gantry from a yoke
-        cx = hx + (-0.4 if k < 2 else 0.4)
-        cy = hy + (-0.4 if k % 2 else 0.4)
-        p.round(T.straight((cx, cy, cz), (hx, hy, cz + 0.7), X, Y), 0.9, 0.025, "MI_Rope_Hemp", nseed(), sides=5, seg=2.0, wear=0.0)
+        p.beam(T.straight((hs[1] - 0.06, hs[2] + 0.06, zz), (hs[1] - 0.06, hs[3] - 0.06, zz), UP, X), hs[3] - hs[2] - 0.12, 0.05, 0.04,
+               "MI_Wood_TeakDark", nseed())
+    for cx in (hs[0] + 0.06, hs[1] - 0.06):                                       # the ropes from the posts' heads up to the yoke
+        for cy in (hs[2] + 0.06, hs[3] - 0.06):
+            a, b = Vector((cx, cy, cz + 0.02)), Vector((hx + (0.25 if cx > hx else -0.25), hy, cz + 0.66))
+            p.round(T.straight(a, b, X, Y), (b - a).length, 0.025, "MI_Rope_Hemp", nseed(), sides=5, seg=2.0, wear=0.0)
     p.block(hx - 0.3, hx + 0.3, hy - 0.08, hy + 0.08, cz + 0.62, cz + 0.8, "MI_Metal_Iron", nseed(), axis="x")
-    p.round(T.straight((hx, hy, cz + 0.8), end - UP * 0.25, X, Y), top - cz - 1.05, 0.05, "MI_Rope_Hemp", nseed(), sides=6, seg=40.0, wear=0.0)
-    p.round(T.straight((hx + 0.2, hy, cz + 1.2), (hx + 0.2, hy, top - 0.8), X, Y), top - cz - 2.0, 0.015, "MI_Rope_Hemp", nseed(), sides=4, seg=40.0,
-            wear=0.0)                                                             # the brake's hand line
     p.beam(T.straight((hx + 0.3, hy - 0.5, z0 + 0.15), (hx + 0.3, hy - 0.45, z0 + 1.2), X, Y), 1.05, 0.05, 0.05, "MI_Metal_Iron", nseed())  # the lever
-    # The guide posts at the cage's aft corners, braced to each gallery's edge.
-    for gy in (hs[2], hs[3] - 0.1):
-        p.beam(T.straight((hs[0] - 0.08, gy + 0.05, zq), (hs[0] - 0.08, gy + 0.05, top - 1.0), X, Y), top - 1.0 - zq, 0.16, 0.12, "MI_Wood_TeakDark",
-               nseed(), seg=1.0)
-        for lv in ("lower", "middle", "upper", "main"):
-            zz = Z[lv] - 0.4
-            a, b = Vector((hs[0] - 0.08, gy + 0.05, zz)), Vector((H.R(HUB["shaft"])[0] - 0.05, gy + 0.05, zz))
-            if (a - b).length > 0.05:
-                p.beam(T.straight(a, b, UP, Y), (a - b).length, 0.1, 0.08, "MI_Metal_Iron", nseed())
-    # The counterweight up under the gantry: stone blocks in an iron frame, its rope over the second sheave; its bay below.
-    ztop = top - 1.0
-    p.block(cw["x0"], cw["x1"], cw["y0"], cw["y1"], ztop - cw["h"], ztop, STONE, nseed(), axis="z")
-    for zz in (ztop - cw["h"] + 0.1, ztop - 0.1):
-        p.block(cw["x0"] - 0.04, cw["x1"] + 0.04, cw["y0"] - 0.04, cw["y1"] + 0.04, zz - 0.05, zz + 0.05, "MI_Metal_Iron", nseed(), axis="x")
-    p.round(T.straight((cwx, cwy, ztop), (cwx, cwy, top - 0.25), X, Y), top - 0.25 - ztop, 0.04, "MI_Rope_Hemp", nseed(), sides=6, wear=0.0)
-    for (ax, ln, a0, a1) in (("y", cw["y0"] - 0.2, cw["x0"] - 0.2, cw["x1"] + 0.3), ("x", cw["x1"] + 0.3, cw["y0"] - 0.2, cw["y1"]),
-                             ("x", cw["x0"] - 0.2, cw["y0"] - 0.2, cw["y1"])):
-        rail(p, ax, ln, a0, a1, zq)
+    # Collision: the floor and the three railed sides (shoulder high); the aft side open.
+    p.collide_box(hs[0], hs[1], hs[2], hs[3], z0, z0 + 0.12)
+    p.collide_box(hs[1] - 0.12, hs[1], hs[2], hs[3], z0, z0 + 1.1)
+    p.collide_box(hs[0], hs[1], hs[2], hs[2] + 0.12, z0, z0 + 1.1)
+    p.collide_box(hs[0], hs[1], hs[3] - 0.12, hs[3], z0, z0 + 1.1)
+    export_pivoted(p, cage_pivot)
+
+    cw = H.prop("well", "counterweight")
+    w = T.Part("SM_Hub_HoistWeight")
+    wz = weight_pivot[2]
+    w.block(cw["x0"], cw["x1"], cw["y0"], cw["y1"], wz, wz + cw["h"], STONE, nseed(), axis="z")
+    for zz in (wz + 0.1, wz + cw["h"] - 0.1):
+        w.block(cw["x0"] - 0.04, cw["x1"] + 0.04, cw["y0"] - 0.04, cw["y1"] + 0.04, zz - 0.05, zz + 0.05, "MI_Metal_Iron", nseed(), axis="x")
+    wx, wy = weight_pivot[0], weight_pivot[1]
+    w.beam(T.arc(Vector((wx, wy, wz + cw["h"] + 0.12)), X, UP, 0.1, 0.0, 2 * math.pi), 0.63, 0.035, 0.035, "MI_Metal_Iron", nseed(), seg=0.1)  # its eye
+    export_pivoted(w, weight_pivot)
 
 
 KEEL_LINE = 0.07              # the gate's glowing lines' width (m)
@@ -1711,8 +1746,8 @@ def build_gates():
     export(p)
 
 
-BUILDERS = {"dock": build_dock, "slip": build_slip, "tally": build_tally, "well": build_well, "keelgate": build_keelgate,
-            "main": build_main, "chandlery": build_chandlery, "gates": build_gates}
+BUILDERS = {"dock": build_dock, "slip": build_slip, "tally": build_tally, "well": build_well, "hoist": build_hoist,
+            "keelgate": build_keelgate, "main": build_main, "chandlery": build_chandlery, "gates": build_gates}
 
 if __name__ == "__main__":
     random.seed(62)

@@ -154,12 +154,12 @@ const LOCKED = [
 ];
 
 const GATES = {
-  G1: { name: 'Barred door', why: 'Somebody’s room or business, not open to you yet.', how: 'A timber door with an iron bar and a padlock. E: a short line of why.' },
-  G2: { name: 'Rope and board', why: 'Work going on, or closed for now.', how: 'A rope across the way on stanchions (or between the door posts), a hand-painted board on it.' },
-  G3: { name: 'Chained ladder or hatch', why: 'Up or down: masts, forecastle, cargo hatches.', how: 'A chain through the rungs or the grating, padlocked.' },
-  G4: { name: 'Shutters', why: 'Windows and bays of locked rooms.', how: 'Closed shutters: nothing inside to see, nothing inside to build.' },
+  G1: { name: 'Barred door', why: 'Somebody’s room or business, not open to you yet.', how: 'A timber door with an iron bar and a padlock. E: a short line of why.', prompt: 'Try the door', line: 'Barred from inside.' },
+  G2: { name: 'Rope and board', why: 'Work going on, or closed for now.', how: 'A rope across the way on stanchions (or between the door posts), a hand-painted board on it.', prompt: 'Read the board', line: 'Closed for now.' },
+  G3: { name: 'Chained ladder or hatch', why: 'Up or down: masts, forecastle, cargo hatches.', how: 'A chain through the rungs or the grating, padlocked.', prompt: 'Try the chain', line: 'Chained and padlocked.' },
+  G4: { name: 'Shutters', why: 'Windows and bays of locked rooms.', how: 'Closed shutters: nothing inside to see, nothing inside to build.', prompt: 'Try the shutters', line: 'Shuttered from inside.' },
   G5: { name: 'Ancient seal', why: 'The lost civilisation: the main quest.', how: 'Pale seamless stone, turquoise lines, no handle, no lock.' },
-  G6: { name: 'Iron grille', why: 'A glimpse: stores and holds.', how: 'Bars you see through into a shallow set, 2 to 3 m deep, and no further.' },
+  G6: { name: 'Iron grille', why: 'A glimpse: stores and holds.', how: 'Bars you see through into a shallow set, 2 to 3 m deep, and no further.', prompt: 'Look through the grille', line: 'Stacked timber, and no way in.' },
 };
 
 /* ---------- the spaces in detail: NPC spots, interaction points, furniture (for the build) ----------
@@ -320,7 +320,7 @@ const GATE_MARKS = [
   { level: 'middle', x: 73, y: 0, g: 'G1', zone: 'L10' }, { level: 'middle', x: 95, y: 3.5, g: 'G2', zone: 'L11' }, { level: 'middle', x: 88, y: -11, g: 'G4', zone: 'L11' }, { level: 'middle', x: 88, y: 11, g: 'G4', zone: 'L11' },
   { level: 'upper', x: 73, y: -4, g: 'G1', zone: 'L12' }, { level: 'upper', x: 95, y: 0, g: 'G1', zone: 'L13' }, { level: 'upper', x: 88.5, y: -11, g: 'G1', zone: 'L13' }, { level: 'upper', x: 84, y: 11, g: 'G1', zone: 'L13' },
   { level: 'main', x: 44, y: 14.5, g: 'G1', zone: 'L1' }, { level: 'main', x: 44, y: -14.5, g: 'G1', zone: 'L1' },
-  { level: 'main', x: 116, y: 0, g: 'G2', zone: 'L15' }, { level: 'main', x: 122, y: 0, g: 'G3', zone: 'L6' },
+  { level: 'main', x: 116, y: 0, g: 'G2', zone: 'L15', line: 'Cargo work, keep clear.' }, { level: 'main', x: 122, y: 0, g: 'G3', zone: 'L6' },
   { level: 'main', x: 134, y: 8, g: 'G1', zone: 'L14' }, { level: 'main', x: 134, y: -8, g: 'G1', zone: 'L14' }, { level: 'main', x: 134, y: 15, g: 'G3', zone: 'L14' }, { level: 'main', x: 134, y: -15, g: 'G3', zone: 'L14' },
   { level: 'main', x: 68, y: 17.6, g: 'G3', zone: 'L16' }, { level: 'main', x: 100, y: 17.6, g: 'G3', zone: 'L16' },
 ];

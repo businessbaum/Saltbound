@@ -729,5 +729,19 @@
     "nanite": true,
     "collision": "none",
     "_note": "D62 the open spaces inside (build_hub_inside.py): visual only, the blockout collides"
+  },
+  "SM_Hub_HoistCage": {
+    "fbx": "Hub/SM_Hub_HoistCage.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D63 the Well's hoist cage (build_hub_inside.py hoist): ASaltHubHoist moves it; pivot at its floor centre"
+  },
+  "SM_Hub_HoistWeight": {
+    "fbx": "Hub/SM_Hub_HoistWeight.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D63 the hoist's counterweight (build_hub_inside.py hoist): ASaltHubHoist moves it; pivot at its bottom centre"
   }
 }

@@ -257,6 +257,13 @@ spawn(unreal.SaltLantern, (1310, -70, 110), (0, -30, 0), "Lantern_Dock")
 spawn(unreal.SaltBoat, (900, -350, 0), (0, 0, 0), "Boat")
 # The boat lays its own gangway to the pier while moored (D43), so it is not a separate actor.
 
+# --- the hub ship (D63): her berth in the Saltbound Roads, 415 m north of the pier; ASaltHubShip streams her level (L_Hub,
+# build_hub_level.py) in there and adds her calm zones while she lies there; hidden until the first landfall --------------
+import importlib  # noqa: E402
+import hub_place  # noqa: E402
+importlib.reload(hub_place)
+hub_place.berth_and_ship(eas, folder="Hub")
+
 # --- seagulls (ambient): a flock circling over the cove and a few birds out at sea -----------------------------
 spawn(unreal.SaltBirds, (1500, 0, 0), label="Gulls_Cove")
 gulls_sea = spawn(unreal.SaltBirds, (16000, -7000, 0), label="Gulls_Sea")

@@ -662,23 +662,8 @@ def build_stairs():
 
 
 # --- gates ---------------------------------------------------------------------------------------------------------------
-GATE_SIZE = {"G1": (1.2, DOOR_H), "G2": (2.4, 1.0), "G3": (0.9, 3.0), "G4": (1.6, 1.4), "G6": (3.0, 2.5)}
-
-
-def gate_axis(gm):
-    """Which wall line the gate stands on: ('x', line) spans y, ('y', line) spans x, or None (on the deck)."""
-    lines = []
-    for zid, r in H.open_rects(gm["level"]):
-        lines += [("x", r[0], r[2], r[3]), ("x", r[1], r[2], r[3]), ("y", r[2], r[0], r[1]), ("y", r[3], r[0], r[1])]
-    if gm["level"] == "main":
-        lines += [("x", H.HUB["fcX"], -20.0, 20.0)]
-    best = None
-    for ax, ln, a0, a1 in lines:
-        along, across = (gm["y"], gm["x"]) if ax == "x" else (gm["x"], gm["y"])
-        if a0 - 0.3 <= along <= a1 + 0.3 and abs(across - ln) < 1.0:
-            if best is None or abs(across - ln) < best[2]:
-                best = (ax, ln, abs(across - ln), a0, a1)
-    return best
+GATE_SIZE = H.GATE_SIZE      # (hub_layout: build_hub_level.py places ASaltHubGate on the same boxes)
+gate_axis = H.gate_axis
 
 
 def build_gates():
@@ -703,25 +688,8 @@ def build_gates():
                 k += 1
             p.box(x - 0.15, x + 0.15, y - 0.6, y + 0.6, z + 0.5, z + 1.3, "MI_HubBlk_Gate", collide=False)
             continue
-        found = gate_axis(gm)
-        wdt, hgt = GATE_SIZE[g]
-        z0 = z + (1.0 if g == "G4" else 0.0)
-        if found is None and gm["level"] == "main" and abs(y) > 15.0:
-            # Shrouds whose ratlines start out of reach: a chained plate at the bulwark.
-            p.box(x - 0.75, x + 0.75, y - 0.1, y + 0.1, z, z + 2.5, "MI_HubBlk_Gate")
-            continue
-        if found is None:
-            # A padlocked hatch on the deck.
-            p.box(x - 0.8, x + 0.8, y - 0.8, y + 0.8, z, z + 0.3, "MI_HubBlk_Gate")
-            continue
-        ax, ln, _, a0, a1 = found
-        along = y if ax == "x" else x
-        if a1 - a0 >= wdt:
-            along = min(max(along, a0 + wdt / 2), a1 - wdt / 2)
-        if ax == "x":
-            p.box(ln - WALL / 2 - 0.08, ln + WALL / 2 + 0.08, along - wdt / 2, along + wdt / 2, z0, z0 + hgt, "MI_HubBlk_Gate")
-        else:
-            p.box(along - wdt / 2, along + wdt / 2, ln - WALL / 2 - 0.08, ln + WALL / 2 + 0.08, z0, z0 + hgt, "MI_HubBlk_Gate")
+        kind, box = H.gate_box(gm)
+        p.box(*box, "MI_HubBlk_Gate")
     p.finish()
 
 
@@ -838,7 +806,7 @@ def build_props():
     hs = H.R(H.HUB["hoist"])
     for cx in (hs[0], hs[1] - 0.1):
         for cy in (hs[2], hs[3] - 0.1):
-            p.box(cx, cx + 0.1, cy, cy + 0.1, zq, zq + 2.4, "MI_HubBlk_Rail")
+            p.box(cx, cx + 0.1, cy, cy + 0.1, zq, zq + 2.4, "MI_HubBlk_Rail", collide=False)     # ASaltHubHoist's cage collides
     p.box(hs[0], hs[1], hs[2], hs[3], zq + 2.4, zq + 2.5, "MI_HubBlk_Rail", collide=False)
     for gy in (hs[2], hs[3] - 0.1):                                                         # the guide posts (aft corners)
         p.box(hs[0] - 0.12, hs[0], gy, gy + 0.1, zq, Z["main"] + 7.5, "MI_HubBlk_Rail", collide=False)

@@ -20,7 +20,8 @@ namespace SaltOceanParams
 	static const FName Wave[FSaltWaveField::MaxWaves] = {
 		TEXT("W0"), TEXT("W1"), TEXT("W2"), TEXT("W3"), TEXT("W4"), TEXT("W5"),
 		TEXT("W6"), TEXT("W7"), TEXT("W8"), TEXT("W9"), TEXT("W10"), TEXT("W11") };
-	static const FName Calm[FSaltWaveField::MaxCalmZones] = { TEXT("Calm0"), TEXT("Calm1"), TEXT("Calm2"), TEXT("Calm3") };
+	static const FName Calm[FSaltWaveField::MaxCalmZones] = { TEXT("Calm0"), TEXT("Calm1"), TEXT("Calm2"), TEXT("Calm3"),
+		TEXT("Calm4"), TEXT("Calm5"), TEXT("Calm6"), TEXT("Calm7") };
 	static const FName Phase0123(TEXT("Phase0123"));
 	static const FName Phase4567(TEXT("Phase4567"));
 	static const FName Phase891011(TEXT("Phase891011"));
@@ -28,6 +29,7 @@ namespace SaltOceanParams
 	static const FName PrevPhase4567(TEXT("PrevPhase4567"));
 	static const FName PrevPhase891011(TEXT("PrevPhase891011"));
 	static const FName CalmMin(TEXT("CalmMin"));
+	static const FName CalmMin2(TEXT("CalmMin2"));
 	static const FName Chop(TEXT("Chop"));
 	static const FName Globals(TEXT("Globals"));
 	static const FName Ripples(TEXT("RippleOffsets"));
@@ -367,6 +369,7 @@ void ASaltOcean::PushParameters()
 		Inst->SetVectorParameterValue(SaltOceanParams::Calm[j], FLinearColor(Z.X, Z.Y, Z.Z, Z.W));
 	}
 	Inst->SetVectorParameterValue(SaltOceanParams::CalmMin, FLinearColor(Field.CalmMin[0], Field.CalmMin[1], Field.CalmMin[2], Field.CalmMin[3]));
+	Inst->SetVectorParameterValue(SaltOceanParams::CalmMin2, FLinearColor(Field.CalmMin[4], Field.CalmMin[5], Field.CalmMin[6], Field.CalmMin[7]));
 	// Chop patches (x: factor in calm patches, y: 2pi/patch size, z: swell count) and w: swell height
 	// (sum of swell amplitudes, cm) so the material can normalise crest masks for any sea state.
 	// W: typical crest height of the whole sea (swells + half the wind-sea significant height).

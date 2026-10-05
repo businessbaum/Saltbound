@@ -80,7 +80,7 @@ struct FSaltWaterSample
 struct SALTBOUND_API FSaltWaveField
 {
 	static constexpr int32 MaxWaves = 12;
-	static constexpr int32 MaxCalmZones = 4;
+	static constexpr int32 MaxCalmZones = 8;           // D62: the play map's four and the hub's berth
 	static constexpr double Gravity = 980.665; // cm/s^2
 
 	struct FWave

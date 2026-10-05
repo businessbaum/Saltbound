@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Boat/SaltMooringPoint.h"
 #include "Core/SaltKinematicBase.h"
 #include "GameFramework/Actor.h"
 #include "SaltBoat.generated.h"
@@ -31,7 +32,7 @@ UENUM(BlueprintType)
 enum class ESaltBoatHold : uint8
 {
 	Free,      // sailing or drifting
-	Moored,    // bow and stern lines to the mooring (its start position)
+	Moored,    // bow and stern lines to a mooring (its start position, the pier, or a mooring point: D62)
 	Anchored   // one rode from the bow; the boat swings to the wind
 };
 
@@ -98,8 +99,16 @@ public:
 	void Recover();
 	/** Development and tests: place the boat (origin, cm; heading in degrees), optionally with a forward speed (cm/s). */
 	void PlaceAt(const FVector& Location, float Yaw, float ForwardSpeed = 0.f);
-	/** A saved state (D46): moored boats lie at their mooring, anchored ones with the anchor down and holding. */
-	void RestoreState(const FVector& Location, float Yaw, ESaltBoatHold InHold, bool bSail);
+	/** A saved state (D46): moored boats lie at their mooring (D62: InMooring, its home when invalid), anchored ones with the
+	 *  anchor down and holding. */
+	void RestoreState(const FVector& Location, float Yaw, ESaltBoatHold InHold, bool bSail, const FSaltMooring& InMooring = FSaltMooring());
+	/** Moored at that mooring now: placed there at rest, lines out, the sail taken in. */
+	void MoorAt(const FSaltMooring& InMooring);
+	/** The mooring it lies at (or last lay at). Its home is its start position (the pier). */
+	const FSaltMooring& GetMooring() const { return Mooring; }
+	const FSaltMooring& GetHomeMooring() const { return Home; }
+	/** The nearest mooring within MooringRadius: its home or a USaltMooringPointComponent's in the world. */
+	bool FindMooring(FSaltMooring& Out, double* OutDistanceM = nullptr) const;
 
 	// State --------------------------------------------------------------------
 	bool IsSailSet() const { return bSailSet; }
@@ -295,7 +304,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines") float LineStiffness = 6000.f;
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines") float LineDamping = 6000.f;
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "m")) float AnchorRode = 14.f;
-	/** Mooring is possible within this distance of the start position. */
+	/** Mooring is possible within this distance of a mooring (the start position, or a mooring point: D62). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "m")) float MooringRadius = 8.f;
 	/** Where the mooring lines reach the pier: this far to starboard (+) or port (-) of the bitts at the start. */
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "cm")) float MooringReach = 240.f;
@@ -481,6 +490,10 @@ private:
 	bool bNearStatic = false;
 
 	FTransform StartTransform;
+	/** D62: the home mooring (the start position with MooringReach / MooringPierHeight) and the one in use. */
+	FSaltMooring Home;
+	FSaltMooring Mooring;
+	void UpdateHomeMooring();
 	struct FSafePose { FVector Origin; float Yaw; };
 	TArray<FSafePose> SafePoses;
 	float SafePoseTimer = 0.f;
