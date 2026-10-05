@@ -42,6 +42,13 @@ const HUB = {
   sheer: { stern: 0.8, aft: 30, bow: 1.4, fore: 128 },
   // The beakhead (D62): a platform out from the stem under the bowsprit, headrails up to the forecastle, the figurehead.
   beakhead: { x0: 158, x1: 171, z: 19.5, halfW: 2.2, rails_to: 25.5, figure: [171.6, 0, 20.2] },
+  // The sea gate (owner, D62: "open and close it with ropes like a castle gate"): a portcullis in grooves just inside the
+  // stern face. Down, it closes the basin to boats (its spikes in a sill on the basin's floor, its top 4 m over the water);
+  // raised by `raise` m into a slot in the gatehouse over the arch, its spikes hang at the arch's springing (21.5), clear of
+  // any mast. Four ropes from its head beam run up over sheaves in the gatehouse and down through the wings to a capstan on
+  // each quay by the mouth (E: raise or lower it). halfW: to the grooves' backs; posts: the grooves' timbers on the walls.
+  seagate: { x: 1.6, thick: 0.6, halfW: 9.9, z0: -5, h: 9, raise: 26.5, ropes: [-7, -2.5, 2.5, 7], capstans: [[6, 12.4], [6, -12.4]],
+             seconds: 24, turns: 8, posts: { x0: 0.9, x1: 2.3, y: 9.55 } },
   masts: [
     { id: 'mizzen', name: 'Mizzen', x: 68, h: 54 },
     { id: 'main', name: 'Main', x: 100, h: 76 },
@@ -157,7 +164,7 @@ const SPACES = {
       { id: 'quays', note: 'x 0..44 at |y| 10..14, timber decking on the ancient walls, under the wings (arcades)' },
       { id: 'arcade_posts', every: 6, from: 3, to: 44, y: 10.2, size: 0.6, h: 4, note: 'both sides; carry the wing over the quay from z 5.5' },
       { id: 'bollards', every: 6, from: 6, to: 44, y: 10.6, r: 0.3, h: 0.6, note: 'both sides' },
-      { id: 'rung_ladders', at: [1.5, 20], y: 10, note: 'both sides, from the water onto the quay (the D54 ladder)' },
+      { id: 'rung_ladders', at: [3.5, 20], y: 10, note: 'both sides, from the water onto the quay (the D54 ladder)' },
       { id: 'slipway', x0: 32, x1: 46, y0: -5, y1: 5, z_at_x0: -3, z_at_x1: 1.5, note: 'absolute z (waterline 0); a beach the boat runs up on; enters the hall floor at x 46' },
       { id: 'fitting_berth', x0: 32, x1: 42, y: 7.9, note: 'starboard quay under the wall crane: the player boat moors here, bow forward (centreline 0.4 m clear of the wall for the 3.4 m beam: blockout, D61)' },
       { id: 'fleet_berths', berths: [{ x0: 8, x1: 18, y: -7.9, boat: '10 m' }, { x0: 22, x1: 36, y: -7.5, boat: '14 m' }], note: 'port quay; boats the player owns (later)' },

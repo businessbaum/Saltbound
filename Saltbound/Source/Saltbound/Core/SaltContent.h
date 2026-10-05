@@ -36,6 +36,11 @@ namespace SaltContent
 	{
 		return FString::Printf(TEXT("/Game/Saltbound/Boat/SM_Boat_%s.SM_Boat_%s"), Part, Part);
 	}
+	/** The hub ship's art meshes (Art/Blender/Scripts/build_hub_*.py): /Game/Saltbound/Hub/Art/SM_Hub_<Part>. */
+	inline FString HubMesh(const TCHAR* Part)
+	{
+		return FString::Printf(TEXT("/Game/Saltbound/Hub/Art/SM_Hub_%s.SM_Hub_%s"), Part, Part);
+	}
 	/** FFT ocean render targets (setup_ocean.py): /Game/Saltbound/Water/FFT/RT_Ocean<Kind><Cascade>. */
 	inline FString OceanFFTTarget(const TCHAR* Kind, int32 Cascade)
 	{

@@ -309,10 +309,12 @@ class Part:
         self.ucx.append([Vector(p) for p in pts])
 
     # --- output ------------------------------------------------------------------------------------------------------
-    def finish(self, materials, ucx=True):
-        """Move to Blender, reverse the windings (the Y mirror flips them), make the object and its UCX hulls."""
+    def finish(self, materials, ucx=True, pivot=(PIVOT_X, 0.0, 0.0)):
+        """Move to Blender (the mesh's pivot at `pivot`, ship metres; the ship's x 80 by default), reverse the windings
+        (the Y mirror flips them), make the object and its UCX hulls."""
+        px, py, pz = pivot
         for v in self.bm.verts:
-            v.co = Vector((v.co.x - PIVOT_X, -v.co.y, v.co.z))
+            v.co = Vector((v.co.x - px, -(v.co.y - py), v.co.z - pz))
         bmesh.ops.reverse_faces(self.bm, faces=self.bm.faces, flip_multires=False)
         me = bpy.data.meshes.new(self.name)
         self.bm.normal_update()
@@ -328,7 +330,7 @@ class Part:
             for k, pts in enumerate(self.ucx):
                 hb = bmesh.new()
                 for p in pts:
-                    hb.verts.new(Vector((p.x - PIVOT_X, -p.y, p.z)))
+                    hb.verts.new(Vector((p.x - px, -(p.y - py), p.z - pz)))
                 bmesh.ops.convex_hull(hb, input=list(hb.verts))
                 hm = bpy.data.meshes.new("UCX_%s_%03d" % (self.name, k))
                 hb.to_mesh(hm)

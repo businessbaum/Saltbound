@@ -1547,8 +1547,16 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - The courtyard walls over the dock, with rows of shuttered windows, and the arch's vault and forward face.
   - The head: stem, knee, beakhead grating, headrails, a carved scroll figurehead with a brass crown, the bowsprit with iron
     bands, catheads, iron-rimmed hawse holes with the bow cables, and the bobstay.
+- **The sea gate** (`hub.seagate`, `build_hub_seagate.py`, `Hub/SaltSeaGate`):
+  - A 20 m portcullis of tarred oak (iron-shod points, bolted plates, a head beam with four iron eyes) in grooves just
+    inside the stern face.
+  - Down, it closes the basin to boats: its points sit in a sill on the floor and its head is 4 m over the water.
+  - Raised 26.5 m into a slot in the gatehouse over the arch, its points hang at the springing (21.5 m), clear of any mast.
+  - Four ropes run up over sheaves and down through the wings to a capstan on each quay by the mouth. E at a capstan
+    raises or lowers it in 24 s, easing in and out: the ropes pay in and out, the capstans turn eight times.
+  - It starts open and is not saved (a boat can always come home). `sb.Hub.SeaGate open|close|toggle|snapopen|snapclosed`.
+  - The quays' rung ladders moved from x 1.5 to 3.5, out of the grooves.
 - **Next, in this order:**
-  1. The sea gate.
-  2. The rig (masts, tops, yards, furled sails, shrouds).
+  1. The rig (masts, tops, yards, furled sails, shrouds).
   3. The prompt's spaces: Stern Dock and Slip; Tally House; Well and Keelgate; main deck and Chandlery. Every wall, floor
      and corner, by hand.

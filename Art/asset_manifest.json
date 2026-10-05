@@ -610,5 +610,33 @@
     "nanite": true,
     "collision": "none",
     "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
+  },
+  "SM_Hub_SeaGate": {
+    "fbx": "Hub/SM_Hub_SeaGate.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D62 the sea gate (build_hub_seagate.py): ASaltSeaGate moves the gate, the ropes and the capstans"
+  },
+  "SM_Hub_GateRope": {
+    "fbx": "Hub/SM_Hub_GateRope.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the sea gate (build_hub_seagate.py): ASaltSeaGate moves the gate, the ropes and the capstans"
+  },
+  "SM_Hub_Capstan": {
+    "fbx": "Hub/SM_Hub_Capstan.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D62 the sea gate (build_hub_seagate.py): ASaltSeaGate moves the gate, the ropes and the capstans"
+  },
+  "SM_Hub_SeaGateFrame": {
+    "fbx": "Hub/SM_Hub_SeaGateFrame.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D62 the sea gate (build_hub_seagate.py): ASaltSeaGate moves the gate, the ropes and the capstans"
   }
 }

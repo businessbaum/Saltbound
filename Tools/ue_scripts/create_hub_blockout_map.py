@@ -123,6 +123,22 @@ if ART:
         a = spawn(unreal.StaticMeshActor, (BX, BY, BZ), (0, YAW, 0), "HubArt_" + part, "HubShip/Art")
         a.static_mesh_component.set_static_mesh(mesh)
         a.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    # The sea gate (hub.seagate): its fixed frame (the grooves collide: the boat must not pass through them) and the
+    # portcullis on its ropes and capstans (ASaltSeaGate; it starts open). Local frame: the gate's bottom centre, closed.
+    sg = H.HUB["seagate"]
+    frame = unreal.load_asset(ART_DIR + "SM_Hub_SeaGateFrame")
+    if frame is not None and hasattr(unreal, "SaltSeaGate"):
+        a = spawn(unreal.StaticMeshActor, (BX, BY, BZ), (0, YAW, 0), "HubArt_SeaGateFrame", "HubShip/Art")
+        a.static_mesh_component.set_static_mesh(frame)
+        g = spawn(unreal.SaltSeaGate, H.ship_to_world(sg["x"], 0.0, sg["z0"]), (0, YAW, 0), "SeaGate", "HubShip/Art")
+        g.set_editor_property("raise_cm", sg["raise"] * 100.0)
+        g.set_editor_property("gate_height_cm", (sg["h"] + 0.1) * 100.0)
+        g.set_editor_property("travel_seconds", float(sg["seconds"]))
+        g.set_editor_property("capstan_turns", float(sg["turns"]))
+        g.set_editor_property("rope_tops", [unreal.Vector(0.0, y * 100.0, (30.4 - sg["z0"]) * 100.0) for y in sg["ropes"]])
+        g.set_editor_property("capstan_spots", [unreal.Vector((cx - sg["x"]) * 100.0, cy * 100.0, (H.Z["quay"] - sg["z0"]) * 100.0)
+                                                for cx, cy in sg["capstans"]])
+        g.rerun_construction_scripts() if hasattr(g, "rerun_construction_scripts") else None
 
 
 def label(text, x, y, z, face_deg, colour, size=34.0):

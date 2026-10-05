@@ -650,9 +650,11 @@ def build_castles():
         ym = 0.5 * (y + yb)
         nrm = Vector((0.0, -ym, zc - arch_z(ym))).normalized()           # towards the arch's centre: down into the mouth
         tng = Vector((0.0, 1.0, (arch_z(yb) - arch_z(y)) / max(yb - y, 1e-6))).normalized()
-        pa, pb = Vector((0.4, ym, arch_z(ym) + 0.06)), Vector((ARCH["x1"] - 0.05, ym, arch_z(ym) + 0.06))
-        p.board(T.straight(pa, pb, tng, nrm), pb.x - pa.x, (Vector((0, yb, arch_z(yb))) - Vector((0, y, arch_z(y)))).length - 0.02, 0.12,
-                random.choice(("MI_Hub_HullTar", "MI_Hub_HullTarFaded")), nseed(), seg=1.0, wear=0.8)
+        sg = HUB["seagate"]
+        for xa_, xb_ in ((0.4, sg["x"] - sg["thick"] * 0.5 - 0.15), (sg["x"] + sg["thick"] * 0.5 + 0.15, ARCH["x1"] - 0.05)):   # the gate's slot
+            pa, pb = Vector((xa_, ym, arch_z(ym) + 0.06)), Vector((xb_, ym, arch_z(ym) + 0.06))
+            p.board(T.straight(pa, pb, tng, nrm), pb.x - pa.x, (Vector((0, yb, arch_z(yb))) - Vector((0, y, arch_z(y)))).length - 0.02, 0.12,
+                    random.choice(("MI_Hub_HullTar", "MI_Hub_HullTarFaded")), nseed(), seg=1.0, wear=0.8)
         y = yb
     for xr in (2.5, 6.0, ARCH["x1"] - 0.3):
         ys = [-MOUTH + 2 * MOUTH * k / 30 for k in range(31)]
