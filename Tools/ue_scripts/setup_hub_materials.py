@@ -68,4 +68,8 @@ pennant = dict(scalars={"TexNormalize": 2.6, "NormalStrength": 0.5, "RoughScale"
                         "Length": 1600.0, "Wind": 0.6}, textures=S.canvas_textures())
 sb_ue.make_mi("MI_Hub_Pennant", MI, flag, vectors={"Tint": (0.36, 0.075, 0.05, 1)}, **pennant)
 sb_ue.make_mi("MI_Hub_PennantCream", MI, flag, vectors={"Tint": (0.6, 0.53, 0.4, 1)}, **pennant)
+sb_ue.make_mi("MI_Hub_CanvasRed", MI, surf, vectors={"Tint": (0.3, 0.06, 0.04, 1), "VarTint": (1.05, 0.9, 0.9, 1)}, **canvas)   # the awning's stripes
+glow = unreal.load_asset(S.MASTER + "/M_SB_Glow")
+sb_ue.make_mi("MI_Hub_AncientGlowLow", MI, glow, vectors={"BaseColor": (0.05, 0.12, 0.12, 1), "GlowColor": (0.35, 0.95, 0.85, 1)},
+              scalars={"GlowIntensity": 3.0})                       # the salvaged pieces: faintly (spaces.keelgate.shelves)
 print("SB_HUB_MATERIALS_OK")

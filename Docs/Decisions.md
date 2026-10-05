@@ -1568,5 +1568,52 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - The pennant flies from the main truck on the flag material, oxblood over cream, streaming aft: she lies head to wind on
     her anchors.
   - The blockout's masts stay as hidden collision.
-- **Next, in this order:** the prompt's spaces: Stern Dock and Slip; Tally House; Well and Keelgate; main deck and
-  Chandlery. Every wall, floor and corner, by hand.
+- **Inside: every open space** (`build_hub_inside.py`; 9 meshes):
+  - **How it lies on the collision:** the art follows the blockout's own construction (the same wall runs along the open
+    zones' edges, openings, flights and prop boxes). Floors' tops sit at the deck heights and walls' faces on the collision
+    walls' faces, so the hidden blockout still collides and L_HubReview now draws only art.
+  - **Materials:** deck planks fore and aft over caulked seams, with the quays in weathered oak.
+  - **Walls and ceilings:** walls of planks in rows on frame posts, with a skirting and a top plate, and frames round
+    every door and window. Decks overhead sit on beams with hanging knees.
+  - **The hull's inner side:** a lining on curved frames that follows the tumblehome, with the ports through it.
+  - **Rails:** turned balusters, like the castles' balustrades.
+  - **The Stern Dock:**
+    - Ancient stone basin walls with oak fenders, mooring rings and iron rung ladders.
+    - The slipway's oak ways and sleepers.
+    - An iron-shod kerb, and arcades of posts on iron shoes with braces to the edge beam under the wing.
+    - Bollards, lanterns on brackets, the berth board, and the wall crane with its fall, hook block and winch.
+  - **The Slip:**
+    - The 12 m hall on heavy beams.
+    - The counter with its ledger, the plans board, the half-models, the workbench with a vice, the timber racks.
+    - The 14 m cutter on her cradles in the boat's oxblood and cream, and her mast on trestles.
+    - Lanterns on chains, and SHIPWRIGHT over the hall's mouth.
+  - **The dock stair:** 22 oak steps with handrails.
+  - **The Tally House:**
+    - The job board with six slips, the TALLY header and a slate.
+    - The pay booth: grilled hatch, ledge, door and PAY.
+    - The weighing bench with its brass balance, sacks, salt cakes, the long table and its benches.
+  - **The Well:** galleries with balustrades, four flights with balustrades and boarded soffits, and lanterns on the
+    corners. The gantry has guys and a brake drum. The hoist's cage stands between its guide posts, with its ropes, the
+    counterweight in its frame and its railed bay.
+  - **The Keelgate:**
+    - The seal in pale stone with its glowing circles and spokes, seven empty sockets, and a stone apron.
+    - The reader's desk with books, a brass lamp and an open book, and the chair.
+    - Shelves of salvaged pieces, a quarter glowing faintly, and the rubbings.
+  - **The main deck:**
+    - The deck, the waterways, and the bulwarks' inner side on stanchions.
+    - The Well's coaming and rails, and the hooded companion.
+    - Fife rails with belaying pins and coils, the masts' coats and wedges.
+    - Grated and padlocked cargo hatches, the ship's boats under canvas, the great capstan, the galley's stovepipe.
+  - **The Chandlery:**
+    - Cream-painted walls, the counter front, the door standing open, the striped oxblood-and-cream awning, CHANDLER.
+    - A shingled roof on rafters.
+    - Shelves of tins, jars, coils and boxes, with a ladder on a brass rail.
+    - The display table with compass, spyglass and lantern, and beams hung with lanterns, coils and a net.
+    - The tripod spyglass, the binnacle, barrels and crates.
+  - **The gates:** barred doors (G1), rope and a board (G2), chained ladders and padlocked hatches (G3), shuttered bays (G4),
+    iron grilles with timber behind (G6), and the cargo rope with its CARGO board.
+- **Still to do or to decide:**
+  - The figurehead is a carved scroll for now.
+  - The hoist and the sea gate's state are not saved (phase 3).
+  - The space sheets 08-11 still show the layouts from before D61.
+  - The section and exploded sheets draw the sterncastle as one block.

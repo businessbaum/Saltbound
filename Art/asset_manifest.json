@@ -673,5 +673,61 @@
     "nanite": false,
     "collision": "none",
     "_note": "D62 the rig (build_hub_rig.py): visual only (the blockout's masts collide); the pennant streams on M_SB_Flag (no Nanite: WPO)"
+  },
+  "SM_Hub_Dock": {
+    "fbx": "Hub/SM_Hub_Dock.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the open spaces inside (build_hub_inside.py): visual only, the blockout collides"
+  },
+  "SM_Hub_Slip": {
+    "fbx": "Hub/SM_Hub_Slip.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the open spaces inside (build_hub_inside.py): visual only, the blockout collides"
+  },
+  "SM_Hub_Tally": {
+    "fbx": "Hub/SM_Hub_Tally.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the open spaces inside (build_hub_inside.py): visual only, the blockout collides"
+  },
+  "SM_Hub_Well": {
+    "fbx": "Hub/SM_Hub_Well.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the open spaces inside (build_hub_inside.py): visual only, the blockout collides"
+  },
+  "SM_Hub_Keelgate": {
+    "fbx": "Hub/SM_Hub_Keelgate.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the open spaces inside (build_hub_inside.py): visual only, the blockout collides"
+  },
+  "SM_Hub_MainDeck": {
+    "fbx": "Hub/SM_Hub_MainDeck.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the open spaces inside (build_hub_inside.py): visual only, the blockout collides"
+  },
+  "SM_Hub_Chandlery": {
+    "fbx": "Hub/SM_Hub_Chandlery.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the open spaces inside (build_hub_inside.py): visual only, the blockout collides"
+  },
+  "SM_Hub_Gates": {
+    "fbx": "Hub/SM_Hub_Gates.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the open spaces inside (build_hub_inside.py): visual only, the blockout collides"
   }
 }

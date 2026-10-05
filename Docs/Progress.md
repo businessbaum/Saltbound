@@ -224,10 +224,13 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
-- **D62 (in progress, the art pass):** the hub as a giant old galleon in `L_HubReview` (the art over the blockout, which stays
-  as collision): the outside is built (planked hull with the sheer, wales, lidded ports, windows, the tiered sterncastle, the
-  transom with its arch, great windows and nameboard, quarter galleries, castles, the beakhead). Next: the sea gate, the rig,
-  then every space inside.
+- **D62 (art pass, waiting for the owner's look):** the hub as a giant old galleon in `L_HubReview`. Only the art draws there;
+  the blockout stays as hidden collision, so the D61 measurements hold.
+  - Outside: the planked hull with the sheer, wales, lidded ports, windows, the tiered sterncastle, the transom with its
+    arch, great windows and nameboard, quarter galleries, castles, the beakhead.
+  - The sea gate on ropes and capstans (`sb.Hub.SeaGate`).
+  - The rig: three masts, round tops, furled yards, the lateen, ratlined shrouds, the pennant.
+  - Inside, every open space by hand: dock, Slip, dock stair, Tally House, Well, Keelgate, main deck, Chandlery, gates.
 - **D61 (phase 1, waiting for the owner's review):** the hub ship Hollowkeel as a blockout in its own map `L_HubBlockout`
   (plain shapes, flat colours; open it in the editor and play): every deck of the open 20 %, the stairs, gates, props as boxes,
   markers and labels at the NPC spots, the player's boat moored at the fitting berth. After the logic pass (D61 addendum:

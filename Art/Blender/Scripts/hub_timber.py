@@ -191,7 +191,9 @@ class Part:
             for k in range(m):
                 k1 = (k + 1) % m
                 ka, kb = section[k][2], section[k1][2]
-                chamfer = ka == "c" and kb == "c" or (ka == "c" and kb == "t") or (ka == "t" and kb == "c")
+                dy, dz = section[k1][0] - section[k][0], section[k1][1] - section[k][1]
+                diagonal = abs(dy) > 1e-5 and abs(dz) > 1e-5                     # only the slanted facets are worn edges
+                chamfer = diagonal and (ka == "c" and kb == "c" or (ka == "c" and kb == "t") or (ka == "t" and kb == "c"))
                 top = ka in "tc" and kb in "tc" and ka != "" and kb != ""
                 quad = [verts[i][k], verts[i][k1], verts[i + 1][k1], verts[i + 1][k]]
                 uvs = [(ss[i] + du, per[k] + dv), (ss[i] + du, per[k + 1] + dv), (ss[i + 1] + du, per[k + 1] + dv), (ss[i + 1] + du, per[k] + dv)]

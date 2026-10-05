@@ -31,8 +31,10 @@ MAP = "/Game/Saltbound/Maps/L_HubReview" if ART else "/Game/Saltbound/Maps/L_Hub
 BLK = "/Game/Saltbound/Hub/Blockout/"
 ART_DIR = "/Game/Saltbound/Hub/Art/"
 ART_PARTS = ["HullStern", "HullWaistS", "HullWaistP", "HullBow", "Ancient", "Stern", "Galleries", "Castles", "Head",
-             "MastMizzen", "MastMain", "MastFore", "Spritsail"]
-ART_REPLACES = {"ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow", "Masts"}   # blockout parts kept only as collision
+             "MastMizzen", "MastMain", "MastFore", "Spritsail", "Dock", "Slip", "Tally", "Well", "Keelgate", "MainDeck", "Chandlery", "Gates"]
+# Every blockout part stays, as collision only: the art draws the whole ship.
+ART_REPLACES = {"ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow", "Basin", "Quay", "Lower", "Middle", "Upper", "Main", "Stairs",
+                "Gates", "Props", "Masts", "Markers"}
 PARTS = ["ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow", "Basin", "Quay", "Lower", "Middle", "Upper", "Main", "Stairs",
          "Gates", "Props", "Masts", "Markers"]
 # Calm zones (prompt section 4; not in the data): round the ship within 120 m (full by 300 m), in the basin. Measured in the
@@ -222,6 +224,8 @@ print("SB_HUB_LANTERNS", len(lamps))
 # The eye adapts below decks: each enclosed space gets its own exposure range (the rig's presets clamp it for the open sea).
 INTERIORS = {"Slip": (44.0, 64.0, -9.0, 19.0, 1.5, 13.5), "TallyStair": (30.0, 73.0, 6.0, 20.0, 1.5, 9.5),
              "KeelgateWell": (72.0, 96.0, -12.0, 12.0, 1.5, 17.5)}
+if ART:                                       # under the arcades the eye opens a little (the quays are deep under the wings)
+    INTERIORS.update({"QuayS": (0.5, 44.0, 10.0, 14.0, 1.5, 5.5), "QuayP": (0.5, 44.0, -14.0, -10.0, 1.5, 5.5)})
 for name, (x0, x1, y0, y1, z0, z1) in INTERIORS.items():
     v = spawn(unreal.PostProcessVolume, world(0.5 * (x0 + x1), 0.5 * (y0 + y1), 0.5 * (z0 + z1)), (0, YAW, 0), "Exposure_" + name, "HubShip")
     v.set_actor_scale3d(unreal.Vector((x1 - x0) * 0.5, (y1 - y0) * 0.5, (z1 - z0) * 0.5))      # the brush is 2 m (200 cm) across
@@ -230,7 +234,7 @@ for name, (x0, x1, y0, y1, z0, z1) in INTERIORS.items():
     v.set_editor_property("blend_radius", 300.0)
     ps = v.get_editor_property("settings")
     ps.set_editor_property("override_auto_exposure_min_brightness", True)
-    ps.set_editor_property("auto_exposure_min_brightness", INTERIOR_MIN_EV)
+    ps.set_editor_property("auto_exposure_min_brightness", 6.0 if name.startswith("Quay") else INTERIOR_MIN_EV)
     v.set_editor_property("settings", ps)
 
 # --- the player's boat at the fitting berth, the player on the starboard quay --------------------------------------------
