@@ -223,6 +223,9 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **Waiting for the owner (2026-10-05):** a look at D53-D57 in the game; which items the game needs (then the item icons,
+  rendered from their meshes); the second boat (D51) with its map table (chart stage 2); whether the UI's hero pieces
+  should become 3D renders (a Blender pilot of the rope ring read plainer than the painted parts, D55).
 - **D57 (awaiting the owner's check):** no map in the satchel or on the tool wheel (five tools now); a small live chart is
   pinned to the mast (1.6 km round the boat, north up), E to look at it closely. The map table waits for the bigger boat.
 - **D56 (awaiting the owner's check):** flags that ripple like cloth; in big waves the eyes take part of the deck's swell
