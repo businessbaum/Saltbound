@@ -6,7 +6,11 @@ zones round her and in her basin; the player's boat moored at the fitting berth 
 lines and gangway reach the starboard quay); the player on the starboard quay; text labels at the NPC spots and the gates;
 lanterns where the data hangs them (and on the Well's gallery corners and in the shaft, its note).
 
-    python Tools/ue_exec.py Tools/ue_scripts/create_hub_blockout_map.py
+    python Tools/ue_exec.py Tools/ue_scripts/create_hub_blockout_map.py [art]
+
+With `art` it builds the art pass's review map instead, /Game/Saltbound/Maps/L_HubReview (D62): the art meshes
+(SM_Hub_*, build_hub_hull.py / build_hub_ends.py) where they exist, the blockout parts they replace kept as hidden collision
+(so the D61 measurements hold), the rest of the blockout as it is until its art is built; no labels or markers.
 """
 import math
 import os
@@ -22,8 +26,12 @@ import hub_layout as H  # noqa: E402  (pure Python: every number from HubShip_Da
 import importlib  # noqa: E402
 importlib.reload(H)                # the editor keeps modules: always read the current data
 
-MAP = "/Game/Saltbound/Maps/L_HubBlockout"
+ART = "art" in sys.argv[1:]
+MAP = "/Game/Saltbound/Maps/L_HubReview" if ART else "/Game/Saltbound/Maps/L_HubBlockout"
 BLK = "/Game/Saltbound/Hub/Blockout/"
+ART_DIR = "/Game/Saltbound/Hub/Art/"
+ART_PARTS = ["HullStern", "HullWaistS", "HullWaistP", "HullBow", "Ancient", "Stern", "Galleries", "Castles", "Head"]
+ART_REPLACES = {"ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow"}       # blockout parts kept only as collision
 PARTS = ["ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow", "Basin", "Quay", "Lower", "Middle", "Upper", "Main", "Stairs",
          "Gates", "Props", "Masts", "Markers"]
 # Calm zones (prompt section 4; not in the data): round the ship within 120 m (full by 300 m), in the basin. Measured in the
@@ -98,11 +106,23 @@ floor.static_mesh_component.set_editor_property("visible_in_ray_tracing", False)
 
 # --- the ship ----------------------------------------------------------------------------------------------------------------
 for part in PARTS:
-    a = spawn(unreal.StaticMeshActor, (BX, BY, BZ), (0, YAW, 0), "Hub_" + part, "HubShip")
+    if ART and part == "Markers":
+        continue
+    a = spawn(unreal.StaticMeshActor, (BX, BY, BZ), (0, YAW, 0), "Hub_" + part, "HubShip/Collision" if ART and part in ART_REPLACES else "HubShip")
     a.static_mesh_component.set_static_mesh(unreal.load_asset(BLK + "SM_HubBlk_" + part))
     if part == "Markers":
         a.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
         a.static_mesh_component.set_editor_property("cast_shadow", False)
+    if ART and part in ART_REPLACES:
+        a.static_mesh_component.set_visibility(False, False)           # collision only: the art draws this part
+if ART:
+    for part in ART_PARTS:
+        mesh = unreal.load_asset(ART_DIR + "SM_Hub_" + part)
+        if mesh is None:
+            continue
+        a = spawn(unreal.StaticMeshActor, (BX, BY, BZ), (0, YAW, 0), "HubArt_" + part, "HubShip/Art")
+        a.static_mesh_component.set_static_mesh(mesh)
+        a.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
 
 
 def label(text, x, y, z, face_deg, colour, size=34.0):
@@ -118,7 +138,7 @@ def label(text, x, y, z, face_deg, colour, size=34.0):
 
 FLOORS = {"slip": H.Z["quay"], "tally": H.Z["lower"], "keelgate": H.Z["quay"], "chandlery": H.Z["main"]}
 SVC = {o["id"]: o.get("svc", "") for o in H.OPEN}
-for name, fl in FLOORS.items():
+for name, fl in ({} if ART else FLOORS).items():
     sp = H.space(name)
     npc = sp["npc"]
     label("%s %s NPC" % (sp["svc"], sp["name"]), npc["x"], npc["y"], fl + 2.1, npc["face"], unreal.Color(r=255, g=80, b=230, a=255))
@@ -140,7 +160,7 @@ def open_side(gm):
     return best
 
 
-for gm in H.GATE_MARKS:
+for gm in ([] if ART else H.GATE_MARKS):
     zl = H.level_z(gm["level"])
     label("%s %s" % (gm["g"], gm["zone"]), gm["x"], gm["y"], zl + 2.6, open_side(gm), unreal.Color(r=255, g=70, b=50, a=255), size=28.0)
 

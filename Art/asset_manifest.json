@@ -547,5 +547,68 @@
     "nanite": false,
     "collision": "none",
     "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout: NPC spots, interaction points, berths"
+  },
+  "SM_Hub_HullStern": {
+    "fbx": "Hub/SM_Hub_HullStern.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
+  },
+  "SM_Hub_HullWaistS": {
+    "fbx": "Hub/SM_Hub_HullWaistS.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
+  },
+  "SM_Hub_HullWaistP": {
+    "fbx": "Hub/SM_Hub_HullWaistP.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
+  },
+  "SM_Hub_HullBow": {
+    "fbx": "Hub/SM_Hub_HullBow.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
+  },
+  "SM_Hub_Ancient": {
+    "fbx": "Hub/SM_Hub_Ancient.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
+  },
+  "SM_Hub_Stern": {
+    "fbx": "Hub/SM_Hub_Stern.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
+  },
+  "SM_Hub_Galleries": {
+    "fbx": "Hub/SM_Hub_Galleries.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
+  },
+  "SM_Hub_Castles": {
+    "fbx": "Hub/SM_Hub_Castles.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
+  },
+  "SM_Hub_Head": {
+    "fbx": "Hub/SM_Hub_Head.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
   }
 }

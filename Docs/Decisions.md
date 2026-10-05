@@ -1498,3 +1498,57 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - The calm zones (proposal 2).
   - The space sheets 08-11 still show the layouts from before this pass (the derrick, the old counters).
   - The last flight arrives on the main deck facing starboard, away from the Chandlery.
+
+### D62 · The hub ship, phase 2: the art pass, a giant old galleon (In progress)
+- **Owner (2026-10-05), after the logic pass:**
+  - "It needs to Look like Giant ship from outside. Best case also a Bit older and handcrafted Like everything Else. That also
+    Applies for EVERYTHING inside ... you need to Look at Everything, every Wall every Corner floor etc. etc. Style like my
+    current ship."
+  - "Style like a Giant Gallion."
+  - "The Open for Ships to Sail in the hub needs to be able to open and close ist with ropes like a Castel Gate."
+  - This starts phase 2 of the hub prompt (the art pass), with the gate added.
+- **How it is built:**
+  - `Art/Blender/Scripts/hub_timber.py` generates every board, beam, post and turned piece straight into one mesh per part.
+    Each board is a chamfered, cupped and grooved section swept along its frame.
+  - The boards follow the boat's rules (D38, D52): each has its own seed, drifting width, wobbling edges, a gentle bend and
+    twist, and a few millimetres proud or sunk; worn chamfers, ends cut askew, and its own shade from a material's variants.
+  - Vertex masks as M_SB_Surface reads them: R wear, G grime and wet, B tone.
+  - Sb_timber's object boards (about 3 000 vertices each) would not scale to the hub's tens of thousands. The whole outside
+    (about 9 000 boards) builds in about 30 s.
+- **Visual only:** the blockout stays in the map as hidden collision, so every D61 measurement still holds while the art
+  replaces it piece by piece. The review map is `L_HubReview` (`create_hub_blockout_map.py art`); `L_HubBlockout` stays the
+  plain review build.
+- **Data changed for the galleon** (`hub_data.js`; the JSON and the sheets re-rendered):
+  - The sterncastle rises in two tiers (`hub.poopX` 22): the quarterdeck over x 22..44 (rail 26.4) and the poop over
+    x 0..22 (rail 34.4). It was one 34 m wall. The upper storeys sc2 and sc3 shrink to x 0..22, so the total area is now
+    30 354 m2 and the open share 21.3 %.
+  - A sheer (`hub.sheer`): the bands rise 0.8 m towards the stern and 1.4 m towards the stem; the decks inside stay level.
+  - A beakhead (`hub.beakhead`): a grated platform at z 19.5, headrails up to the forecastle, the figurehead at its tip.
+  - The rudders get a real blade, 3.2 m at the heel narrowing to 1.2 m at the head (they were 1.2 m posts). They move to
+    y +/-15, so they stay inside the stern face down to its foot.
+- **Built so far: the outside** (`build_hub_hull.py`, `build_hub_ends.py`, `setup_hub_materials.py`; 9 meshes `SM_Hub_*`,
+  Nanite):
+  - Strakes 0.55 m wide, with staggered butts, on a dark caulked core.
+  - The ancient lower hull: pale seamless stone with two thin turquoise lines, its stern face and the stem foot.
+  - Wales: a tarred one over the joint with the stone, ochre ones at the deck lines.
+  - 174 lidded ports: 115 shut in ochre-edged frames, 45 propped open (oxblood inside, like the boat's hull), 14 boarded
+    over where the lid is gone.
+  - Cream-framed castle windows: glass, lit, or shut behind oxblood shutters.
+  - Channels on knees with deadeyes and chain plates.
+  - Cap rails.
+  - The transom:
+    - The dock mouth's arch with a heavy rib, ochre springers and keystone.
+    - The seven pointed great windows between oxblood pilasters.
+    - The frieze with HOLLOWKEEL in carved brass letters, and the taffrail on turned balusters with a brass crest.
+    - The great stern lanterns on the corner posts, and the lashed great wheel.
+    - Twin rudders with iron straps and their hoods, and the stern moorings through iron fairleads.
+  - The quarter galleries: two tiers of windows, oxblood boards, a brass drop and a dome.
+  - The castles' teak decks with balustrades round the courtyard, and their fronts with windows.
+  - The courtyard walls over the dock, with rows of shuttered windows, and the arch's vault and forward face.
+  - The head: stem, knee, beakhead grating, headrails, a carved scroll figurehead with a brass crown, the bowsprit with iron
+    bands, catheads, iron-rimmed hawse holes with the bow cables, and the bobstay.
+- **Next, in this order:**
+  1. The sea gate.
+  2. The rig (masts, tops, yards, furled sails, shrouds).
+  3. The prompt's spaces: Stern Dock and Slip; Tally House; Well and Keelgate; main deck and Chandlery. Every wall, floor
+     and corner, by hand.

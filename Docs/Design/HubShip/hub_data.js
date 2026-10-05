@@ -34,6 +34,14 @@ const HUB = {
   wing: 10,     // the wings stand outboard of |y| 10, aft of x 44 (the basin between them)
   quayY: 14,    // the quays run |y| 10..14 at +1.5 under the wings (arcades)
   fcX: 134,     // the forecastle starts here
+  // A galleon's stern rises in tiers (owner, D62: "style like a giant galleon"): the quarterdeck over the first storey
+  // (x poopX..44, its deck at sc2), the poop over three (x 0..poopX, its deck at poop).
+  poopX: 22,
+  // The planking's sheer (D62): the bands and wales rise towards the ends (m at the stern face and at the stem); the decks
+  // inside stay level. aft/fore: where the rise starts.
+  sheer: { stern: 0.8, aft: 30, bow: 1.4, fore: 128 },
+  // The beakhead (D62): a platform out from the stem under the bowsprit, headrails up to the forecastle, the figurehead.
+  beakhead: { x0: 158, x1: 171, z: 19.5, halfW: 2.2, rails_to: 25.5, figure: [171.6, 0, 20.2] },
   masts: [
     { id: 'mizzen', name: 'Mizzen', x: 68, h: 54 },
     { id: 'main', name: 'Main', x: 100, h: 76 },
@@ -41,7 +49,8 @@ const HUB = {
   ],
   helm: { x: 6, y: 0, r: 1.8 },  // the great wheel on the poop over the arch: lashed, it never turns
   // Twin rudders on the wings' sternposts (the dock mouth splits the stern); the wheel's ropes run down to their tillers.
-  rudders: { y: 16.5, x0: -1.2, x1: 0, z0: -6, z1: 6 },
+  // The blade is x0..x1 at the heel, narrowing to `head` (m) at the top (D62: 1.2 m was a post on a ship this size).
+  rudders: { y: 15, x0: -3.2, x1: 0, z0: -6, z1: 6, head: 1.2 },     // y 15: inside the stern face down to its foot (z -6: +/-15.2)
   // She lies still because she is held: two bow cables from hawse holes to anchors ahead (the capstan heaves them), two stern
   // moorings from the wings' quarters, splayed out clear of the dock's approach. from: on the hull; to: where it meets the water.
   cables: [{ id: 'bow', from: [151, 7, 21], to: [178, 13, 0] }, { id: 'bow', from: [151, -7, 21], to: [178, -13, 0] },
@@ -68,18 +77,19 @@ HUB.outline = function (k = 1, n = 80) {
 /** The side profile (x, z): stern face, sterncastle, waist, forecastle, stem, keel. */
 HUB.profile = function () {
   // The stern goes down to z -6 at its face: the dock's floor (z -5) and walls stay inside the hull (logic pass, D61).
-  return [[0, 34.4], [44, 34.4], [44.6, 18.4], [134, 18.4], [134.6, 26.4], [161.5, 26.4], [161, 20], [159.8, 12], [157.5, 4], [153, -4], [145, -10], [132, -12],
+  return [[0, 34.4], [22, 34.4], [22.6, 26.4], [44, 26.4], [44.6, 18.4], [134, 18.4], [134.6, 26.4], [161.5, 26.4], [161, 20], [159.8, 12], [157.5, 4], [153, -4], [145, -10], [132, -12],
     [14, -12], [6, -11], [2, -8], [0, -6]];
 };
 
 const ST = { OPEN: 'open', LOCKED: 'locked', WATER: 'water' };
 const R = (x0, x1, y0, y1) => ({ x0, x1, y0, y1 });
 const WINGS = [R(0, 44, 10, 20), R(0, 44, -20, -10)];
+const WINGS_AFT = [R(0, 22, 10, 20), R(0, 22, -20, -10)];     // under the poop (HUB.poopX): the upper storeys (D62)
 
 /** Levels (floors) of the ship. width: share of the deck half-beam at that floor (the hull is narrower low down). */
 const LEVELS = [
-  { id: 'sc3', name: 'Sterncastle, third storey', z: 29.5, only: [...WINGS, R(0, 10, -10, 10)] },
-  { id: 'sc2', name: 'Sterncastle, second storey', z: 25.5, only: [...WINGS, R(0, 10, -10, 10)] },
+  { id: 'sc3', name: 'Sterncastle, third storey', z: 29.5, only: [...WINGS_AFT, R(0, 10, -10, 10)] },
+  { id: 'sc2', name: 'Sterncastle, second storey', z: 25.5, only: [...WINGS_AFT, R(0, 10, -10, 10)] },
   { id: 'sc1', name: 'Sterncastle, first storey', z: 21.5, only: WINGS },
   { id: 'fc1', name: 'Forecastle, upper storey', z: 21.5, only: [R(134, 160, -20, 20)] },
   { id: 'main', name: 'Main deck', z: 17.5, voids: [HUB.basin, HUB.shaft] },
@@ -107,7 +117,7 @@ const OPEN = [
 
 /** Planned, locked, not designed: working names only. gate = the gate type (see GATES). */
 const LOCKED = [
-  { id: 'L1', name: 'Sterncastle and Stern Arch', levels: { main: WINGS, sc1: WINGS, sc2: [...WINGS, R(0, 10, -10, 10)], sc3: [...WINGS, R(0, 10, -10, 10)] }, gate: 'G1', sees: 'Tall doors at the aft end of the main deck, barred from inside. The great windows of the arch glow at night; the great wheel on the poop is lashed and never turns.' },
+  { id: 'L1', name: 'Sterncastle and Stern Arch', levels: { main: WINGS, sc1: WINGS, sc2: [...WINGS_AFT, R(0, 10, -10, 10)], sc3: [...WINGS_AFT, R(0, 10, -10, 10)] }, gate: 'G1', sees: 'Tall doors at the aft end of the main deck, barred from inside. The great windows of the arch glow at night; the great wheel on the poop is lashed and never turns.' },
   { id: 'L2', name: 'Wing quarters', levels: { lower: WINGS, upper: WINGS }, gate: 'G4', sees: 'Rows of shuttered windows and washing lines on the wings over the dock.' },
   { id: 'L3', name: 'Quay stores', levels: { quay: [R(0, 44, 14, 20), R(0, 44, -20, -14)] }, gate: 'G4', sees: 'Shuttered bays along both arcades of the dock.' },
   { id: 'L4', name: 'Timber store', levels: { quay: [R(48, 64, -20, -9), R(44, 48, -20, -14)] }, gate: 'G6', sees: 'Iron grilles on the port side of the Slip and at the end of the port quay; stacked timber behind them, 2 m deep.' },
@@ -309,10 +319,10 @@ const WHERE = {
 /* The outside, for the build (from the sketches; metres, absolute z). */
 const OUTSIDE = {
   hull_section: 'Below +3 m the ancient hull: flat bottom +/-6 m at the keel (z -12), +/-16 m at z -6, +/-19 m at the waterline. Above it timber: widest +/-20 m at about z +6, tumblehome to +/-18.8 m at the main deck rail amidships (z 18.4) and +/-15.7 m at the poop rail aft (z 34.4). The deck outline is HUB.hb(x).',
-  stern: 'The stern face (x 0) goes down to z -6. The dock mouth is +/-10 m wide from the basin floor (z -5) up, +/-14 m between the quay decks (z 1.5) and z 5.5 (the quays show; under them the quays are solid stone), its top an arch from z 21.5 at the sides to 25.5 in the middle. The Stern Arch (x 0..10) fills z 25.5..33.5: seven tall great windows on its aft face (z 26.2..31.5, 1.8 m wide, 2.8 m apart, pointed tops), a brass frieze with the name at z 32..33.3. The taffrail rises 1.0 m in the middle (z 34.4 to 35.4). Quarter galleries on both wings’ outer sides, z 21.5..32, standing out 2.4 m, two tiers of windows, a brass drop below and a small dome on top. Stern lanterns on the wing corners at z 37.6. The great wheel (r 1.8 m) on the arch’s top, lashed with a rope cross, shows above the taffrail; its ropes run down the wings to the tillers of twin rudders hung on the wings’ sternposts (hub.rudders). Stern moorings from both wings’ quarters, splayed out clear of the approach (hub.cables).',
-  sides: 'Dark tarred planking; ochre bands at z 5.5, 17.5, 33.5 (0.9 m) and thinner ones at the other deck lines; lidded square ports (1 m) below the main deck, cream-framed windows (1.3 x 2 m) above it; most shut, some lit at night. Channels with deadeyes at each mast. The ancient band (pale, two turquoise lines) from z -1.5 to +3 all round.',
+  stern: 'A galleon’s stern (D62): the sterncastle rises in two tiers, the quarterdeck over x 22..44 (rail 26.4) and the poop over x 0..22 (rail 34.4). The stern face (x 0) goes down to z -6. The dock mouth is +/-10 m wide from the basin floor (z -5) up, +/-14 m between the quay decks (z 1.5) and z 5.5 (the quays show; under them the quays are solid stone), its top an arch from z 21.5 at the sides to 25.5 in the middle. The Stern Arch (x 0..10) fills z 25.5..33.5: seven tall great windows on its aft face (z 26.2..31.5, 1.8 m wide, 2.8 m apart, pointed tops), a brass frieze with the name at z 32..33.3. The taffrail rises 1.0 m in the middle (z 34.4 to 35.4). Quarter galleries on both wings’ outer sides, x 3..13, z 21.5..32, standing out 2.4 m, two tiers of windows, a brass drop below and a small dome on top. Stern lanterns on the wing corners at z 37.6. The great wheel (r 1.8 m) on the arch’s top, lashed with a rope cross, shows above the taffrail; its ropes run down the wings to the tillers of twin rudders hung on the wings’ sternposts (hub.rudders). Stern moorings from both wings’ quarters, splayed out clear of the approach (hub.cables).',
+  sides: 'Dark tarred planking in strakes about 0.55 m wide with a gentle sheer (hub.sheer: the bands rise towards both ends) and heavy wales at the bands; ochre bands at z 5.5, 17.5, 33.5 (0.9 m) and thinner ones at the other deck lines; lidded square ports (1 m) below the main deck, cream-framed windows (1.3 x 2 m) above it; most shut, some lit at night. Channels with deadeyes at each mast. The ancient band (pale, two turquoise lines) from z -1.5 to +3 all round.',
   masts: 'x 68, 100, 140; 54, 76, 64 m above the main deck; 2.0 m thick at the deck tapering to 0.7; tops at 0.38 h (14 m wide) and crosstrees at 0.68 h (6.4 m); yards at 0.27, 0.47, 0.62, 0.80 h with half-lengths 0.42, 0.35, 0.26, 0.18 x 40 m (main; fore x 0.92, mizzen x 0.8); every sail furled on its yard with gaskets; shrouds to the channels, stays forward, a long oxblood-and-cream pennant at the main truck.',
-  bow: 'Forecastle x 134..160 up to z 25.5 with a rail; a plain stem with two hawse holes and their cables down to the anchors ahead (hub.cables); the bowsprit from (154, 24.5) to (188, 31.5) with furled jibs, held down by its bobstay; the stem foot is ancient stone (the pale band rises a little at the bow).',
+  bow: 'Forecastle x 134..160 up to z 25.5 with a rail; a plain stem with two hawse holes and their cables down to the anchors ahead (hub.cables); a galleon’s beakhead out from the stem under the bowsprit (hub.beakhead: a grated platform at z 19.5, headrails curving up to the forecastle, a carved figurehead at its tip); the bowsprit from (154, 24.5) to (188, 31.5) with furled jibs, held down by its bobstay; the stem foot is ancient stone (the pale band rises a little at the bow).',
   colours: 'Hull planking dark tarred brown (new MI); ochre bands (new MI, muted); window frames MI_Paint_Cream; carvings and frieze MI_Metal_Brass (muted); decks MI_Wood_Teak and its light/dark variants; canvas MI_Canvas; iron MI_Metal_Iron; the ancient hull a new pale stone MI with MI_AncientGlow lines (sparingly).',
 };
 

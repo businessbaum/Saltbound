@@ -283,14 +283,17 @@ def build_shell():
         y = s * half
         # The wings' inner faces over the basin: from the wing's lower deck (over the arcade) up to the poop rail.
         p.quad([(0.0, y, Z["lower"]), (a["x1"], y, Z["lower"]), (a["x1"], y, Z["sc1"]), (0.0, y, Z["sc1"])], "MI_HubBlk_Locked")
-        p.quad([(a["x1"], y, Z["lower"]), (basin["x1"], y, Z["lower"]), (basin["x1"], y, H.profile_top(1.0)),
-                (a["x1"], y, H.profile_top(1.0))], "MI_HubBlk_Locked")
-        # The poop over each wing.
+        px = H.HUB["poopX"]                       # the galleon's tiers (D62): the poop aft of poopX, the quarterdeck forward
+        for xa_, xb_ in ((a["x1"], px + 0.3), (px + 0.3, basin["x1"])):
+            zt_ = H.profile_top(0.5 * (xa_ + xb_))
+            p.quad([(xa_, y, Z["lower"]), (xb_, y, Z["lower"]), (xb_, y, zt_), (xa_, y, zt_)], "MI_HubBlk_Locked")
+        # The poop and the quarterdeck over each wing.
         for xa in range(0, int(basin["x1"]), 2):
             xb = min(xa + 2, basin["x1"])
-            w = H.half_width(0.5 * (xa + xb), Z["poop"])
+            zd = Z["poop"] if xb <= px else Z["sc2"]
+            w = H.half_width(0.5 * (xa + xb), zd)
             ya, yb = sorted((y, s * w))
-            p.quad([(xa, ya, Z["poop"]), (xb, ya, Z["poop"]), (xb, yb, Z["poop"]), (xa, yb, Z["poop"])], "MI_HubBlk_Locked")
+            p.quad([(xa, ya, zd), (xb, ya, zd), (xb, yb, zd), (xa, yb, zd)], "MI_HubBlk_Locked")
     # Twin rudders on the wings' sternposts (the wheel's ropes run to their tillers) and the stern moorings.
     ru = H.HUB["rudders"]
     for sg in (-1.0, 1.0):
@@ -300,7 +303,9 @@ def build_shell():
             pole(p, cb["from"], cb["to"], 0.22, 0.22, "MI_HubBlk_Rail", sides=6)
     # The sterncastle's front over the main deck (its doors are gates).
     xf = basin["x1"] + 0.3
-    face_cells(p, xf, Z["main"], H.profile_top(1.0), lambda y, z: abs(y) >= half, lambda z: H.half_width(xf, z), "MI_HubBlk_Locked")
+    face_cells(p, xf, Z["main"], H.profile_top(xf - 1.0), lambda y, z: abs(y) >= half, lambda z: H.half_width(xf, z), "MI_HubBlk_Locked")
+    xp = H.HUB["poopX"] + 0.3                     # the poop's front over the quarterdeck
+    face_cells(p, xp, Z["sc2"], H.profile_top(1.0), lambda y, z: abs(y) >= half, lambda z: H.half_width(xp, z), "MI_HubBlk_Locked")
     p.finish()
 
     for side, name in ((1, "SM_HubBlk_ShellWaistS"), (-1, "SM_HubBlk_ShellWaistP")):
