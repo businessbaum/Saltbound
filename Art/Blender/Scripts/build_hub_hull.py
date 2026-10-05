@@ -401,7 +401,7 @@ PORT = 1.0                          # outside.sides: lidded square ports of 1 m 
 WIN_W, WIN_H = 1.3, 2.0             # cream-framed windows above it
 PORT_ROWS = ((Z["lower"] + 1.0, 2.0), (Z["middle"] + 1.0, 0.0), (Z["upper"] + 1.0, 2.0))   # sill z, x offset (staggered)
 WIN_ROWS = (Z["sc1"] + 0.8, Z["sc2"] + 0.8, Z["sc3"] + 0.8)
-CHANNELS = {"mizzen": (12.0, 5), "main": (17.0, 8), "fore": (12.0, 6)}                       # length, deadeyes a side
+CHANNELS = {m: (float(HUB["rig"]["channels"][m]), HUB["rig"]["shrouds"][m]) for m in HUB["rig"]["shrouds"]}   # length, deadeyes
 GALLERY = (3.0, 13.0)               # outside.stern: the quarter galleries' x on the wings (z 21.5..32)
 
 

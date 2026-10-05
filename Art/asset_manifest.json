@@ -638,5 +638,40 @@
     "nanite": true,
     "collision": "ucx",
     "_note": "D62 the sea gate (build_hub_seagate.py): ASaltSeaGate moves the gate, the ropes and the capstans"
+  },
+  "SM_Hub_MastMizzen": {
+    "fbx": "Hub/SM_Hub_MastMizzen.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the rig (build_hub_rig.py): visual only (the blockout's masts collide); the pennant streams on M_SB_Flag (no Nanite: WPO)"
+  },
+  "SM_Hub_MastMain": {
+    "fbx": "Hub/SM_Hub_MastMain.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the rig (build_hub_rig.py): visual only (the blockout's masts collide); the pennant streams on M_SB_Flag (no Nanite: WPO)"
+  },
+  "SM_Hub_MastFore": {
+    "fbx": "Hub/SM_Hub_MastFore.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the rig (build_hub_rig.py): visual only (the blockout's masts collide); the pennant streams on M_SB_Flag (no Nanite: WPO)"
+  },
+  "SM_Hub_Spritsail": {
+    "fbx": "Hub/SM_Hub_Spritsail.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D62 the rig (build_hub_rig.py): visual only (the blockout's masts collide); the pennant streams on M_SB_Flag (no Nanite: WPO)"
+  },
+  "SM_Hub_Pennant": {
+    "fbx": "Hub/SM_Hub_Pennant.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D62 the rig (build_hub_rig.py): visual only (the blockout's masts collide); the pennant streams on M_SB_Flag (no Nanite: WPO)"
   }
 }

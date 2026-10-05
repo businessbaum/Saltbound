@@ -30,8 +30,9 @@ ART = "art" in sys.argv[1:]
 MAP = "/Game/Saltbound/Maps/L_HubReview" if ART else "/Game/Saltbound/Maps/L_HubBlockout"
 BLK = "/Game/Saltbound/Hub/Blockout/"
 ART_DIR = "/Game/Saltbound/Hub/Art/"
-ART_PARTS = ["HullStern", "HullWaistS", "HullWaistP", "HullBow", "Ancient", "Stern", "Galleries", "Castles", "Head"]
-ART_REPLACES = {"ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow"}       # blockout parts kept only as collision
+ART_PARTS = ["HullStern", "HullWaistS", "HullWaistP", "HullBow", "Ancient", "Stern", "Galleries", "Castles", "Head",
+             "MastMizzen", "MastMain", "MastFore", "Spritsail"]
+ART_REPLACES = {"ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow", "Masts"}   # blockout parts kept only as collision
 PARTS = ["ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow", "Basin", "Quay", "Lower", "Middle", "Upper", "Main", "Stairs",
          "Gates", "Props", "Masts", "Markers"]
 # Calm zones (prompt section 4; not in the data): round the ship within 120 m (full by 300 m), in the basin. Measured in the
@@ -123,6 +124,17 @@ if ART:
         a = spawn(unreal.StaticMeshActor, (BX, BY, BZ), (0, YAW, 0), "HubArt_" + part, "HubShip/Art")
         a.static_mesh_component.set_static_mesh(mesh)
         a.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    # The pennant at the main truck (build_hub_rig.py writes where): it streams aft, she lies head to wind on her anchors.
+    rig_json = os.path.join(os.path.dirname(__file__), "..", "..", "Art", "Generated", "hub_rig.json")
+    pennant = unreal.load_asset(ART_DIR + "SM_Hub_Pennant")
+    if pennant is not None and os.path.exists(rig_json):
+        import json
+        with open(rig_json, encoding="utf-8") as fh:
+            px, py, pz = json.load(fh)["pennant"]
+        a = spawn(unreal.StaticMeshActor, H.ship_to_world(px, py, pz), (0, YAW + 180.0, 0), "HubArt_Pennant", "HubShip/Art")
+        a.static_mesh_component.set_static_mesh(pennant)
+        a.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+        a.static_mesh_component.set_mobility(unreal.ComponentMobility.MOVABLE)
     # The sea gate (hub.seagate): its fixed frame (the grooves collide: the boat must not pass through them) and the
     # portcullis on its ropes and capstans (ASaltSeaGate; it starts open). Local frame: the gate's bottom centre, closed.
     sg = H.HUB["seagate"]

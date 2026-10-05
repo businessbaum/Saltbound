@@ -1556,7 +1556,17 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     raises or lowers it in 24 s, easing in and out: the ropes pay in and out, the capstans turn eight times.
   - It starts open and is not saved (a boat can always come home). `sb.Hub.SeaGate open|close|toggle|snapopen|snapclosed`.
   - The quays' rung ladders moved from x 1.5 to 3.5, out of the grooves.
-- **Next, in this order:**
-  1. The rig (masts, tops, yards, furled sails, shrouds).
-  3. The prompt's spaces: Stern Dock and Slip; Tally House; Well and Keelgate; main deck and Chandlery. Every wall, floor
-     and corner, by hand.
+- **The rig** (`hub.rig`: the numbers of outside.masts, plus the galleon's lateen and spritsail yards; `build_hub_rig.py`):
+  - Each mast is stepped in three pieces: the lower mast with rope wooldings up to a round fighting top (plank platform on
+    trestle and cross trees, an ochre rim, a rail open forward, the lubber's hole), the topmast fidded forward of it under a
+    cap, and the topgallant mast to the truck.
+  - Square yards hang from slings and parrels, with lifts and sagging footropes; their sails are furled in rolls bound by
+    gaskets.
+  - The mizzen's lowest yard is a lateen slung fore and aft. The spritsail yard hangs under the bowsprit.
+  - The standing rigging is tarred: shrouds from the channels' deadeyes (pairs with lanyards) with ratlines every 0.5 m,
+    futtock, topmast and topgallant shrouds, backstays, and stays forward to the next mast or the bowsprit.
+  - The pennant flies from the main truck on the flag material, oxblood over cream, streaming aft: she lies head to wind on
+    her anchors.
+  - The blockout's masts stay as hidden collision.
+- **Next, in this order:** the prompt's spaces: Stern Dock and Slip; Tally House; Well and Keelgate; main deck and
+  Chandlery. Every wall, floor and corner, by hand.
