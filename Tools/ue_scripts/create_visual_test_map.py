@@ -257,7 +257,7 @@ spawn(unreal.SaltLantern, (1310, -70, 110), (0, -30, 0), "Lantern_Dock")
 spawn(unreal.SaltBoat, (900, -350, 0), (0, 0, 0), "Boat")
 # The boat lays its own gangway to the pier while moored (D43), so it is not a separate actor.
 
-# --- the hub ship (D63): her berth in the Saltbound Roads, 415 m north of the pier; ASaltHubShip streams her level (L_Hub,
+# --- the hub ship (D63): her berth in the Saltbound Roads, 415 m east of the pier off the lagoon's channel; ASaltHubShip streams her level (L_Hub,
 # build_hub_level.py) in there and adds her calm zones while she lies there; hidden until the first landfall --------------
 import importlib  # noqa: E402
 import hub_place  # noqa: E402
