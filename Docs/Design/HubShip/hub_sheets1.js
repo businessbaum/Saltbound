@@ -136,7 +136,7 @@ defSheet('approach', 'Arriving: the stern arch from the sea', 'Elevation from as
   const haze = (col, a) => rgba(mix(col, [200, 205, 205], 1 - a));
   const mastStern = (m, a, wk) => {
     const H = HUB.Z.main + m.h, base = E(0, HUB.Z.main), top = E(0, H), w0 = 2.1 * s * wk, w1 = 0.7 * s * wk;
-    for (const [f, sp] of [[0.38, 7], [0.68, 3.2]]) { const z = HUB.Z.main + m.h * f; for (const sg of [-1, 1]) for (const k of [0, 1, 2]) { const lo = f < 0.5 ? E(sg * (half(18.7) - k * 2.2), HUB.Z.main + 1.2) : E(sg * 7 * (1 - k * 0.15), HUB.Z.main + m.h * 0.38); seg(c, E(sg * sp, z), lo, { w: 1, col: ink(a * 0.55), amp: 0.2, seed: k * 3 + f + sg }); } }
+    for (const [f, sp] of [[0.38, 7], [0.68, 3.2]]) { const z = HUB.Z.main + m.h * f; for (const sg of [-1, 1]) for (const k of [0, 1, 2]) { const lo = f < 0.5 ? E(sg * (half(18.4) - k * 2.2), HUB.Z.main + 1.2) : E(sg * 7 * (1 - k * 0.15), HUB.Z.main + m.h * 0.38); seg(c, E(sg * sp, z), lo, { w: 1, col: ink(a * 0.55), amp: 0.2, seed: k * 3 + f + sg }); } }
     const mp = [[base[0] - w0 / 2, base[1]], [top[0] - w1 / 2, top[1]], [top[0] + w1 / 2, top[1]], [base[0] + w0 / 2, base[1]]];
     fill(c, mp, haze(C.timberDark, a)); line(c, mp, { w: 1.4, col: ink(a), closed: true });
     for (const [f, sp] of [[0.38, 7], [0.68, 3.2]]) { const z = HUB.Z.main + m.h * f; fill(c, rectPts(E(-sp, z)[0], E(0, z)[1] - 6, sp * 2 * s, 9), haze(C.timberDark, a)); }
@@ -156,8 +156,8 @@ defSheet('approach', 'Arriving: the stern arch from the sea', 'Elevation from as
   fill(c, pen.concat(pen2.reverse()), rgba(C.oxblood, 0.8)); line(c, pen, { w: 1.2 });
 
   // The stern face. Outline: the sides with their tumblehome, the taffrail rising to a low crest in the middle.
-  const sideP = sg => { const p = []; for (let i = 0; i <= 24; i++) { const z = -1 + 35.7 * i / 24; p.push(E(sg * half(z), z)); } return p; };
-  const taff = []; for (let i = 0; i <= 24; i++) { const t = i / 24 * 2 - 1; taff.push(E(-t * half(34.7), 34.7 + 1.0 * (1 - t * t))); }
+  const sideP = sg => { const p = []; for (let i = 0; i <= 24; i++) { const z = -1 + 35.4 * i / 24; p.push(E(sg * half(z), z)); } return p; };
+  const taff = []; for (let i = 0; i <= 24; i++) { const t = i / 24 * 2 - 1; taff.push(E(-t * half(34.4), 34.4 + 1.0 * (1 - t * t))); }
   const outer = sideP(-1).concat(taff.slice(1, -1).reverse().map(p => p)).concat(sideP(1).reverse());
   // The great wheel first: it shows above the taffrail.
   const wc = E(0, 36.4), wr = HUB.helm.r * s;
@@ -186,10 +186,10 @@ defSheet('approach', 'Arriving: the stern arch from the sea', 'Elevation from as
   // Through it: sky over the canyon, the mizzen, the dock head, the Slip lit at the far end, quays and water.
   c.fillStyle = 'rgba(214,214,198,1)'; c.fillRect(E(-14, 0)[0], E(0, 26)[1], 28 * s, 8 * s);
   const mz = [E(-0.9, 18), E(-0.6, 27), E(0.6, 27), E(0.9, 18)]; fill(c, mz, ink(0.5));
-  fill(c, [E(-10, 18.7), E(10, 18.7), E(10, -1.5), E(-10, -1.5)], rgba(mul(C.timberDark, 1.15), 1));
+  fill(c, [E(-10, 18.4), E(10, 18.4), E(10, -1.5), E(-10, -1.5)], rgba(mul(C.timberDark, 1.15), 1));
   for (const yy of [-6, -2, 2, 6]) { const p = rectPts(E(yy - 0.7, 16.6)[0], E(0, 16.6)[1], 1.4 * s, 2 * s); fill(c, p, rgba(C.lamp, 0.55)); line(c, p, { closed: true, w: 1, col: ink(0.6) }); }
-  fill(c, rectPts(E(-10, 18.7)[0], E(0, 18.7)[1], 20 * s, 0.5 * s), rgba(C.ochre, 0.8));
-  for (let yy = -9.5; yy <= 9.6; yy += 1.2) seg(c, E(yy, 17.6), E(yy, 18.7), { w: 1.2, col: ink(0.75) });
+  fill(c, rectPts(E(-10, 18.4)[0], E(0, 18.4)[1], 20 * s, 0.5 * s), rgba(C.ochre, 0.8));
+  for (let yy = -9.5; yy <= 9.6; yy += 1.2) seg(c, E(yy, 17.6), E(yy, 18.4), { w: 1.2, col: ink(0.75) });
   figure(c, ...E(3.2, 17.6), s, { w: 1.5 }); figure(c, ...E(-5.5, 17.6), s, { w: 1.5 });
   const hall = c.createLinearGradient(0, E(0, 13.5)[1], 0, E(0, 1.5)[1]); hall.addColorStop(0, 'rgba(255,196,110,0.8)'); hall.addColorStop(1, 'rgba(255,218,150,0.98)');
   c.fillStyle = hall; c.fillRect(E(-9, 0)[0], E(0, 13.5)[1], 18 * s, 12 * s);
@@ -234,7 +234,7 @@ defSheet('approach', 'Arriving: the stern arch from the sea', 'Elevation from as
     const drop = [E(qi(21.5), 21.5), E(qg(21.5), 21.5), E(sg * (half(19) + 0.9), 18.6), E(sg * (half(19) + 0.5), 17.8)]; fill(c, drop, rgba(C.brass, 0.85)); line(c, drop, { closed: true, w: 1.4 });
     const dome = []; for (let i = 0; i <= 12; i++) { const t = i / 12 * Math.PI; dome.push(E((qi(32) + qg(32)) / 2 - Math.cos(t) * Math.abs(qg(32) - qi(32)) / 2 * sg, 32 + Math.sin(t) * 1.6)); }
     fill(c, dome, rgba(C.brass, 0.85)); line(c, dome, { w: 1.4 });
-    const lp = E(sg * (half(34.7) - 0.6), 37.6); seg(c, E(sg * (half(34.7) - 0.6), 34.7), lp, { w: 3, col: rgba(C.iron) }); lantern(c, { s, P: () => lp }, 0, 0, 0, 0, { r: 0.6 });
+    const lp = E(sg * (half(34.4) - 0.6), 37.6); seg(c, E(sg * (half(34.4) - 0.6), 34.4), lp, { w: 3, col: rgba(C.iron) }); lantern(c, { s, P: () => lp }, 0, 0, 0, 0, { r: 0.6 });
   }
   // The Stern Arch over the opening: the great windows and the frieze with the name.
   for (let i = 0; i < 7; i++) { const yy = -8.4 + i * 2.8, zb = 26.2 + 0.25 * Math.cos(yy / 10 * Math.PI / 2), p = [E(yy - 0.9, zb), E(yy + 0.9, zb), E(yy + 0.9, 30.8), E(yy, 31.5), E(yy - 0.9, 30.8)]; fill(c, p, rgba(C.lamp, i % 3 === 1 ? 0.9 : 0.55)); line(c, p, { closed: true, w: 1.4, col: rgba(C.cream, 1) }); seg(c, E(yy, zb), E(yy, 31.4), { w: 1, col: ink(0.6) }); }
@@ -372,12 +372,16 @@ defSheet('section', 'Long section on the centreline', 'Looking to port, bow to t
   // The poop: the lashed wheel and the stern lanterns.
   const wc = P(HUB.helm.x, Z.poop + 2.2); line(c, ellipsePts(wc[0], wc[1], 3, HUB.helm.r * s, 20), { closed: true, w: 3, col: rgba(C.timberDark) }); seg(c, P(HUB.helm.x, Z.poop), wc, { w: 3 });
   for (const x of [1, 40]) { seg(c, P(x, Z.poop), P(x, Z.poop + 3), { w: 2.4, col: rgba(C.iron) }); lantern(c, { s, P: (a, b, z) => P(x, z) }, 0, 0, Z.poop + 3, Z.poop + 3, { r: 0.6 }); }
-  // Your boat at the port quay (the fleet berth), beyond the cut.
-  const pb = [], b0 = 6;
+  // Your boat at the fitting berth (starboard quay, in front of the cut: drawn light, dashed).
+  const fb = SPACES.dock.props.find(q => q.id === 'fitting_berth'), pb = [], b0 = fb.x0;
   for (let i = 0; i <= 24; i++) { const t = i / 24; pb.push(P(b0 + 10 * t, 0.75 + 0.3 * Math.pow(t * 2 - 1, 2))); }
   for (let i = 24; i >= 0; i--) { const t = i / 24, u = t * 2 - 1; pb.push(P(b0 + 10 * t, -0.65 * Math.pow(Math.max(0, 1 - u * u), 0.6) - (Math.abs(u) < 0.7 ? 0.8 : 0))); }
-  fill(c, pb, rgba(C.oxblood)); line(c, pb, { closed: true, w: 1.4 });
-  seg(c, P(b0 + 6.2, 0.75), P(b0 + 6.2, 11.25), { w: 2.4, col: rgba(C.timberDark) }); line(c, [P(b0 + 6.2, 2.8), P(b0 + 1.2, 2.5)], { w: 4, col: rgba([226, 214, 182]) });
+  fill(c, pb, rgba(C.oxblood, 0.45)); line(c, pb, { closed: true, w: 1.4, dash: [5, 4] });
+  seg(c, P(b0 + 6.2, 0.75), P(b0 + 6.2, 11.25), { w: 2.4, dash: [5, 4], col: rgba(C.timberDark) }); line(c, [P(b0 + 6.2, 2.8), P(b0 + 1.2, 2.5)], { w: 4, col: rgba([226, 214, 182], 0.6) });
+  // The rudder on the port wing's sternpost (its twin on the starboard wing), and the bow's cables and bobstay.
+  const ru = HUB.rudders, rp = box2(ru.x0, ru.x1, ru.z0, ru.z1); fill(c, rp, rgba(C.timberDark)); line(c, rp, { closed: true, w: 1.4 });
+  for (const cb of HUB.cables) if (cb.id === 'bow' && cb.from[1] < 0) seg(c, P(cb.from[0], cb.from[2]), P(cb.to[0], cb.to[2]), { w: 1.6, col: ink(0.8) });
+  const bst = SPACES.main_deck.props.find(q => q.id === 'bobstay'); seg(c, P(bst.from[0], bst.from[2]), P(bst.to[0], bst.to[2]), { w: 1.2, col: ink(0.8) });
   // Figures for scale.
   for (const [x, z] of [[30, Z.quay], [76, Z.quay], [92.5, Z.middle], [62, Z.main], [108, Z.main]]) figure(c, ...P(x, z), s, { w: 1.4 });
   // Outline and waterline.
@@ -399,7 +403,9 @@ defSheet('section', 'Long section on the centreline', 'Looking to port, bow to t
   callout(c, 'Main mast 76 m', P(100, 0)[0] + 30, P(0, 90)[1], P(100.4, Z.main + 74), { size: 20 });
   callout(c, 'The lashed wheel', P(18, 0)[0], P(0, 42)[1], [wc[0] + 4, wc[1] - 10], { size: 19 });
   callout(c, 'the ancient lower hull', P(150, 0)[0], P(0, -14.3)[1] + 6, P(140, -9), { size: 19, style: 'italic' });
-  callout(c, 'your boat at the fleet berth', P(1, 0)[0], P(0, -15.2)[1], P(b0 + 3, 0.2), { size: 18, style: 'italic' });
+  callout(c, 'your boat at the fitting berth (starboard)', P(1, 0)[0], P(0, -15.2)[1], P(b0 + 3, 0.2), { size: 18, style: 'italic' });
+  callout(c, 'rudder', P(-9, 0)[0], P(0, -9.5)[1], P(ru.x0, ru.z0 + 1.5), { size: 17, style: 'italic' });
+  callout(c, 'anchor cables', P(176, 0)[0], P(0, 9)[1], P(165, 10.1), { size: 17, style: 'italic' });
   legend(c, 1000, 1410, ['open', 'locked', 'water', 'ancient'], { cols: 2, colW: 470 });
   scaleBar(c, 300, 1450, s, 40, 10);
 });
@@ -486,7 +492,7 @@ defSheet('exploded', 'The decks, pulled apart', 'Every floor of the ship, one ab
 defSheet('cross', 'Cross-sections', 'A: through the Stern Dock at x 22 m, looking aft.   B: through the Well at x 84 m, looking forward.', 2400, 1600, (c) => {
   const s = 19, oy = 1180, cxA = 560, cxB = 1560, Z = HUB.Z;
   const A = (y, z) => [cxA - y * s, oy - z * s], B = (y, z) => [cxB + y * s, oy - z * s];
-  const hullSec = (F) => { const top = F === A ? 34.7 : 18.7; const p = []; const half = z => z < -6 ? 6 + (z + 12) * (10 / 6) : z < 0 ? 16 + (z + 6) * 0.5 : z < 26 ? 19 + 0.6 * Math.sin(Math.min(1, z / 26) * Math.PI) : 19 - (z - 26) * 0.12; for (let z = -12; z <= top + 0.01; z += 0.5) p.push([half(Math.min(z, top)), Math.min(z, top)]); return p; };
+  const hullSec = (F) => { const top = F === A ? 34.4 : 18.4; const p = []; const half = z => z < -6 ? 6 + (z + 12) * (10 / 6) : z < 0 ? 16 + (z + 6) * 0.5 : z < 26 ? 19 + 0.6 * Math.sin(Math.min(1, z / 26) * Math.PI) : 19 - (z - 26) * 0.12; for (let z = -12; z <= top + 0.01; z += 0.5) p.push([half(Math.min(z, top)), Math.min(z, top)]); return p; };
   for (const [F, cx, label] of [[A, cxA, 'A'], [B, cxB, 'B']]) {
     c.fillStyle = 'rgba(84,140,164,0.18)'; c.fillRect(cx - 21 * s - 40, oy, 42 * s + 80, 13 * s);
     const sec = hullSec(F), outer = sec.map(([y, z]) => F(y, z)).concat(sec.map(([y, z]) => F(-y, z)).reverse());
@@ -502,7 +508,7 @@ defSheet('cross', 'Cross-sections', 'A: through the Stern Dock at x 22 m, lookin
     fill(c, [F(-10, 25.5), F(10, 25.5), F(10, 0), F(-10, 0)], 'rgba(214,220,214,0.9)');
     seg(c, F(-10, 1.2), F(10, 1.2), { w: 1, col: ink(0.4) }); fill(c, [F(-10, 1.2), F(10, 1.2), F(10, 0), F(-10, 0)], rgba(C.water, 0.4));
     // The arch beyond.
-    const ar = [F(-10, 25.5), F(-6, 26.4), F(0, 26.7), F(6, 26.4), F(10, 25.5), F(10, 33.5), F(-10, 33.5)]; fill(c, ar, rgba(C.timberDark, 0.85)); zoneFill(c, ar, 'locked', 4); line(c, ar, { closed: true, w: 1.8 });
+    const ar = [F(-10, 25.5), F(-6, 26.4), F(0, 26.4), F(6, 26.4), F(10, 25.5), F(10, 33.5), F(-10, 33.5)]; fill(c, ar, rgba(C.timberDark, 0.85)); zoneFill(c, ar, 'locked', 4); line(c, ar, { closed: true, w: 1.8 });
     zoneName(c, 'Stern Arch (beyond)', F(0, 0)[0], F(0, 30)[1], 'locked', 18);
     // Basin: water, floor, side walls of ancient stone up to the quays.
     fill(c, [F(-10, 0), F(10, 0), F(10, HUB.basin.floor), F(-10, HUB.basin.floor)], rgba(C.water, 0.55));
@@ -559,22 +565,22 @@ defSheet('cross', 'Cross-sections', 'A: through the Stern Dock at x 22 m, lookin
       for (const z of [Z.lower, Z.middle, Z.upper]) { seg(c, F(sg * 11, z), F(sg * 11, z + 3.55), { w: 2.4 }); const d = [F(sg * 11, z), F(sg * 11, z + 2.4)]; seg(c, d[0], d[1], { w: 6, col: rgba(C.timberDark) }); seg(c, F(sg * 10.8, z + 1.2), F(sg * 11.2, z + 1.2), { w: 3, col: rgba(C.iron) }); figure(c, ...F(sg * 8.4, z), s, { w: 1.5 }); }
     }
     // Main deck rail round the shaft, the gantry, the main mast beyond.
-    for (const sg of [-1, 1]) { seg(c, F(sg * 6, Z.main), F(sg * 6, Z.main + 1.2), { w: 2 }); seg(c, F(sg * 6, Z.main + 1.2), F(sg * 8, Z.main + 1.2), { w: 2 }); fill(c, [F(sg * 19.6, Z.main + 1.2), F(sg * 18.8, Z.main + 1.2), F(sg * 18.8, Z.main), F(sg * 19.6, Z.main)], rgba(C.timberDark)); }
+    for (const sg of [-1, 1]) { seg(c, F(sg * 6, Z.main), F(sg * 6, Z.main + 1.0), { w: 2 }); seg(c, F(sg * 6, Z.main + 1.0), F(sg * 8, Z.main + 1.0), { w: 2 }); fill(c, [F(sg * 19.6, Z.main + HUB.rail), F(sg * 18.8, Z.main + HUB.rail), F(sg * 18.8, Z.main), F(sg * 19.6, Z.main)], rgba(C.timberDark)); }
     fill(c, [F(-0.9, Z.main), F(-0.6, 36), F(0.6, 36), F(0.9, Z.main)], rgba(C.timberDark, 0.35));
     line(c, [F(-7.5, Z.main), F(0, Z.main + 7.5), F(7.5, Z.main)], { w: 4, col: rgba(C.timberDark) }); seg(c, F(0, Z.main + 7.5), F(4.5, Z.main + 7.5), { w: 4, col: rgba(C.timberDark) });
     seg(c, F(4.5, Z.main + 7.5), F(4.5, Z.lower + 2.4), { w: 1.2 });
     const cage = [F(3.2, Z.lower + 2.4), F(5.8, Z.lower + 2.4), F(5.8, Z.lower), F(3.2, Z.lower)]; fill(c, cage, rgba(C.timberLight, 0.6)); line(c, cage, { closed: true, w: 1.6 });
     for (let y = 3.5; y < 5.8; y += 0.5) seg(c, F(y, Z.lower), F(y, Z.lower + 2.4), { w: 0.8 });
     // The Chandlery beyond (port side), on the main deck.
-    const ch = [F(-19, Z.main), F(-19, Z.main + 4.2), F(-13.5, Z.main + 5.4), F(-8, Z.main + 4.2), F(-8, Z.main)]; wash(c, ch, C.open, 0.7); line(c, ch, { closed: true, w: 1.6 });
-    txt(c, 'Chandlery (beyond)', F(-13.5, 0)[0], F(0, Z.main + 2)[1], { size: 18, f: FL, align: 'center', halo: true }); badge(c, F(-13.5, 0)[0], F(0, Z.main + 6.8)[1], 'E', 14);
+    const chd = HUB.chandlery, chm = (chd.y0 + chd.y1) / 2; const ch = [F(chd.y0, Z.main), F(chd.y0, Z.main + chd.h), F(chm, Z.main + 5.4), F(chd.y1, Z.main + chd.h), F(chd.y1, Z.main)]; wash(c, ch, C.open, 0.7); line(c, ch, { closed: true, w: 1.6 });
+    txt(c, 'Chandlery (beyond)', F(chm, 0)[0], F(0, Z.main + 2)[1], { size: 18, f: FL, align: 'center', halo: true }); badge(c, F(chm, 0)[0], F(0, Z.main + 6.8)[1], 'E', 14);
     // The Keelgate in the floor and the Deep below.
     fill(c, [F(-4, Z.quay + 0.05), F(4, Z.quay + 0.05), F(4, Z.quay - 0.7), F(-4, Z.quay - 0.7)], rgba(C.ancient)); line(c, [F(-4, Z.quay + 0.05), F(4, Z.quay + 0.05), F(4, Z.quay - 0.7), F(-4, Z.quay - 0.7)], { closed: true, w: 1.6 });
     seg(c, F(-3, Z.quay - 0.35), F(3, Z.quay - 0.35), { w: 2.6, col: rgba(C.glow, 0.95) });
     const dp = [F(-15, Z.quay - 0.75), F(15, Z.quay - 0.75), F(13, Z.deep), F(-13, Z.deep)]; zoneFill(c, dp, 'locked', 44);
     zoneName(c, 'The Deep (ancient, sealed)', F(0, 0)[0], F(0, -3.6)[1], 'locked', 18);
-    const desk = [F(-9, Z.quay + 0.9), F(-6.5, Z.quay + 0.9), F(-6.5, Z.quay), F(-9, Z.quay)]; fill(c, desk, rgba(C.timber)); line(c, desk, { closed: true, w: 1.2 });
-    figure(c, ...F(-5.6, Z.quay), s, { w: 1.6 });
+    const dk = SPACES.keelgate.props.find(q => q.id === 'desk'); const desk = [F(dk.y0, Z.quay + dk.h), F(dk.y1, Z.quay + dk.h), F(dk.y1, Z.quay), F(dk.y0, Z.quay)]; fill(c, desk, rgba(C.timber)); line(c, desk, { closed: true, w: 1.2 });
+    figure(c, ...F(SPACES.keelgate.npc.y, Z.quay), s, { w: 1.6 });
     const RX = 1990;
     callout(c, 'gantry over the Well', RX, 520, F(3, Z.main + 7.5), { size: 19 });
     callout(c, 'the Well: 12 × 12 m,', RX, 690, F(2, 14), { size: 19, sub: 'daylight from above' });

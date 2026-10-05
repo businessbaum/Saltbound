@@ -226,10 +226,11 @@ for a higher screen percentage (for example 75 %) and more content.
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
 - **D61 (phase 1, waiting for the owner's review):** the hub ship Hollowkeel as a blockout in its own map `L_HubBlockout`
   (plain shapes, flat colours; open it in the editor and play): every deck of the open 20 %, the stairs, gates, props as boxes,
-  markers and labels at the NPC spots, the player's boat moored at the fitting berth. Measured: walking 8-33 s to the Slip,
-  the Tally House and the Keelgate, 63 s to the Chandlery; 3.7 m clear everywhere; the boat in and out under the arch; the
-  Storm sea under +1.05 m (hull) and +0.36 m (basin) with stronger calm zones; light readable with an exposure volume per
-  space. Proposals in D61 (her berth off the island's channel, eight calm zones, a shortcut to the main deck).
+  markers and labels at the NPC spots, the player's boat moored at the fitting berth. After the logic pass (D61 addendum:
+  rail 0.9 m, rudders, anchor cables and moorings, the crane, counters facing the customers, the hoist's counterweight, the
+  port landing, her berth off the island's channel): walking 5-33 s to the Slip, the Tally House and the Keelgate, 63 s to
+  the Chandlery; 3.7 m clear everywhere; the boat in and out under the arch; the Storm sea under +1.06 m (hull) and +0.34 m
+  (basin). Open: eight calm zones, a shortcut to the main deck, the space sheets 08-11.
 - **D60 (awaiting the owner's check):** the interaction prompt pinned on its object or low on the screen (pause menu: Prompt
   position; on the object by default). The start is a tropical ring island round a lagoon with the harbour inside: palms in
   groves, broadleaf trees, bushes, flowers, big-leaf plants, ferns and beach grass swaying in the wind, a footpath to a hill in

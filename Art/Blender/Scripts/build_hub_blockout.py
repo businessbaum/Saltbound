@@ -267,7 +267,7 @@ def build_shell():
 
     def open_mouth(y, z):
         if abs(y) < half:
-            return z < arch_z(y)
+            return basin["floor"] < z < arch_z(y)
         return abs(y) < mouth and Z["quay"] < z < Z["lower"]
 
     face_cells(p, 0.0, H.profile_bottom(0.0), H.profile_top(0.0), lambda y, z: not open_mouth(y, z),
@@ -291,6 +291,13 @@ def build_shell():
             w = H.half_width(0.5 * (xa + xb), Z["poop"])
             ya, yb = sorted((y, s * w))
             p.quad([(xa, ya, Z["poop"]), (xb, ya, Z["poop"]), (xb, yb, Z["poop"]), (xa, yb, Z["poop"])], "MI_HubBlk_Locked")
+    # Twin rudders on the wings' sternposts (the wheel's ropes run to their tillers) and the stern moorings.
+    ru = H.HUB["rudders"]
+    for sg in (-1.0, 1.0):
+        p.box(ru["x0"], ru["x1"], sg * ru["y"] - 0.25, sg * ru["y"] + 0.25, ru["z0"], ru["z1"], "MI_HubBlk_Hull")
+    for cb in H.HUB["cables"]:
+        if cb["id"] == "stern":
+            pole(p, cb["from"], cb["to"], 0.22, 0.22, "MI_HubBlk_Rail", sides=6)
     # The sterncastle's front over the main deck (its doors are gates).
     xf = basin["x1"] + 0.3
     face_cells(p, xf, Z["main"], H.profile_top(1.0), lambda y, z: abs(y) >= half, lambda z: H.half_width(xf, z), "MI_HubBlk_Locked")
@@ -314,6 +321,11 @@ def build_shell():
         x = xb
     sp = H.prop("main_deck", "bowsprit")
     pole(b, sp["from"], sp["to"], 0.9, 0.4, "MI_HubBlk_Prop")
+    bs_ = H.prop("main_deck", "bobstay")
+    pole(b, bs_["from"], bs_["to"], 0.12, 0.12, "MI_HubBlk_Rail", sides=6)
+    for cb in H.HUB["cables"]:
+        if cb["id"] == "bow":
+            pole(b, cb["from"], cb["to"], 0.25, 0.25, "MI_HubBlk_Rail", sides=6)
     b.finish()
 
 
@@ -483,6 +495,9 @@ def build_decks():
     for r in subtract((hall[0], hall[1], hall[2], shop[3]), [(hall[0], sw["x1"], sw["y0"], sw["y1"])]):
         slab(q, r, zq, "MI_HubBlk_Open")
     slab(q, ch, zq, "MI_HubBlk_Open")
+    for zid, r in H.open_rects("quay"):
+        if zid == "dock" and r[0] >= H.HUB["basin"]["x1"]:
+            slab(q, r, zq, "MI_HubBlk_Open")                                             # the port landing
     for s in (-1, 1):
         ya, yb = sorted((s * bs["y1"], s * H.HUB["quayY"]))
         slab(q, (bs["x0"], bs["x1"], ya, yb), Z["lower"], "MI_HubBlk_Locked")          # the wing over the arcade
@@ -562,6 +577,9 @@ def build_decks():
             pieces = [(a0, hoist_gap[2]), (hoist_gap[3], a1)]
         for pa, pb in pieces:
             wall_box(m, ax, ln, pa, pb, zm, zm + RAIL_H, "MI_HubBlk_Rail", RAIL_T)
+    co = H.prop("well", "coaming")
+    for (ax, ln, a0, a1) in (("x", sh[0], sh[2], sh[3]), ("x", sh[1], sh[2], sh[3]), ("y", sh[2], sh[0], sh[1]), ("y", sh[3], sh[0], sh[1])):
+        wall_box(m, ax, ln, a0 - 0.2, a1 + 0.2, zm, zm + co["h"], "MI_HubBlk_Rail", 0.35)
     f_main = next(f for f in H.flights() if f["to"] == "main")
     for (ax, ln, a0, a1) in (("x", comp[0], comp[2], comp[3]), ("x", comp[1], comp[2], comp[3]), ("y", comp[2], comp[0], comp[1])):
         wall_box(m, ax, ln, a0, a1, zm, zm + RAIL_H, "MI_HubBlk_Rail", RAIL_T)
@@ -673,6 +691,11 @@ def build_gates():
             # The cargo rope across the whole deck, a board in the middle: it stops the player.
             w = H.half_width(x, z) - 0.1
             p.box(x - 0.05, x + 0.05, -w, w, z, z + 1.0, "MI_HubBlk_Gate")
+            step = H.prop("main_deck", "cargo_rope")["every"]
+            k = -math.floor(w / step)
+            while k * step <= w:
+                p.box(x - 0.08, x + 0.08, k * step - 0.08, k * step + 0.08, z, z + 1.05, "MI_HubBlk_Rail")
+                k += 1
             p.box(x - 0.15, x + 0.15, y - 0.6, y + 0.6, z + 0.5, z + 1.3, "MI_HubBlk_Gate", collide=False)
             continue
         found = gate_axis(gm)
@@ -712,12 +735,16 @@ def wall_prop(part, space_name, pr, floor, depth=0.12, mat="MI_HubBlk_Prop"):
     line = float(val)
     z0, z1 = floor + pr.get("z0", 0.0), floor + pr.get("z1", 2.0)
     d = pr.get("depth", depth)
+    level = {"slip": "quay", "keelgate": "quay", "tally": "lower", "chandlery": "main"}[space_name]
+    rects = [r for _, r in H.open_rects(level)]
     if ax == "x":
-        inner = -1.0 if line > 0 or line > 50 else 1.0
+        mid = 0.5 * (pr["y0"] + pr["y1"])
+        inner = 1.0 if any(H.inside(r, line + 0.5, mid) for r in rects) else -1.0          # the board faces the open floor
         x0 = line - WALL / 2 - d if inner < 0 else line + WALL / 2
         part.box(x0, x0 + d, pr["y0"], pr["y1"], z0, z1, mat)
     else:
-        inner = -1.0 if line > 0 else 1.0
+        mid = 0.5 * (pr["x0"] + pr["x1"])
+        inner = 1.0 if any(H.inside(r, mid, line + 0.5) for r in rects) else -1.0
         y0 = line - WALL / 2 - d if inner < 0 else line + WALL / 2
         part.box(pr["x0"], pr["x1"], y0, y0 + d, z0, z1, mat)
 
@@ -758,10 +785,16 @@ def build_props():
     p.box(mt["x0"], mt["x1"], mt["y"] - 0.2, mt["y"] + 0.2, zq + mt["z"], zq + mt["z"] + 0.4, "MI_HubBlk_Prop")
     for tx in (mt["x0"] + 2.0, mt["x1"] - 2.0):
         p.box(tx - 0.1, tx + 0.1, mt["y"] - 0.6, mt["y"] + 0.6, zq, zq + mt["z"], "MI_HubBlk_Prop")
-    dr = sl["derrick"]
-    p.box(dr["x"] - 0.25, dr["x"] + 0.25, dr["y"] - 0.25, dr["y"] + 0.25, zq, zq + dr["h"], "MI_HubBlk_Prop")
-    bt = dr["boom_to"]
-    pole(p, (dr["x"], dr["y"], zq + 2.0), (bt[0], bt[1], zq + bt[2]), 0.18, 0.12, "MI_HubBlk_Prop", collide=False)
+    cr = sl["crane"]
+    zb = zq + cr["bracket_z"]
+    p.box(cr["x"] - 0.3, cr["x"] + 0.3, cr["y"] - 0.5, cr["y"], zb - 1.6, zb + 0.4, "MI_HubBlk_Prop", collide=False)   # the bracket
+    jt = cr["jib_to"]
+    pole(p, (cr["x"], cr["y"] - 0.3, zb), (jt[0], jt[1], zq + jt[2]), 0.2, 0.15, "MI_HubBlk_Prop", collide=False)
+    pole(p, (cr["x"], cr["y"] - 1.2, zb - 1.4), (cr["x"], cr["y"] - 0.4, zb - 0.2), 0.12, 0.12, "MI_HubBlk_Prop", collide=False)  # its strut
+    p.box(jt[0] - 0.02, jt[0] + 0.02, jt[1] - 0.02, jt[1] + 0.02, zq + 3.0, zq + jt[2], "MI_HubBlk_Rail", collide=False)   # the fall
+    p.box(jt[0] - 0.15, jt[0] + 0.15, jt[1] - 0.15, jt[1] + 0.15, zq + 2.7, zq + 3.0, "MI_HubBlk_Rail", collide=False)    # the hook block
+    wx, wy = cr["winch"]
+    p.box(wx - 0.5, wx + 0.5, wy - 0.4, wy + 0.4, zq, zq + 0.9, "MI_HubBlk_Prop")                                         # the winch
     lanterns(p, sl["lanterns"], zq)
     sg = sl["sign"]
     p.box(sg["x"] - 0.3, sg["x"], sg["y"] - 3.0, sg["y"] + 3.0, zq + sg["z"] - 0.5, zq + sg["z"] + 0.5, "MI_HubBlk_Canvas", collide=False)
@@ -772,8 +805,11 @@ def build_props():
     p.box(pb["x0"], pb["x1"], pb["y0"], pb["y0"] + 0.1, zl + 2.0, zl + pb["h"], "MI_HubBlk_Prop")
     p.box(pb["x0"], 51.5, pb["y0"], pb["y0"] + 0.1, zl + 1.0, zl + 2.0, "MI_HubBlk_Prop")      # (hatch x 51.5..54.5, its note)
     p.box(54.5, pb["x1"], pb["y0"], pb["y0"] + 0.1, zl + 1.0, zl + 2.0, "MI_HubBlk_Prop")
-    for bx in (pb["x0"], pb["x1"] - 0.1):
-        p.box(bx, bx + 0.1, pb["y0"], pb["y1"], zl, zl + pb["h"], "MI_HubBlk_Prop")
+    p.box(pb["x0"], pb["x0"] + 0.1, pb["y0"], pb["y1"], zl, zl + pb["h"], "MI_HubBlk_Prop")
+    dy0, dy1 = pb["door"]                                                                  # the door in its forward side
+    for ya, yb in ((pb["y0"], dy0), (dy1, pb["y1"])):
+        p.box(pb["x1"] - 0.1, pb["x1"], ya, yb, zl, zl + pb["h"], "MI_HubBlk_Prop")
+    p.box(pb["x1"] - 0.1, pb["x1"], dy0, dy1, zl + DOOR_H, zl + pb["h"], "MI_HubBlk_Prop")
     p.box(pb["x0"], pb["x1"], pb["y0"], pb["y1"], zl + 2.7, zl + 2.8, "MI_HubBlk_Prop")
     p.box(pb["x0"], pb["x1"], 17.0, pb["y0"], zl + 0.95, zl + 1.0, "MI_HubBlk_Prop")          # the ledge (its note)
     for key in ("weighing_bench", "salt_cakes", "table"):
@@ -788,7 +824,8 @@ def build_props():
     kg = {pr["id"]: pr for pr in H.space("keelgate")["props"]}
     dk = kg["desk"]
     p.box(dk["x0"], dk["x1"], dk["y0"], dk["y1"], zq, zq + dk["h"], "MI_HubBlk_Prop")
-    p.box(72.8, 73.6, -8.4, -7.6, zq, zq + 0.9, "MI_HubBlk_Prop")                          # the chair (desk note)
+    ch_ = dk["chair"]
+    p.box(ch_[0], ch_[1], ch_[2], ch_[3], zq, zq + 0.9, "MI_HubBlk_Prop")                   # the chair behind it
     wall_prop(p, "keelgate", kg["shelves"], zq)
     wall_prop(p, "keelgate", kg["rubbings"], zq, depth=0.05, mat="MI_HubBlk_Canvas")
     lanterns(p, kg["lanterns"], zq)
@@ -798,6 +835,14 @@ def build_props():
         for cy in (hs[2], hs[3] - 0.1):
             p.box(cx, cx + 0.1, cy, cy + 0.1, zq, zq + 2.4, "MI_HubBlk_Rail")
     p.box(hs[0], hs[1], hs[2], hs[3], zq + 2.4, zq + 2.5, "MI_HubBlk_Rail", collide=False)
+    for gy in (hs[2], hs[3] - 0.1):                                                         # the guide posts (aft corners)
+        p.box(hs[0] - 0.12, hs[0], gy, gy + 0.1, zq, Z["main"] + 7.5, "MI_HubBlk_Rail", collide=False)
+    cw = H.prop("well", "counterweight")
+    top_ = Z["main"] + 7.5 - 1.0
+    p.box(cw["x0"], cw["x1"], cw["y0"], cw["y1"], top_ - cw["h"], top_, "MI_HubBlk_Prop", collide=False)   # up while the cage is down
+    for (ax, ln, a0, a1) in (("y", cw["y0"] - 0.2, cw["x0"] - 0.2, cw["x1"] + 0.3), ("x", cw["x1"] + 0.3, cw["y0"] - 0.2, cw["y1"]),
+                             ("x", cw["x0"] - 0.2, cw["y0"] - 0.2, cw["y1"])):
+        wall_box(p, ax, ln, a0, a1, zq, zq + RAIL_H, "MI_HubBlk_Rail", RAIL_T)                # its bay on the chamber floor
     sh = H.R(H.HUB["shaft"])
     top = zm + 7.5                                                                          # gantry note: 7.5 m above the deck
     apex = (0.5 * (76.5 + 91.5), 0.0, top)
@@ -820,7 +865,7 @@ def build_props():
     p.box(dh["x1"] - 0.3, dh["x1"], win["y0"], win["y1"], zm + win["z1"], zm + eav, "MI_HubBlk_Wall")
     cf = cd["counter_front"]
     p.box(cf["x0"], cf["x1"], cf["y0"], cf["y1"], zm, zm + cf["h"], "MI_HubBlk_Prop")
-    p.box(cf["x0"], cf["x1"], cf["y0"] - 0.2, cf["y1"], zm + cf["h"], zm + 1.22, "MI_HubBlk_Prop")   # the top board
+    p.box(cf["x0"], cf["x1"], cf["y0"] - 0.2, cf["y1"], zm + cf["h"], zm + cf["top"], "MI_HubBlk_Prop")   # the top board
     for px0, px1 in ((98.0, 99.5), (110.0, 111.0), (113.0, 114.0)):                         # the posts (counter_front note)
         p.box(px0, px1, cf["y0"], cf["y1"], zm, zm + eav, "MI_HubBlk_Wall")
     door = cd["door"]
@@ -848,8 +893,9 @@ def build_props():
         p.box(ax_ - 0.06, ax_ + 0.06, ay1 - 0.06, ay1 + 0.06, zm, zm + az1, "MI_HubBlk_Prop")
     sgn = cd["sign"]
     p.box(sgn["x0"], sgn["x1"], -8.0 + 0.0, -8.0 + 0.12, zm + sgn["z0"], zm + sgn["z1"], "MI_HubBlk_Canvas", collide=False)
-    for sx0, sx1, sy0, sy1 in ((98.5, 113.5, -18.7, -18.1), (98.3, 98.9, -18.2, -9.2)):         # shelves (their note, 0.6 deep)
-        p.box(sx0, sx1, sy0, sy1, zm, zm + 3.6, "MI_HubBlk_Prop")
+    shv = cd["shelves"]
+    for sx0, sx1, sy0, sy1 in shv["runs"]:
+        p.box(sx0, sx1, sy0, sy1, zm, zm + shv["h"], "MI_HubBlk_Prop")
     dt = cd["display_table"]
     p.box(dt["x0"], dt["x1"], dt["y0"], dt["y1"], zm, zm + dt["h"], "MI_HubBlk_Prop")
     for bx in cd["beams"]["at_x"]:

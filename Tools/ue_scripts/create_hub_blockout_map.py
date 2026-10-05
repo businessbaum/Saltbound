@@ -149,6 +149,9 @@ lamps = []
 for name, fl in (("slip", H.Z["quay"]), ("tally", H.Z["lower"]), ("keelgate", H.Z["quay"])):
     pr = H.prop(name, "lanterns")
     lamps += [(x, y, fl + z - 0.4) for x, y, z in pr["at"]]
+for name, fl in (("dock", H.Z["quay"]), ("main_deck", H.Z["main"])):          # on the arcade posts; on the main deck
+    pr = H.prop(name, "lanterns")
+    lamps += [(x, y, fl + z - 0.4) for x, y, z in pr["at"]]
 ring = H.R(H.HUB["ring"])
 for lvl in ("lower", "middle", "upper"):                                      # the Well's gallery corners (its note)
     lamps += [(x, y, H.Z[lvl] + 3.0) for x in (ring[0] + 0.6, ring[1] - 0.6) for y in (ring[2] + 0.6, ring[3] - 0.6)]

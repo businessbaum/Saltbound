@@ -49,12 +49,14 @@ Every number from `Docs/Design/HubShip/HubShip_Data.json` (generated from `hub_d
 |---|---|---|
 | Size | 160 m on deck (188 m with the bowsprit), 40 m beam, keel at -12 m | 37.8 m wide at the main deck (the hull's tumblehome) |
 | Decks | quay +1.5, lower +5.5, middle +9.5, upper +13.5, main +17.5 m | 4 m floor to floor, 3.7 m clear under the slabs |
-| Open at the start | 6 446 of 31 747 m2 (20 %) | |
+| Open at the start | 6 466 of 31 234 m2 (20.7 %) | |
+| Bulwarks | 0.9 m with a cap rail | the 1.4 m player's eyes see over them |
 | Stern Dock | basin 44 x 20 m, 5 m deep; the arch 21.5-25.5 m clear | quays 4 m wide at +1.5 |
 | Stairs | 22 steps of 18 cm on 30 cm treads per storey, 3 m wide | ramps in the collision |
 | Fitting berth | x 32..42, y 7.9 (0.4 m off the wall) | the boat moors there (`MooringPierHeight` 150 cm) |
-| Walking from the fitting berth | Slip 7.7 s, Tally House 10.0 s, Keelgate 32.7 s, Chandlery 63.1 s | 2.5 m/s; sprinting about 0.6 x |
-| Calm zones | 20 % within 120 m of her (full by 300 m), 10 % → 7 % in the basin | Storm: +1.05 m under the hull, +0.36 m in the basin |
+| Walking from the fitting berth | Slip 4.6 s, Tally House 10.2 s, Keelgate 33.4 s, Chandlery 63.1 s | 2.5 m/s; sprinting about 0.6 x |
+| Her berth | (81, 415) m, bow to 92 degrees | off the lagoon's channel, held by two bow cables and two stern moorings |
+| Calm zones | 20 % within 120 m of her (full by 300 m), 10 % → 7 % in the basin | Storm: +1.06 m under the hull, +0.34 m in the basin |
 | Lanterns below decks | 60 cd, 2100 K, lit by day | exposure down to EV 3 inside |
 
 ## Player

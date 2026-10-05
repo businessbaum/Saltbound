@@ -64,7 +64,7 @@ function drawDeckPlan(c, lv, P, s, o = {}) {
       for (const x of [1.5, 20]) { const p = T.rect({ x0: x, x1: x + 1, y0: sg * 10 - 0.25, y1: sg * 10 + 0.25 }); line(c, p, { closed: true, w: 1 }); }
     }
     seg(c, P(0, -10), P(44, -10), { w: 1.6, col: rgba(C.water, 1) }); seg(c, P(0, 10), P(44, 10), { w: 1.6, col: rgba(C.water, 1) });
-    const rp = T.rect({ x0: HUB.ramp.x0 + 2, x1: 44, y0: -5, y1: 5 }); hatch(c, rp, { ang: 90, gap: Math.max(4, s * 0.5), col: ink(0.45) }); line(c, rp, { closed: true, w: 1.4 });
+    const rp = T.rect({ x0: HUB.ramp.x0, x1: 44, y0: -5, y1: 5 }); hatch(c, rp, { ang: 90, gap: Math.max(4, s * 0.5), col: ink(0.45) }); line(c, rp, { closed: true, w: 1.4 });
     T.boat(32, 10, 7.9, 3.4, { bow: '+x' });
     T.boat(8, 10, -7.9, 3.4, { bow: '+x', dash: [5, 4] }); T.boat(22, 14, -7.5, 4.4, { bow: '+x', transom: true, dash: [5, 4] });
     T.circle(40, 12.5, 0.45, C.timberDark);
@@ -74,7 +74,8 @@ function drawDeckPlan(c, lv, P, s, o = {}) {
     for (let x = 48.4; x < 60; x += 0.8) seg(c, P(x, -9.25), P(x, -8.75), { w: 1.6 });
     T.boat(47, 14, 0, 4.4, { bow: '+x', transom: true }); for (const x of [50, 54, 58]) T.box(x - 0.3, x + 0.3, -3, 3, C.timberDark, 0.9, 1);
     T.box(46, 62, -5.7, -5.3, C.timber); // the mast on trestles
-    T.box(52, 60, 9.6, 10.6, C.timberLight); T.box(46, 50, 16.5, 18.5, C.timber); T.box(48, 60, 18.4, 18.9, C.cream, 1, 1.2);
+    { const sl = n => SPACES.slip.props.find(q => q.id === n); const ct = sl('counter'), wb = sl('workbench'), pb = sl('plans_board');
+      T.box(ct.x0, ct.x1, ct.y0, ct.y1, C.timberLight); T.box(wb.x0, wb.x1, wb.y0, wb.y1, C.timber); T.box(44.1, 44.6, pb.y0, pb.y1, C.cream, 1, 1.2); }
     // Keelgate chamber.
     T.walls(HUB.chamber, [['x0', 5, 7.5], ['x1', -7, -4], ['x1', 4, 7], ['y1', 79, 86]]);
     line(c, T.rect(sh), { closed: true, w: 1.2, dash: [6, 5] });
@@ -84,7 +85,7 @@ function drawDeckPlan(c, lv, P, s, o = {}) {
     for (let i = 0; i < 7; i++) { const t = i / 7 * Math.PI * 2 - Math.PI / 2; T.circle(kg.x + Math.cos(t) * (kg.r + 0.5), kg.y + Math.sin(t) * (kg.r + 0.5), 0.18, C.iron, 0.8); }
     const fl = HUB.flights[0]; T.stairs(fl, '-x');
     const ho = HUB.hoist; line(c, T.rect(ho), { closed: true, w: 1.6 }); seg(c, P(ho.x0, ho.y0), P(ho.x1, ho.y1), { w: 1 }); seg(c, P(ho.x1, ho.y0), P(ho.x0, ho.y1), { w: 1 });
-    T.box(74, 77.5, -9, -7, C.timber); T.box(73, 92, -12, -11.4, C.timberDark, 0.9, 1);
+    { const dk = SPACES.keelgate.props.find(q => q.id === 'desk'); T.box(dk.x0, dk.x1, dk.y0, dk.y1, C.timber); T.box(dk.chair[0], dk.chair[1], dk.chair[2], dk.chair[3], C.timberDark); } T.box(73, 92, -12, -11.4, C.timberDark, 0.9, 1);
     if (o.labels) {
       T.name('Stern Dock', 20, 0, Math.max(17, s * 1.7)); T.name('The Slip', 54, 13.5, s * 1.5); T.name('Keelgate', 89, -8.6, s * 1.4);
       T.name('Quay stores', 22, 17, s * 1.1, true); T.name('Quay stores', 22, -17, s * 1.1, true); T.name('Timber store', 54, -14.5, s * 1.1, true);
@@ -106,7 +107,7 @@ function drawDeckPlan(c, lv, P, s, o = {}) {
       for (let x = 46; x < 62; x += 4) { seg(c, P(x, 8.8), P(x + 3, 8.8), { w: 1 }); seg(c, P(x, 9.2), P(x + 3, 9.2), { w: 1 }); }
       T.walls(HUB.lane, [['x0', 6, 12], ['x1', 6, 12]]);
       fill(c, T.rect({ x0: 42, x1: 44, y0: 14, y1: 17 }), rgba(C.open, 0.7));
-      T.box(63.4, 64, 13, 18.5, C.cream, 1, 1.2); T.box(50, 56, 17.5, 20, C.timber); T.box(57, 62, 18.5, 20, C.timberLight); T.box(49, 58, 12.6, 13.8, C.timberLight);
+      T.box(63.4, 64, 13, 18.5, C.cream, 1, 1.2); T.box(50, 56, 17.5, 20, C.timber); T.box(55.6, 56.1, 18.0, 19.0, C.cream); T.box(57, 62, 18.5, 20, C.timberLight); T.box(49, 58, 12.6, 13.8, C.timberLight);
       if (o.labels) { T.name('Tally House', 54, 11.6, s * 1.4); T.name('Wing quarters', 22, 15, s * 1.1, true); T.name('Wing quarters', 22, -15, s * 1.1, true); T.name('The Ropewalk', 112, -15, s * 1.3, true); T.name('Mess and galley', 128, 4, s * 1.4, true); T.name('Purser’s', 68.5, -5, s * 0.9, true); T.name('stores', 68.5, -3.4, s * 0.9, true); T.name('lane', 68.5, 9, s * 0.95); }
     }
     if (o.labels && lv === 'middle') { T.name('Guild rooms', 30, 15, s * 1.3, true); T.name('Guild rooms', 60, -15, s * 1.3, true); T.name('Lantern Market', 128, 0, s * 1.5, true); }
@@ -126,7 +127,7 @@ function drawDeckPlan(c, lv, P, s, o = {}) {
     // Masts and fife rails.
     for (const m of HUB.masts) { T.circle(m.x, 0, 1.0, C.timberDark); line(c, T.rect({ x0: m.x - 2, x1: m.x + 2, y0: -2, y1: 2 }), { closed: true, w: 1.2 }); for (const sg of [-1, 1]) for (let d = -4; d <= 4; d += 2) { const e = HUB.hb(m.x + d) - 0.4; T.box(m.x + d - 0.5, m.x + d + 0.5, sg * e - 0.4, sg * e + 0.4, C.iron, 1, 0.8); } }
     // The Chandlery.
-    const ch = HUB.chandlery; T.walls(ch, [['y1', 100, 110], ['y1', 111, 113]]); fill(c, T.rect({ x0: 100, x1: 110, y0: -8.4, y1: -7.6 }), rgba(C.timberLight)); T.box(98.4, 113.6, -18.8, -18.2, C.timber); T.box(98.2, 98.8, -18, -9, C.timber); T.box(103, 108, -14.5, -12.5, C.timberLight);
+    const ch = HUB.chandlery; T.walls(ch, [['y1', 100, 110], ['y1', 111, 113]]); fill(c, T.rect({ x0: 100, x1: 110, y0: -8.4, y1: -7.6 }), rgba(C.timberLight)); for (const [x0, x1, y0, y1] of SPACES.chandlery.props.find(q => q.id === 'shelves').runs) T.box(x0, x1, y0, y1, C.timber); T.box(103, 108, -14.5, -12.5, C.timberLight);
     line(c, T.rect({ x0: 99.5, x1: 112.5, y0: -8, y1: -5.6 }), { closed: true, w: 1, dash: [3, 4] });
     T.circle(106, -4.5, 0.4, C.brass); T.circle(110, -4.5, 0.45, C.timber);
     // Cargo deck: the rope, hatches, boats, cargo, capstan, chimney.
@@ -146,15 +147,21 @@ function drawDeckPlan(c, lv, P, s, o = {}) {
   line(c, hull, { closed: true, w: Math.max(2.4, s * 0.25), seed: 3 });
   for (const gm of GATE_MARKS.filter(q => q.level === lv)) T.gate(gm.x, gm.y, gm.g);
   // Services: badges, NPC spots, interaction points.
+  // From the data: each space's NPC spot (facing as it looks) and its interaction points.
+  const spot = (name, labels) => {
+    const sp = SPACES[name], f = sp.npc.face * Math.PI / 180;
+    T.npc(sp.npc.x, sp.npc.y, f > Math.PI ? f - 2 * Math.PI : f);
+    for (const e of sp.e) T.E(e.x, e.y, o.labels ? (labels[e.id] || null) : null);
+  };
   const svc = {
-    quay: () => { T.npc(56, 11.6, -Math.PI / 2); T.E(56, 8.4, o.labels ? 'counter' : null); T.E(54, 17.4, o.labels ? 'plans' : null); T.E(57.5, -3.2, o.labels ? 'the boat' : null); T.npc(76.5, -5.8, -0.6); T.E(78.6, -3.6, o.labels ? 'talk' : null); T.E(81, 1.7, o.labels ? 'the gate' : null, -1); badge(c, ...P(50, 13.6), 'S', Math.max(12, s * 1.1)); badge(c, ...P(80, -10), 'Q', Math.max(12, s * 1.1)); },
-    lower: () => { T.npc(53, 18.8, -Math.PI / 2); T.E(53, 16.6, o.labels ? 'pay hatch' : null); T.E(62.4, 15.8, o.labels ? 'job board' : null, -1); T.E(59.5, 17.4, o.labels ? 'deliver' : null); badge(c, ...P(47, 11), 'J', Math.max(12, s * 1.1)); },
-    main: () => { T.npc(105, -9.4, Math.PI / 2); T.E(105, -6.8, o.labels ? 'counter' : null); T.E(106, -3.4, o.labels ? 'spyglass' : null, -1); T.E(110.4, -3.4, o.labels ? 'compass' : null); badge(c, ...P(100.4, -16), 'E', Math.max(12, s * 1.1)); },
+    quay: () => { spot('slip', { counter: 'counter', plans: 'plans', display_boat: 'the boat', fitting_berth: 'berth board' }); spot('keelgate', { talk: 'talk', gate: 'the gate', hoist: 'hoist' }); badge(c, ...P(50, 13.6 - 3.0), 'S', Math.max(12, s * 1.1)); badge(c, ...P(80, -10), 'Q', Math.max(12, s * 1.1)); },
+    lower: () => { spot('tally', { pay_hatch: 'pay hatch', job_board: 'job board', weighing_bench: 'deliver' }); badge(c, ...P(47, 11), 'J', Math.max(12, s * 1.1)); },
+    main: () => { spot('chandlery', { counter: 'counter', try_spyglass: 'spyglass', try_compass: 'compass' }); badge(c, ...P(100.4, -15), 'E', Math.max(12, s * 1.1)); },
   };
   if (svc[lv]) svc[lv]();
   if (o.route) {
     const R = {
-      quay: [[[-6, 0], [34, 7.9]], [[37, 12], [46, 12], [56, 9.2]], [[42, 12.6], [33, 15.5], [44, 15.5]], [[86, 9.5], [88, 7], [78, -4.6]]],
+      quay: [[[-6, 0], [34, 7.9]], [[37, 12], [44.5, 12], [48.6, 13.2]], [[42, 12.6], [33, 15.5], [44, 15.5]], [[86, 9.5], [88, 7], [81.6, 2.4], [77, -1], [76.2, -5.6]]],
       lower: [[[44, 15.5], [58, 15.5], [64, 10.5], [73, 9], [79, 9.5]], [[79, 9.5], [93.5, 6], [93.5, -1]]],
       middle: [[[93.5, -7], [90, -9.5], [86, -9.5]]], upper: [[[79, -9.5], [74.5, -8], [74.5, 0]]], main: [[[74.5, 7], [94, 7.5], [102, -3], [105, -6.4]]],
     };

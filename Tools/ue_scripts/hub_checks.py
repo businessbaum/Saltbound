@@ -86,8 +86,8 @@ def routes():
     f_lm, f_mu, f_um = _flight("lower", "middle"), _flight("middle", "upper"), _flight("upper", "main")
     chand = to_well + [(sh[0] - 4.0, sh[3] + 1.0, lw), (f_lm[0][0], sh[3] + 1.0, lw)] + f_lm + \
         [(f_mu[0][0] + 1.5, f_mu[0][1], Z["middle"])] + f_mu + [(f_um[0][0] + 1.5, f_mu[1][1], Z["upper"]), (f_um[0][0] + 1.5, f_um[0][1] - 1.0, Z["upper"])] + \
-        [f_um[0], f_um[1]] + [(sh[0] - 1.0, sh[3] + 2.5, m), (sh[1] + 2.0, sh[3] + 1.5, m), (sh[1] + 6.0, -5.0, m), _e("chandlery", "counter") + (m,)]
-    slip = [berth, (H.HUB["basin"]["x1"] + 0.5, H.HUB["quayY"] - 2.5, q), (51.0, 8.6, q), _e("slip", "counter") + (q,)]
+        [f_um[0], f_um[1]] + [(sh[0] - 1.0, sh[3] + 2.5, m), (sh[1] + 2.0, sh[3] + 1.5, m), (sh[1] + 6.0, -5.0, m), (sh[1] + 10.5, -5.0, m), _e("chandlery", "counter") + (m,)]
+    slip = [berth, (H.HUB["basin"]["x1"] + 0.5, H.HUB["quayY"] - 2.0, q), _e("slip", "counter") + (q,)]
     return {"slip": slip, "tally": tally, "keelgate": keel, "chandlery": chand}
 
 

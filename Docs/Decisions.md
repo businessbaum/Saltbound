@@ -1445,3 +1445,56 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   5. Data to settle: the derrick (9 m high at y 12.6) stands under the arcade's roof (z 5.5); the slipway starts at x 30 in
      `hub.ramp` but at 32 in `spaces.dock` (built from the latter); the deck outline is 40 m wide but the hull section has 37.8 m at
      the main deck (the Chandlery's back wall at y -19 then meets the bulwark).
+- **Logic pass (owner, 2026-10-05):** "Check for Design issues and Logic of the Ship. Everything needs to make Sense think back
+  to the Bell…" (D53: every object starts from its purpose; nothing floats or hangs from nothing). Changed in `hub_data.js`
+  (the JSON and all sheets re-rendered), the blockout and the map:
+  - **Seen from the player's eyes (1.4 m):** the bulwarks and the taffrail were 1.2 m, so the sea did not show from the main deck.
+    `hub.rail` is now 0.9 m (the hull's tops 18.4 / 26.4 / 34.4). Counters 0.95, window sills 0.8-0.9, the spyglass on its
+    tripod 1.15, the binnacle 1.0.
+  - **What holds her and steers her:** the lashed wheel had nothing to steer and nothing held her in place. Now twin rudders hang
+    on the wings' sternposts (`hub.rudders`; the dock mouth splits the stern), with the wheel's ropes running to their tillers.
+    Two bow cables run from the hawse holes to anchors ahead (the capstan heaves them), and two stern moorings run from the wings'
+    quarters, splayed clear of the approach (`hub.cables`). A bobstay holds the bowsprit down.
+  - **Hull and water:** the dock's floor (z -5) lay below the stern's bottom, so the stern now goes down to z -6. The Deep
+    overlapped the slipway, so it starts at x 46. The slipway begins at x 32 in both `hub.ramp` and the dock.
+  - **Ways:** the port quay was a dead end, so its fleet berths could not be reached on foot. A port landing (x 44-48) now joins it
+    to the boat hall, and the timber store's grille moved to its side.
+  - **The Slip:** customers came in behind the counter. The counter now stands across the shop facing aft, toward the door from
+    the quay, with the shipwright behind it (51.4, 13.2). The plans board hangs by that door, and the workbench stands at the hull
+    wall.
+  - **The Slip's derrick:** it was 9 m high, but stood under the arcade's 4 m roof. It is now a wall crane bracketed to the wing's
+    face over an arcade post: the jib is 11 m up (clear of the boat's 10.5 m mast), the hook hangs over the berth, and the fall
+    runs to a winch under the arcade.
+  - **Mooring:** the quay said "Moor here", but the boat moors from its own windlass. The quay now has a berth board ("Read the
+    berth board").
+  - **Tally House:** the pay booth had no door; it now has one in its forward side. The purser's-stores door is by the booth.
+  - **Keelgate:** the reader stood with the desk behind them. The desk now stands between the reader and the gate they face, with
+    a chair on the wall side.
+  - **The Well:**
+    - The hoist had only ropes. It now has guide posts, and a counterweight on the gantry beam's second sheave that rests in a
+      railed bay (no one walks under it). A brake on a hand line is worked from the cage, and the door is on the aft side.
+    - A 0.3 m coaming now runs round the opening on the main deck.
+    - The ring lantern hung from nothing; it now hangs on a chain from the gantry's apex.
+  - **Main deck:** the Chandlery's back wall met the bulwark and the main mast's shrouds, so it moved 1.5 m inboard (y -17.5),
+    with its shelves inside. The cargo rope now runs on stanchions every 4 m. Lanterns now hang on the dock's arcade posts, the
+    awning and the fife rail (33 lamps in the map).
+  - **Her berth:** she now lies at (81, 415) m, bow to 92 degrees, off the lagoon's channel (proposal 1 above; it was behind the
+    island from the pier).
+  - **The long section:** your boat was drawn at a fleet berth; it is now at the fitting berth. The section also draws the rudder,
+    the anchor cables and the bobstay.
+- **Measured again** at the new berth:
+  - **Walking:** the Slip 11.8 m in 4.6 s, the Tally House 26.6 m in 10.2 s, the Keelgate 86.6 m in 33.4 s, the Chandlery
+    162.3 m in 63.1 s.
+  - **Headroom:** 3.70 m, and low only within reach of the bulwark.
+  - **The boat:**
+    - In under the arch: 0.6 m off the centreline at most and 7.7 m from the quays; it grounds softly on the slipway.
+    - Turning: 168 degrees in 40 s, 4.97 m clear of the quays. Out: clean.
+    - Moored: 0 contacts (lying at y 7.65), with the gangway on the quay at +1.5.
+  - **Storm:** +1.06 m under the hull, +0.34 m in the basin.
+  - **Area:** 6 466 of 31 234 m2 open (20.7 %). Evidence: `Docs/Evidence/D61/logic_pass.png`.
+- **Still open:**
+  - The Chandlery is 63 s away (proposal 3).
+  - The Well has no skylight.
+  - The calm zones (proposal 2).
+  - The space sheets 08-11 still show the layouts from before this pass (the derrick, the old counters).
+  - The last flight arrives on the main deck facing starboard, away from the Chandlery.
