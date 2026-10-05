@@ -12,6 +12,16 @@
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Core/SaltPlaces.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Fonts/FontMeasure.h"
+#include "HAL/IConsoleManager.h"
+#include "Misc/App.h"
+#include "Misc/PackageName.h"
+#include "Player/SaltInputConfig.h"
+#include "Rendering/SlateRenderer.h"
+#include "Slate/WidgetRenderer.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/Text/STextBlock.h"
 #include "Core/SaltSaveSubsystem.h"
 #include "Engine/Texture2D.h"
 #include "Framework/Application/SlateApplication.h"
@@ -207,6 +217,144 @@ UWidget* SaltMenu::KeyScrap(UWidgetTree* Tree, const FString& Label, float Size)
 	return Box;
 }
 
+namespace
+{
+#if !UE_BUILD_SHIPPING
+	TAutoConsoleVariable<int32> CVarDrawnKeyLetters(TEXT("sb.Dev.DrawnKeyLetters"), 0,
+		TEXT("sb.Dev.DrawnKeyLetters 1: draw every key letter at run time, also where a painted one exists (to compare them)."), ECVF_Cheat);
+#endif
+
+	/** A key's letter drawn into a render target: IM Fell English SC, 60 px (the painted letters' 32 px at 2x look this big once
+	 *  their ink has bled), centred, its
+	 *  baseline 22 px under the middle; ink (rgba 48/30/16 at 94 %, a faint bleed) or the light twin (#EFDFB8). The target is
+	 *  cleared to the letter's own colour at no opacity, so its edges keep their colour where they fade. */
+	UTexture* DrawKeyLetter(const FString& Label, bool bLight)
+	{
+		if (!FSlateApplication::IsInitialized() || !FApp::CanEverRender())
+		{
+			return nullptr;
+		}
+		constexpr int32 Px = 240;
+		const FLinearColor Colour = bLight ? SaltUI::SRGB(0xEF, 0xDF, 0xB8) : SaltUI::SRGB(48, 30, 16, 0.94f);
+		float Size = 60.f;
+		FSlateFontInfo Font = SaltUI::Font(ESaltFace::FellSC, Size);
+		const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+		const float Width = (float)Measure->Measure(Label, Font).X;
+		// Words fit the 58 px scrap (96 px of the 116 at 2x).
+		if (Width > 96.f)
+		{
+			Size = FMath::Max(Size * 96.f / Width, 28.f);
+			Font = SaltUI::Font(ESaltFace::FellSC, Size);
+		}
+		if (!bLight)
+		{
+			Font.OutlineSettings.OutlineSize = 3;
+			Font.OutlineSettings.OutlineColor = SaltUI::SRGB(48, 30, 16, 0.22f);
+		}
+		UTextureRenderTarget2D* Target = NewObject<UTextureRenderTarget2D>(GetTransientPackage(), NAME_None, RF_Transient);
+		Target->ClearColor = FLinearColor(Colour.R, Colour.G, Colour.B, 0.f);
+		Target->InitCustomFormat(Px, Px, PF_B8G8R8A8, false);
+		Target->UpdateResourceImmediate(true);
+		// IM Fell English's ascent is 0.905 em: the text's top so its baseline lands 22 px under the middle.
+		const float Top = Px * 0.5f + 22.f - 0.905f * Size;
+		TSharedRef<SWidget> Letter = SNew(SBox)
+			.WidthOverride((float)Px)
+			.HeightOverride((float)Px)
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Top)
+			.Padding(FMargin(0.f, Top, 0.f, 0.f))
+			[
+				SNew(STextBlock).Text(FText::FromString(Label)).Font(Font).ColorAndOpacity(FSlateColor(Colour))
+			];
+		// The target is sRGB, so Slate writes linear colour (no gamma of its own) and the target keeps it as the pictures have it.
+		FWidgetRenderer* Renderer = new FWidgetRenderer(false, false);
+		Renderer->DrawWidget(Target, Letter, FVector2D(Px, Px), 0.f);
+		BeginCleanup(Renderer);
+		return Target;
+	}
+}
+
+FString SaltMenu::ShownKey(const FString& DefaultLabel)
+{
+	for (const FSaltRebindable& R : USaltInputConfig::Rebindables())
+	{
+		if (KeyName(R.Default) == DefaultLabel)
+		{
+			return KeyName(USaltInputConfig::KeyOf(R.Id));
+		}
+	}
+	return DefaultLabel;
+}
+
+bool SaltMenu::IsActionKey(const FKey& Pressed, FName ActionId)
+{
+	const FSaltRebindable* R = USaltInputConfig::FindRebindable(ActionId);
+	return R && (Pressed == R->Default || Pressed == USaltInputConfig::KeyOf(ActionId));
+}
+
+UTexture* SaltMenu::KeyLetter(const FString& Label, bool bLight)
+{
+	// Weak: the painted letters are assets and may be unloaded (they are found again); the drawn ones are rooted.
+	static TMap<FString, TWeakObjectPtr<UTexture>> Cache;
+#if !UE_BUILD_SHIPPING
+	const bool bDrawAll = CVarDrawnKeyLetters.GetValueOnGameThread() != 0;
+#else
+	const bool bDrawAll = false;
+#endif
+	const FString CacheKey = Label + (bLight ? TEXT("|light") : TEXT("|ink")) + (bDrawAll ? TEXT("|drawn") : TEXT(""));
+	if (const TWeakObjectPtr<UTexture>* Found = Cache.Find(CacheKey))
+	{
+		if (UTexture* T = Found->Get())
+		{
+			return T;
+		}
+	}
+	UTexture* T = nullptr;
+	// The painted letters keep the approved look (Tools/textures/ui_parts.js, menu_parts.js).
+	bool bName = !Label.IsEmpty() && !bDrawAll;
+	for (const TCHAR C : Label)
+	{
+		bName = bName && FChar::IsAlnum(C);
+	}
+	if (bName)
+	{
+		const FString Name = bLight ? FString::Printf(TEXT("T_UI_KeyLetterLight_%s"), *Label) : FString::Printf(TEXT("T_UI_KeyLetter_%s"), *Label);
+		if (FPackageName::DoesPackageExist(FString(TEXT("/Game/Saltbound/UI/Textures/")) + Name))
+		{
+			T = SaltUI::Tex(*Name);
+		}
+	}
+	if (!T)
+	{
+		T = DrawKeyLetter(Label, bLight);
+		if (T)
+		{
+			T->AddToRoot();
+		}
+	}
+	if (T)
+	{
+		Cache.Add(CacheKey, T);
+	}
+	return T;
+}
+
+void SaltMenu::SetSoakKey(UMaterialInstanceDynamic* Mid, const FString& Label)
+{
+	if (!Mid)
+	{
+		return;
+	}
+	if (UTexture* L = KeyLetter(Label, false))
+	{
+		Mid->SetTextureParameterValue(TEXT("Letter"), L);
+	}
+	if (UTexture* L = KeyLetter(Label, true))
+	{
+		Mid->SetTextureParameterValue(TEXT("LetterLight"), L);
+	}
+}
+
 UWidget* SaltMenu::SoakKey(UWidgetTree* Tree, UObject* Outer, const FString& Letter, float Size, UMaterialInstanceDynamic*& OutMid)
 {
 	const float Frame = 120.f * Size / 58.f;
@@ -222,14 +370,7 @@ UWidget* SaltMenu::SoakKey(UWidgetTree* Tree, UObject* Outer, const FString& Let
 	{
 		OutMid = UMaterialInstanceDynamic::Create(Base, Outer);
 		OutMid->SetScalarParameterValue(TEXT("Progress"), 0.f);
-		if (UTexture2D* L = SaltUI::Tex(*FString::Printf(TEXT("T_UI_KeyLetter_%s"), *Letter)))
-		{
-			OutMid->SetTextureParameterValue(TEXT("Letter"), L);
-		}
-		if (UTexture2D* L = SaltUI::Tex(*FString::Printf(TEXT("T_UI_KeyLetterLight_%s"), *Letter)))
-		{
-			OutMid->SetTextureParameterValue(TEXT("LetterLight"), L);
-		}
+		SetSoakKey(OutMid, Letter);
 		Img->SetBrush(SaltUI::ImageBrush(OutMid, FVector2D(Frame, Frame)));
 	}
 	UCanvasPanelSlot* S = C->AddChildToCanvas(Img);
@@ -257,6 +398,39 @@ UHorizontalBox* SaltMenu::Hints(UWidgetTree* Tree, const TArray<FHint>& InHints,
 		UHorizontalBoxSlot* S = Row->AddChildToHorizontalBox(L);
 		S->SetVerticalAlignment(VAlign_Center);
 		S->SetPadding(FMargin(12.f, 0.f, 0.f, 0.f));
+	}
+	return Row;
+}
+
+UHorizontalBox* SaltMenu::KeycapHints(UWidgetTree* Tree, const TArray<FHint>& InHints, float KeySize, float TextSize)
+{
+	UHorizontalBox* Row = Tree->ConstructWidget<UHorizontalBox>();
+	Row->SetVisibility(ESlateVisibility::HitTestInvisible);
+	for (int32 H = 0; H < InHints.Num(); ++H)
+	{
+		for (int32 K = 0; K < InHints[H].Keys.Num(); ++K)
+		{
+			const FString& Key = InHints[H].Keys[K];
+			UWidget* W = nullptr;
+			if (Key == TEXT("-"))
+			{
+				USaltPaintedText* Dash = Paint(Tree, FText::FromString(TEXT("\u2013")), ESaltFace::Alegreya, TextSize * 0.8f);
+				Dash->SetPlainColor(SaltUI::SRGB(0xE3, 0xD3, 0xB2, 0.5f));
+				W = Dash;
+			}
+			else
+			{
+				W = SaltUI::Keycap(Tree, FText::FromString(Key), KeySize);
+			}
+			UHorizontalBoxSlot* S = Row->AddChildToHorizontalBox(W);
+			S->SetVerticalAlignment(VAlign_Center);
+			S->SetPadding(FMargin(K == 0 ? (H == 0 ? 0.f : 56.f) : 8.f, 0.f, 0.f, 0.f));
+		}
+		USaltPaintedText* L = Paint(Tree, InHints[H].Label, ESaltFace::Alegreya, TextSize);
+		L->SetPlainColor(SaltUI::SRGB(0xE3, 0xD3, 0xB2));
+		UHorizontalBoxSlot* S = Row->AddChildToHorizontalBox(L);
+		S->SetVerticalAlignment(VAlign_Center);
+		S->SetPadding(FMargin(14.f, 0.f, 0.f, 0.f));
 	}
 	return Row;
 }

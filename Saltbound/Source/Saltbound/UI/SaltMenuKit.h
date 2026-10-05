@@ -61,8 +61,20 @@ namespace SaltMenu
 	 *  box of the scrap's own size (its shadow reaches past it). */
 	SALTBOUND_API UWidget* KeyScrap(UWidgetTree* Tree, const FString& Label, float Size = 56.f);
 	SALTBOUND_API float KeyScrapWidth(const FString& Label, float Size = 56.f);
-	/** A key whose scrap the ink soaks while it is held (M_UI_KeySoak; Letter has a T_UI_KeyLetter_ picture). */
+	/** A key whose scrap the ink soaks while it is held (M_UI_KeySoak, the letter from KeyLetter). */
 	SALTBOUND_API UWidget* SoakKey(UWidgetTree* Tree, UObject* Outer, const FString& Letter, float Size, UMaterialInstanceDynamic*& OutMid);
+
+	/** The player's key for what a prompt shows by its default key: "E" becomes "F" when Use was changed to F (Keys and
+	 *  buttons). Keys that cannot be changed (R, G, Esc, the digits) stay as they are. */
+	SALTBOUND_API FString ShownKey(const FString& DefaultLabel);
+	/** A key pressed in a screen is the action's key: the player's, or the default (which keeps working in the screens). */
+	SALTBOUND_API bool IsActionKey(const FKey& Pressed, FName ActionId);
+	/** A key's inked letter for the key-soak material (Letter) or its light twin where the ink has soaked through (LetterLight):
+	 *  the painted picture where there is one (T_UI_KeyLetter_<Key>: A D E F G Q R S W X), otherwise drawn once at run time in
+	 *  the same face, size and place into a 240 px target (words a little smaller to fit the scrap). */
+	SALTBOUND_API UTexture* KeyLetter(const FString& Label, bool bLight);
+	/** Puts a key's letters into a key-soak material. */
+	SALTBOUND_API void SetSoakKey(UMaterialInstanceDynamic* Mid, const FString& Label);
 
 	/** One hint of the controls row: its keys and what they do. */
 	struct FHint
@@ -72,6 +84,10 @@ namespace SaltMenu
 	};
 	/** The controls row at the bottom ("[W][S] choose   [E] sail"): keys 12 px apart, then the label; hints 46 px apart. */
 	SALTBOUND_API UHorizontalBox* Hints(UWidgetTree* Tree, const TArray<FHint>& Hints, float KeySize = 56.f, float TextSize = 30.f);
+	/** A hints row in the leather screens' style (leather keycaps, the words in plain cream lettering with the soft halo), as
+	 *  their baked hint pictures draw it; for when the player's keys differ from those pictures. A key "-" is a dash between
+	 *  two keys ("1 - 5"). */
+	SALTBOUND_API UHorizontalBox* KeycapHints(UWidgetTree* Tree, const TArray<FHint>& Hints, float KeySize = 40.f, float TextSize = 26.f);
 
 	/** "2 h 14 min", "12 min", "under a minute". */
 	SALTBOUND_API FText PlayTime(double Seconds);

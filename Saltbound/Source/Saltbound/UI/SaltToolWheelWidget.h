@@ -52,6 +52,11 @@ private:
 	UPROPERTY(Transient) TObjectPtr<USaltPaintedText> NameText;
 	UPROPERTY(Transient) TObjectPtr<USaltPaintedText> HintText;
 	UPROPERTY(Transient) TObjectPtr<USaltPaintedText> LetGoText;
+	/** The hints along the bottom: the painted row, or a live one with the player's wheel key (D66). */
+	UPROPERTY(Transient) TObjectPtr<UImage> HintsPicture;
+	UPROPERTY(Transient) TObjectPtr<UWidget> HintsLive;
+	FString HintsKey;
+	void RefreshKeys();
 
 	TArray<bool> Owned;
 	TArray<float> SelAlpha;

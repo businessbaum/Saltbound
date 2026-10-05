@@ -1,7 +1,12 @@
 // Saltbound - menu checks (sb.Dev.RunMenuTests): the pause menu pauses, the settings apply, keys rebind, the brightness and the
 // title; sb.Dev.Menu opens any menu screen for captures (D66).
 
+#include "AudioDevice.h"
 #include "Camera/CameraComponent.h"
+#include "Engine/Texture2D.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Sound/AudioSettings.h"
+#include "Sound/SoundMix.h"
 #include "Containers/Ticker.h"
 #include "UnrealClient.h"
 #include "Misc/Paths.h"
@@ -20,6 +25,7 @@
 #include "UI/SaltHUDWidget.h"
 #include "UI/SaltKeysWidget.h"
 #include "UI/SaltLoadingWidget.h"
+#include "UI/SaltMenuKit.h"
 #include "UI/SaltMenuWidget.h"
 #include "UI/SaltSettingsWidget.h"
 #include "UI/SaltStartMenuWidget.h"
@@ -127,6 +133,33 @@ namespace
 			S->MasterVolume = Volume;
 			S->ApplyExtras();
 			Report(TEXT("MenuVolume"), !FMath::IsNearlyEqual(Volume1, Volume), FString::Printf(TEXT("before=%.2f stepped=%.2f"), Volume, Volume1));
+
+			// The groups under it: each has its row, its class and its place in the mix, pushed on the world's audio device.
+			{
+				const float Music = S->MusicVolume;
+				const float Sea = S->SeaVolume;
+				const float Effects = S->EffectsVolume;
+				Set->ShowSetting(ESaltSetting::MusicVolume);
+				Set->Change(ESaltSetting::MusicVolume, -1);
+				Set->Change(ESaltSetting::SeaVolume, -2);
+				Set->Change(ESaltSetting::EffectsVolume, -3);
+				const bool bStepped = S->MusicVolume < Music - 0.01f && S->SeaVolume < Sea - 0.06f && S->EffectsVolume < Effects - 0.11f;
+				const FString Shown = Set->Describe(ESaltSetting::MusicVolume) + TEXT("/") + Set->Describe(ESaltSetting::SeaVolume) + TEXT("/")
+					+ Set->Describe(ESaltSetting::EffectsVolume);
+				USoundMix* Mix = USaltGameUserSettings::VolumeMix();
+				FAudioDeviceHandle Device = World->GetAudioDevice();
+				const bool bClasses = USaltGameUserSettings::SoundGroup(TEXT("SC_Music")) && USaltGameUserSettings::SoundGroup(TEXT("SC_SeaAndWind"))
+					&& USaltGameUserSettings::SoundGroup(TEXT("SC_Effects"));
+				const bool bPushed = Mix && Device && Device->GetSoundMixModifiers().Contains(Mix);
+				const FString Default = GetDefault<UAudioSettings>()->DefaultSoundClassName.ToString();
+				S->MusicVolume = Music;
+				S->SeaVolume = Sea;
+				S->EffectsVolume = Effects;
+				S->ApplyExtras(World);
+				S->SaveSettings();
+				Report(TEXT("MenuVolumeGroups"), bStepped && bClasses && bPushed && Default.Contains(TEXT("SC_Effects")) && Set->GetPage() == 3,
+					FString::Printf(TEXT("shown=%s classes=%d mix_pushed=%d default=%s page=%d"), *Shown, bClasses ? 1 : 0, bPushed ? 1 : 0, *Default, Set->GetPage()));
+			}
 			const int32 Quality = S->GetOverallScalabilityLevel();
 			Set->ShowSetting(ESaltSetting::Quality);
 			const FString QualityShown = Set->Describe(ESaltSetting::Quality);
@@ -173,6 +206,13 @@ namespace
 				Report(TEXT("MenuRebindSwap"), bClash && USaltInputConfig::KeyOf(TEXT("Jump")) == EKeys::E && USaltInputConfig::KeyOf(TEXT("Interact")) == EKeys::J,
 					FString::Printf(TEXT("clash=%d jump=%s use=%s"), bClash ? 1 : 0, *USaltInputConfig::KeyOf(TEXT("Jump")).ToString(),
 						*USaltInputConfig::KeyOf(TEXT("Interact")).ToString()));
+				// The prompts follow: E shows as J, drawn at run time (there is no painted J); E keeps its painted letter.
+				const FString Shown = SaltMenu::ShownKey(TEXT("E"));
+				UTexture* Drawn = SaltMenu::KeyLetter(Shown, false);
+				UTexture* Painted = SaltMenu::KeyLetter(TEXT("E"), false);
+				Report(TEXT("MenuPromptKey"), Shown == TEXT("J") && Cast<UTextureRenderTarget2D>(Drawn) && Cast<UTexture2D>(Painted)
+					&& SaltMenu::ShownKey(TEXT("Q")) == TEXT("Q") && SaltMenu::ShownKey(TEXT("R")) == TEXT("R"),
+					FString::Printf(TEXT("shown=%s drawn=%s painted=%s"), *Shown, *GetNameSafe(Drawn), *GetNameSafe(Painted)));
 				K->Listen();
 				K->Offer(EKeys::Escape);
 				Report(TEXT("MenuRebindReserved"), USaltInputConfig::KeyOf(TEXT("Jump")) == EKeys::E && K->GetState() == USaltKeysWidget::EState::Browse,
@@ -180,7 +220,8 @@ namespace
 				S->KeyBindings = Keys;
 				S->SaveSettings();
 				PC->RebuildInputMappings();
-				Report(TEXT("MenuRebindRestored"), USaltInputConfig::KeyOf(TEXT("Jump")) == OldJump, FString::Printf(TEXT("jump=%s"), *USaltInputConfig::KeyOf(TEXT("Jump")).ToString()));
+				Report(TEXT("MenuRebindRestored"), USaltInputConfig::KeyOf(TEXT("Jump")) == OldJump && SaltMenu::ShownKey(TEXT("E")) == TEXT("E"),
+					FString::Printf(TEXT("jump=%s shown_use=%s"), *USaltInputConfig::KeyOf(TEXT("Jump")).ToString(), *SaltMenu::ShownKey(TEXT("E"))));
 				PC->PopScreen(K);
 			}
 			else
@@ -443,6 +484,121 @@ namespace
 			return true;
 		}), 0.f);
 	}
+
+	/** sb.Dev.KeyShots [quit]: Use on J, the tool wheel on Space, the satchel on M; pictures of the focus prompt, its hold, a
+	 *  store, the wheel and the satchel with those keys, then E drawn at run time beside the painted E; the keys are put back. */
+	void KeyShots(const TArray<FString>& Args, UWorld* World)
+	{
+		USaltGameUserSettings* Settings = USaltGameUserSettings::Get();
+		ASaltPlayerController* PC0 = World ? Cast<ASaltPlayerController>(World->GetFirstPlayerController()) : nullptr;
+		if (!Settings || !PC0)
+		{
+			return;
+		}
+		const TArray<FSaltKeyBinding> Before = Settings->KeyBindings;
+		const bool bQuit = Args.Num() > 0 && Args[0] == TEXT("quit");
+		auto Exec = [](const TCHAR* Cmd) { return [Cmd](ASaltPlayerController* PC) { GEngine->Exec(PC->GetWorld(), Cmd); }; };
+		auto Shot = [](const TCHAR* Name)
+		{
+			return [Name](ASaltPlayerController*)
+			{
+				FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("MenuShots") / (FString(TEXT("keys_")) + Name + TEXT(".png")), true, false);
+				UE_LOG(LogSaltbound, Display, TEXT("SB_KEY_SHOT %s use=%s wheel=%s"), Name, *SaltMenu::ShownKey(TEXT("E")), *SaltMenu::ShownKey(TEXT("Q")));
+			};
+		};
+		struct FStep
+		{
+			float Wait;
+			TFunction<void(ASaltPlayerController*)> Do;
+		};
+		TSharedRef<TArray<FStep>> Steps = MakeShared<TArray<FStep>>();
+		Steps->Add({ 0.5f, [](ASaltPlayerController* PC)
+		{
+			USaltGameUserSettings* S = USaltGameUserSettings::Get();
+			S->SetKey(TEXT("Interact"), EKeys::J, EKeys::E);
+			S->SetKey(TEXT("ToolWheel"), EKeys::SpaceBar, EKeys::Q);
+			S->SetKey(TEXT("Jump"), EKeys::Q, EKeys::SpaceBar);
+			S->SetKey(TEXT("Satchel"), EKeys::M, EKeys::Tab);
+			PC->RebuildInputMappings();
+			PC->CloseScreens();
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Prompt Open the barrel"));
+		} });
+		Steps->Add({ 1.0f, Shot(TEXT("1_prompt")) });
+		Steps->Add({ 0.3f, Exec(TEXT("sb.Dev.Hold 0.55")) });
+		Steps->Add({ 0.8f, Shot(TEXT("2_hold")) });
+		Steps->Add({ 0.3f, [](ASaltPlayerController* PC)
+		{
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Hold -1"));
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Prompt"));
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Store crate"));
+		} });
+		Steps->Add({ 1.0f, Shot(TEXT("3_store")) });
+		Steps->Add({ 0.3f, [](ASaltPlayerController* PC)
+		{
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Store off"));
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Wheel 1"));
+		} });
+		Steps->Add({ 1.0f, Shot(TEXT("4_wheel")) });
+		Steps->Add({ 0.3f, [](ASaltPlayerController* PC)
+		{
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Wheel 0"));
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Satchel"));
+		} });
+		Steps->Add({ 1.0f, Shot(TEXT("5_satchel")) });
+		Steps->Add({ 0.3f, [](ASaltPlayerController* PC)
+		{
+			// E as drawn at run time, to set beside the painted one.
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Satchel off"));
+			USaltGameUserSettings::Get()->SetKey(TEXT("Interact"), EKeys::E, EKeys::E);
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.DrawnKeyLetters 1"));
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Prompt Open the barrel"));
+		} });
+		Steps->Add({ 1.0f, Shot(TEXT("6_prompt_E_drawn")) });
+		Steps->Add({ 0.3f, Exec(TEXT("sb.Dev.DrawnKeyLetters 0")) });
+		Steps->Add({ 1.0f, Shot(TEXT("7_prompt_E_painted")) });
+		Steps->Add({ 0.3f, [Before](ASaltPlayerController* PC)
+		{
+			GEngine->Exec(PC->GetWorld(), TEXT("sb.Dev.Prompt"));
+			USaltGameUserSettings* S = USaltGameUserSettings::Get();
+			S->KeyBindings = Before;
+			S->SaveSettings();
+			PC->RebuildInputMappings();
+		} });
+		TWeakObjectPtr<UWorld> WeakWorld(World);
+		TSharedRef<int32> Index = MakeShared<int32>(0);
+		TSharedRef<double> Next = MakeShared<double>(FPlatformTime::Seconds() + (*Steps)[0].Wait);
+		FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([WeakWorld, Steps, Index, Next, bQuit](float)
+		{
+			UWorld* W = WeakWorld.Get();
+			ASaltPlayerController* PC = W ? Cast<ASaltPlayerController>(W->GetFirstPlayerController()) : nullptr;
+			if (!PC)
+			{
+				return false;
+			}
+			if (FPlatformTime::Seconds() < *Next)
+			{
+				return true;
+			}
+			if (*Index >= Steps->Num())
+			{
+				UE_LOG(LogSaltbound, Display, TEXT("SB_KEY_SHOTS_DONE"));
+				if (bQuit)
+				{
+					GEngine->Exec(W, TEXT("quit"));
+				}
+				return false;
+			}
+			(*Steps)[*Index].Do(PC);
+			++*Index;
+			*Next = FPlatformTime::Seconds() + (Steps->IsValidIndex(*Index) ? (*Steps)[*Index].Wait : 0.5f);
+			return true;
+		}), 0.f);
+	}
+
+	FAutoConsoleCommandWithWorldAndArgs CmdKeyShots(
+		TEXT("sb.Dev.KeyShots"),
+		TEXT("sb.Dev.KeyShots [quit]: pictures of the prompt, the hold, a store, the wheel and the satchel with other keys (put back after)."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&KeyShots));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdMenuFlow(
 		TEXT("sb.Dev.MenuFlow"),

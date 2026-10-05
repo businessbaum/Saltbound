@@ -18,11 +18,13 @@ enum class ESaltSetting : uint8
 	Quality, Shadows, ViewDistance, FieldOfView,
 	Volume,
 	MouseSensitivity, InvertLook, Keys,
+	MusicVolume, SeaVolume, EffectsVolume,
 };
 
 /**
  * Pages: Game (the prompt's place, restore every setting), Display (window, frame cap, vsync, resolution scale, brightness),
- * Graphics (quality Calm / Fair / Fresh / Gale, shadows, view distance, field of view), Audio (everything's volume), Controls
+ * Graphics (quality Calm / Fair / Fresh / Gale, shadows, view distance, field of view), Audio (master, music, the sea and the wind,
+ * effects), Controls
  * (mouse sensitivity, invert look, keys and buttons). Choices step with the small anchors ("< value >", A / D), on / off is
  * the inked word with the rope under it, numbers are the rope with a knot as the handle. Every change applies at once and
  * is saved.

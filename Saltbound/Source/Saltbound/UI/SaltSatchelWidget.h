@@ -167,6 +167,9 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> TagDescription;
 	UPROPERTY(Transient) TObjectPtr<UVerticalBox> TagActions;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> UseText;
+	/** The tag's "use" row and the key on its keycap (the player's Use key, D66). */
+	UPROPERTY(Transient) TObjectPtr<class UHorizontalBox> UseRow;
+	FString UseRowKey;
 
 	int32 Selected = 0;
 	/** The tag's swing (degrees from its resting tilt) and its rate. */

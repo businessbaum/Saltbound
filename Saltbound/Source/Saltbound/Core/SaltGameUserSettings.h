@@ -34,8 +34,12 @@ public:
 
 	/** Applies the display settings (in the editor only the ones that do not touch the editor's window). */
 	void ApplyDisplay();
-	/** Applies brightness and the master volume (D66); called at start and whenever they change. */
-	void ApplyExtras();
+	/** Applies brightness and the volumes (D66) to the audio device of the context's world (else the main one); called at
+	 *  start and whenever they change. */
+	void ApplyExtras(const UObject* WorldContext = nullptr);
+	/** The sound groups (Tools/ue_scripts/setup_audio.py): every sound belongs to one; a sound with none is an effect. */
+	static class USoundClass* SoundGroup(const TCHAR* Name);
+	static class USoundMix* VolumeMix();
 
 	/** Frame cap offered by default: the display's refresh rate, at least 60. */
 	static float DefaultFrameRateLimit();
@@ -54,6 +58,10 @@ public:
 	static constexpr float BrightnessMax = 3.0f;
 	/** Everything the game plays, 0..1. */
 	UPROPERTY(Config) float MasterVolume = 1.f;
+	/** The groups under it, 0..1: music (SC_Music), the sea and the wind (SC_SeaAndWind), effects (SC_Effects). */
+	UPROPERTY(Config) float MusicVolume = 1.f;
+	UPROPERTY(Config) float SeaVolume = 1.f;
+	UPROPERTY(Config) float EffectsVolume = 1.f;
 	/** The first start (brightness) has been done. */
 	UPROPERTY(Config) bool bFirstStartDone = false;
 	/** The voyage (save slot, 0..2) the start menu continues. */

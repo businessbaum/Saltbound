@@ -68,8 +68,14 @@ namespace
 				NSLOCTEXT("SaltSettings", "ViewDistanceD", "How far away small things are still drawn.") } },
 			{ ESaltSetting::FieldOfView, { NSLOCTEXT("SaltSettings", "FieldOfView", "Field of view"),
 				NSLOCTEXT("SaltSettings", "FieldOfViewD", "How wide you see. Wider feels faster on the boat; narrower is calmer.") } },
-			{ ESaltSetting::Volume, { NSLOCTEXT("SaltSettings", "Volume", "Volume"),
-				NSLOCTEXT("SaltSettings", "VolumeD", "Everything the game plays: the sea, the wind, the boat and the rest.") } },
+			{ ESaltSetting::Volume, { NSLOCTEXT("SaltSettings", "Master", "Master"),
+				NSLOCTEXT("SaltSettings", "MasterD", "Everything at once.") } },
+			{ ESaltSetting::MusicVolume, { NSLOCTEXT("SaltSettings", "Music", "Music"),
+				NSLOCTEXT("SaltSettings", "MusicD", "The music on land, at sea and in the menus.") } },
+			{ ESaltSetting::SeaVolume, { NSLOCTEXT("SaltSettings", "Sea", "Sea and wind"),
+				NSLOCTEXT("SaltSettings", "SeaD", "Waves, the wind in the rigging, water along the hull.") } },
+			{ ESaltSetting::EffectsVolume, { NSLOCTEXT("SaltSettings", "Effects", "Effects"),
+				NSLOCTEXT("SaltSettings", "EffectsD", "Ropes, footsteps, the satchel, the windlass, the bell: everything else.") } },
 			{ ESaltSetting::MouseSensitivity, { NSLOCTEXT("SaltSettings", "Mouse", "Mouse sensitivity"),
 				NSLOCTEXT("SaltSettings", "MouseD", "How fast the view turns with the mouse.") } },
 			{ ESaltSetting::InvertLook, { NSLOCTEXT("SaltSettings", "Invert", "Invert look"),
@@ -92,7 +98,7 @@ namespace
 			{ NSLOCTEXT("SaltSettings", "Game", "Game"), { ESaltSetting::Prompts, ESaltSetting::Defaults } },
 			{ NSLOCTEXT("SaltSettings", "Display", "Display"), { ESaltSetting::Window, ESaltSetting::FrameCap, ESaltSetting::VSync, ESaltSetting::ResolutionScale, ESaltSetting::Brightness } },
 			{ NSLOCTEXT("SaltSettings", "Graphics", "Graphics"), { ESaltSetting::Quality, ESaltSetting::Shadows, ESaltSetting::ViewDistance, ESaltSetting::FieldOfView } },
-			{ NSLOCTEXT("SaltSettings", "Audio", "Audio"), { ESaltSetting::Volume } },
+			{ NSLOCTEXT("SaltSettings", "Audio", "Audio"), { ESaltSetting::Volume, ESaltSetting::MusicVolume, ESaltSetting::SeaVolume, ESaltSetting::EffectsVolume } },
 			{ NSLOCTEXT("SaltSettings", "Controls", "Controls"), { ESaltSetting::MouseSensitivity, ESaltSetting::InvertLook, ESaltSetting::Keys } },
 		};
 		return P;
@@ -146,7 +152,10 @@ namespace
 		{
 		case ESaltSetting::ResolutionScale: return { 50.f, 100.f, 5.f };
 		case ESaltSetting::FieldOfView: return { 70.f, 110.f, 5.f };
-		case ESaltSetting::Volume: return { 0.f, 1.f, 0.05f };
+		case ESaltSetting::Volume:
+		case ESaltSetting::MusicVolume:
+		case ESaltSetting::SeaVolume:
+		case ESaltSetting::EffectsVolume: return { 0.f, 1.f, 0.05f };
 		case ESaltSetting::MouseSensitivity: return { 0.25f, 3.f, 0.25f };
 		default: return { 0.f, 1.f, 0.1f };
 		}
@@ -200,6 +209,9 @@ USaltSettingsWidget::EKind USaltSettingsWidget::KindOf(ESaltSetting S)
 	case ESaltSetting::ResolutionScale:
 	case ESaltSetting::FieldOfView:
 	case ESaltSetting::Volume:
+	case ESaltSetting::MusicVolume:
+	case ESaltSetting::SeaVolume:
+	case ESaltSetting::EffectsVolume:
 	case ESaltSetting::MouseSensitivity:
 		return EKind::Number;
 	default:
@@ -438,6 +450,9 @@ float USaltSettingsWidget::NumberOf(ESaltSetting Setting, FText* OutLabel) const
 	case ESaltSetting::ResolutionScale: Value = ResolutionScale(S); Label = FString::Printf(TEXT("%.0f %%"), Value); break;
 	case ESaltSetting::FieldOfView: Value = S->FieldOfView; Label = FString::Printf(TEXT("%.0f°"), Value); break;
 	case ESaltSetting::Volume: Value = S->MasterVolume; Label = FString::Printf(TEXT("%.0f"), Value * 100.f); break;
+	case ESaltSetting::MusicVolume: Value = S->MusicVolume; Label = FString::Printf(TEXT("%.0f"), Value * 100.f); break;
+	case ESaltSetting::SeaVolume: Value = S->SeaVolume; Label = FString::Printf(TEXT("%.0f"), Value * 100.f); break;
+	case ESaltSetting::EffectsVolume: Value = S->EffectsVolume; Label = FString::Printf(TEXT("%.0f"), Value * 100.f); break;
 	case ESaltSetting::MouseSensitivity: Value = S->MouseSensitivity; Label = FString::Printf(TEXT("%.2f"), Value); break;
 	default: break;
 	}
@@ -463,6 +478,9 @@ void USaltSettingsWidget::SetNumber(ESaltSetting Setting, float Normalized)
 	case ESaltSetting::ResolutionScale: S->SetResolutionScaleValueEx(Value); break;
 	case ESaltSetting::FieldOfView: S->FieldOfView = Value; break;
 	case ESaltSetting::Volume: S->MasterVolume = Value; break;
+	case ESaltSetting::MusicVolume: S->MusicVolume = Value; break;
+	case ESaltSetting::SeaVolume: S->SeaVolume = Value; break;
+	case ESaltSetting::EffectsVolume: S->EffectsVolume = Value; break;
 	case ESaltSetting::MouseSensitivity: S->MouseSensitivity = Value; break;
 	default: return;
 	}
@@ -488,7 +506,10 @@ void USaltSettingsWidget::Apply(ESaltSetting Setting)
 		S->ApplyDisplay();
 		break;
 	case ESaltSetting::Volume:
-		S->ApplyExtras();
+	case ESaltSetting::MusicVolume:
+	case ESaltSetting::SeaVolume:
+	case ESaltSetting::EffectsVolume:
+		S->ApplyExtras(this);
 		S->SaveSettings();
 		break;
 	default:
@@ -555,7 +576,7 @@ void USaltSettingsWidget::Change(ESaltSetting Setting, int32 Delta)
 					{
 						Settings->SetToDefaults();
 						Settings->ApplyDisplay();
-						Settings->ApplyExtras();
+						Settings->ApplyExtras(PC);
 						if (ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(PC->GetPawn()))
 						{
 							Player->ApplyUserSettings();

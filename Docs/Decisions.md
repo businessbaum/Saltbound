@@ -1763,6 +1763,21 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   with a swap, the voyages, the title) passed in a standalone run. `sb.Dev.MenuShots` and `sb.Dev.MenuFlow` (title, new
   voyage, play, save, voyages with the picture, back to the title) capture every screen; evidence:
   `Docs/Evidence/D66/D66_menus_sheet.jpg`.
-- **Not done yet:** the prompts still show E when Use is changed (their letters are pictures); hold-to-toggle, text size,
-  subtitles and the seasickness comfort settings; separate music / sea / effects volumes (there is one bus); the save picture
-  is the full screen as a PNG (about 3 MB); the title shows the world at the time of day it was saved, not always at dusk.
+- **Prompts follow the player's keys (owner, same day: "fix" the two gaps):** every prompt names its key by the default ("E",
+  "W", "Q") and shows the player's key now (`SaltMenu::ShownKey`): the focus prompt and its hold, the station hints, the chart,
+  the satchel's tag, the store's and the tool wheel's hints, "let go of Q". A key with a painted letter (A D E F G Q R S W X)
+  keeps it; any other is drawn once at run time in the same face, size and place into a render target
+  (`SaltMenu::KeyLetter`, `FWidgetRenderer`), so the ink-soak hold works for it too; words are set smaller to fit the scrap.
+  The store's and the wheel's baked hint pictures stay while their keys are the defaults and are drawn live (leather keycaps)
+  otherwise. The chart, the store and the satchel also take the player's Use, satchel and movement keys (the defaults keep
+  working there). The shared keycap now stretches for words (its picture filled only a one-letter cap).
+- **Separate volumes:** Audio has Master (the device's primary volume), Music, Sea and wind, Effects. They are sound classes
+  under `SC_Master` (`/Game/Saltbound/Audio`, `Tools/ue_scripts/setup_audio.py`) whose volumes are overridden in one mix
+  (`SM_Volumes`) pushed once on the world's audio device. A sound without a class is an effect (`DefaultSoundClassName`); music
+  and the sea's sounds must be given `SC_Music` / `SC_SeaAndWind` when they are added (the game has no sounds yet). The audio
+  folder is cooked always (`DirectoriesToAlwaysCook`).
+- **Checks after the fixes:** `sb.Dev.RunMenuTests` 22 of 22 (with the volume groups and the prompt's key after a swap);
+  `sb.Dev.KeyShots` pictures the prompt, the hold, a store, the wheel and the satchel with Use on J, the wheel on Space and the
+  satchel on M, and the drawn E beside the painted one (they match).
+- **Not done yet:** hold-to-toggle, text size, subtitles and the seasickness comfort settings; the save picture is the full
+  screen as a PNG (about 3 MB); the title shows the world at the time of day it was saved, not always at dusk.

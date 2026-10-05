@@ -13,6 +13,7 @@
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
 #include "UI/SaltKeyPrompt.h"
+#include "UI/SaltMenuKit.h"
 #include "UI/SaltUIStyle.h"
 
 using namespace SaltUI;
@@ -192,7 +193,8 @@ void USaltChartWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 FReply USaltChartWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	const FKey Key = InKeyEvent.GetKey();
-	if (Key == EKeys::E || Key == EKeys::Escape || Key == EKeys::F10 || Key == EKeys::Gamepad_FaceButton_Right || Key == EKeys::Gamepad_FaceButton_Left)
+	if (SaltMenu::IsActionKey(Key, TEXT("Interact")) || Key == EKeys::Escape || Key == EKeys::F10 || Key == EKeys::Gamepad_FaceButton_Right
+		|| Key == EKeys::Gamepad_FaceButton_Left)
 	{
 		// Not the E that opened it, still repeating while held.
 		if (!InKeyEvent.IsRepeat())

@@ -20,7 +20,9 @@
 #include "Engine/World.h"
 #include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerCharacter.h"
+#include "Player/SaltInputConfig.h"
 #include "Player/SaltPlayerController.h"
+#include "UI/SaltMenuKit.h"
 #include "Styling/CoreStyle.h"
 #include "UI/SaltUIStyle.h"
 #include "World/SaltPickup.h"
@@ -361,6 +363,8 @@ UWidget* USaltSatchelWidget::BuildTag()
 		return T;
 	};
 	UseText = Action(TEXT("E"), FText::GetEmpty());
+	UseRow = Cast<UHorizontalBox>(UseText->GetParent());
+	UseRowKey = TEXT("E");
 	Action(TEXT("R"), NSLOCTEXT("Saltbound", "TagTurn", "Turn it in your hand"));
 	Action(TEXT("G"), NSLOCTEXT("Saltbound", "TagDrop", "Drop it"));
 	return TagRoot;
@@ -369,6 +373,18 @@ UWidget* USaltSatchelWidget::BuildTag()
 void USaltSatchelWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	// D66: the tag's "use" keycap shows the player's Use key.
+	const FString UseKey = SaltMenu::ShownKey(TEXT("E"));
+	if (UseRow && UseRow->GetChildrenCount() > 0 && UseKey != UseRowKey)
+	{
+		UseRowKey = UseKey;
+		UseRow->RemoveChildAt(0);
+		UseRow->InsertChildAt(0, Keycap(WidgetTree, FText::FromString(UseKey), 30.f));
+		if (UHorizontalBoxSlot* S = Cast<UHorizontalBoxSlot>(UseRow->GetChildAt(0)->Slot))
+		{
+			S->SetVerticalAlignment(VAlign_Center);
+		}
+	}
 	// The screen takes the mouse itself: hover, click and drag on the pockets (D58).
 	SetVisibility(ESlateVisibility::Visible);
 	if (const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn()))
@@ -645,7 +661,22 @@ void USaltSatchelWidget::RequestClose()
 
 FReply USaltSatchelWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	const FKey Key = InKeyEvent.GetKey();
+	FKey Key = InKeyEvent.GetKey();
+	// D66: the player's satchel key closes it, their movement keys move the choice as the arrows do.
+	if (SaltMenu::IsActionKey(Key, TEXT("Satchel")))
+	{
+		Key = EKeys::Tab;
+	}
+	const TPair<FName, FKey> MoveKeys[] = { { TEXT("MoveLeft"), EKeys::Left }, { TEXT("MoveRight"), EKeys::Right }, { TEXT("MoveForward"), EKeys::Up },
+		{ TEXT("MoveBack"), EKeys::Down } };
+	for (const TPair<FName, FKey>& M : MoveKeys)
+	{
+		if (Key == USaltInputConfig::KeyOf(M.Key))
+		{
+			Key = M.Value;
+			break;
+		}
+	}
 	auto Is = [&Key](std::initializer_list<FKey> Keys)
 	{
 		for (const FKey& K : Keys)

@@ -25,7 +25,7 @@ class SALTBOUND_API USaltKeyPrompt : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	/** The keys (letters with a T_UI_KeyLetter_ picture: A, D, E, F, G, Q, R, S, W) and the action. Call before it is shown. */
+	/** The keys by their default ("E", "W"; shown as the player's keys now, D66) and the action. Call before it is shown. */
 	void Setup(const TArray<FString>& InKeys, const FText& InAction, float InTextSize = 36.f);
 	void SetAction(const FText& InAction);
 	const FText& GetAction() const { return Action; }

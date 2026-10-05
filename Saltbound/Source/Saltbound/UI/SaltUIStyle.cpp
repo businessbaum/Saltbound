@@ -118,7 +118,10 @@ UWidget* SaltUI::Keycap(UWidgetTree* Tree, const FText& Key, float Size)
 	UImage* Cap = Tree->ConstructWidget<UImage>();
 	// The texture is a 40 px key in a 48 px frame (shadow); stretched as a box so words widen it.
 	Cap->SetBrush(BoxBrush(Tex(TEXT("T_UI_Keycap")), FVector2D(48.f, 48.f) * Size / 40.f, 0.32f));
-	O->AddChildToOverlay(Cap);
+	// The cap fills the box (an overlay slot keeps its child's own size otherwise, and words would run off a one-letter cap).
+	UOverlaySlot* CapSlot = O->AddChildToOverlay(Cap);
+	CapSlot->SetHorizontalAlignment(HAlign_Fill);
+	CapSlot->SetVerticalAlignment(VAlign_Fill);
 	UTextBlock* T = FaceText(Tree, Key, ESaltFace::AlegreyaBold, FMath::RoundToFloat(Size * 0.5f), SRGB(0xF3, 0xE6, 0xC8), ETextJustify::Center);
 	UOverlaySlot* S = O->AddChildToOverlay(T);
 	S->SetHorizontalAlignment(HAlign_Center);

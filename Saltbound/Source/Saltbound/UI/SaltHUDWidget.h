@@ -103,6 +103,9 @@ private:
 	FVector2D ViewSize = FVector2D(1920.f, 1080.f);
 	float ShownHold = 0.f;
 	float Clock = 0.f;
+	/** The Use key the prompt's scrap shows (D66), looked up a few times a second. */
+	FString PromptKey;
+	float PromptKeyAge = 0.f;
 
 	float NoticeTime = 0.f;
 	float DotAlpha = 0.35f;

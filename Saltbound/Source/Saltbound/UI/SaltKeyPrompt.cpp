@@ -7,6 +7,7 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "UI/SaltMenuKit.h"
 #include "UI/SaltPaintedText.h"
 #include "UI/SaltUIStyle.h"
 
@@ -58,14 +59,8 @@ TSharedRef<SWidget> USaltKeyPrompt::RebuildWidget()
 			{
 				UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(Base, this);
 				Mid->SetScalarParameterValue(TEXT("Progress"), 0.f);
-				if (UTexture2D* Letter = SaltUI::Tex(*FString::Printf(TEXT("T_UI_KeyLetter_%s"), *Key)))
-				{
-					Mid->SetTextureParameterValue(TEXT("Letter"), Letter);
-				}
-				if (UTexture2D* Light = SaltUI::Tex(*FString::Printf(TEXT("T_UI_KeyLetterLight_%s"), *Key)))
-				{
-					Mid->SetTextureParameterValue(TEXT("LetterLight"), Light);
-				}
+				// D66: the key the player uses now (the prompt names the default; Keys and buttons may have changed it).
+				SaltMenu::SetSoakKey(Mid, SaltMenu::ShownKey(Key));
 				Scrap->SetBrush(SaltUI::ImageBrush(Mid, FVector2D(KeyFrame, KeyFrame)));
 			}
 			if (UCanvasPanelSlot* S = Row->AddChildToCanvas(Scrap))

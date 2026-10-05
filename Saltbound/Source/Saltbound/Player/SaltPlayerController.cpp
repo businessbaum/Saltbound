@@ -781,7 +781,7 @@ void ASaltPlayerController::BeginPlay()
 	// D66: the brightness and the volume the player chose.
 	if (USaltGameUserSettings* Settings = USaltGameUserSettings::Get())
 	{
-		Settings->ApplyExtras();
+		Settings->ApplyExtras(this);
 	}
 	GetWorldTimerManager().SetTimer(PlayClock, this, &ASaltPlayerController::TickPlayClock, 1.f, true);
 

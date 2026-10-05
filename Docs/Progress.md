@@ -355,7 +355,8 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
 - Menus (D66): `sb.Dev.RunMenuTests`, `sb.Dev.Menu <title|pause|settings [page]|voyages|keys [listen|clash]|first|ask|loading [s]|close>`,
   `sb.Dev.MenuShots [quit]` (every screen to `Saved/MenuShots`), `sb.Dev.MenuFlow [quit]` (title, new voyage, save, voyages, back
-  to the title; uses the real voyage slots, so run it in a test install)
+  to the title; uses the real voyage slots, so run it in a test install), `sb.Dev.KeyShots [quit]` (prompts with other keys),
+  `sb.Dev.DrawnKeyLetters 1` (draw every key letter at run time, to compare with the painted ones)
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.PromptOnObject 1|0`, `sb.Dev.ShowInteractionVolumes 1`,
   `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched), `sb.Dev.RunInventoryTests`,
   `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel [off]`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`, `sb.Dev.Chart [off]`, `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`, `sb.Dev.CameraTrace [s] [deck]`, `sb.Dev.EdgeTest [s]` (the view beside the deck's low steps in the open sea), `sb.Boat.RigTurn 0|1`, `sb.Camera.DeckKnees 0|1`, `sb.Camera.DeckTilt <share>` (0 = level view), `sb.Camera.StepSmooth 0|1`
@@ -373,10 +374,9 @@ Developer console (`~`, non-shipping builds):
   input), `sb.Dev.WaterState` (logs `SB_WATER`: movement mode, immersion, surface, camera height above the water)
 
 ## Known issues and limitations
-- **Menus (D66):** the prompts still show E when Use is changed in Keys and buttons (their letters are pictures); one volume for
-  everything (no music / sea / effects buses yet); no hold-to-toggle, text size, subtitles or seasickness settings yet; a save's
-  picture is the full screen as a PNG (about 3 MB). The packaged game now opens on the first start (once) and the title; it was
-  checked in a standalone run of the editor build, not yet in a packaged build.
+- **Menus (D66):** the game has no sounds yet, so the Music, Sea and wind and Effects volumes have nothing to act on until sounds
+  are added with their classes. The packaged game now opens on the first start (once) and the title; it was checked in a
+  standalone run of the editor build, not yet in a packaged build. Open items: Next steps 8 and 9.
 - **Performance:** revision 2 measured in standalone, 2560×1440 native, editor closed:
   - Day 75.7 fps (GPU 12.5 ms), Evening 69.6 fps (GPU 13.6 ms), Dusk 72.1 fps (GPU 13.1 ms).
   - This is within D8 (60 fps), but the headroom shrank from about 2× to 1.2×.
@@ -448,3 +448,8 @@ Developer console (`~`, non-shipping builds):
 6. Packaged benchmark with the D44 defaults (frame cap), the masked ocean and the wake (editor closed).
 7. Underwater after the owner's review: waterline split at the camera, god rays and bubbles, sea grass
    bending around the player, a packaged-build benchmark of the FFT ocean plus the underwater rendering.
+8. **Menus (D66), accessibility settings:** hold actions as press-to-toggle (raising the anchor, the tool wheel), text size,
+   subtitles (with a parchment backing) and seasickness comfort (a steady horizon, less roll with the boat, a soft vignette in
+   sharp turns), each a real setting on its page (the menu page's ideas, `Docs/Design/Menu_Ideas/Menus.html`).
+9. **Menus (D66), smaller voyage pictures:** a save's picture is the whole screen as a PNG (about 3 MB at 1440p, loaded when the
+   voyages page opens). Scale it down to the page's print (about 460 x 260, a JPEG or a small PNG) when it is written.

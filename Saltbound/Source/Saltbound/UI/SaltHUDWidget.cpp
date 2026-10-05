@@ -20,6 +20,7 @@
 #include "Styling/CoreStyle.h"
 #include "UI/SaltKeyPrompt.h"
 #include "UI/SaltLandfallWidget.h"
+#include "UI/SaltMenuKit.h"
 #include "UI/SaltPaintedText.h"
 #include "UI/SaltToolWheelWidget.h"
 #include "UI/SaltUIStyle.h"
@@ -378,6 +379,22 @@ void USaltHUDWidget::TickPrompt(float DeltaSeconds)
 		else
 		{
 			Active.Text = FText::GetEmpty();
+		}
+	}
+
+	// D66: the scrap shows the player's Use key (Keys and buttons).
+	PromptKeyAge -= DeltaSeconds;
+	if (PromptKeyAge <= 0.f)
+	{
+		PromptKeyAge = 0.25f;
+		const FString Key = SaltMenu::ShownKey(TEXT("E"));
+		if (Key != PromptKey)
+		{
+			PromptKey = Key;
+			for (UMaterialInstanceDynamic* Mid : RowMaterials)
+			{
+				SaltMenu::SetSoakKey(Mid, Key);
+			}
 		}
 	}
 

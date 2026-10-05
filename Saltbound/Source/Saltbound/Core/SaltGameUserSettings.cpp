@@ -4,6 +4,9 @@
 #include "Core/SaltGameUserSettings.h"
 
 #include "AudioDevice.h"
+#include "Engine/World.h"
+#include "Sound/SoundClass.h"
+#include "Sound/SoundMix.h"
 #include "Engine/Engine.h"
 #include "HAL/PlatformMisc.h"
 
@@ -35,6 +38,9 @@ void USaltGameUserSettings::SetToDefaults()
 	// D66: the first start and the voyage are kept; the keys go back to their defaults.
 	Brightness = 2.2f;
 	MasterVolume = 1.f;
+	MusicVolume = 1.f;
+	SeaVolume = 1.f;
+	EffectsVolume = 1.f;
 	KeyBindings.Reset();
 }
 
@@ -52,7 +58,17 @@ void USaltGameUserSettings::ApplyDisplay()
 	SaveSettings();
 }
 
-void USaltGameUserSettings::ApplyExtras()
+USoundClass* USaltGameUserSettings::SoundGroup(const TCHAR* Name)
+{
+	return LoadObject<USoundClass>(nullptr, *FString::Printf(TEXT("/Game/Saltbound/Audio/%s.%s"), Name, Name));
+}
+
+USoundMix* USaltGameUserSettings::VolumeMix()
+{
+	return LoadObject<USoundMix>(nullptr, TEXT("/Game/Saltbound/Audio/SM_Volumes.SM_Volumes"));
+}
+
+void USaltGameUserSettings::ApplyExtras(const UObject* WorldContext)
 {
 	if (!GEngine)
 	{
@@ -60,10 +76,41 @@ void USaltGameUserSettings::ApplyExtras()
 	}
 	Brightness = FMath::Clamp(Brightness, BrightnessMin, BrightnessMax);
 	MasterVolume = FMath::Clamp(MasterVolume, 0.f, 1.f);
+	MusicVolume = FMath::Clamp(MusicVolume, 0.f, 1.f);
+	SeaVolume = FMath::Clamp(SeaVolume, 0.f, 1.f);
+	EffectsVolume = FMath::Clamp(EffectsVolume, 0.f, 1.f);
 	GEngine->DisplayGamma = Brightness;
-	if (FAudioDeviceHandle Device = GEngine->GetMainAudioDevice())
+	// The world's audio device (play-in-editor has one per world), else the main one.
+	const UWorld* World = WorldContext ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull) : nullptr;
+	FAudioDeviceHandle Device = World ? World->GetAudioDevice() : FAudioDeviceHandle();
+	if (!Device)
 	{
-		Device->SetTransientPrimaryVolume(MasterVolume);
+		Device = GEngine->GetMainAudioDevice();
+	}
+	if (!Device)
+	{
+		return;
+	}
+	Device->SetTransientPrimaryVolume(MasterVolume);
+	// The groups: one mix, pushed once per device, its class volumes overridden (a group's volume reaches the classes under it).
+	USoundMix* Mix = VolumeMix();
+	if (!Mix)
+	{
+		return;
+	}
+	const TPair<const TCHAR*, float> Groups[] = { { TEXT("SC_Music"), MusicVolume }, { TEXT("SC_SeaAndWind"), SeaVolume }, { TEXT("SC_Effects"), EffectsVolume } };
+	for (const TPair<const TCHAR*, float>& G : Groups)
+	{
+		if (USoundClass* Class = SoundGroup(G.Key))
+		{
+			Device->SetSoundMixClassOverride(Mix, Class, G.Value, 1.f, 0.f, true);
+		}
+	}
+	static TSet<Audio::FDeviceId> Pushed;
+	if (!Pushed.Contains(Device.GetDeviceID()))
+	{
+		Pushed.Add(Device.GetDeviceID());
+		Device->PushSoundMixModifier(Mix);
 	}
 }
 

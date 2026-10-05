@@ -13,6 +13,9 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerController.h"
+#include "Components/HorizontalBox.h"
+#include "Player/SaltInputConfig.h"
+#include "UI/SaltMenuKit.h"
 #include "UI/SaltMenuWidget.h"
 #include "UI/SaltSatchelWidget.h"
 #include "UI/SaltUIStyle.h"
@@ -312,8 +315,19 @@ TSharedRef<SWidget> USaltStoreWidget::RebuildWidget()
 			StoreSlots.Add(W);
 		}
 
-		// Along the bottom: "Click: move the stack . Shift-click: move one . [E] close the lid".
-		At(Canvas, Picture(TEXT("T_UI_StoreHints"), FVector2D(860.f, 80.f)), FVector2D(540.f, 1000.f), FVector2D(860.f, 80.f));
+		// Along the bottom: "Click: move the stack . Shift-click: move one . [E] close the lid" (the painted row; drawn live with
+		// the player's key when Use was changed, D66).
+		const FString UseKey = SaltMenu::ShownKey(TEXT("E"));
+		if (UseKey == TEXT("E"))
+		{
+			At(Canvas, Picture(TEXT("T_UI_StoreHints"), FVector2D(860.f, 80.f)), FVector2D(540.f, 1000.f), FVector2D(860.f, 80.f));
+		}
+		else
+		{
+			At(Canvas, SaltMenu::KeycapHints(WidgetTree, { { {}, NSLOCTEXT("Saltbound", "StoreHintClick", "Click: move the stack") },
+				{ {}, NSLOCTEXT("Saltbound", "StoreHintShift", "Shift-click: move one") }, { { UseKey }, NSLOCTEXT("Saltbound", "StoreHintClose", "close the lid") } }),
+				FVector2D(970.f, 1040.f), FVector2D::ZeroVector, FVector2D(0.5f, 0.5f));
+		}
 
 		// On top, the flight (and a dragged item, D58): the dotted path, the target's outline, the item with its shadow and its
 		// coin.
@@ -956,11 +970,23 @@ void USaltStoreWidget::Close()
 
 FReply USaltStoreWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	const FKey Key = InKeyEvent.GetKey();
-	if (Key == EKeys::E || Key == EKeys::Escape || Key == EKeys::Tab || Key == EKeys::I || Key == EKeys::F10 || Key == EKeys::Gamepad_FaceButton_Right)
+	FKey Key = InKeyEvent.GetKey();
+	if (SaltMenu::IsActionKey(Key, TEXT("Interact")) || SaltMenu::IsActionKey(Key, TEXT("Satchel")) || Key == EKeys::Escape || Key == EKeys::I
+		|| Key == EKeys::F10 || Key == EKeys::Gamepad_FaceButton_Right)
 	{
 		Close();
 		return FReply::Handled();
+	}
+	// D66: the player's movement keys move the choice as the arrows do.
+	const TPair<FName, FKey> MoveKeys[] = { { TEXT("MoveLeft"), EKeys::Left }, { TEXT("MoveRight"), EKeys::Right }, { TEXT("MoveForward"), EKeys::Up },
+		{ TEXT("MoveBack"), EKeys::Down } };
+	for (const TPair<FName, FKey>& M : MoveKeys)
+	{
+		if (Key == USaltInputConfig::KeyOf(M.Key))
+		{
+			Key = M.Value;
+			break;
+		}
 	}
 	struct FMove { FKey Key; FVector2D Dir; };
 	const FMove Moves[] = {

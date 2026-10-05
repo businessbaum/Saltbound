@@ -8,6 +8,8 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Core/SaltTools.h"
+#include "Components/HorizontalBox.h"
+#include "UI/SaltMenuKit.h"
 #include "UI/SaltPaintedText.h"
 #include "UI/SaltUIStyle.h"
 
@@ -130,14 +132,39 @@ TSharedRef<SWidget> USaltToolWheelWidget::RebuildWidget()
 		Hints->SetBrush(ImageBrush(Tex(TEXT("T_UI_WheelHints")), FVector2D(720.f, 90.f)));
 		Hints->SetVisibility(ESlateVisibility::HitTestInvisible);
 		At(Group, Hints, FVector2D(600.f, 950.f), FVector2D(720.f, 90.f));
+		HintsPicture = Hints;
 		SelAlpha.Init(0.f, WheelSlotCount());
 		Owned.Init(true, WheelSlotCount());
 	}
 	return Super::RebuildWidget();
 }
 
+void USaltToolWheelWidget::RefreshKeys()
+{
+	const FString Key = SaltMenu::ShownKey(TEXT("Q"));
+	if (Key == HintsKey || !HintsPicture)
+	{
+		return;
+	}
+	HintsKey = Key;
+	if (HintsLive)
+	{
+		HintsLive->RemoveFromParent();
+		HintsLive = nullptr;
+	}
+	const bool bPainted = Key == TEXT("Q");
+	HintsPicture->SetVisibility(bPainted ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	if (!bPainted)
+	{
+		HintsLive = SaltMenu::KeycapHints(WidgetTree, { { { Key }, NSLOCTEXT("Saltbound", "WheelHintHold", "hold, aim, let go") },
+			{ { TEXT("1"), TEXT("-"), TEXT("5") }, NSLOCTEXT("Saltbound", "WheelHintPick", "pick directly") } });
+		At(Group, HintsLive, FVector2D(960.f, 995.f), FVector2D::ZeroVector, FVector2D(0.5f, 0.5f));
+	}
+}
+
 void USaltToolWheelWidget::Open(int32 InSelected, const TArray<bool>& InOwned)
 {
+	RefreshKeys();
 	Owned = InOwned;
 	Owned.SetNum(WheelSlotCount());
 	for (int32 I = 0; I < Pictures.Num(); ++I)
@@ -188,7 +215,8 @@ void USaltToolWheelWidget::UpdateText()
 	const bool bHave = Owned.IsValidIndex(Selected) && Owned[Selected];
 	NameText->SetText(Tools[Selected].Name);
 	HintText->SetText(bHave ? Tools[Selected].Hint : NSLOCTEXT("Saltbound", "ToolNotFound", "Not found yet"));
-	LetGoText->SetText(bHave ? NSLOCTEXT("Saltbound", "ToolLetGo", "let go of Q to take it") : FText::GetEmpty());
+	LetGoText->SetText(bHave ? FText::Format(NSLOCTEXT("Saltbound", "ToolLetGoKey", "let go of {0} to take it"), FText::FromString(SaltMenu::ShownKey(TEXT("Q"))))
+		: FText::GetEmpty());
 }
 
 void USaltToolWheelWidget::Layout()

@@ -102,7 +102,7 @@ void USaltFirstStartWidget::SetBrightness(float Value)
 	if (USaltGameUserSettings* S = USaltGameUserSettings::Get())
 	{
 		S->Brightness = FMath::Clamp(FMath::RoundToFloat(Value / FirstStep) * FirstStep, USaltGameUserSettings::BrightnessMin, USaltGameUserSettings::BrightnessMax);
-		S->ApplyExtras();
+		S->ApplyExtras(this);
 	}
 	Layout();
 }
