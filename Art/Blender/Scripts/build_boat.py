@@ -57,6 +57,11 @@ PENNANT_H, PENNANT_L, PENNANT_HOIST = 0.42, 1.6, 0.28   # swivel above the mast 
 # Windlass (its drum and rope are moving parts, D43) and the boarding ladders over both sides at the gap (D43).
 WINDLASS_X, WINDLASS_DRUM_H = 3.55, 0.34
 LADDER_X, LADDER_OUT, LADDER_BOTTOM_Z, RUNG_STEP = 0.0, 0.07, -0.75, 0.3
+# The stores and the sea chest on the port side aft (D58: 30 % bigger, owner): centre (x, y) and size (m). The barrel is
+# radius and height; the crate and the chest are length (X), depth (Y), height. ASaltBoat's lids follow these.
+BARREL = (-1.65, -1.0, 0.27, 0.86)
+CRATE = (-2.42, -0.95, 0.68, 0.5, 0.48)
+CHEST = (-3.3, -0.6, 0.8, 0.52, 0.42)
 RUDDER_HEEL, RUDDER_HEAD, RUDDER_CHORD = (-4.38, -1.45), (-4.98, 1.0), 0.6
 CAMBER = 0.04            # deck crown
 BOOTTOP = 0.03           # top of the dark bottom paint above the waterline
@@ -536,6 +541,57 @@ def keel_and_posts():
     return parts
 
 
+def end_closures():
+    """D58 (owner: "fix this hole in the ship"): both ends were open. The deck planks stop short of the stem and the
+    sternpost, so between them and the bulwarks' ends one looked down into the dark hull, the cap rails ended either side
+    of the posts, and the sternpost stopped below the rails. Now a breasthook (a thick timber filling the deck's V) at
+    both ends, the sternpost carried up between the bulwarks to above the rails as a stern head (as the stem's head), and
+    a cap over each end where the two rails meet."""
+    parts = []
+    top = sheer_z(HALF_LENGTH)
+    for end in (1, -1):
+        # The breasthook: between the bulwarks' inner faces from 0.75 m inboard of the end to the post, its inboard
+        # edge a shallow curve, 1.2 cm proud of the deck planks it covers.
+        x_in, x_tip = HALF_LENGTH - 0.75, HALF_LENGTH - 0.07
+        def inner(x):
+            return max(half_beam(x) - BULWARK_T + 0.01, 0.07)
+        y_in = inner(x_in)
+        plan = [(x_in + 0.12 * (1.0 - (y / y_in) ** 2), y) for y in [y_in * (-1.0 + 2.0 * i / 10) for i in range(11)]]
+        plan += [(x, inner(x)) for x in [x_in + (x_tip - x_in) * i / 8 for i in range(1, 9)]]
+        plan += [(x, -inner(x)) for x in [x_in + (x_tip - x_in) * i / 8 for i in range(8, 0, -1)]]
+        bm = bmesh.new()
+        tops = [bm.verts.new(U((end * x, y, deck_z(x, y) + 0.012))) for x, y in plan]
+        bots = [bm.verts.new(U((end * x, y, deck_z(x, y) - 0.05))) for x, y in plan]
+        bm.faces.new(tops)
+        bm.faces.new(list(reversed(bots)))
+        n = len(plan)
+        for i in range(n):
+            j = (i + 1) % n
+            bm.faces.new((tops[j], tops[i], bots[i], bots[j]))
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+        hook = mesh_object("breasthook", bm, ["MI_Wood_TeakDark"])
+        sb.soften(hook, 0.012, 2)
+        parts.append(hook)
+        for y in (-0.12, 0.12):
+            parts.append(nail((end * (x_in + 0.32), y, deck_z(x_in + 0.32, y) + 0.012), (0, 0, 1)))
+        # A cap over the post where the two cap rails end.
+        parts.append(block("end_cap", (0.26, 0.36, 0.07), (end * (HALF_LENGTH - 0.06), 0.0, top + BULWARK_H + 0.035), "MI_Wood_Varnish", 0.02))
+    # The stern head: the sternpost carried up between the bulwarks' ends to above the cap (the stem has its head).
+    z0, z1 = top - 0.45, top + BULWARK_H + 0.16
+
+    def stern_head(s):
+        z = z0 + (z1 - z0) * s
+        def xs(zz):
+            return -stem_x(min(zz, top)) - max(zz - top, 0.0) * 0.08
+        e = 0.01
+        t = Vector((xs(z + e) - xs(z - e), 0.0, 2 * e)).normalized()
+        nrm = Vector((-t.z, 0.0, t.x))
+        return Vector((xs(z), 0.0, z)) + nrm * 0.02, Vector((0.0, 1.0, 0.0)), nrm, 1.0
+    parts.append(laid_board("stern_head", path_length(stern_head), 0.17, 0.13, stern_head, "MI_Wood_Varnish", wear=0.5))
+    return parts
+
+
 def rig_and_fittings():
     """The mast and all its fittings (mast_and_fittings), chunky rope shrouds on deadeyes and chain wales, forestay,
     the steering oar's boss (or the wheel pedestal), bitts."""
@@ -971,35 +1027,39 @@ def deck_gear():
                                     (math.pi / 2, 0, math.pi / 2 + j * 0.25), 24, 6, M["MI_Rope_Hemp"])
                 parts.append(coil)
     # Water barrel and crate, port side aft of the gap, lashed together.
-    bx, by = -1.65, -1.0
-    parts += staved("barrel", lambda s: 0.21 + 0.045 * math.sin(math.pi * s), 0.66, 12, (bx, by, deck_z(bx, by) - 0.01), "MI_Wood_Varnish",
+    bx, by, br, bh = BARREL
+    k = br / 0.21                                       # D58: 30 % bigger than D52's barrel
+    parts += staved("barrel", lambda s: br + 0.045 * k * math.sin(math.pi * s), bh, 14, (bx, by, deck_z(bx, by) - 0.01), "MI_Wood_Varnish",
                     hoops=(0.12, 0.3, 0.7, 0.88))
-    parts.append(sb.add_cylinder("barrel_lid", 0.2, 0.03, U((bx, by, deck_z(bx, by) + 0.63)), "Z", 20, M["MI_Wood_Teak"]))
-    parts.append(block("barrel_lid_handle", (0.16, 0.035, 0.035), (bx, by, deck_z(bx, by) + 0.662), "MI_Wood_TeakDark", 0.01))
+    parts.append(sb.add_cylinder("barrel_lid", br - 0.01 * k, 0.03 * k, U((bx, by, deck_z(bx, by) + bh - 0.03 * k)), "Z", 22, M["MI_Wood_Teak"]))
+    parts.append(block("barrel_lid_handle", (0.16 * k, 0.035 * k, 0.035 * k), (bx, by, deck_z(bx, by) + bh + 0.002), "MI_Wood_TeakDark", 0.01))
     # Lashed to an eye bolt on the bulwark, so it does not walk about in a sea.
     yb = -(half_beam(bx) - BULWARK_T) + 0.006
-    zb = deck_z(bx, by) + 0.42
+    zb = deck_z(bx, by) + 0.42 * k
+    rl = br + 0.046 * k                                 # the lashing round its belly
     parts.append(block("eye_plate", (0.08, 0.012, 0.08), (bx, yb, zb), "MI_Metal_Iron", 0.004))
     parts.append(ring("eye_bolt", 0.025, 0.007, (bx, yb + 0.03, zb), (1, 0, 0), "MI_Metal_Iron", 12))
-    parts.append(sb.add_torus("barrel_lashing", 0.256, 0.012, U((bx, by, zb)), (0, 0, 0), 32, 6, M["MI_Rope_Hemp"]))
-    parts += rope("barrel_lashing", [(bx, by - 0.258, zb), (bx, yb + 0.03, zb - 0.02)], 0.012)
-    cx, cy = -2.25, -0.95
+    parts.append(sb.add_torus("barrel_lashing", rl, 0.012, U((bx, by, zb)), (0, 0, 0), 32, 6, M["MI_Rope_Hemp"]))
+    parts += rope("barrel_lashing", [(bx, by - rl, zb), (bx, yb + 0.03, zb - 0.02)], 0.012)
+    cx, cy, cl, cw, ch = CRATE
     cz = deck_z(cx, cy)
-    for w, rot, off in ((0.52, (math.pi / 2, 0, 0), (0, 0.19)), (0.52, (math.pi / 2, 0, 0), (0, -0.19)),
-                        (0.38, (math.pi / 2, 0, math.pi / 2), (0.25, 0)), (0.38, (math.pi / 2, 0, math.pi / 2), (-0.25, 0))):
+    row = (ch - 0.025) / 3                              # three boards high, the lid on top
+    for w, rot, off in ((cl, (math.pi / 2, 0, 0), (0, cw / 2 - 0.0125)), (cl, (math.pi / 2, 0, 0), (0, -cw / 2 + 0.0125)),
+                        (cw - 0.025, (math.pi / 2, 0, math.pi / 2), (cl / 2 - 0.0125, 0)), (cw - 0.025, (math.pi / 2, 0, math.pi / 2), (-cl / 2 + 0.0125, 0))):
         for r in range(3):
-            parts.append(tb.rough_plank("crate", w, 0.11, 0.025, U((cx + off[0], cy + off[1], cz + 0.065 + r * 0.115)), rot, M["MI_Wood_Teak"], nseed(),
+            parts.append(tb.rough_plank("crate", w, row - 0.005, 0.025, U((cx + off[0], cy + off[1], cz + 0.01 + (r + 0.5) * row)), rot, M["MI_Wood_Teak"], nseed(),
                                         wear=0.6, grooves=(0, 1), split_chance=0.2))
+    lid_w = (cw + 0.02) / 4
     for r in range(4):
-        parts.append(tb.rough_plank("crate_lid", 0.54, 0.095, 0.025, U((cx, cy - 0.15 + r * 0.1, cz + 0.37)), (0, 0, 0), M["MI_Wood_Teak"], nseed(),
-                                    wear=0.6, grooves=(0, 1), split_chance=0.2))
-    parts += rope("lashing", [(bx + 0.24, by - 0.08, deck_z(bx, by) + 0.35), (bx + 0.1, by - 0.3, deck_z(bx, by) + 0.4),
-                              (cx + 0.1, cy - 0.3, cz + 0.3), (cx - 0.26, cy - 0.12, cz + 0.3)], 0.014)
+        parts.append(tb.rough_plank("crate_lid", cl + 0.02, lid_w - 0.005, 0.025, U((cx, cy - (cw + 0.02) / 2 + (r + 0.5) * lid_w, cz + ch)), (0, 0, 0),
+                                    M["MI_Wood_Teak"], nseed(), wear=0.6, grooves=(0, 1), split_chance=0.2))
+    parts += rope("lashing", [(bx - br * 0.9, by - br * 0.3, deck_z(bx, by) + 0.45), (bx - br * 0.4, by - br * 1.1, deck_z(bx, by) + 0.5),
+                              (cx + cl * 0.2, cy - cw * 0.6, cz + ch * 0.8), (cx - cl * 0.5 - 0.01, cy - cw * 0.25, cz + ch * 0.8)], 0.014)
     # The crate: rope handles through its ends, iron straps on its corners.
-    for dx in (-0.27, 0.27):
-        parts.append(ring("crate_handle", 0.055, 0.012, (cx + dx * 1.04, cy, cz + 0.27), (1, 0, 0), "MI_Rope_Hemp", 12))
-        for dy in (-0.2, 0.2):
-            parts.append(block("crate_corner", (0.032, 0.032, 0.37), (cx + dx, cy + dy, cz + 0.2), "MI_Metal_Iron", 0.005))
+    for dx in (-cl / 2, cl / 2):
+        parts.append(ring("crate_handle", 0.06, 0.012, (cx + dx * 1.04, cy, cz + ch * 0.72), (1, 0, 0), "MI_Rope_Hemp", 12))
+        for dy in (-cw / 2, cw / 2):
+            parts.append(block("crate_corner", (0.036, 0.036, ch), (cx + dx, cy + dy, cz + ch / 2 + 0.01), "MI_Metal_Iron", 0.005))
     # Oars lying along the port side deck.
     for k, y in enumerate((-1.08, -0.96)):
         x0, x1 = 0.7 + k * 0.1, 3.3 + k * 0.05
@@ -1169,18 +1229,20 @@ def hull_collision(mesh_name):
         add([(WHEEL_X + dx, dy, z) for dx in (-0.15, 0.15) for dy in (-0.15, 0.15) for z in (sheer_z(WHEEL_X) - 0.05, hub_z + 0.04)])
     for x in (4.0, -4.15):
         add([(x + dx, dy, z) for dx in (-0.08, 0.08) for dy in (-0.32, 0.32) for z in (deck_z(x, 0) - 0.05, deck_z(x, 0) + 0.36)])
-    bx, by = -1.65, -1.0
-    add([(bx + 0.25 * math.cos(a), by + 0.25 * math.sin(a), z) for a in [i * math.pi / 4 for i in range(8)]
-         for z in (deck_z(bx, by) - 0.03, deck_z(bx, by) + 0.66)])
-    cx, cy = -2.25, -0.95
-    add([(cx + dx, cy + dy, z) for dx in (-0.27, 0.27) for dy in (-0.2, 0.2) for z in (deck_z(cx, cy) - 0.03, deck_z(cx, cy) + 0.39)])
+    bx, by, br, bh = BARREL
+    add([(bx + (br + 0.04) * math.cos(a), by + (br + 0.04) * math.sin(a), z) for a in [i * math.pi / 4 for i in range(8)]
+         for z in (deck_z(bx, by) - 0.03, deck_z(bx, by) + bh)])
+    cx, cy, cl, cw, ch = CRATE
+    add([(cx + dx, cy + dy, z) for dx in (-cl / 2 - 0.02, cl / 2 + 0.02) for dy in (-cw / 2, cw / 2)
+         for z in (deck_z(cx, cy) - 0.03, deck_z(cx, cy) + ch + 0.02)])
     px = MAST_X - 0.42
     add([(px + dx, dy, z) for dx in (-0.07, 0.07) for dy in (-0.5, 0.5) for z in (deck_z(px, 0) - 0.03, deck_z(px, 0) + 0.66)])
     wx = WINDLASS_X
     add([(wx + dx, dy, z) for dx in (-0.14, 0.14) for dy in (-0.58, 0.58) for z in (deck_z(wx, 0) - 0.03, deck_z(wx, 0) + 0.6)])
     # Everything on deck collides (D53): net heap, sea chest, ensign staff, the oars, the shroud pin rails, the boat hook,
     # the mast's partners and coat, the bell's arm and knee, the lantern's arm.
-    for (cx_, cy_, hx_, hy_, h_) in ((-2.3, 0.85, 0.5, 0.38, 0.32), (-2.95, -0.78, 0.35, 0.24, 0.42), (ENSIGN_X, 0.0, 0.07, 0.07, ENSIGN_H),
+    for (cx_, cy_, hx_, hy_, h_) in ((-2.3, 0.85, 0.5, 0.38, 0.32), (CHEST[0], CHEST[1], CHEST[2] / 2 + 0.04, CHEST[3] / 2 + 0.04, CHEST[4] + 0.1),
+                                     (ENSIGN_X, 0.0, 0.07, 0.07, ENSIGN_H),
                                      (2.3, -1.02, 1.7, 0.1, 0.13)):
         add([(cx_ + dx, cy_ + dy, z) for dx in (-hx_, hx_) for dy in (-hy_, hy_) for z in (deck_z(cx_, cy_) - 0.03, deck_z(cx_, cy_) + h_)])
     for side in (-1, 1):
@@ -1347,9 +1409,8 @@ def boat_decor():
     nz = deck_z(nx, ny)
     parts += net_heap(nx, ny, nz)
     # A sea chest aft on the port side: planked box, iron corners, rope handles.
-    sx, sy = -2.95, -0.78
+    sx, sy, cl, cw, ch = CHEST                          # length (X), depth (Y), height of the box (D58: 30 % bigger)
     sz = deck_z(sx, sy)
-    cl, cw, ch = 0.62, 0.4, 0.32                        # length (X), depth (Y), height of the box
     for r in range(3):                                  # three boards high on each side, ends between them
         z = sz + 0.02 + (r + 0.5) * (ch / 3)
         for yy in (-cw / 2 + 0.013, cw / 2 - 0.013):
@@ -1366,9 +1427,9 @@ def boat_decor():
     for dx in (-cl / 2, cl / 2):                        # iron corner bands
         for dy in (-cw / 2, cw / 2):
             parts.append(block("chest_corner", (0.045, 0.045, ch + 0.02), (sx + dx, sy + dy, sz + ch / 2 + 0.02), "MI_Metal_Iron", 0.006))
-    for dx in (-0.18, 0.18):                            # hinge straps from the back over the lid
+    for dx in (-cl * 0.29, cl * 0.29):                  # hinge straps from the back over the lid
         parts.append(block("chest_hinge", (0.05, 0.012, 0.16), (sx + dx, sy - cw / 2 - 0.006, sz + ch - 0.05), "MI_Metal_Iron", 0.004))
-        parts.append(block("chest_hinge_top", (0.05, 0.22, 0.012), (sx + dx, sy - cw / 2 + 0.1, sz + ch + 0.055), "MI_Metal_Iron", 0.004))
+        parts.append(block("chest_hinge_top", (0.05, cw * 0.42, 0.012), (sx + dx, sy - cw * 0.25, sz + ch + 0.055), "MI_Metal_Iron", 0.004))
         parts.append(rod("chest_hinge_pin", (sx + dx - 0.03, sy - cw / 2 - 0.01, sz + ch + 0.03), (sx + dx + 0.03, sy - cw / 2 - 0.01, sz + ch + 0.03),
                          0.009, "MI_Metal_Iron", 8))
     parts.append(block("chest_hasp", (0.05, 0.012, 0.1), (sx, sy + cw / 2 + 0.008, sz + ch - 0.01), "MI_Metal_Iron", 0.004))
@@ -1418,7 +1479,8 @@ def boat_decor():
 
 
 def build_hull():
-    parts = [hull_core()] + planking() + bulwarks() + deck_planks() + keel_and_posts() + rig_and_fittings() + deck_gear() + boat_decor()
+    parts = ([hull_core()] + planking() + bulwarks() + deck_planks() + end_closures() + keel_and_posts() + rig_and_fittings() + deck_gear()
+             + boat_decor())
     obj = finish(parts, "SM_Boat_Hull", waterline=0.0, deck_grime=True)
     cols = hull_collision("SM_Boat_Hull")
     print("SB_BOAT_HULL faces", len(obj.data.polygons), "parts", len(parts), "collision pieces", len(cols))

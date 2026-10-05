@@ -30,12 +30,12 @@ namespace
 {
 	FAutoConsoleCommandWithWorldAndArgs CmdRunBoatTests(
 		TEXT("sb.Dev.RunBoatTests"),
-		TEXT("Run the sailing tests (needs a SaltBoat in the map): buoyancy, roll, points of sail, turning, collision, grounding, player aboard, helm, mooring."),
+		TEXT("Run the sailing tests (needs a SaltBoat in the map): buoyancy, roll, points of sail, turning, collision, grounding, player aboard, helm, mooring. sb.Dev.RunBoatTests ladder: the ladders alone."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			if (USaltDevTestSubsystem* T = World ? World->GetSubsystem<USaltDevTestSubsystem>() : nullptr)
 			{
-				T->RunBoatSuite();
+				T->RunBoatSuite(Args.Num() > 0 ? Args[0] : FString());
 			}
 		}));
 
@@ -340,7 +340,7 @@ namespace
 }
 #endif
 
-void USaltDevTestSubsystem::RunBoatSuite()
+void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 {
 #if !UE_BUILD_SHIPPING
 	UWorld* World = GetWorld();
@@ -1006,8 +1006,9 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		float Time;
 		int32 Rungs;
 		ClimbStats(Time, Rungs);
+		// D59: one smooth glide up (no rung-by-rung pulls), then over the top on to the deck.
 		return P && !P->IsOnLadder() && !P->IsClimbing() && OnBoat() && FMath::Abs(FeetInBoat().Y) < SaltHull::HalfBeamAtSheer(0.f) * 100.f - 30.f
-			&& Time > 0.6f && Rungs >= 3;
+			&& Time > 0.6f && Rungs >= 1 && Rungs <= 2;
 	}, [=, this]()
 	{
 		float Time;
@@ -1025,7 +1026,7 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		float Time;
 		int32 Rungs;
 		ClimbStats(Time, Rungs);
-		return P && !P->IsOnLadder() && P->IsSwimming() && FMath::Abs(FeetInBoat().Y) > SaltHull::HalfBeamAtSheer(0.f) * 100.f && Rungs >= 3;
+		return P && !P->IsOnLadder() && P->IsSwimming() && FMath::Abs(FeetInBoat().Y) > SaltHull::HalfBeamAtSheer(0.f) * 100.f && Rungs >= 1 && Rungs <= 2;
 	}, [=, this]()
 	{
 		const ASaltPlayerCharacter* P = GetPlayer();
@@ -1049,6 +1050,34 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		const ASaltPlayerCharacter* P = GetPlayer();
 		Report(TEXT("BoatLadderLetGo"), P && !P->IsOnLadder() && P->IsSwimming() && MaxValue > 0.1f,
 			FString::Printf(TEXT("let go at along %.2f, swimming=%d"), MaxValue, P && P->IsSwimming() ? 1 : 0));
+	}});
+	// D59 (owner: "just running in the ladder does nothing"): swimming at the ladder takes hold of it, no E needed.
+	SwimToLadder(TEXT("LadderTouch"));
+	Steps.Add({TEXT("BoatLadderTouch"), 2.f, [this]()
+	{
+		MaxValue = 0.f;
+		if (ASaltPlayerCharacter* P = GetPlayer()) { P->SetDebugMoveInput(FVector2D(0.f, 1.f)); }
+	}, [this](float)
+	{
+		// Holding W it takes hold and climbs straight on up (on deck within about a second): note when it held on.
+		ASaltPlayerCharacter* P = GetPlayer();
+		if (P && P->IsOnLadder() && MaxValue <= 0.f)
+		{
+			MaxValue = FMath::Max(StepTime, 0.001f);
+		}
+		if (P && MaxValue > 0.f && !P->IsOnLadder() && !P->IsClimbing())
+		{
+			P->SetDebugMoveInput(FVector2D::ZeroVector);
+		}
+	}, [this]()
+	{
+		ASaltPlayerCharacter* P = GetPlayer();
+		if (P)
+		{
+			P->SetDebugMoveInput(FVector2D::ZeroVector);
+			P->LetGoOfLadder();
+		}
+		Report(TEXT("BoatLadderTouch"), MaxValue > 0.f && MaxValue < 1.f, FString::Printf(TEXT("swam at the ladder: took hold after %.2f s"), MaxValue));
 	}});
 
 	// 10) Waves: a beam reach in the Rough sea, then bare poles in the Storm sea (open water beyond the cove's calm
@@ -1150,6 +1179,17 @@ void USaltDevTestSubsystem::RunBoatSuite()
 		ResetPlayer();
 		UE_LOG(LogSaltbound, Display, TEXT("SB_TEST BoatSuite DONE passed=%d failed=%d"), Passed, Failed);
 	}, nullptr, nullptr});
+
+	// D59: a part on its own (its steps, the set-up and the finish).
+	if (!Only.IsEmpty())
+	{
+		const FString Part = Only;
+		Steps.RemoveAll([&Part](const FStep& S)
+		{
+			return !S.Name.Contains(Part) && S.Name != TEXT("BoatSetup") && S.Name != TEXT("BoatFinish");
+		});
+		UE_LOG(LogSaltbound, Display, TEXT("SB_TEST BoatSuite only '%s': %d steps"), *Part, Steps.Num());
+	}
 
 	StepIndex = 0;
 	StepTime = 0.f;

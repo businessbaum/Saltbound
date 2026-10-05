@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Interaction/SaltStationComponent.h"
 #include "SaltPlayerCharacter.generated.h"
 
 class UCameraComponent;
@@ -52,9 +53,9 @@ public:
 	USaltInteractableComponent* GetFocusedInteractable() const { return FocusedInteractable.Get(); }
 	/** Prompt for the HUD (empty when there is nothing to do). */
 	FText GetPromptText() const;
-	/** The controls in use for the HUD (D58: shown in the key-scrap prompt): the keys and what they do (at a station, on a
-	 *  ladder), and a status line (the boat's). False when there are none. */
-	bool GetControlsHint(TArray<FString>& OutKeys, FText& OutAction, FText& OutStatus) const;
+	/** The controls in use for the HUD (D58: shown in the key-scrap prompt): groups of keys and what they do (at a station,
+	 *  on a ladder), and a status line (the boat's). False when there are none. */
+	bool GetControlsHint(TArray<FSaltControlHint>& OutControls, FText& OutStatus) const;
 
 	// Stations ----------------------------------------------------------------
 	void EnterStation(USaltStationComponent* Station);
@@ -97,17 +98,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0", Units = "cm/s"))
 	float SwimSprintSpeed = 460.f;
 
-	/** Highest ledge above the feet that the player can climb onto from the water (pier deck, boat side). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0", Units = "cm"))
-	float ClimbOutReach = 300.f;
-
 	/** True while swimming in the sea (surface or under water). */
 	bool IsSwimming() const;
 
 	/** Scripted climb along a path (capsule centre points in Base's space, cm, so it follows a moving boat). Stepped
 	 *  segments go rung by rung with a dip of the head on each pull; the others glide. bEndInWater: the climb ends
 	 *  in the sea (down a ladder), otherwise standing on the top. */
-	void StartScriptedClimb(USceneComponent* Base, const TArray<FVector>& LocalPoints, const TArray<bool>& Stepped, bool bEndInWater);
+	void StartScriptedClimb(USceneComponent* Base, const TArray<FVector>& LocalPoints, const TArray<bool>& Stepped, bool bEndInWater, float GlideTime = 0.f);
 	bool IsClimbing() const { return bClimbing; }
 
 	/** Takes hold of a ladder (D54): from the deck at its top, from the water where the body is. W and S climb rung by
@@ -142,9 +139,14 @@ public:
 	float ClimbStepHeight = 30.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (Units = "s"))
 	float ClimbStepTime = 0.34f;
-	/** Fastest climbing speed on a ladder, between two rungs (the hands slow it at each rung). */
+	/** Climbing speed on a ladder, the same up and down, eased in and out (D59: smooth, no rung-by-rung steps). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (Units = "cm/s"))
-	float LadderSpeed = 150.f;
+	float LadderSpeed = 190.f;
+	/** D59: the move on to a ladder (cm/s) and over its top on to the deck (s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (Units = "cm/s"))
+	float LadderMountSpeed = 320.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (Units = "s"))
+	float LadderTopTime = 0.35f;
 
 	/** Camera height above the feet (capsule height is 140 cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "100", ClampMax = "180", Units = "cm"))
@@ -256,8 +258,6 @@ private:
 	void HandleInteract();
 	void HandleInteractReleased();
 	void TickHold(float DeltaSeconds);
-	/** Starts climbing onto a walkable ledge in front when swimming at the surface. */
-	bool TryClimbOutOfWater();
 	void TickClimb(float DeltaSeconds);
 	void TickLadder(float DeltaSeconds, float Input);
 	/** Off the bottom of the ladder into the sea. */
@@ -311,5 +311,9 @@ private:
 	float LadderTime = 0.f;
 	float LadderGlide = 1.f;
 	float LadderGlideTime = 0.3f;
+	/** Climbing speed along the ladder now (cm/s, + up), eased towards the keys' wish. */
+	float LadderVelocity = 0.f;
+	/** A scripted climb's glide time per segment (s; <= 0: from the distance). */
+	float ClimbGlideTime = 0.f;
 	FVector LadderGlideFrom = FVector::ZeroVector;
 };

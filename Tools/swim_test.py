@@ -63,13 +63,14 @@ def main():
         drift = s["feet"][2] - s0["feet"][2]
         print("   hover drift over 3 s: %.1f cm" % drift)
         check("hover_at_depth", s["mode"] == "Swimming" and s["immersion"] > 0.99 and abs(drift) < 10.0, s)
-        # 4. Hold Up facing the pier: rise to the surface and climb out onto the deck (top 110 cm above the water).
+        # 4. Hold Up facing the pier: rise to the surface, but no climbing out on to the pier (D59, owner: "remove the
+        #    climbing system for objects when you run against them"; out of the sea by the beach or the boat's ladders).
         pie.pie_console("sb.Dev.Input 0 0 1 0")
         time.sleep(3.0)
         pie.pie_console("sb.Dev.Input 0 0 0 0")
         time.sleep(1.0)
         s = state()
-        check("climb_out", s["mode"] in ("Walking", "Falling") and not s["in_water"] and s["feet"][2] > 95.0, s)
+        check("no_climb_out", s["mode"] == "Swimming" and s["in_water"] and s["feet"][2] < 95.0, s)
         # 5. Walk off the pier end into the sea again.
         pie.pie_console("sb.Dev.Teleport 1350 0 112 0 0")
         pie.pie_console("sb.Dev.Input 1 0 0 0")

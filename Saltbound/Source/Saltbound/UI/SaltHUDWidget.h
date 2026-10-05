@@ -71,7 +71,7 @@ private:
 
 	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> HudRoot;
 	UPROPERTY(Transient) TObjectPtr<UImage> Dot;
-	UPROPERTY(Transient) TObjectPtr<USaltKeyPrompt> ControlsRow;
+	UPROPERTY(Transient) TArray<TObjectPtr<USaltKeyPrompt>> ControlsRows;
 	UPROPERTY(Transient) TObjectPtr<USaltPaintedText> StatusLine;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> Notice;
 	UPROPERTY(Transient) TArray<TObjectPtr<UCanvasPanel>> RowRoots;
@@ -91,8 +91,8 @@ private:
 
 	float NoticeTime = 0.f;
 	float DotAlpha = 0.35f;
-	/** The controls row's keys (a new set makes a new row), whether it shows, and its opacity. */
-	TArray<FString> ControlKeys;
+	/** The controls rows' keys (a new set makes new rows), whether they show, and their opacity. */
+	FString ControlKeys;
 	bool bControlsShowing = false;
 	float ControlsAlpha = 0.f;
 

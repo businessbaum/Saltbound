@@ -1320,3 +1320,40 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   swim 5/5, save 5/5, menu 7/7. The boat suite ran 42/44 with the sea-state zone (its two flat-water checks); it was not run
   again after the switch to the calm zone (owner: the long suites take too much time). Captures: `Docs/Evidence/D58/`.
 - Dev: `sb.Dev.Helm [off]`, `sb.Dev.Drag <x> <y> <x2> <y2> | up`, `sb.Dev.EdgeTest [s]`.
+
+### D59 · Owner round 2: a faster boat and a stats table, bigger stores, the ends closed, quicker ladders, snappier walking, a fuller sail you trim at the helm (Adopted)
+- **Owner (2026-10-05):** "1. Make the first ship a bit faster, create lists for stats for each object like the ships. 2. Make the
+  barrels and chests bigger. 3. fix this hole in the ship [the stern from above]. 4. make the going to the ladder animation
+  faster - reduce the steps in the animation, make smooth upwards movement when climbing - you can climb down way faster than
+  up - you can only use the ladder if pressing the interaction button. Just running in the ladder does nothing! 4.1 remove the
+  climbing system for objects when you run against them. 5. the movement doesnt feel responsive and clean. 6. Make the sail
+  bend more in the wind. 7. make a way to control the sail more, so you can control the speed of your ship." Answers: the sail
+  with W / S at the helm; one tunable table per kind of object.
+- **Stats tables (`Core/SaltStats`, `Docs/Stats.md`):** boats (speed, sail, steering, stores) and the player (walking,
+  jumping, swimming, ladders, eyes); the boat reads its row (`BoatClass`, the first boat `DoubleEnder`) when play starts and it
+  overrides its tunables; the player reads its row when made. Items and tools keep their own tables; `Docs/Stats.md` lists
+  them all with what was measured.
+- **Faster:** sail thrust 7 800 → 10 000 N: about 8.4 kn on a reach in a 7 m/s breeze (the resistance climbs steeply past hull
+  speed, so the extra force buys about 15 %).
+- **Sail control:** at the helm W lets the sail out and S takes it in, smoothly from nothing to full in 3 s; the drive goes with
+  how much is set; the pin rails still set it fully or take it in (E). The helm's prompt reads "W S Sail   A D Steer", the status
+  line "sail 60 %". Groups of keys are side by side in the HUD (`FSaltControlHint`).
+- **The sail bends more:** a new `Belly` in `M_SB_Sail` presses the cloth out between mast, boom and gaff (held at all three,
+  deepest a little forward of the middle) up to 70 cm beyond its cut shape in a fresh breeze; the fill follows the apparent
+  wind's strength (slack in light air) and the gusts more strongly (0.7-1.35), and its spring is livelier (1.6 Hz).
+- **Bigger stores:** barrel, crate and sea chest 30 % bigger (`build_boat.py` BARREL, CRATE, CHEST; the crate and the chest
+  moved aft to keep them apart), their collision and the lids' E volumes with them.
+- **The hole at the ends:** both ends were open: the deck planks stop short of the stem and the sternpost, the cap rails ended
+  either side of the posts and the sternpost stopped below the rails, so one looked down into the dark hull. Now a breasthook
+  fills the deck to each post, a cap joins the rails over each end and the sternpost rises between the bulwarks as a stern head.
+- **Ladders:** moving into a ladder takes hold of it (swimming at it, or walking out at its head on deck, not on the gangway's
+  side while moored); E still works. On to it in 0.12-0.35 s (3.2 m/s), one smooth glide at 1.9 m/s the same up and down, eased
+  in and out (no rung-by-rung pulls, no dip of the head), it stops where the keys are let go, and over the top in 0.35 s.
+- **No climbing on to things:** Space at a ledge no longer climbs out of the sea on to the pier, the boat's side or a rock (the
+  climb-out is gone): out of the sea by the beach or up the ladders.
+- **Snappier walking:** acceleration 1 500 → 2 800, braking 1 800 → 2 600, friction 8 → 10 (full speed and a stop in about a
+  tenth of a second); the jump the same height but quicker (420 cm/s at 1.5 x gravity, was 340 at 1 x); air control 0.35.
+- **Tests (short runs only, owner):** the boat suite runs a part alone now (`sb.Dev.RunBoatTests ladder`, `... WindAbeam`): ladders
+  11/11 (up 0.87 s and down 0.88 s in one glide each, `BoatLadderTouch`: swimming at it takes hold), a beam reach 8.37 kn (was
+  about 7.4), swim 5/5 (`no_climb_out`). The movement suite and the rest of the boat suite were not run again. Evidence:
+  `Docs/Evidence/D59/` (the ends and the stores in Blender, the sail from above in light and fresh wind, the helm's prompt).

@@ -8,6 +8,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Core/SaltContent.h"
 #include "Core/SaltPlaces.h"
+#include "Core/SaltStats.h"
 #include "Core/SaltSaveSubsystem.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/OverlapResult.h"
@@ -269,14 +270,15 @@ ASaltBoat::ASaltBoat()
 	LadderPort->PromptText = LadderStarboard->PromptText = NSLOCTEXT("Saltbound", "BoatClimbLadder", "Climb the ladder");
 	ApplySteeringLayout();
 	// Stores (D52): the lashed water barrel and crate on the port side aft (build_boat.py deck_gear).
-	BarrelLid = Interaction(TEXT("BarrelLid"), FVector(-1.65f, -1.0f, SheerZ(-1.65f) + 0.38f), FVector(30.f, 30.f, 38.f));
-	CrateLid = Interaction(TEXT("CrateLid"), FVector(-2.25f, -0.95f, SheerZ(-2.25f) + 0.24f), FVector(32.f, 26.f, 26.f));
+	// D59: 30 % bigger (build_boat.py BARREL and CRATE: the barrel 0.27 m round and 0.86 m high, the crate 0.68 x 0.5 x 0.48 m).
+	BarrelLid = Interaction(TEXT("BarrelLid"), FVector(-1.65f, -1.0f, SheerZ(-1.65f) + 0.48f), FVector(36.f, 36.f, 48.f));
+	CrateLid = Interaction(TEXT("CrateLid"), FVector(-2.42f, -0.95f, SheerZ(-2.42f) + 0.3f), FVector(40.f, 31.f, 32.f));
 	BarrelLid->PromptText = NSLOCTEXT("Saltbound", "OpenBarrel", "Open the barrel");
 	CrateLid->PromptText = NSLOCTEXT("Saltbound", "OpenCrate", "Open the crate");
 	BarrelStore = CreateDefaultSubobject<USaltInventoryComponent>(TEXT("BarrelStore"));
 	CrateStore = CreateDefaultSubobject<USaltInventoryComponent>(TEXT("CrateStore"));
-	BarrelStore->InitStore(TEXT("Boat_Barrel"), NSLOCTEXT("Saltbound", "Barrel", "Barrel"), 10);
-	CrateStore->InitStore(TEXT("Boat_Crate"), NSLOCTEXT("Saltbound", "Crate", "Crate"), 10);
+	BarrelStore->InitStore(TEXT("Boat_Barrel"), NSLOCTEXT("Saltbound", "Barrel", "Barrel"), SaltStats::Boat(BoatClass).BarrelSlots);
+	CrateStore->InitStore(TEXT("Boat_Crate"), NSLOCTEXT("Saltbound", "Crate", "Crate"), SaltStats::Boat(BoatClass).CrateSlots);
 	CrateStore->SetSlots({ { TEXT("Driftwood"), 4 }, { TEXT("RopeCoil"), 1 } });
 	// Gangway to the pier while moored (placed every frame; the player walks on it).
 	Gangway = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Gangway"));
@@ -468,9 +470,26 @@ void ASaltBoat::SetupSailMaterials()
 	}
 }
 
+void ASaltBoat::ApplyStats()
+{
+	// D59: the boat's numbers come from its row in the stats table (Core/SaltStats, Docs/Stats.md).
+	const FSaltBoatStats& S = SaltStats::Boat(BoatClass);
+	SailThrust = S.SailThrust;
+	HullSpeed = S.HullSpeed;
+	HullSpeedResistance = S.HullResistance;
+	CoastDrag = S.CoastDrag;
+	SetTime = S.SetTime;
+	TrimTime = S.TrimTime;
+	SailBelly = S.SailBelly;
+	MaxRudderAngle = S.MaxRudderAngle;
+	RudderRate = S.RudderRate;
+	RestTurnTorque = S.RestTurnTorque;
+}
+
 void ASaltBoat::BeginPlay()
 {
 	Super::BeginPlay();
+	ApplyStats();
 	ResolveContent();
 	ApplySteeringLayout();
 	BuildHullModel();
@@ -738,6 +757,7 @@ void ASaltBoat::RestoreState(const FVector& Location, float Yaw, ESaltBoatHold I
 		}
 	}
 	bSailSet = bSail;
+	SailTarget = bSail ? 1.f : 0.f;
 	Hoist = bSail ? 1.f : 0.f;
 	Fill = FillVel = 0.f;
 }
@@ -747,6 +767,7 @@ void ASaltBoat::ResetToStart()
 	SetHold(ESaltBoatHold::Free);
 	PlaceAt(StartTransform.GetLocation(), StartTransform.Rotator().Yaw);
 	bSailSet = false;
+	SailTarget = 0.f;
 	Hoist = 0.f;
 	Fill = FillVel = 0.f;
 	RudderAngle = 0.f;
@@ -767,6 +788,7 @@ void ASaltBoat::Recover()
 	SetHold(ESaltBoatHold::Free);
 	PlaceAt(Origin, Yaw);
 	bSailSet = false;
+	SailTarget = 0.f;
 	Hoist = 0.f;
 	Fill = FillVel = 0.f;
 	RudderAngle = 0.f;
@@ -776,6 +798,13 @@ void ASaltBoat::Recover()
 void ASaltBoat::SetSailSet(bool bSet)
 {
 	bSailSet = bSet;
+	SailTarget = bSet ? 1.f : 0.f;
+}
+
+void ASaltBoat::SetSailAmount(float Amount)
+{
+	SailTarget = FMath::Clamp(Amount, 0.f, 1.f);
+	bSailSet = SailTarget > 0.f;
 }
 
 void ASaltBoat::SetControlOverride(bool bEnable, float Rudder01)
@@ -988,6 +1017,55 @@ FSaltLadderLine ASaltBoat::GetLadderLine(bool bStarboard, float CapsuleHalfHeigh
 	return Line;
 }
 
+void ASaltBoat::TakeLaddersOnTouch()
+{
+	// D59 (owner: "just running in the ladder does nothing"): moving into a ladder takes hold of it as E does. From the
+	// water: swimming at it, within its width and an arm's length of it. From the deck: walking out at its head (not where
+	// the gangway lies while moored: that way leads ashore).
+	ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetWorld() ? GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr : nullptr);
+	if (!Player || !Hull || Player->IsOnLadder() || Player->IsClimbing() || Player->IsAtStation() || Player->IsViewFocused())
+	{
+		return;
+	}
+	const FTransform Xf = Hull->GetComponentTransform();
+	FVector Push = Xf.InverseTransformVectorNoScale(Player->GetLastMovementInputVector());
+	Push.Z = 0.0;
+	if (Push.Size() < 0.3)
+	{
+		return;
+	}
+	Push.Normalize();
+	const FVector Body = Xf.InverseTransformPosition(Player->GetActorLocation());
+	const float Half = Player->GetCapsuleHalfHeightForClimb();
+	const float Radius = Player->GetCapsuleComponent()->GetScaledCapsuleRadius();
+	for (const bool bStarboard : { false, true })
+	{
+		const float Side = bStarboard ? 1.f : -1.f;
+		const FSaltLadderLine Line = GetLadderLine(bStarboard, Half, Radius);
+		const bool bAlong = FMath::Abs(Body.X - Line.Bottom.X) < 45.f;
+		if (Player->IsSwimming())
+		{
+			// Outboard of the ladder by at most an arm's length, between its foot and its head, swimming towards the hull.
+			const float Out = (float)((Body.Y - Line.Bottom.Y) * Side);
+			if (bAlong && Out > -25.f && Out < 70.f && Body.Z > Line.Bottom.Z - 120.f && Body.Z < Line.Top.Z && Push.Y * Side < -0.55)
+			{
+				Player->MountLadder(Line, false);
+				return;
+			}
+		}
+		else if (Player->GetMovementBaseObject() == Hull && !(bStarboard && Hold == ESaltBoatHold::Moored))
+		{
+			// At the gap above it, walking out towards it.
+			const float Out = (float)((Body.Y - Line.TopExit.Y) * Side);
+			if (bAlong && Out > 35.f && FMath::Abs(Body.Z - Line.TopExit.Z) < 40.f && Push.Y * Side > 0.55)
+			{
+				Player->MountLadder(Line, true);
+				return;
+			}
+		}
+	}
+}
+
 void ASaltBoat::HandleLadder(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
 {
 	if (!Player || Player->IsOnLadder())
@@ -1066,6 +1144,7 @@ void ASaltBoat::Tick(float DeltaSeconds)
 	UpdateLantern(Dt);
 	UpdateMastChart();
 	UpdateGangway();
+	TakeLaddersOnTouch();
 	UpdateTrail(Dt);
 	PushOceanMask(bMasksOcean);
 	UpdateHints();
@@ -1415,7 +1494,14 @@ void ASaltBoat::UpdateControls(float DeltaSeconds)
 	}
 	RudderAngle = FMath::FInterpConstantTo(RudderAngle, RudderTarget, DeltaSeconds,
 		FMath::IsNearlyZero(RudderTarget) ? RudderReturnRate : RudderRate);
-	Hoist = FMath::FInterpConstantTo(Hoist, bSailSet ? 1.f : 0.f, DeltaSeconds, 1.f / FMath::Max(SetTime, 0.1f));
+	// D59 (owner: "a way to control the sail more, so you can control the speed"): at the helm W lets the sail out and S
+	// takes it in, smoothly from nothing to full in TrimTime; the pin rails set it fully or take it in (E). The sail
+	// follows its target at the set rate, and the drive goes with how much of it is set.
+	if (!bOverride && FMath::Abs(In.Y) > 0.2f)
+	{
+		SetSailAmount(SailTarget + FMath::Sign(In.Y) * DeltaSeconds / FMath::Max(TrimTime, 0.1f));
+	}
+	Hoist = FMath::FInterpConstantTo(Hoist, SailTarget, DeltaSeconds, 1.f / FMath::Max(SetTime, 0.1f));
 
 	// The boom trims itself: about half the angle the wind blows past (abeam 45 degrees, running 75), centred when
 	// the sail is taken in. Dead downwind it stays on its side until the wind is 15 degrees on the other side.
@@ -1437,13 +1523,17 @@ void ASaltBoat::UpdateControls(float DeltaSeconds)
 	BoomAngle = FMath::FInterpConstantTo(BoomAngle, Target, DeltaSeconds, BoomSwingRate);
 
 	// Belly fill: a spring with little damping, so the sail pops full when it catches the wind and breathes with
-	// the gusts (the wind speed against its own slow average).
+	// the gusts (the wind speed against its own slow average). D59 (owner: "too little reaction in the sail"): how full
+	// follows the apparent wind's strength (a slack belly in light air, a deep one in a fresh breeze, SailPress), the
+	// gusts count more and the spring is livelier; a part-set sail fills less.
 	const float WindNow = (float)LastTrueWind.Size();
 	AvgWind = AvgWind <= 0.f ? WindNow : FMath::Lerp(AvgWind, WindNow, FMath::Min(DeltaSeconds / 8.f, 1.f));
-	const float Gust = AvgWind > 0.1f ? FMath::Clamp(WindNow / AvgWind, 0.8f, 1.25f) : 1.f;
-	const float FillTarget = Hoist > 0.6f ? FMath::Lerp(1.f, 0.35f, Luff) * Gust : 0.12f * Hoist;
-	const float Omega = 2.f * PI * 1.3f;
-	FillVel += (Omega * Omega * (FillTarget - Fill) - 2.f * 0.22f * Omega * FillVel) * DeltaSeconds;
+	const float Gust = AvgWind > 0.1f ? FMath::Clamp(WindNow / AvgWind, 0.7f, 1.35f) : 1.f;
+	SailPress = FMath::SmoothStep(1.f, 9.f, (float)AppSpeed);
+	const float Set = FMath::SmoothStep(0.1f, 0.7f, Hoist);
+	const float FillTarget = Set * FMath::Lerp(1.f, 0.3f, Luff) * (0.55f + 0.6f * SailPress) * Gust + (1.f - Set) * 0.12f * Hoist;
+	const float Omega = 2.f * PI * 1.6f;
+	FillVel += (Omega * Omega * (FillTarget - Fill) - 2.f * 0.2f * Omega * FillVel) * DeltaSeconds;
 	Fill += FillVel * DeltaSeconds;
 }
 
@@ -1466,6 +1556,8 @@ void ASaltBoat::UpdateVisuals(float DeltaSeconds)
 	{
 		Mid->SetScalarParameterValue(TEXT("Furl"), Furl);
 		Mid->SetScalarParameterValue(TEXT("Fill"), FMath::Max(Fill, 0.f));
+		// D59: the wind presses the cloth out beyond its cut shape, deeper as it freshens.
+		Mid->SetScalarParameterValue(TEXT("Belly"), SailBelly * FMath::Max(Fill, 0.f) * FMath::Lerp(0.35f, 1.f, SailPress) * (1.f - Luff));
 		Mid->SetScalarParameterValue(TEXT("Side"), SailSideVisual);
 		Mid->SetScalarParameterValue(TEXT("Flutter"), 0.15f + 0.85f * Luff * Hoist);
 	}
@@ -1528,11 +1620,11 @@ void ASaltBoat::UpdateHints()
 			: FString::Printf(TEXT("on the %s %s"), Side, A < 70.f ? TEXT("bow") : (A < 115.f ? TEXT("beam") : TEXT("quarter")));
 		WindText = FString::Printf(TEXT("wind %.0f kn %s"), TrueSpeed * MsToKnots, *Where);
 	}
-	const TCHAR* SailState = Hoist > 0.95f ? TEXT("sail down") : (Hoist < 0.05f ? TEXT("sail up") : TEXT("sail moving"));
-	// D58: the controls in the key-scrap prompt (A and D steer), the boat's state on a line under it.
-	Helm->ControlKeys = { TEXT("A"), TEXT("D") };
-	Helm->ControlAction = NSLOCTEXT("Saltbound", "BoatSteer", "Steer");
-	const FString Status = FString::Printf(TEXT("%.1f kn  ·  %s  ·  %s%s"), Speed * MsToKnots, SailState, *WindText,
+	const FString SailState = SailTarget <= 0.f && Hoist < 0.02f ? FString(TEXT("sail up")) : FString::Printf(TEXT("sail %d %%"), FMath::RoundToInt(SailTarget * 100.f));
+	// D58: the controls in the key-scrap prompt (W and S the sail, D59; A and D steer), the boat's state on a line under it.
+	Helm->Controls = { { { TEXT("W"), TEXT("S") }, NSLOCTEXT("Saltbound", "BoatTrimSail", "Sail") },
+		{ { TEXT("A"), TEXT("D") }, NSLOCTEXT("Saltbound", "BoatSteer", "Steer") } };
+	const FString Status = FString::Printf(TEXT("%.1f kn  ·  %s  ·  %s%s"), Speed * MsToKnots, *SailState, *WindText,
 		Hold == ESaltBoatHold::Moored ? TEXT("  ·  moored") : (Hold == ESaltBoatHold::Anchored ? TEXT("  ·  at anchor") : TEXT("")));
 	Helm->ControlsHintText = FText::FromString(Status);
 }

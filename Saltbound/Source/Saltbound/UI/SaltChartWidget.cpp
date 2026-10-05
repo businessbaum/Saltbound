@@ -24,7 +24,7 @@ namespace
 	const FVector2D ChartSheetSize(USaltChartWidget::SheetWidth, USaltChartWidget::SheetWidth * SaltChart::SheetAspect);
 	const FVector2D ChartSheetMiddle = ChartSheetSize * 0.5f;
 	constexpr float ScaleMetres = 200.f;
-	constexpr float InkTime = 0.3f;
+	constexpr float ChartInkTime = 0.3f;
 
 	UCanvasPanelSlot* OnSheet(UCanvasPanel* Sheet, UWidget* W, FVector2D At, FVector2D Size, FVector2D Alignment = FVector2D::ZeroVector)
 	{
@@ -176,7 +176,7 @@ void USaltChartWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	// The marks ink in once the eyes have arrived at the sheet, with the prompt.
 	const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn());
 	const bool bThere = !Player || Player->GetViewFocusAlpha() > 0.97f;
-	Ink = bThere ? FMath::Min(Ink + InDeltaTime / InkTime, 1.f) : 0.f;
+	Ink = bThere ? FMath::Min(Ink + InDeltaTime / ChartInkTime, 1.f) : 0.f;
 	if (SheetLayer)
 	{
 		SheetLayer->SetRenderOpacity(FMath::SmoothStep(0.f, 1.f, Ink));

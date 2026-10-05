@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review round D58).
+Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59).
 
 ## Milestone status
 
@@ -223,6 +223,11 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D59 (awaiting the owner's check):** the first boat about 15 % faster (8.4 kn on a reach); stats tables for boats and the
+  player (`Core/SaltStats`, `Docs/Stats.md`); W / S at the helm let the sail out or take it in (0-100 %, the speed follows);
+  the sail bellies much more in a fresh breeze; barrel, crate and sea chest 30 % bigger; the open ends of the boat closed
+  (breasthooks, rail caps, a stern head); ladders taken by moving into them, one smooth quick climb the same up and down; no
+  more climbing out of the sea on to ledges; snappier walking and jumping.
 - **D58 (awaiting the owner's check):** drag and drop in the satchel and the stores (off the pockets it flies back); the satchel
   and the stores open with a quick rise (0.2 s); E at the mast chart glides the eyes to the sheet itself (0.45 s; the names,
   north and the scale ink in on it) instead of a picture popping up; "Put the chart back" and the helm's controls ("A D Steer",
@@ -301,14 +306,14 @@ the sail and cast off.
 | Move | W A S D / arrow keys | Left stick |
 | Look | Mouse | Right stick |
 | Sprint | Left Shift (hold) | Left stick click |
-| Jump / swim up / climb out of the water (under water you hover when no key is pressed) | Space | A / Cross |
+| Jump / swim up (under water you hover when no key is pressed) | Space | A / Cross |
 | Dive (while swimming) | Left Ctrl / C | B / Circle |
 | Interact / leave station (raising the anchor: hold E) | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
 | Pause menu / settings | Esc (in the editor: F10) | Start |
 | Satchel | Tab or I (arrows or the mouse choose a pocket, drag an item to another pocket, R turn the item, G drop one; Tab, I or Esc close) | Back |
 | Tool wheel | Hold Q, aim with the mouse, let go to take the tool; Esc cancels; 1 to 5 take a tool directly | Hold LB, aim with the right stick; B cancels |
-| On the boat | Steering oar (starboard quarter, E at its handle): A / D steer. Pin rails by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Bell rope: E rings the bell; lantern: E lights / douses it. Chart on the mast (aft, to starboard): E looks at it closely (E / Esc put it back). Ladders (both sides, midship): E takes hold (from the water or the deck), W / S climb, E lets go; off the bottom into the sea, over the top on board | |
+| On the boat | Steering oar (starboard quarter, E at its handle): A / D steer, W / S let the sail out or take it in. Pin rails by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Bell rope: E rings the bell; lantern: E lights / douses it. Chart on the mast (aft, to starboard): E looks at it closely (E / Esc put it back). Ladders (both sides, midship): swim or walk into one (or E) to take hold, W / S climb, E lets go; off the bottom into the sea, over the top on board | |
 | Store (barrel or crate on the boat, E at its lid) | Click moves the stack, Shift-click one; drag to a chosen slot on either side (Shift: one); arrows choose, Enter moves the stack; E / Esc close | D-pad, A (the stack), X (one), B close |
 
 Developer console (`~`, non-shipping builds):
@@ -324,6 +329,7 @@ Developer console (`~`, non-shipping builds):
   `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched), `sb.Dev.RunInventoryTests`,
   `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel [off]`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`, `sb.Dev.Chart [off]`, `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`, `sb.Dev.CameraTrace [s] [deck]`, `sb.Dev.EdgeTest [s]` (the view beside the deck's low steps in the open sea), `sb.Boat.RigTurn 0|1`, `sb.Camera.DeckKnees 0|1`, `sb.Camera.DeckTilt <share>` (0 = level view), `sb.Camera.StepSmooth 0|1`
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
+- `sb.Dev.RunBoatTests [part]` (a part alone: `ladder`, `WindAbeam`, ...), `sb.Dev.Helm [off]`
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`
   (SB_BOAT state line), `sb.Boat.Place X Y Yaw [Speed m/s]`, `sb.Boat.Hold Free|Moored|Anchored`,
   `sb.Boat.Control <Rudder> <Sheet> [Sail 0|1]` / `sb.Boat.Control off`, `sb.Dev.RunBoatTests`

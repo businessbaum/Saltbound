@@ -42,8 +42,8 @@ ASaltDevMovingPlatform::ASaltDevMovingPlatform()
 	Helm->ExitOffset = FVector(-110.f, 0.f, -105.f);
 	Helm->PromptText = NSLOCTEXT("Saltbound", "DevHelmUse", "Take the helm");
 	Helm->LeavePromptText = NSLOCTEXT("Saltbound", "DevHelmLeave", "Leave the helm");
-	Helm->ControlKeys = { TEXT("W"), TEXT("A"), TEXT("S"), TEXT("D") };
-	Helm->ControlAction = NSLOCTEXT("Saltbound", "DevHelmHint", "Speed and steer");
+	Helm->Controls = { { { TEXT("W"), TEXT("S") }, NSLOCTEXT("Saltbound", "DevHelmSpeed", "Speed") },
+		{ { TEXT("A"), TEXT("D") }, NSLOCTEXT("Saltbound", "DevHelmSteer", "Steer") } };
 }
 
 UStaticMeshComponent* ASaltDevMovingPlatform::AddBlock(FName Name, UStaticMesh* Mesh, const FVector& Center, const FVector& SizeCm)

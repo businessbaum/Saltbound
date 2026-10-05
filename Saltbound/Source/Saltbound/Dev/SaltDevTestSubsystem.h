@@ -30,7 +30,8 @@ public:
 
 	void RunMovementSuite(float MotionScale, float Speed, float TurnRate);
 	/** Sailing tests (SaltDevBoatTests.cpp): buoyancy, points of sail, turning, collision, grounding, player aboard. */
-	void RunBoatSuite();
+	/** Only: a part of the suite on its own (D59: "ladder"); empty runs it all. */
+	void RunBoatSuite(const FString& Only = FString());
 	void ConfigurePlatform(float MotionScale, bool bForce, float Speed, float TurnRate);
 	void ResetPlayer();
 	void StartPerf(float Seconds);

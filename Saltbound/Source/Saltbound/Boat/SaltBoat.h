@@ -80,6 +80,9 @@ public:
 	/** Set the sail (let it down: the boat sails) or take it in (raised to the gaff: the boat slows down). */
 	void SetSailSet(bool bSet);
 	void ToggleSail() { SetSailSet(!bSailSet); }
+	/** D59: how much sail to set, 0 (taken in) .. 1 (full): W / S at the helm move it; the sail follows at its set rate. */
+	void SetSailAmount(float Amount);
+	float GetSailTarget() const { return SailTarget; }
 	/** Cast off when held; otherwise moor (near the mooring) or drop the anchor. */
 	void ToggleHold();
 	void SetHold(ESaltBoatHold NewHold);
@@ -307,6 +310,13 @@ public:
 
 	/** Initial state when play starts. */
 	UPROPERTY(EditAnywhere, Category = "Boat") ESaltBoatHold StartHold = ESaltBoatHold::Moored;
+	/** D59: the boat's row in the stats table (Core/SaltStats): speed, sail and steering numbers and its stores, read when
+	 *  play starts (they override the tunables above). */
+	UPROPERTY(EditAnywhere, Category = "Boat") FName BoatClass = TEXT("DoubleEnder");
+	/** Seconds for W / S at the helm to let the sail out from nothing to full (D59). */
+	UPROPERTY(EditAnywhere, Category = "Boat|Sail", meta = (Units = "s")) float TrimTime = 3.f;
+	/** How deep the sail bellies beyond its cut shape in a fresh breeze (cm, D59). */
+	UPROPERTY(EditAnywhere, Category = "Boat|Sail", meta = (Units = "cm")) float SailBelly = 70.f;
 
 	/** The sea is cut out inside this boat's hull (MPC_Ocean Boat*, D42): no waves inside the boat or on its deck. */
 	UPROPERTY(EditAnywhere, Category = "Boat") bool bMasksOcean = true;
@@ -347,6 +357,7 @@ private:
 		float Slack = 0.f;
 	};
 
+	void ApplyStats();
 	void ResolveContent();
 	void BuildHullModel();
 	void SampleWater(float DeltaSeconds);
@@ -368,6 +379,8 @@ private:
 	UFUNCTION() void HandleSailRope(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleWindlass(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleLadder(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
+	/** D59: the player takes hold of a ladder by moving into it (from the water, or at its head on deck). */
+	void TakeLaddersOnTouch();
 	UFUNCTION() void HandleStore(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleBell(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleLantern(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
@@ -415,6 +428,7 @@ private:
 	// Controls and rig.
 	float RudderAngle = 0.f;                 // deg, + = bear away to starboard
 	bool bSailSet = false;
+	float SailTarget = 0.f;                  // D59: how much sail is wanted (0..1)
 	float Hoist = 0.f;                       // 0 taken in .. 1 set
 	float BoomAngle = 0.f;                   // deg, + = boom to starboard
 	float SailSide = 1.f;                    // leeward side of the belly (visual)
@@ -430,6 +444,7 @@ private:
 	float Fill = 0.f;                        // belly fill (spring: pops when the sail catches the wind)
 	float FillVel = 0.f;
 	float Luff = 0.f;                        // 0..1, wind from ahead: the sail shivers
+	float SailPress = 0.f;                   // D59: 0..1, how hard the apparent wind presses the sail
 	float AvgWind = 0.f;                     // slow average of the wind speed (gusts against it)
 	float SailDrive = 0.f;                   // N, last forward sail force (logs)
 	bool bOverride = false;

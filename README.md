@@ -73,6 +73,7 @@ Controls are listed in [Docs/Progress.md](Docs/Progress.md#controls); settings (
 - [Docs/Conventions.md](Docs/Conventions.md) – scale, axes, naming, folders, materials, collision, Blender→Unreal export
 - [Docs/Decisions.md](Docs/Decisions.md) – significant technical and visual decisions with rationale
 - [Docs/Progress.md](Docs/Progress.md) – milestone status, verification results, known issues, next steps
+- [Docs/Stats.md](Docs/Stats.md) – every object's numbers (boats, the player, items, tools) and where to change them
 - [Docs/Ideas.md](Docs/Ideas.md) – future ideas with benefits and prerequisites
 - [Docs/ArtDirection.md](Docs/ArtDirection.md) – visual principles, palette, lighting presets, boat proportions
 - [Docs/ThirdParty.md](Docs/ThirdParty.md) – external content, sources and licenses

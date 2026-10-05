@@ -469,53 +469,82 @@ void USaltHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 void USaltHUDWidget::TickControls(float DeltaSeconds)
 {
 	const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn());
-	TArray<FString> Keys;
-	FText Action;
+	TArray<FSaltControlHint> Controls;
 	FText Status;
-	const bool bAny = Player && Player->GetControlsHint(Keys, Action, Status);
-	// A new set of keys makes a new row (each key is a scrap with its letter); the same keys keep theirs.
-	if (bAny && Keys.Num() > 0 && (!ControlsRow || Keys != ControlKeys) && HudRoot)
+	const bool bAny = Player && Player->GetControlsHint(Controls, Status);
+	// A new set of keys makes new rows (each key is a scrap with its letter), side by side ("W S Sail   A D Steer").
+	FString Keys;
+	for (const FSaltControlHint& C : Controls)
 	{
-		if (ControlsRow)
+		Keys += FString::Join(C.Keys, TEXT("")) + TEXT("|");
+	}
+	const bool bRows = bAny && Controls.Num() > 0;
+	if (bRows && (ControlsRows.Num() != Controls.Num() || Keys != ControlKeys) && HudRoot)
+	{
+		for (USaltKeyPrompt* Row : ControlsRows)
 		{
-			ControlsRow->RemoveFromParent();
+			Row->RemoveFromParent();
 		}
+		ControlsRows.Reset();
 		ControlKeys = Keys;
-		ControlsRow = CreateWidget<USaltKeyPrompt>(this, USaltKeyPrompt::StaticClass());
-		ControlsRow->Setup(Keys, Action);
-		if (UCanvasPanelSlot* S = HudRoot->AddChildToCanvas(ControlsRow))
+		for (const FSaltControlHint& C : Controls)
 		{
-			S->SetAnchors(FAnchors(0.5f, 1.f));
-			S->SetAlignment(FVector2D::ZeroVector);
-			S->SetSize(FVector2D(1.f, 1.f));
-			S->SetPosition(FVector2D(0.f, -ControlsRowUp));
+			USaltKeyPrompt* Row = CreateWidget<USaltKeyPrompt>(this, USaltKeyPrompt::StaticClass());
+			Row->Setup(C.Keys, C.Action);
+			if (UCanvasPanelSlot* S = HudRoot->AddChildToCanvas(Row))
+			{
+				S->SetAnchors(FAnchors(0.5f, 1.f));
+				S->SetAlignment(FVector2D::ZeroVector);
+				S->SetSize(FVector2D(1.f, 1.f));
+			}
+			ControlsRows.Add(Row);
 		}
 		bControlsShowing = false;
 	}
-	const bool bRow = bAny && Keys.Num() > 0;
-	if (ControlsRow && bRow)
+	if (bRows)
 	{
-		ControlsRow->SetAction(Action);
-		if (!bControlsShowing)
+		// Centred as a whole, 56 px between the groups.
+		constexpr float Gap = 56.f;
+		float Total = -Gap;
+		for (int32 I = 0; I < ControlsRows.Num(); ++I)
 		{
-			ControlsRow->PlayIn();
+			ControlsRows[I]->SetAction(Controls[I].Action);
+			Total += ControlsRows[I]->GetRowWidth() + Gap;
+		}
+		float X = -Total * 0.5f;
+		for (USaltKeyPrompt* Row : ControlsRows)
+		{
+			if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(Row->Slot))
+			{
+				S->SetPosition(FVector2D(X + Row->GetRowWidth() * 0.5f, -ControlsRowUp));
+			}
+			X += Row->GetRowWidth() + Gap;
+			if (!bControlsShowing)
+			{
+				Row->PlayIn();
+			}
 		}
 	}
-	bControlsShowing = bRow;
+	bControlsShowing = bRows;
 	if (bAny && !Status.EqualTo(StatusLine->GetText()))
 	{
 		StatusLine->SetText(Status);
 	}
 	ControlsAlpha = FMath::FInterpTo(ControlsAlpha, bAny ? 1.f : 0.f, DeltaSeconds, 10.f);
-	if (ControlsRow)
+	for (USaltKeyPrompt* Row : ControlsRows)
 	{
-		ControlsRow->SetRenderOpacity(bRow ? 1.f : ControlsAlpha);
-		ControlsRow->SetVisibility(ControlsAlpha > 0.01f || bRow ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		Row->SetRenderOpacity(bRows ? 1.f : ControlsAlpha);
+		Row->SetVisibility(ControlsAlpha > 0.01f || bRows ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	}
 	StatusLine->SetRenderOpacity(0.9f * ControlsAlpha * (Status.IsEmpty() && bAny ? 0.f : 1.f));
 }
 
 FText USaltHUDWidget::GetShownControls() const
 {
-	return ControlsRow && bControlsShowing ? ControlsRow->GetAction() : FText::GetEmpty();
+	TArray<FString> Actions;
+	for (const USaltKeyPrompt* Row : ControlsRows)
+	{
+		Actions.Add(Row->GetAction().ToString());
+	}
+	return bControlsShowing ? FText::FromString(FString::Join(Actions, TEXT(", "))) : FText::GetEmpty();
 }

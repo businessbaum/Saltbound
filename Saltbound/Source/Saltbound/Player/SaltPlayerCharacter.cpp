@@ -5,6 +5,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Core/SaltGameUserSettings.h"
+#include "Core/SaltStats.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Core/SaltTypes.h"
@@ -91,14 +92,29 @@ ASaltPlayerCharacter::ASaltPlayerCharacter(const FObjectInitializer& ObjectIniti
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationRoll = false;
 
+	// D59: the player's numbers come from the stats table (Core/SaltStats, Docs/Stats.md). Owner: "the movement doesn't
+	// feel responsive and clean": up to speed and to a stop in about a tenth of a second (was 0.17 s and more), a quicker
+	// jump of the same height (stronger gravity, faster take-off), a little more steering in the air.
+	const FSaltPlayerStats& Stats = SaltStats::Player();
+	WalkSpeed = Stats.WalkSpeed;
+	SprintSpeed = Stats.SprintSpeed;
+	SwimSpeed = Stats.SwimSpeed;
+	SwimSprintSpeed = Stats.SwimSprintSpeed;
+	EyeHeight = Stats.EyeHeight;
+	InteractionRange = Stats.InteractionRange;
+	LadderSpeed = Stats.LadderSpeed;
+	LadderMountSpeed = Stats.LadderMountSpeed;
+	LadderTopTime = Stats.LadderTopTime;
+	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - CapsuleHalfHeight));
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	Move->MaxWalkSpeed = WalkSpeed;
-	Move->MaxAcceleration = 1500.f;
-	Move->BrakingDecelerationWalking = 1800.f;
-	Move->GroundFriction = 8.f;
-	Move->JumpZVelocity = 340.f;
-	Move->AirControl = 0.25f;
-	Move->MaxStepHeight = 25.f;
+	Move->MaxAcceleration = Stats.Acceleration;
+	Move->BrakingDecelerationWalking = Stats.Braking;
+	Move->GroundFriction = Stats.GroundFriction;
+	Move->JumpZVelocity = Stats.JumpSpeed;
+	Move->GravityScale = Stats.GravityScale;
+	Move->AirControl = Stats.AirControl;
+	Move->MaxStepHeight = Stats.MaxStepHeight;
 	Move->SetWalkableFloorAngle(50.f);
 	Move->bOrientRotationToMovement = false;
 	Move->GetNavAgentPropertiesRef().bCanCrouch = false;
@@ -208,15 +224,10 @@ void ASaltPlayerCharacter::Tick(float DeltaSeconds)
 		Move->MaxSwimSpeed = bSprinting ? SwimSprintSpeed : SwimSpeed;
 		if (IsSwimming())
 		{
-			// Space rises (or climbs out at a ledge), Dive sinks; under water the swimmer hovers, at the surface floats.
-			if (bSwimUpHeld && TryClimbOutOfWater())
-			{
-				bSwimUpHeld = false;
-			}
-			else
-			{
-				AddMovementInput(FVector::UpVector, (bSwimUpHeld ? 1.f : 0.f) - (bSwimDownHeld ? 1.f : 0.f));
-			}
+			// Space rises, Dive sinks; under water the swimmer hovers, at the surface floats. D59 (owner: "remove the climbing
+			// system for objects when you run against them"): no more climbing out on to any ledge; out of the sea by the
+			// beach or up the boat's ladders.
+			AddMovementInput(FVector::UpVector, (bSwimUpHeld ? 1.f : 0.f) - (bSwimDownHeld ? 1.f : 0.f));
 		}
 	}
 
@@ -500,65 +511,6 @@ void ASaltPlayerCharacter::HandleDiveCompleted()
 	bSwimDownHeld = false;
 }
 
-bool ASaltPlayerCharacter::TryClimbOutOfWater()
-{
-	// A walkable top within reach just ahead (pier deck, boat side, flat rock), with room to stand. Piers are
-	// open frames, so this probes for the top directly instead of requiring a wall in front.
-	USaltCharacterMovementComponent* Move = Cast<USaltCharacterMovementComponent>(GetCharacterMovement());
-	UWorld* World = GetWorld();
-	if (!Move || !Move->IsSwimming() || !Controller || !World)
-	{
-		return false;
-	}
-	const UCapsuleComponent* Capsule = GetCapsuleComponent();
-	const float Half = Capsule->GetScaledCapsuleHalfHeight();
-	const float Radius = Capsule->GetScaledCapsuleRadius();
-	const FVector Center = GetActorLocation();
-	const float Feet = Center.Z - Half;
-	// Only at the surface (head out of the water).
-	if (Move->GetWaterSurfaceZ() > Center.Z + Half - 15.f)
-	{
-		return false;
-	}
-	const FVector Forward = FRotationMatrix(FRotator(0.f, Controller->GetControlRotation().Yaw, 0.f)).GetUnitAxis(EAxis::X);
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(SaltClimbOut), false, this);
-	const FVector Side(-Forward.Y, Forward.X, 0.f);
-	// Up to an arm's length ahead (the reach does not shrink with a slimmer body, D54).
-	for (const float Ahead : { Radius + 25.f, Radius + 50.f, Radius + 75.f, Radius + 100.f })
-	for (const float Lateral : { 0.f, -35.f, 35.f })
-	{
-		// Straight ahead first, then a little to either side (pier posts, rails).
-		const FVector Probe = Center + Forward * Ahead + Side * Lateral;
-		const FVector From(Probe.X, Probe.Y, Feet + ClimbOutReach + 40.f);
-		FHitResult Top;
-		if (!World->LineTraceSingleByChannel(Top, From, FVector(Probe.X, Probe.Y, Feet), ECC_Visibility, Params)
-			|| Top.bStartPenetrating || Top.ImpactNormal.Z < 0.7f)
-		{
-			continue;
-		}
-		const float Rise = Top.ImpactPoint.Z - Feet;
-		if (Rise > ClimbOutReach || Top.ImpactPoint.Z < Move->GetWaterSurfaceZ() + 20.f)
-		{
-			continue;
-		}
-		// Stand a little further in than the edge.
-		const FVector End = FVector(Top.ImpactPoint.X, Top.ImpactPoint.Y, Top.ImpactPoint.Z + Half + 2.f) + Forward * 15.f;
-		const FVector Raised(Center.X, Center.Y, End.Z);   // the climb rises here first
-		if (!IsCapsuleSpotFree(End) || !IsCapsuleSpotFree(Raised))
-		{
-			continue;
-		}
-		USceneComponent* Base = Top.GetComponent();
-		const FTransform BaseXf = Base ? Base->GetComponentTransform() : FTransform::Identity;
-		// Up (in steps when it is high: pulling up a ladder or a pier side), then forward onto the ledge.
-		StartScriptedClimb(Base, { BaseXf.InverseTransformPosition(Center), BaseXf.InverseTransformPosition(Raised),
-			BaseXf.InverseTransformPosition(End) }, { Rise > 60.f, false }, false);
-		UE_LOG(LogSaltbound, Log, TEXT("Climbing out of the water onto %s (%.0f cm)"), *GetNameSafe(Top.GetActor()), Rise);
-		return true;
-	}
-	return false;
-}
-
 float ASaltPlayerCharacter::GetCapsuleHalfHeightForClimb() const
 {
 	return GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
@@ -575,11 +527,13 @@ float ASaltPlayerCharacter::SegmentDuration(int32 Segment) const
 	{
 		return FMath::Max(1, FMath::RoundToInt(FMath::Abs(D.Z) / FMath::Max(ClimbStepHeight, 5.f))) * ClimbStepTime;
 	}
-	return FMath::Clamp((float)D.Size() / 140.f, 0.25f, 1.2f);
+	return ClimbGlideTime > 0.f ? ClimbGlideTime : FMath::Clamp((float)D.Size() / 140.f, 0.25f, 1.2f);
 }
 
-void ASaltPlayerCharacter::StartScriptedClimb(USceneComponent* Base, const TArray<FVector>& LocalPoints, const TArray<bool>& Stepped, bool bEndInWater)
+void ASaltPlayerCharacter::StartScriptedClimb(USceneComponent* Base, const TArray<FVector>& LocalPoints, const TArray<bool>& Stepped, bool bEndInWater,
+	float GlideTime)
 {
+	ClimbGlideTime = GlideTime;
 	USaltCharacterMovementComponent* Move = Cast<USaltCharacterMovementComponent>(GetCharacterMovement());
 	if (!Move || LocalPoints.Num() < 2)
 	{
@@ -679,8 +633,10 @@ void ASaltPlayerCharacter::MountLadder(const FSaltLadderLine& Line, bool bFromTo
 		const float Along = FMath::Clamp((float)((LadderGlideFrom.Z - Ladder.Bottom.Z) / (Ladder.Top.Z - Ladder.Bottom.Z)), 0.f, 1.f);
 		LadderAlong = FMath::Clamp(FMath::RoundToFloat(Along * Length / Ladder.RungStep) * Ladder.RungStep / Length, 0.f, 1.f);
 	}
-	LadderGlideTime = FMath::Clamp((float)(LadderPoint(LadderAlong) - LadderGlideFrom).Size() / 140.f, 0.2f, 0.8f);
+	// D59 (owner: "make the going to the ladder animation faster"): on to it at 3.2 m/s, eased, in 0.12 to 0.35 s.
+	LadderGlideTime = FMath::Clamp((float)(LadderPoint(LadderAlong) - LadderGlideFrom).Size() / FMath::Max(LadderMountSpeed, 1.f), 0.12f, 0.35f);
 	LadderGlide = 0.f;
+	LadderVelocity = 0.f;
 	LadderTime = 0.f;
 	bOnLadder = true;
 	Move->SuppressWater(0.5f);
@@ -720,28 +676,18 @@ void ASaltPlayerCharacter::TickLadder(float DeltaSeconds, float Input)
 	}
 	const float Length = FMath::Max((float)(Ladder.Top - Ladder.Bottom).Size(), 1.f);
 	const float Dir = FMath::Abs(Input) > 0.2f ? FMath::Sign(Input) : 0.f;
-	// Rung by rung: fast between the rungs, slow where the hands change grip; the head dips a little with each pull.
-	const float Pos = LadderAlong * Length;
-	const float Frac = FMath::Fractional(Pos / Ladder.RungStep);
-	float Bob = 0.f;
-	if (Dir != 0.f)
-	{
-		const float Speed = LadderSpeed * (0.15f + 0.85f * FMath::Sin(PI * Frac));
-		LadderAlong += Dir * Speed * DeltaSeconds / Length;
-		Bob = -3.f * FMath::Sin(PI * Frac);
-	}
-	else
-	{
-		// Let go of the keys: settle on the nearest rung.
-		const float Rung = FMath::RoundToFloat(Pos / Ladder.RungStep) * Ladder.RungStep;
-		LadderAlong = FMath::FInterpTo(Pos, Rung, DeltaSeconds, 6.f) / Length;
-	}
+	// D59 (owner: "make smooth upwards movement when climbing", "you can climb down way faster than up"): one smooth
+	// glide, the same speed up and down, eased in and out (no rung-by-rung steps, no dip of the head); it stops where
+	// the keys are let go.
+	LadderVelocity = FMath::FInterpConstantTo(LadderVelocity, Dir * LadderSpeed, DeltaSeconds, LadderSpeed / 0.15f);
+	LadderAlong += LadderVelocity * DeltaSeconds / Length;
+	const float Bob = 0.f;
 	if (LadderAlong >= 1.f && Dir > 0.f)
 	{
-		// The top: step over on to the deck.
+		// The top: over on to the deck in one quick move.
 		bOnLadder = false;
 		Camera->SetRelativeLocation(FVector(0.f, 0.f, RestZ));
-		StartScriptedClimb(Base, { Ladder.Top, Ladder.TopExit }, { false }, false);
+		StartScriptedClimb(Base, { Ladder.Top, Ladder.TopExit }, { false }, false, LadderTopTime);
 		UE_LOG(LogSaltbound, Log, TEXT("Off the ladder on to the deck"));
 		return;
 	}
@@ -931,23 +877,20 @@ FText ASaltPlayerCharacter::GetPromptText() const
 	return FText::GetEmpty();
 }
 
-bool ASaltPlayerCharacter::GetControlsHint(TArray<FString>& OutKeys, FText& OutAction, FText& OutStatus) const
+bool ASaltPlayerCharacter::GetControlsHint(TArray<FSaltControlHint>& OutControls, FText& OutStatus) const
 {
-	OutKeys.Reset();
-	OutAction = FText::GetEmpty();
+	OutControls.Reset();
 	OutStatus = FText::GetEmpty();
 	if (bOnLadder)
 	{
-		OutKeys = { TEXT("W"), TEXT("S") };
-		OutAction = NSLOCTEXT("Saltbound", "LadderHint", "Climb up and down");
+		OutControls.Add({ { TEXT("W"), TEXT("S") }, NSLOCTEXT("Saltbound", "LadderHint", "Climb up and down") });
 	}
 	else if (ActiveStation)
 	{
-		OutKeys = ActiveStation->ControlKeys;
-		OutAction = ActiveStation->ControlAction;
+		OutControls = ActiveStation->Controls;
 		OutStatus = ActiveStation->ControlsHintText;
 	}
-	return OutKeys.Num() > 0 || !OutStatus.IsEmpty();
+	return OutControls.Num() > 0 || !OutStatus.IsEmpty();
 }
 
 // --- Stations ------------------------------------------------------------------

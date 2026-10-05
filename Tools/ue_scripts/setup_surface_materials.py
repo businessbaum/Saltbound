@@ -84,7 +84,8 @@ return Base;
 
 # Sail motion (M_SB_Sail, D41): the sail mesh's local space (cm): -X aft along the boom, +Z up from the boom, +Y the
 # belly. ASaltBoat drives Furl (1 = brailed up to the gaff), Fill (belly, with a pop when the sail catches the wind),
-# Side (+-1, the leeward side) and Flutter (shiver along the leech) through dynamic instances.
+# Side (+-1, the leeward side), Flutter (shiver along the leech) and Belly (D59: how deep the wind presses the cloth beyond
+# its cut shape, cm) through dynamic instances.
 SAIL_WPO_CODE = """
 float3 P = LocalPos;
 float Aft = max(-LocalPos.x, 0.0);
@@ -95,12 +96,16 @@ P.z = lerp(LocalPos.z, GaffZ - 6.0, F);
 P.x = LocalPos.x * (1.0 - 0.12 * F);
 // Belly to leeward, filled; a slow breath and a shiver running aft along the leech.
 float U = saturate(Aft / max(Chord, 1.0));
-float Breath = sin(Time * 1.6 + LocalPos.z * 0.012) * 0.06 * Fill;
+float Breath = sin(Time * 1.6 + LocalPos.z * 0.012) * 0.08 * Fill;
 float Shiver = sin(Aft * 0.05 - Time * 9.0 + LocalPos.z * 0.03) * Flutter * U * U * 5.0;
-P.y = (LocalPos.y * Side * (Fill + Breath) + Shiver) * (1.0 - 0.85 * F);
+// D59 (owner: "make the sail bend more in the wind"): the wind presses the cloth out between the mast, the boom and the gaff
+// (held at all three, deepest a little forward of the middle), breathing with it.
+float V = saturate(LocalPos.z / max(GaffZ, 1.0));
+float Deep = Belly * sin(3.14159 * U) * (1.0 - 0.3 * U) * sin(3.14159 * V) * (1.0 + Breath);
+P.y = (LocalPos.y * Side * (Fill + Breath) + Side * Deep + Shiver) * (1.0 - 0.85 * F);
 return P - LocalPos;
 """
-SAIL_PARAMS = {"Furl": 1.0, "Fill": 0.0, "Side": 1.0, "Flutter": 0.15, "ThroatHeight": 475.0, "GaffTan": 0.7, "Chord": 485.0}
+SAIL_PARAMS = {"Furl": 1.0, "Fill": 0.0, "Side": 1.0, "Flutter": 0.15, "ThroatHeight": 475.0, "GaffTan": 0.7, "Chord": 485.0, "Belly": 0.0}
 
 # Wind pennant (M_SB_Flag, D44): local cm, +X along the fly from the swivel, -Z down the hoist. ASaltBoat turns it to
 # the apparent wind and drives Wind (0 = calm .. 1 = about 9 m/s): it hangs in light air and streams out as the wind

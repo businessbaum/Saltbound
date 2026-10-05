@@ -307,7 +307,7 @@ namespace
 				if (T > 0.6f)
 				{
 					const FString Controls = Hud->GetShownControls().ToString();
-					Report(TEXT("HelmControls"), Controls == TEXT("Steer"), FString::Printf(TEXT("controls shown at the helm: '%s'"), *Controls));
+					Report(TEXT("HelmControls"), Controls == TEXT("Sail, Steer"), FString::Printf(TEXT("controls shown at the helm: '%s'"), *Controls));
 					P->LeaveStation();
 					UE_LOG(LogSaltbound, Display, TEXT("SB_TEST InventorySuite DONE passed=%d failed=%d"), S->Passed, S->Failed);
 					return false;

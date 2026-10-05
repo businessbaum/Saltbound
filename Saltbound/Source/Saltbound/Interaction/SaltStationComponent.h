@@ -6,6 +6,16 @@
 #include "Interaction/SaltInteractableComponent.h"
 #include "SaltStationComponent.generated.h"
 
+/** One group of keys and what they do (D58): "A D Steer". */
+USTRUCT(BlueprintType)
+struct FSaltControlHint
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station") TArray<FString> Keys;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station") FText Action;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSaltStationOccupancySignature, class USaltStationComponent*, Station, ASaltPlayerCharacter*, Player);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSaltStationActionSignature, class USaltStationComponent*, Station, int32, Action);
 
@@ -45,13 +55,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station")
 	FText LeavePromptText;
 
-	/** The station's controls, shown while operating it in the key-scrap prompt (D58): the keys (letters, e.g. A and D)
-	 *  and what they do ("Steer"). */
+	/** The station's controls, shown while operating it in the key-scrap prompt (D58), side by side: keys (letters, e.g.
+	 *  A and D) and what they do ("Steer"). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station")
-	TArray<FString> ControlKeys;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station")
-	FText ControlAction;
+	TArray<FSaltControlHint> Controls;
 
 	/** Optional status line under the controls (the boat's speed, the sail and the wind). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Station")
