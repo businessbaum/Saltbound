@@ -620,14 +620,20 @@ namespace
 		if (Landfalls && Hud && Hud->GetLandfall())
 		{
 			Hud->GetLandfall()->Clear();
-			// The Spire (420, 150 m, its shore 28 m round): 418 m from home's shore is too far; 250 m off its centre finds it.
+			// The Spire (its shore 28 m round): home is too far, and so is the home island's north beach (D60, 290 m north
+			// of the pier); 250 m off its centre finds it.
+			const FSaltPlace* Spire = SaltPlaces::Find(TEXT("Spire"));
+			const FVector2D SpireM = Spire ? Spire->CentreM : FVector2D::ZeroVector;
 			const FName AtHome = Landfalls->CheckAt(FVector::ZeroVector);
-			const FVector Near((420.0 - 250.0) * 100.0, 150.0 * 100.0, 0.0);
+			const FName NorthBeach = Landfalls->CheckAt(FVector(290.0 * 100.0, 5.0 * 100.0, 0.0));
+			const FVector Near((SpireM.X - 250.0) * 100.0, SpireM.Y * 100.0, 0.0);
 			const FName First = Landfalls->CheckAt(Near);
 			const FName Again = Landfalls->CheckAt(Near);
 			const bool bBanner = Hud->GetLandfall()->IsShowing() && Hud->GetLandfall()->GetShownPlace() == TEXT("Spire");
-			Report(TEXT("LandfallFoundOnce"), AtHome.IsNone() && First == TEXT("Spire") && Again.IsNone() && bBanner && Saves->IsFound(TEXT("Spire")),
-				FString::Printf(TEXT("at home=%s near the Spire=%s again=%s banner=%d"), *AtHome.ToString(), *First.ToString(), *Again.ToString(), bBanner ? 1 : 0));
+			Report(TEXT("LandfallFoundOnce"), AtHome.IsNone() && NorthBeach.IsNone() && First == TEXT("Spire") && Again.IsNone() && bBanner
+				&& Saves->IsFound(TEXT("Spire")),
+				FString::Printf(TEXT("at home=%s on the north beach=%s near the Spire=%s again=%s banner=%d"), *AtHome.ToString(),
+					*NorthBeach.ToString(), *First.ToString(), *Again.ToString(), bBanner ? 1 : 0));
 			Hud->GetLandfall()->Clear();
 		}
 		else

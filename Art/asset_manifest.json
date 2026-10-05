@@ -332,5 +332,115 @@
     "dest": "/Game/Saltbound/Boat",
     "nanite": false,
     "collision": "none"
+  },
+  "SM_Home_Sand": {
+    "fbx": "Islands/SM_Home_Sand.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": true,
+    "collision": "none",
+    "_note": "The home island's sand and sea floor (D60, build_home_island.py): 0.5 m cells near the water, 2 m deeper; vertex colours as the cove's sand. SM_Home_Col collides."
+  },
+  "SM_Home_Turf": {
+    "fbx": "Islands/SM_Home_Turf.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": true,
+    "collision": "none",
+    "_note": "The home island's grass (D60): 0.5 m cells, its edge rolling under the sand; vertex alpha < 1 = forest floor."
+  },
+  "SM_Home_Col": {
+    "fbx": "Islands/SM_Home_Col.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": false,
+    "collision": "complex",
+    "_note": "The home island's collision (D60): 1 m cells within 3 m of the water, 2 m deeper; hidden in the map."
+  },
+  "SM_Palm_A": {
+    "fbx": "Vegetation/SM_Palm_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "ucx",
+    "nanite_shape": "preserve_area",
+    "_note": "D60 build_vegetation.py: the trunk collides (UCX hulls), the leaves do not."
+  },
+  "SM_Palm_B": {
+    "fbx": "Vegetation/SM_Palm_B.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "ucx",
+    "nanite_shape": "preserve_area",
+    "_note": "D60 build_vegetation.py: the trunk collides (UCX hulls), the leaves do not."
+  },
+  "SM_Palm_C": {
+    "fbx": "Vegetation/SM_Palm_C.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "ucx",
+    "nanite_shape": "preserve_area",
+    "_note": "D60 build_vegetation.py: the trunk collides (UCX hulls), the leaves do not."
+  },
+  "SM_Tree_A": {
+    "fbx": "Vegetation/SM_Tree_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "ucx",
+    "nanite_shape": "preserve_area",
+    "_note": "D60 build_vegetation.py: the trunk collides (UCX hulls), the leaves do not."
+  },
+  "SM_Tree_B": {
+    "fbx": "Vegetation/SM_Tree_B.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "ucx",
+    "nanite_shape": "preserve_area",
+    "_note": "D60 build_vegetation.py: the trunk collides (UCX hulls), the leaves do not."
+  },
+  "SM_Bush_A": {
+    "fbx": "Vegetation/SM_Bush_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Bush_B": {
+    "fbx": "Vegetation/SM_Bush_B.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Bush_Flower": {
+    "fbx": "Vegetation/SM_Bush_Flower.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Fern_A": {
+    "fbx": "Vegetation/SM_Fern_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_BigLeaf_A": {
+    "fbx": "Vegetation/SM_BigLeaf_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_GrassTuft_A": {
+    "fbx": "Vegetation/SM_GrassTuft_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_GrassTuft_B": {
+    "fbx": "Vegetation/SM_GrassTuft_B.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
   }
 }

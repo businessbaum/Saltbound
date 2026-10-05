@@ -1357,3 +1357,43 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   11/11 (up 0.87 s and down 0.88 s in one glide each, `BoatLadderTouch`: swimming at it takes hold), a beam reach 8.37 kn (was
   about 7.4), swim 5/5 (`no_climb_out`). The movement suite and the rest of the boat suite were not run again. Evidence:
   `Docs/Evidence/D59/` (the ends and the stores in Blender, the sail from above in light and fresh wind, the helm's prompt).
+
+
+### D60 · The prompt on its object or low on the screen; the home island: a tropical ring round a lagoon with the harbour inside (Adopted)
+- **Owner (2026-10-05):** "1. there will be 2 modes for the interaction line to stay: First is its pinned on the object so if
+  you turn around the interaction message moves with the object. The second option is its how its now but way lower, sub title
+  level position... 2. Create (in blender when useful) a much more interesting start island with nature trees, palms etc etc. a
+  tropic island in form of a circle with an exit, in the middle water and the harbor".
+- **Prompt position (pause menu, `bPromptOnObject` in the user settings, `sb.PromptOnObject 1|0`):** *On the object* (the
+  default) pins each prompt row on its object's prompt point, the focus volume's middle (`PromptOffset` moves it), projected
+  every frame and kept whole on the screen; a row fading out stays where its object was. *Bottom of the screen* puts it in the
+  middle 180 px above the bottom edge (1080p), where subtitles go, just over the controls row. Leaving a station or a ladder has
+  no object, so it is always low. Two objects with the same words (two pickups) count as a new prompt when pinned. Checks:
+  `MenuPromptPlace`, `PromptOnObject` (on the windlass, looked at off its middle: the row within 3 px of it), `PromptLow`.
+- **The home island (`island_shape.py`, `build_home_island.py`, `build_vegetation.py`):** a ring of land 50-95 m wide round a
+  lagoon some 220 m across, about 400 m from reef to reef. The old cove's pier, its beach and the 2.3 m of water under it are the
+  lagoon's south shore (the mooring, the gangway, the pier and the swimming checks keep their places); its old sandbank and
+  headland rocks are gone.
+  - Inside: a turquoise rim 2-2.5 m deep, a floor 6 m down with sea grass, four coral heads and a small sand islet with three
+    palms. The calm zone keeps the lagoon at 12 % of the swell.
+  - The ring: beaches inside and out with the cove's sculpted sand, grass inland (`SM_Home_Turf`: its edge rolls down under the
+    sand, a chunky lip; forest floor under the trees), gentle rises, and a 14.5 m hill in the west with a rock crown. A sandy
+    footpath leads from the pier's beach to the hilltop (flowering bushes along it).
+  - The channel: east, across the usual south-south-west wind, so it is a reach both ways; about 52 m wide and 5 m deep between
+    two rocky headlands. Measured: with the rudder left alone the boat sails out at 8.4 kn; coming in unsteered it drifts on to
+    the north headland (it needs steering).
+  - Outside: a reef flat 2-2.6 m deep (turquoise, passable), the drop-off to the 60 m floor, rocks in the west coast's surf; a
+    second calm zone shelters the outer beaches (45 % at the coast, the full swell 450 m out).
+  - Plants: 363 palms in groves along the shores (three kinds: tall and curved, leaning far over, young), 206 broadleaf trees
+    in clumps inland, 450 bushes, 68 flowering bushes, 159 big-leaf plants, 66 ferns and about 4 900 clumps of beach grass. All
+    geometry leaves (no cut-out cards), Nanite with "preserve area" (without it the palms' thin leaflets thinned away to bare
+    trunks from afar), the trunks collide (UCX), the rest does not.
+  - Materials: `M_SB_Foliage` (two-sided foliage) and `M_SB_FoliageBark` read the plants' vertex masks (tone, age, a random
+    value, how free a part is) and bend the whole plant downwind with gusts, the leaves fluttering on top; bark and leaves of a
+    plant share the bend. `MI_Turf` puts painted grass and forest-floor textures (`gen_textures.py grass forest_floor`) on the
+    rock master.
+- **Knock-on changes:** the Spire moved out to (560, 260) m (the island's north beach would have counted as landfall there);
+  the charts draw the island from its shape (`gen_ui.py`); the boat tests' open water moved south of the island
+  (`TestWater`, the waves part), as their old spot is in the lagoon now.
+- **Tests (short runs):** menu 8/8, UI suite 44/44 (with the prompt checks and `LandfallFoundOnce` on the north beach), the boat
+  suite's pier, grounding, float and mooring parts, swim 5/5, the channel run. Evidence: `Docs/Evidence/D60/`.

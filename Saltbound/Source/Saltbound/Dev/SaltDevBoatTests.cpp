@@ -313,8 +313,8 @@ namespace
 			}));
 		}));
 
-	/** Open water south-east of the test cove (about 15 m deep), clear of the pier, rocks and headlands. */
-	const FVector TestWater(7000.f, -2500.f, 0.f);
+	/** Open sea south of the home island (60 m deep), clear of its reef (D60: the old spot off the cove is in the lagoon now). */
+	const FVector TestWater(-25000.f, -15000.f, 0.f);
 
 	float MeanOf(const TArray<FVector>& S, int32 Axis, int32 From = 0)
 	{
@@ -1080,8 +1080,8 @@ void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 		Report(TEXT("BoatLadderTouch"), MaxValue > 0.f && MaxValue < 1.f, FString::Printf(TEXT("swam at the ladder: took hold after %.2f s"), MaxValue));
 	}});
 
-	// 10) Waves: a beam reach in the Rough sea, then bare poles in the Storm sea (open water beyond the cove's calm
-	// zone). The boat must ride the waves without capsizing.
+	// 10) Waves: a beam reach in the Rough sea, then bare poles in the Storm sea (open water south-west of the home island,
+	// beyond its calm zones). The boat must ride the waves without capsizing.
 	struct FSea { const TCHAR* Name; float WindMs; bool bSail; float MaxHeel; float MinKn; };
 	// The storm only has to be survived: rolls stay below the capsize threshold (70 degrees).
 	const FSea Seas[] = { { TEXT("Rough"), 8.f, true, 40.f, 2.5f }, { TEXT("Storm"), 14.f, false, 70.f, 0.f } };
@@ -1095,7 +1095,7 @@ void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 				R->SetSeaState(FName(Sea.Name), 0.f);
 			}
 			SetWind(0.f, Sea.WindMs);
-			Place(FVector(15000.f, -9000.f, 0.f), 90.f, Sea.bSail ? 2.5f : 0.f, Sea.bSail, true);
+			Place(FVector(-30000.f, -25000.f, 0.f), 90.f, Sea.bSail ? 2.5f : 0.f, Sea.bSail, true);
 		}, nullptr, nullptr});
 		Wait(Name + TEXT("SeaBuild"), 20.f);
 		Steps.Add({Name + TEXT("Sea"), 20.f, [this]() { Samples.Reset(); MinValue = 1e9f; MaxValue = -1e9f; },

@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59).
+Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60).
 
 ## Milestone status
 
@@ -53,7 +53,8 @@ Owner feedback received so far (2026-10-03):
   standalone build. Details in git history and Decisions D7.
 
 ## M3 – Visual test scene (built)
-Map: `/Game/Saltbound/Maps/L_VisualTest` (game and editor default map). Regenerate with
+Map: `/Game/Saltbound/Maps/L_VisualTest` (game and editor default map; since D60 the home island round the old cove's pier).
+Regenerate with
 `python Tools/ue_exec.py Tools/ue_scripts/create_visual_test_map.py`.
 
 Implemented:
@@ -223,6 +224,11 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D60 (awaiting the owner's check):** the interaction prompt pinned on its object or low on the screen (pause menu: Prompt
+  position; on the object by default). The start is a tropical ring island round a lagoon with the harbour inside: palms in
+  groves, broadleaf trees, bushes, flowers, big-leaf plants, ferns and beach grass swaying in the wind, a footpath to a hill in
+  the west, a sand islet in the lagoon, one channel out to the east between rocky headlands, a turquoise reef round it all
+  (`island_shape.py`, `build_home_island.py`, `build_vegetation.py`). The Spire moved further out; the charts show the island.
 - **D59 (awaiting the owner's check):** the first boat about 15 % faster (8.4 kn on a reach); stats tables for boats and the
   player (`Core/SaltStats`, `Docs/Stats.md`); W / S at the helm let the sail out or take it in (0-100 %, the speed follows);
   the sail bellies much more in a fresh breeze; barrel, crate and sea chest 30 % bigger; the open ends of the boat closed
@@ -310,7 +316,7 @@ the sail and cast off.
 | Dive (while swimming) | Left Ctrl / C | B / Circle |
 | Interact / leave station (raising the anchor: hold E) | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
-| Pause menu / settings | Esc (in the editor: F10) | Start |
+| Pause menu / settings (Prompt position: on the object or the bottom of the screen) | Esc (in the editor: F10) | Start |
 | Satchel | Tab or I (arrows or the mouse choose a pocket, drag an item to another pocket, R turn the item, G drop one; Tab, I or Esc close) | Back |
 | Tool wheel | Hold Q, aim with the mouse, let go to take the tool; Esc cancels; 1 to 5 take a tool directly | Hold LB, aim with the right stick; B cancels |
 | On the boat | Steering oar (starboard quarter, E at its handle): A / D steer, W / S let the sail out or take it in. Pin rails by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Bell rope: E rings the bell; lantern: E lights / douses it. Chart on the mast (aft, to starboard): E looks at it closely (E / Esc put it back). Ladders (both sides, midship): swim or walk into one (or E) to take hold, W / S climb, E lets go; off the bottom into the sea, over the top on board | |
@@ -325,7 +331,7 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.DumpFrames <n>`: the renderer writes the next n frames to `Saved/Screenshots` (with `-UseFixedTimeStep -FPS=<n>`, see `Tools/record_clip.py --dump`)
 - `sb.Dev.RunMovementTests [motion speed turn]`, `sb.Dev.Platform <motion> [speed turn]`
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
-- `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`, `sb.Dev.RunMenuTests`,
+- `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.PromptOnObject 1|0`, `sb.Dev.ShowInteractionVolumes 1`, `sb.Dev.RunMenuTests`,
   `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched), `sb.Dev.RunInventoryTests`,
   `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel [off]`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`, `sb.Dev.Chart [off]`, `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`, `sb.Dev.CameraTrace [s] [deck]`, `sb.Dev.EdgeTest [s]` (the view beside the deck's low steps in the open sea), `sb.Boat.RigTurn 0|1`, `sb.Camera.DeckKnees 0|1`, `sb.Camera.DeckTilt <share>` (0 = level view), `sb.Camera.StepSmooth 0|1`
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)

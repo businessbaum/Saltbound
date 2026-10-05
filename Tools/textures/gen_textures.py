@@ -552,6 +552,95 @@ def caustics():
     save_rgb(os.path.join(OUT, "Common", "T_Caustics_M.png"), np.stack([out[0], out[1], np.zeros_like(out[0])], -1))
 
 
+def grass():
+    """Painted island grass (D60), coloured (MI_Turf tints it only a little); triplanar, tile ~4 m at 1024 px.
+
+    Comic, not realistic: broad patches in three greens and a sunny yellow-green with crisp-soft edges, tufts (Voronoi
+    clumps a little lighter in the middle), faint light strokes and rare tiny white and yellow flowers. The normal map
+    raises the tufts; the 3D grass clumps on the island carry the rest."""
+    size = 1024
+    warp = (spectral_noise(size, 1, 5, -1.8, seed=301) * 0.02, spectral_noise(size, 1, 5, -1.8, seed=302) * 0.02)
+    src = n01(spectral_noise(size, 2, 9, -1.9, seed=303))
+    levels = sum(crisp(src, t, 0.01) for t in (0.32, 0.55, 0.75)) / 3.0
+    sunny = crisp(n01(spectral_noise(size, 2, 7, -1.9, seed=304)), 0.68, 0.02)
+    f1, f2, cid = worley_cells(size, 34, seed=305, warp=warp)
+    tuft = np.clip(1.0 - f1 / 0.75, 0.0, 1.0) ** 1.3
+    seam = np.clip(1.0 - (f2 - f1) / 0.12, 0.0, 1.0)
+    rng = np.random.default_rng(306)
+    tuft_tone = rng.uniform(-1.0, 1.0, 34 * 34)[cid]
+    dark = np.array([0.2, 0.36, 0.1])
+    mid = np.array([0.3, 0.48, 0.14])
+    light = np.array([0.43, 0.6, 0.18])
+    sun = np.array([0.58, 0.64, 0.22])
+    t = levels[..., None]
+    rgb = np.where(t < 0.5, dark + (mid - dark) * (t / 0.5), mid + (light - mid) * ((t - 0.5) / 0.5))
+    rgb = rgb + (sun - rgb) * (0.4 * sunny)[..., None]
+    rgb = rgb * (1.0 + 0.1 * (tuft - 0.4) + 0.05 * tuft_tone)[..., None] * (1.0 - 0.04 * seam)[..., None]
+    # Short light strokes: thin bright marks along a wandering direction inside the tufts.
+    ang = spectral_noise(size, 2, 6, -1.8, seed=307) * 2.0
+    v, u = np.mgrid[0:size, 0:size] / size
+    stroke = 0.5 + 0.5 * np.sin((u * np.cos(ang) + v * np.sin(ang)) * 2 * np.pi * 90 + 6.0 * spectral_noise(size, 4, 12, -1.5, seed=308))
+    strokes = crisp(stroke, 0.9, 0.04) * crisp(n01(spectral_noise(size, 8, 30, -1.4, seed=309)), 0.45, 0.08) * (0.4 + 0.6 * tuft)
+    rgb = rgb + (light * 1.15 - rgb) * (0.15 * strokes)[..., None]
+    flowers_w = crisp(n01(spectral_noise(size, 60, 160, -0.9, seed=310)), 0.965, 0.008)
+    flowers_y = crisp(n01(spectral_noise(size, 60, 160, -0.9, seed=311)), 0.97, 0.008)
+    rgb = rgb * (1 - flowers_w[..., None]) + np.array([0.92, 0.9, 0.82]) * flowers_w[..., None]
+    rgb = rgb * (1 - flowers_y[..., None]) + np.array([0.95, 0.8, 0.25]) * flowers_y[..., None]
+    save_rgb(os.path.join(OUT, "Ground", "T_Grass_D.png"), rgb)
+    height = tuft * 0.35 - seam * 0.04 + spectral_noise(size, 2, 10, -1.8, seed=312) * 0.2 + strokes * 0.03
+    save_normal(os.path.join(OUT, "Ground", "T_Grass_N.png"), height_to_normal(height, 4.0))
+    ao = 1.0 - 0.06 * seam
+    rough = np.full_like(ao, 0.88)
+    save_rgb(os.path.join(OUT, "Ground", "T_Grass_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
+
+
+def forest_floor():
+    """The ground under the island's trees (D60): dark earth strewn with fallen leaves in browns, ochre and olive, and
+    soft moss patches; tile ~4 m at 1024 px, coloured. Leaves are crisp painted ovals (tiled: drawn wrapped)."""
+    from PIL import ImageDraw
+    size = 1024
+    soil = n01(spectral_noise(size, 2, 12, -1.8, seed=321))
+    base = np.array([0.2, 0.14, 0.09]) * (0.85 + 0.3 * soil)[..., None]
+    moss = crisp(n01(spectral_noise(size, 2, 8, -1.9, seed=322) + 0.25 * spectral_noise(size, 10, 40, -1.4, seed=325)), 0.66, 0.06)
+    base = base + (np.array([0.22, 0.33, 0.1]) * (0.85 + 0.3 * soil)[..., None] - base) * (0.75 * moss)[..., None]
+    img = Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), "RGB")
+    hmap = Image.new("L", (size, size), 0)
+    d = ImageDraw.Draw(img)
+    dh = ImageDraw.Draw(hmap)
+    rng = np.random.default_rng(323)
+    palette = [(92, 60, 32), (108, 74, 36), (74, 54, 30), (118, 88, 44), (82, 80, 42), (64, 46, 28)]
+    for k in range(1300):
+        cx, cy = rng.uniform(0, size, 2)
+        if moss[int(cy), int(cx)] > 0.5 and rng.random() < 0.8:
+            continue
+        L = rng.uniform(18, 34)
+        W = L * rng.uniform(0.35, 0.5)
+        a = rng.uniform(0, np.pi)
+        col = palette[int(rng.integers(len(palette)))]
+        shade = rng.uniform(0.85, 1.1)
+        col = tuple(int(min(255, c * shade)) for c in col)
+        pts = []
+        for j in range(10):
+            t = 2 * np.pi * j / 10
+            x, y = L * 0.5 * np.cos(t), W * 0.5 * np.sin(t) * (1.0 - 0.3 * np.cos(t))
+            pts.append((x * np.cos(a) - y * np.sin(a), x * np.sin(a) + y * np.cos(a)))
+        for ox in (-size, 0, size):
+            for oy in (-size, 0, size):
+                poly = [(cx + px + ox, cy + py + oy) for px, py in pts]
+                d.polygon(poly, fill=col)
+                dh.polygon(poly, fill=int(120 + 100 * rng.random()))
+                # The midrib, a little darker.
+                d.line([(cx + ox - np.cos(a) * L * 0.45, cy + oy - np.sin(a) * L * 0.45),
+                        (cx + ox + np.cos(a) * L * 0.45, cy + oy + np.sin(a) * L * 0.45)], fill=tuple(int(c * 0.75) for c in col), width=1)
+    rgb = np.asarray(img).astype(np.float64) / 255.0
+    save_rgb(os.path.join(OUT, "Ground", "T_ForestFloor_D.png"), rgb)
+    h = np.asarray(hmap).astype(np.float64) / 255.0 * 0.5 + spectral_noise(size, 2, 12, -1.8, seed=324) * 0.25
+    save_normal(os.path.join(OUT, "Ground", "T_ForestFloor_N.png"), height_to_normal(h, 3.0))
+    ao = 1.0 - 0.2 * (1.0 - np.clip(np.asarray(hmap) / 255.0 * 2.0, 0, 1)) * (1.0 - moss)
+    rough = np.full_like(ao, 0.9)
+    save_rgb(os.path.join(OUT, "Ground", "T_ForestFloor_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
+
+
 GENERATORS = {
     "caustics": caustics,
     "ocean_ripples": ocean_ripples,
@@ -569,6 +658,8 @@ GENERATORS = {
     "macro_noise": macro_noise,
     "paint_surface": paint_surface,
     "canvas": canvas,
+    "grass": grass,
+    "forest_floor": forest_floor,
 }
 
 if __name__ == "__main__":

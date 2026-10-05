@@ -18,6 +18,7 @@ Writes RGBA PNGs to Art/Textures/UI/ (imported by Tools/ue_scripts/import_textur
 Charts: north (up) is world +X, east (right) world +Y. Labels and the scale are drawn by the UI (SaltSatchelWidget),
 which uses the same bounds (keep MAPS in sync with USaltSatchelWidget::Charts).
 """
+import json
 import math
 import os
 import sys
@@ -31,7 +32,7 @@ OUT = os.path.join(ROOT, "Art", "Textures", "UI")
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, "Art", "Blender", "Scripts"))
 from gen_textures import spectral_noise  # noqa: E402
-import seabed_shape  # noqa: E402
+import island_shape  # noqa: E402
 
 INK = (58, 38, 22)
 PARCH = np.array([0.86, 0.77, 0.58])
@@ -251,7 +252,7 @@ REGION = {"T_Map_Region": 4096}
 ISLE = (1600.0, 600.0)
 FAR = [((5500.0, 2500.0), 20.0, (159.0, 130.0), 71), ((7000.0, -1500.0), 140.0, (134.0, 119.0), 72),
        ((4200.0, -4800.0), 75.0, (223.0, 87.0), 73)]
-SPIRE = (420.0, 150.0)
+SPIRE = (560.0, 260.0)            # moved out for the home island (D60)
 STORM = (0.0, -3000.0, 1600.0)
 
 
@@ -288,17 +289,18 @@ def chart(name, size_px=1024):
     t = np.hypot(X - SPIRE[0], Y - SPIRE[1]) / 14.0
     land = np.maximum(land, np.clip((1.0 - t) * 4, 0, 1))
     shallow = np.maximum(shallow, np.clip((2.5 - t), 0, 1))
-    # The home cove: its sculpted floor above / near the water (only where the chart resolves it).
-    rows = np.where((X[:, 0] > -80) & (X[:, 0] < 110))[0]
-    cols = np.where((Y[0, :] > -75) & (Y[0, :] < 75))[0]
-    for r in rows:
-        for c in cols:
-            z = seabed_shape.base(X[r, c], Y[r, c])
-            land[r, c] = max(land[r, c], 1.0 if z > 0.0 else 0.0)
-            shallow[r, c] = max(shallow[r, c], 1.0 if z > -3.0 else 0.0)
-    # Rocks of the cove's coast and headlands (map script positions, m).
-    for rx, ry, rad in ((-7.5, 1.5, 4), (-5.5, -7.5, 3), (-11, -2.5, 5), (-2.6, 5.2, 3), (-2.2, -3.8, 3), (-6, 8.5, 4),
-                        (9, 39, 9), (20, 33, 8), (34, 43, 8)):
+    # The home island (D60): its ring of land round the lagoon, the reef flat and the channel (island_shape.py).
+    rows = np.where(np.abs(X[:, 0] - island_shape.CENTRE[0]) < island_shape.HALF)[0]
+    cols = np.where(np.abs(Y[0, :] - island_shape.CENTRE[1]) < island_shape.HALF)[0]
+    if len(rows) and len(cols):
+        sl = (slice(rows[0], rows[-1] + 1), slice(cols[0], cols[-1] + 1))
+        z = island_shape.base(X[sl], Y[sl])
+        land[sl] = np.maximum(land[sl], np.clip(z * 4.0 + 0.5, 0, 1))
+        shallow[sl] = np.maximum(shallow[sl], np.clip((z + 3.0) * 2.0, 0, 1))
+    # Rocks of the pier's beach and of the island (map script and build_home_island.py positions, m).
+    with open(os.path.join(ROOT, "Art", "Generated", "home_island.json"), encoding="utf-8") as fh:
+        home_rocks = [(r[1] / 100.0, r[2] / 100.0, 2.4 * r[5]) for r in json.load(fh)["rocks"]]
+    for rx, ry, rad in [(-7.5, 1.5, 4), (-5.5, -7.5, 3), (-11, -2.5, 5), (-2.6, 5.2, 3), (-2.2, -3.8, 3), (-6, 8.5, 4)] + home_rocks:
         t = np.hypot(X - rx, Y - ry) / max(rad, px * 1.5)
         land = np.maximum(land, np.clip((1.0 - t) * 4, 0, 1))
     land = np.clip(land, 0, 1)

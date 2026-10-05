@@ -6,6 +6,10 @@
                 caustic light under the water (D28)
   M_SB_Glow     emissive (lantern glass, flame, ancient technology accents)
   M_SB_SeaGrass two-sided sea grass blades: base-to-tip colour ramp (UV.v = height), swaying in the current
+  M_SB_Foliage  the home island's leaves (D60): two-sided foliage, colours from the plant meshes' vertex masks (tone,
+                age, a random value), swaying in the wind (the whole plant bends, its leaves flutter)
+  M_SB_FoliageBark  the same for trunks and stems: lit one-sided, the same bend so the crowns stay on them
+Run with the argument 'foliage' to build only the foliage masters, their instances and MI_Turf.
 Colour values are linear. Palette rationale: Docs/ArtDirection.md.
 """
 import os
@@ -516,6 +520,151 @@ def build_seagrass():
     return m
 
 
+# --- M_SB_Foliage / M_SB_FoliageBark (D60) --------------------------------------------------------------------------
+# The plants (build_vegetation.py) carry masks in their vertex colours: R tone (shaded base .. lit tip), G age (fresh ..
+# dry), B a random value per part, A how freely the part moves in the wind. The instance's colours come from the MI.
+FOLIAGE_COLOR_CODE = """
+float3 Fresh = lerp(DarkColor.rgb, LightColor.rgb, saturate(VC.r));
+float3 Old = lerp(DryDark.rgb, DryLight.rgb, saturate(VC.r));
+float3 C = lerp(Fresh, Old, saturate(VC.g));
+C *= lerp(1.0 - PartVar, 1.0 + PartVar, VC.b);
+// Per plant: a little lighter or darker, warmer or cooler.
+float R2 = frac(InstRand * 13.37);
+C *= lerp(1.0 - InstVar, 1.0 + InstVar, InstRand);
+C *= lerp(float3(1.0 + HueShift, 1.0, 1.0 - HueShift), float3(1.0 - HueShift, 1.0, 1.0 + HueShift), R2);
+// Painted detail: a darker midrib down each leaf (UV.x across it) and a faint grain that moves with the plant.
+C *= 1.0 - RibDark * (1.0 - smoothstep(0.0, 0.09, abs(UV.x - 0.5)));
+float M = Texture2DSample(MacroTex, MacroTexSampler, LocalPos.xy / 90.0 + LocalPos.z / 130.0).b;
+C *= lerp(1.0 - Grain, 1.0 + Grain, M);
+return C;
+"""
+
+# The wind (cm, world space): the plant bends downwind with its height (its pivot sets the phase, gusts roll over the
+# island), the free parts (vertex alpha) flutter on top. The wind blows from 200 degrees (the game's default) towards NNE.
+FOLIAGE_WPO_CODE = """
+float H = saturate(LocalPos.z / BendHeight);
+float Phase = dot(Pivot.xy, float2(0.0031, 0.0047)) + InstRand * 6.2831853;
+float Gust = 0.65 + 0.35 * sin(Time * 0.37 + dot(Pivot.xy, float2(0.0013, 0.0009)));
+float2 Dir = normalize(float2(WindX, WindY));
+float Sway = (0.55 + 0.45 * sin(Time * BendSpeed + Phase)) * Gust;
+float Bend = BendAmount * H * H;
+float3 Off = float3(Dir * (Sway * Bend), -0.25 * Bend * Sway * H);
+float Fl = sin(Time * FlutterSpeed + Phase * 3.0 + dot(LocalPos, float3(0.021, 0.017, 0.013)));
+float Fl2 = sin(Time * FlutterSpeed * 1.7 + Phase + dot(LocalPos, float3(-0.013, 0.025, 0.009)));
+Off += float3(Dir * (0.35 * Fl2), Fl) * (FlutterAmount * VA * Gust);
+return Off;
+"""
+
+FOLIAGE_PARAMS = {
+    "DarkColor": ("v", (0.03, 0.07, 0.02, 1), "Colour"), "LightColor": ("v", (0.18, 0.34, 0.07, 1), "Colour"),
+    "DryDark": ("v", (0.12, 0.07, 0.03, 1), "Colour"), "DryLight": ("v", (0.4, 0.28, 0.12, 1), "Colour"),
+    "PartVar": ("s", 0.12, "Colour"), "InstVar": ("s", 0.1, "Colour"), "HueShift": ("s", 0.06, "Colour"),
+    "RibDark": ("s", 0.25, "Colour"), "Grain": ("s", 0.06, "Colour"),
+    "SubsurfaceColor": ("v", (0.3, 0.45, 0.08, 1), "Surface"), "Roughness": ("s", 0.6, "Surface"), "Specular": ("s", 0.35, "Surface"),
+    "BendHeight": ("s", 900.0, "Wind"), "BendAmount": ("s", 30.0, "Wind"), "BendSpeed": ("s", 0.6, "Wind"),
+    "FlutterAmount": ("s", 5.0, "Wind"), "FlutterSpeed": ("s", 2.4, "Wind"), "WindX": ("s", 0.94, "Wind"), "WindY": ("s", 0.34, "Wind"),
+}
+
+
+def build_foliage(name, leaves):
+    m = sb_ue.reset_material(name, MASTER)
+    for prop, value in (("two_sided", leaves), ("used_with_instanced_static_meshes", True), ("used_with_nanite", True)):
+        m.set_editor_property(prop, value)
+    if leaves:
+        m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_TWO_SIDED_FOLIAGE)
+    try:
+        m.set_editor_property("max_world_position_offset_displacement", 60.0)
+    except Exception as exc:  # noqa: BLE001 (older engines)
+        print("SB_FOLIAGE no WPO bound:", exc)
+    vc = sb_ue.expr(m, unreal.MaterialExpressionVertexColor, -1400, 0)
+    uv = sb_ue.expr(m, unreal.MaterialExpressionTextureCoordinate, -1400, 100)
+    rand = sb_ue.expr(m, unreal.MaterialExpressionPerInstanceRandom, -1400, 180)
+    lp = sb_ue.expr(m, unreal.MaterialExpressionLocalPosition, -1400, 260)
+    pivot = sb_ue.expr(m, unreal.MaterialExpressionObjectPositionWS, -1400, 340)
+    time = sb_ue.expr(m, unreal.MaterialExpressionTime, -1400, 420)
+    macro = sb_ue.expr(m, unreal.MaterialExpressionTextureObjectParameter, -1400, 500, parameter_name="MacroTex",
+                       texture=tex(TEX + "/Common/T_MacroNoise_M"), sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR,
+                       group="Colour")
+    pn = {}
+    for i, (n, (k, v, g)) in enumerate(FOLIAGE_PARAMS.items()):
+        pn[n] = (sb_ue.vector_param if k == "v" else sb_ue.scalar_param)(m, n, v, -1100, -300 + i * 70, g)
+    color_in = ["VC", "UV", "InstRand", "LocalPos", "MacroTex", "DarkColor", "LightColor", "DryDark", "DryLight", "PartVar",
+                "InstVar", "HueShift", "RibDark", "Grain"]
+    col = custom(m, -600, 0, "Foliage colour", FOLIAGE_COLOR_CODE, color_in, F3)
+    links = {"VC": (vc, ""), "UV": (uv, ""), "InstRand": (rand, ""), "LocalPos": (lp, ""), "MacroTex": (macro, "")}
+    for n in color_in:
+        a, out = links.get(n, (pn.get(n), ""))
+        sb_ue.connect(a, out, col, n)
+    wpo_in = ["LocalPos", "Pivot", "Time", "VA", "InstRand", "BendHeight", "BendAmount", "BendSpeed", "FlutterAmount", "FlutterSpeed",
+              "WindX", "WindY"]
+    wpo = custom(m, -600, 500, "Foliage wind (cm)", FOLIAGE_WPO_CODE, wpo_in, F3)
+    links = {"LocalPos": (lp, ""), "Pivot": (pivot, ""), "Time": (time, ""), "VA": (vc, "A"), "InstRand": (rand, "")}
+    for n in wpo_in:
+        a, out = links.get(n, (pn.get(n), ""))
+        sb_ue.connect(a, out, wpo, n)
+    sb_ue.to_prop(col, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    sb_ue.to_prop(wpo, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+    sb_ue.to_prop(pn["Roughness"], "", unreal.MaterialProperty.MP_ROUGHNESS)
+    sb_ue.to_prop(pn["Specular"], "", unreal.MaterialProperty.MP_SPECULAR)
+    if leaves:
+        sss = sb_ue.expr(m, unreal.MaterialExpressionMultiply, -300, 300)
+        sb_ue.connect(pn["SubsurfaceColor"], "", sss, "A")
+        sb_ue.connect(col, "", sss, "B")
+        sb_ue.to_prop(sss, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
+    mel.recompile_material(m)
+    sb_ue.eal.save_loaded_asset(m)
+    return m
+
+
+def foliage_library(rock=None):
+    """The plants' instances (slot names in build_vegetation.py) and the island's grass ground (MI_Turf)."""
+    leaf = build_foliage("M_SB_Foliage", True)
+    bark = build_foliage("M_SB_FoliageBark", False)
+    # A plant's bark and leaves share its bend (BendHeight / Amount / Speed), so the crown stays on its trunk.
+    palm_wind = {"BendHeight": 900.0, "BendAmount": 32.0, "BendSpeed": 0.55}
+    tree_wind = {"BendHeight": 900.0, "BendAmount": 12.0, "BendSpeed": 0.45}
+    low_wind = {"BendHeight": 120.0, "BendAmount": 3.0, "BendSpeed": 0.8}
+    lib = {
+        "MI_Leaf_Palm": (leaf, dict(palm_wind, FlutterAmount=7.0, FlutterSpeed=2.2), {
+            "DarkColor": (0.035, 0.075, 0.02, 1), "LightColor": (0.2, 0.37, 0.07, 1), "DryDark": (0.12, 0.075, 0.03, 1),
+            "DryLight": (0.42, 0.3, 0.13, 1), "SubsurfaceColor": (0.4, 0.55, 0.12, 1)}),
+        "MI_Bark_Palm": (bark, dict(palm_wind, FlutterAmount=0.0, RibDark=0.0, Grain=0.12, Roughness=0.85, Specular=0.25), {
+            "DarkColor": (0.06, 0.045, 0.035, 1), "LightColor": (0.3, 0.25, 0.18, 1), "DryDark": (0.06, 0.045, 0.035, 1),
+            "DryLight": (0.3, 0.25, 0.18, 1)}),
+        "MI_Leaf_Tree": (leaf, dict(tree_wind, FlutterAmount=4.0, FlutterSpeed=2.6), {
+            "DarkColor": (0.015, 0.045, 0.012, 1), "LightColor": (0.12, 0.27, 0.05, 1), "DryDark": (0.18, 0.15, 0.03, 1),
+            "DryLight": (0.5, 0.42, 0.1, 1), "SubsurfaceColor": (0.3, 0.45, 0.08, 1)}),
+        "MI_Bark_Tree": (bark, dict(tree_wind, FlutterAmount=0.0, RibDark=0.0, Grain=0.12, Roughness=0.85, Specular=0.25), {
+            "DarkColor": (0.04, 0.032, 0.026, 1), "LightColor": (0.2, 0.165, 0.13, 1), "DryDark": (0.05, 0.06, 0.03, 1),
+            "DryLight": (0.16, 0.2, 0.08, 1)}),
+        "MI_Leaf_Bush": (leaf, dict(low_wind, FlutterAmount=2.5, FlutterSpeed=2.8), {
+            "DarkColor": (0.02, 0.055, 0.018, 1), "LightColor": (0.15, 0.31, 0.06, 1), "DryDark": (0.2, 0.12, 0.03, 1),
+            "DryLight": (0.55, 0.32, 0.08, 1), "SubsurfaceColor": (0.35, 0.5, 0.1, 1)}),
+        "MI_Flower": (leaf, dict(low_wind, FlutterAmount=2.5, FlutterSpeed=2.8, RibDark=0.0, HueShift=0.1), {
+            "DarkColor": (0.3, 0.03, 0.025, 1), "LightColor": (0.85, 0.12, 0.09, 1), "DryDark": (0.3, 0.03, 0.025, 1),
+            "DryLight": (0.85, 0.12, 0.09, 1), "SubsurfaceColor": (0.9, 0.2, 0.15, 1)}),
+        "MI_Grass_Beach": (leaf, {"BendHeight": 60.0, "BendAmount": 6.0, "BendSpeed": 1.1, "FlutterAmount": 2.0, "FlutterSpeed": 3.2,
+                                  "RibDark": 0.0}, {
+            "DarkColor": (0.09, 0.13, 0.04, 1), "LightColor": (0.38, 0.46, 0.14, 1), "DryDark": (0.3, 0.24, 0.1, 1),
+            "DryLight": (0.7, 0.6, 0.32, 1), "SubsurfaceColor": (0.8, 0.8, 0.35, 1)}),
+    }
+    for name, (parent, scalars, vectors) in lib.items():
+        sb_ue.make_mi(name, MI, parent, scalars=scalars, vectors=vectors)
+    # The island's grass (and the forest floor where the vertex alpha drops, under the trees): the rock master's
+    # world-projected sets with painted, coloured textures; no lichen, no tide, no wet band.
+    rock = rock or unreal.load_asset(MASTER + "/M_SB_Rock")
+    sb_ue.make_mi("MI_Turf", MI, rock, vectors={"Tint": (0.88, 0.92, 0.74, 1)},
+                  textures={"AlbedoTex": TEX + "/Ground/T_Grass_D", "NormalTex": TEX + "/Ground/T_Grass_N", "ORMTex": TEX + "/Ground/T_Grass_ORM",
+                            "AlbedoTex2": TEX + "/Ground/T_ForestFloor_D", "NormalTex2": TEX + "/Ground/T_ForestFloor_N",
+                            "ORMTex2": TEX + "/Ground/T_ForestFloor_ORM"},
+                  scalars={"Scale": 420.0, "AntiTile": 1.0, "AntiTileScale": 5000.0, "PatternContrast": 1.0, "TexNormalize": 0.8,
+                           "NormalStrength": 0.6, "TopLighten": 0.08, "MacroScale": 2500.0, "MacroAmount": 0.16, "GritAmount": 0.0,
+                           "LichenCoverage": 0.0, "AlgaeAmount": 0.0, "BarnacleAmount": 0.0, "WetDarken": 1.0, "TideHeight": 0.0,
+                           "WetHeight": 1.0, "VertexMaskAmount": 1.0, "EdgeLighten": 1.12, "CavityDarken": 0.8, "PlateVar": 0.1,
+                           "SecondSetAmount": 1.0, "StrataScale": 1.0e6, "CausticStrength": 0.0})
+    print("SB_FOLIAGE_MATERIALS_OK", mel.get_statistics(leaf).num_pixel_shader_instructions, mel.get_statistics(bark).num_pixel_shader_instructions)
+
+
 def paint_textures():
     return {"BaseTexture": TEX + "/Paint/T_PaintSurface_D", "NormalTexture": TEX + "/Paint/T_PaintSurface_N",
             "ORMTexture": TEX + "/Paint/T_PaintSurface_ORM"}
@@ -650,8 +799,12 @@ def main():
     sb_ue.make_mi("MI_LanternGlass", MI, glow, vectors={"BaseColor": (0.35, 0.25, 0.14, 1), "GlowColor": (1.0, 0.52, 0.2, 1)}, scalars={"GlowIntensity": 80.0, "Roughness": 0.1})
     sb_ue.make_mi("MI_CandleFlame", MI, glow, vectors={"BaseColor": (0.9, 0.7, 0.4, 1), "GlowColor": (1.0, 0.62, 0.28, 1)}, scalars={"GlowIntensity": 600.0})
     sb_ue.make_mi("MI_AncientGlow", MI, glow, vectors={"BaseColor": (0.05, 0.12, 0.12, 1), "GlowColor": (0.35, 0.95, 0.85, 1)}, scalars={"GlowIntensity": 40.0})
+    foliage_library(rock)
     print("SB_SURFACE_MATERIALS_OK", mel.get_statistics(surf).num_pixel_shader_instructions, mel.get_statistics(rock).num_pixel_shader_instructions)
 
 
 if __name__ == "__main__":
-    main()
+    if "foliage" in sys.argv[1:]:
+        foliage_library()
+    else:
+        main()

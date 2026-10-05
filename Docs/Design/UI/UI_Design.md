@@ -182,8 +182,10 @@ The stores are the D52 barrel and crate, with 10 slots each.
 
 ![Prompt](UI_prompt.png)
 
-- **Where:** fixed on screen, under the focus dot. The prompt row is centred 66 px below the screen centre. It is not
-  pinned to the object; players of similar games find pinned prompts jumpy.
+- **Where (owner, D60: the player's choice, pause menu "Prompt position"):** *On the object* (the default): the row's middle
+  on the object's prompt point (its focus volume's middle), following it as the view turns, kept whole on the screen.
+  *Bottom of the screen*: centred 180 px above the bottom edge, where subtitles go (just over a station's controls row).
+  Leaving a station or a ladder always shows low. (Before D60 the row sat fixed 66 px under the screen centre.)
 - **Key scrap:**
   - 58 × 58 torn parchment: a jagged edge (points every 7 px, inward jitter up to 4 px, an occasional deeper tear),
     rotated −3°.

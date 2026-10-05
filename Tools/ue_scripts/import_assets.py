@@ -10,6 +10,8 @@ Per entry:
   collision "ucx" (use UCX_ hulls from the file), "complex" (use complex as simple), or "none"
   bounds_extension  optional [x, y, z] added to the mesh bounds on both sides (local units), for meshes
                     displaced in the material (e.g. ocean tiles)
+  nanite_shape      optional "preserve_area" (or "voxelize"): how Nanite simplifies at a distance; foliage of thin
+                    leaves keeps its area instead of thinning away (D60: the palms' crowns vanished from afar)
 Material slots are matched by name to existing material instances anywhere under /Game/Saltbound.
 Unreal never creates materials from the FBX; missing ones fall back to MI_Placeholder.
 """
@@ -97,6 +99,15 @@ def import_entry(name, entry):
         nanite.enabled = bool(entry.get("nanite", False))
         sm.set_editor_property("nanite_settings", nanite)
         unreal.log("SB_IMPORT %s: Nanite switched to %s" % (name, nanite.enabled))
+    shape = entry.get("nanite_shape")
+    if shape:
+        want = {"preserve_area": unreal.NaniteShapePreservation.PRESERVE_AREA,
+                "voxelize": unreal.NaniteShapePreservation.VOXELIZE}[shape]
+        nanite = sm.get_editor_property("nanite_settings")
+        if nanite.get_editor_property("shape_preservation") != want:
+            nanite.set_editor_property("shape_preservation", want)
+            sm.set_editor_property("nanite_settings", nanite)
+            unreal.log("SB_IMPORT %s: Nanite shape preservation %s" % (name, shape))
     # Collision complexity
     body = sm.get_editor_property("body_setup")
     if body:

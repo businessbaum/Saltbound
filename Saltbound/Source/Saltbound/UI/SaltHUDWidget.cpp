@@ -34,13 +34,13 @@ namespace
 	// prompt point, or 180 px above the bottom edge in the middle (where subtitles go, above the controls row).
 	constexpr float RowLowUp = 180.f;
 	constexpr float RowEdge = 40.f;
-	constexpr float KeySize = 58.f;
-	constexpr float KeyFrame = 120.f;
-	constexpr float KeyGap = 18.f;
+	constexpr float RowKeySize = 58.f;
+	constexpr float RowKeyFrame = 120.f;
+	constexpr float RowKeyGap = 18.f;
 	constexpr float PromptSize = 36.f;
 	constexpr float TextCentreY = 12.f - 0.271f * PromptSize;
-	constexpr float FadeIn = 0.15f;
-	constexpr float FadeOut = 0.1f;
+	constexpr float RowFadeIn = 0.15f;
+	constexpr float RowFadeOut = 0.1f;
 
 	// D58: the controls row (key scraps and action) and the status line under it, above the bottom edge.
 	constexpr float ControlsRowUp = 112.f;
@@ -140,12 +140,12 @@ TSharedRef<SWidget> USaltHUDWidget::RebuildWidget()
 			if (UMaterialInterface* Base = SaltUI::Material(TEXT("M_UI_KeySoak")))
 			{
 				Mid = UMaterialInstanceDynamic::Create(Base, this);
-				Scrap->SetBrush(SaltUI::ImageBrush(Mid, FVector2D(KeyFrame, KeyFrame)));
+				Scrap->SetBrush(SaltUI::ImageBrush(Mid, FVector2D(RowKeyFrame, RowKeyFrame)));
 			}
 			if (UCanvasPanelSlot* S = RowRoot->AddChildToCanvas(Scrap))
 			{
 				S->SetAlignment(FVector2D(0.5f, 0.5f));
-				S->SetSize(FVector2D(KeyFrame, KeyFrame));
+				S->SetSize(FVector2D(RowKeyFrame, RowKeyFrame));
 			}
 			Scrap->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
 			USaltPaintedText* Label = WidgetTree->ConstructWidget<USaltPaintedText>(USaltPaintedText::StaticClass());
@@ -296,15 +296,15 @@ void USaltHUDWidget::LayoutRow(int32 Index)
 	USaltPaintedText* Label = RowLabels[Index];
 	Label->SetText(Rows[Index].Text);
 	const float TextW = Label->MeasureWidth();
-	Rows[Index].Width = KeySize + KeyGap + TextW;
+	Rows[Index].Width = RowKeySize + RowKeyGap + TextW;
 	const float X0 = -Rows[Index].Width * 0.5f;
 	if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(RowScraps[Index]->Slot))
 	{
-		S->SetPosition(FVector2D(X0 + KeySize * 0.5f, 0.f));
+		S->SetPosition(FVector2D(X0 + RowKeySize * 0.5f, 0.f));
 	}
 	if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(Label->Slot))
 	{
-		S->SetPosition(FVector2D(X0 + KeySize + KeyGap + TextW * 0.5f, TextCentreY));
+		S->SetPosition(FVector2D(X0 + RowKeySize + RowKeyGap + TextW * 0.5f, TextCentreY));
 	}
 }
 
@@ -380,14 +380,14 @@ void USaltHUDWidget::TickPrompt(float DeltaSeconds)
 	{
 		FPromptRow& Row = Rows[I];
 		Row.Age += DeltaSeconds;
-		Row.Alpha = Row.bShowing ? FMath::Min(Row.Alpha + DeltaSeconds / FadeIn, 1.f) : FMath::Max(Row.Alpha - DeltaSeconds / FadeOut, 0.f);
+		Row.Alpha = Row.bShowing ? FMath::Min(Row.Alpha + DeltaSeconds / RowFadeIn, 1.f) : FMath::Max(Row.Alpha - DeltaSeconds / RowFadeOut, 0.f);
 		if (!RowRoots.IsValidIndex(I))
 		{
 			continue;
 		}
 		PlaceRow(I, bOnObject);
 		// Fade in and rise 6 px in 0.15 s while the scrap's tilt settles from -6 to -3 degrees.
-		const float In = EaseOut(Row.Age / FadeIn);
+		const float In = EaseOut(Row.Age / RowFadeIn);
 		RowRoots[I]->SetRenderOpacity(Row.Alpha);
 		RowRoots[I]->SetRenderTranslation(FVector2D(0.f, Row.bShowing ? 6.f * (1.f - In) : 0.f));
 		const bool bActive = I == ActiveRow && Row.bShowing;
@@ -412,7 +412,7 @@ void USaltHUDWidget::PlaceRow(int32 Index, bool bOnObject)
 	{
 		// The row's middle on the object's prompt point, kept whole on the screen.
 		const float HalfW = Row.Width * 0.5f + RowEdge;
-		const float HalfH = KeyFrame * 0.5f;
+		const float HalfH = RowKeyFrame * 0.5f;
 		Row.At = FVector2D(FMath::Clamp(P.X, HalfW, FMath::Max(ViewSize.X - HalfW, HalfW)),
 			FMath::Clamp(P.Y, HalfH, FMath::Max(ViewSize.Y - HalfH, HalfH)));
 		Row.bPinned = true;

@@ -14,8 +14,9 @@ const TArray<FSaltPlace>& SaltPlaces::All()
 	// the landfall banners (LANDFALL in Tools/textures/ui_parts.js).
 	static const TArray<FSaltPlace> Places = {
 		{ TEXT("SaltboundCove"), NSLOCTEXT("Saltbound", "PlaceCove", "Saltbound Cove"), FVector2D(0.0, 0.0), FVector2D::ZeroVector, 0.f, false },
-		// A sea stack with a ruined tower (SM_Landmark_Spire, about 28 m across at its foot).
-		{ TEXT("Spire"), NSLOCTEXT("Saltbound", "PlaceSpire", "The Spire"), FVector2D(420.0, 150.0), FVector2D(28.0, 28.0), 0.f, true },
+		// A sea stack with a ruined tower (SM_Landmark_Spire, about 28 m across at its foot); since the home island (D60)
+		// further out, so walking its north beach does not count as landfall there.
+		{ TEXT("Spire"), NSLOCTEXT("Saltbound", "PlaceSpire", "The Spire"), FVector2D(560.0, 260.0), FVector2D(28.0, 28.0), 0.f, true },
 		// Ruin Isle (D47): its coast radius is 55 m, give or take a third.
 		{ TEXT("RuinIsle"), NSLOCTEXT("Saltbound", "PlaceRuinIsle", "Ruin Isle"), FVector2D(1600.0, 600.0), FVector2D(55.0, 55.0), 0.f, true },
 		// The far islands: the charts' ellipses.
