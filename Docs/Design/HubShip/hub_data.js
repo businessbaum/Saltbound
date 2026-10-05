@@ -6,6 +6,9 @@
 const HUB = {
   name: 'Hollowkeel',
   L: 160, B: 40, sprit: 188, keel: -12,
+  // The hull's half-width up its height amidships, [z, half-width] (outside.hull_section in numbers, for the build): ancient
+  // below ancientTop, timber above; aft the tumblehome runs on to the poop rail. Scaled along the ship by hb(x) / 20.
+  section: [[-12, 6], [-6, 16], [0, 19], [6, 20], [18.7, 18.8], [34.7, 15.7]], ancientTop: 3,
   Z: { deep: -8, quay: 1.5, lower: 5.5, middle: 9.5, upper: 13.5, main: 17.5, sc1: 21.5, sc2: 25.5, sc3: 29.5, poop: 33.5, fc1: 21.5, fcTop: 25.5 },
   rail: 1.2,                                        // bulwark and gallery rails above their floor
   basin: { x0: 0, x1: 44, y0: -10, y1: 10, floor: -5 }, // the Stern Dock: sea water, open to the sky
@@ -137,8 +140,8 @@ const SPACES = {
       { id: 'bollards', every: 6, from: 6, to: 44, y: 10.6, r: 0.3, h: 0.6, note: 'both sides' },
       { id: 'rung_ladders', at: [1.5, 20], y: 10, note: 'both sides, from the water onto the quay (the D54 ladder)' },
       { id: 'slipway', x0: 32, x1: 46, y0: -5, y1: 5, z_at_x0: -3, z_at_x1: 1.5, note: 'absolute z (waterline 0); a beach the boat runs up on; enters the hall floor at x 46' },
-      { id: 'fitting_berth', x0: 32, x1: 42, y: 8.3, note: 'starboard quay by the derrick: the player boat moors here, bow forward' },
-      { id: 'fleet_berths', berths: [{ x0: 8, x1: 18, y: -8.3, boat: '10 m' }, { x0: 22, x1: 36, y: -7.8, boat: '14 m' }], note: 'port quay; boats the player owns (later)' },
+      { id: 'fitting_berth', x0: 32, x1: 42, y: 7.9, note: 'starboard quay by the derrick: the player boat moors here, bow forward (centreline 0.4 m clear of the wall for the 3.4 m beam: blockout, D61)' },
+      { id: 'fleet_berths', berths: [{ x0: 8, x1: 18, y: -7.9, boat: '10 m' }, { x0: 22, x1: 36, y: -7.5, boat: '14 m' }], note: 'port quay; boats the player owns (later)' },
       { id: 'dock_stair', x0: 30, x1: 44, y0: 14, y1: 17, rises: '+x', from_floor: 1.5, to_floor: 5.5, note: 'inside the starboard wing, through an opening in the arcade wall' },
       { id: 'dock_head_rail', note: 'main deck, along x 44 for |y| < 10: rail 1.0 m over the basin' },
     ],

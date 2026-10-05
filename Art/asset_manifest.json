@@ -442,5 +442,110 @@
     "nanite": true,
     "collision": "none",
     "nanite_shape": "preserve_area"
+  },
+  "SM_HubBlk_ShellStern": {
+    "fbx": "Hub/SM_HubBlk_ShellStern.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "complex",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout: complex collision (the boat's hull capsules hit it)"
+  },
+  "SM_HubBlk_ShellWaistS": {
+    "fbx": "Hub/SM_HubBlk_ShellWaistS.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "complex",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout: complex collision (the boat's hull capsules hit it)"
+  },
+  "SM_HubBlk_ShellWaistP": {
+    "fbx": "Hub/SM_HubBlk_ShellWaistP.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "complex",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout: complex collision (the boat's hull capsules hit it)"
+  },
+  "SM_HubBlk_ShellBow": {
+    "fbx": "Hub/SM_HubBlk_ShellBow.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "complex",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout: complex collision (the boat's hull capsules hit it)"
+  },
+  "SM_HubBlk_Basin": {
+    "fbx": "Hub/SM_HubBlk_Basin.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "complex",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout: complex collision (the boat's hull capsules hit it)"
+  },
+  "SM_HubBlk_Quay": {
+    "fbx": "Hub/SM_HubBlk_Quay.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+  },
+  "SM_HubBlk_Lower": {
+    "fbx": "Hub/SM_HubBlk_Lower.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+  },
+  "SM_HubBlk_Middle": {
+    "fbx": "Hub/SM_HubBlk_Middle.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+  },
+  "SM_HubBlk_Upper": {
+    "fbx": "Hub/SM_HubBlk_Upper.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+  },
+  "SM_HubBlk_Main": {
+    "fbx": "Hub/SM_HubBlk_Main.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+  },
+  "SM_HubBlk_Stairs": {
+    "fbx": "Hub/SM_HubBlk_Stairs.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+  },
+  "SM_HubBlk_Gates": {
+    "fbx": "Hub/SM_HubBlk_Gates.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+  },
+  "SM_HubBlk_Props": {
+    "fbx": "Hub/SM_HubBlk_Props.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+  },
+  "SM_HubBlk_Masts": {
+    "fbx": "Hub/SM_HubBlk_Masts.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+  },
+  "SM_HubBlk_Markers": {
+    "fbx": "Hub/SM_HubBlk_Markers.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout: NPC spots, interaction points, berths"
   }
 }

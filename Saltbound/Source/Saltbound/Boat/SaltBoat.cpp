@@ -1787,7 +1787,7 @@ void ASaltBoat::UpdateRopes(float DeltaSeconds)
 	// Mooring lines to the pier (their pier ends stay where the boat was moored).
 	using namespace SaltHull;
 	const FVector Reach = StartTransform.GetRotation().RotateVector(FVector(0.0, MooringReach, 0.0));
-	const FVector PierZ(0.0, 0.0, StartTransform.GetLocation().Z + 115.0);
+	const FVector PierZ(0.0, 0.0, StartTransform.GetLocation().Z + MooringPierHeight + 4.0);
 	auto PierPoint = [&](const FVector& BittBody)
 	{
 		FVector P = StartTransform.TransformPosition(BittBody * 100.0) + Reach;
@@ -1868,7 +1868,7 @@ void ASaltBoat::UpdateGangway()
 		return;
 	}
 	FVector Pier = StartTransform.TransformPosition(FVector(LadderX * 100.f, MooringReach + 15.f, 0.f));
-	Pier.Z = StartTransform.GetLocation().Z + 111.f;
+	Pier.Z = StartTransform.GetLocation().Z + MooringPierHeight;
 	const FVector OnBoat = Hull->GetComponentTransform().TransformPosition(FVector(LadderX, HalfBeamAtSheer(LadderX) - 0.2f, SheerZ(LadderX) + 0.03f) * 100.0);
 	Gangway->SetWorldLocationAndRotation(Pier, (OnBoat - Pier).Rotation());
 }

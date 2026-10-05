@@ -224,6 +224,12 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D61 (phase 1, waiting for the owner's review):** the hub ship Hollowkeel as a blockout in its own map `L_HubBlockout`
+  (plain shapes, flat colours; open it in the editor and play): every deck of the open 20 %, the stairs, gates, props as boxes,
+  markers and labels at the NPC spots, the player's boat moored at the fitting berth. Measured: walking 8-33 s to the Slip,
+  the Tally House and the Keelgate, 63 s to the Chandlery; 3.7 m clear everywhere; the boat in and out under the arch; the
+  Storm sea under +1.05 m (hull) and +0.36 m (basin) with stronger calm zones; light readable with an exposure volume per
+  space. Proposals in D61 (her berth off the island's channel, eight calm zones, a shortcut to the main deck).
 - **D60 (awaiting the owner's check):** the interaction prompt pinned on its object or low on the screen (pause menu: Prompt
   position; on the object by default). The start is a tropical ring island round a lagoon with the harbour inside: palms in
   groves, broadleaf trees, bushes, flowers, big-leaf plants, ferns and beach grass swaying in the wind, a footpath to a hill in
@@ -336,6 +342,7 @@ Developer console (`~`, non-shipping builds):
   `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel [off]`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`, `sb.Dev.Chart [off]`, `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`, `sb.Dev.CameraTrace [s] [deck]`, `sb.Dev.EdgeTest [s]` (the view beside the deck's low steps in the open sea), `sb.Boat.RigTurn 0|1`, `sb.Camera.DeckKnees 0|1`, `sb.Camera.DeckTilt <share>` (0 = level view), `sb.Camera.StepSmooth 0|1`
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
 - `sb.Dev.RunBoatTests [part]` (a part alone: `ladder`, `WindAbeam`, ...), `sb.Dev.Helm [off]`
+- Hub blockout (D61, on `L_HubBlockout`): `python Tools/hub_blockout_checks.py [headroom] [walk | walk:<space>] [boat] [water]`
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`
   (SB_BOAT state line), `sb.Boat.Place X Y Yaw [Speed m/s]`, `sb.Boat.Hold Free|Moored|Anchored`,
   `sb.Boat.Control <Rudder> <Sheet> [Sail 0|1]` / `sb.Boat.Control off`, `sb.Dev.RunBoatTests`

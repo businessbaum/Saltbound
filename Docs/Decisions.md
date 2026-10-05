@@ -1397,3 +1397,51 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   (`TestWater`, the waves part), as their old spot is in the lagoon now.
 - **Tests (short runs):** menu 8/8, UI suite 44/44 (with the prompt checks and `LandfallFoundOnce` on the north beach), the boat
   suite's pier, grounding, float and mooring parts, swim 5/5, the channel run. Evidence: `Docs/Evidence/D60/`.
+
+### D61 · The hub ship, phase 1: the blockout in its own map, measured (Provisional: waiting for the owner's review)
+- **Owner (2026-10-05):** "Build the hub ship for Saltbound ... follow Docs/Design/HubShip/HubShip_Agent_Prompt.md ... Then do Phase 1
+  only: the blockout in its own map, L_HubBlockout. Stop there and give me your measurements for review." And: "Use the defaults in
+  section 2 as my answers": the name Hollowkeel, salt as the currency (a purse), she first appears after the first landfall, 160 m,
+  entry only by sailing into the stern dock, the ancient hull visible at the waterline, no selling of finds yet.
+- **Built:** `Art/Blender/Scripts/hub_layout.py` (the loader: every number from `HubShip_Data.json`), `build_hub_blockout.py` (15
+  meshes `SM_HubBlk_*`: the hull's shell in four parts, the basin, the five decks' open floors with their walls, ceilings and rails
+  (walls along the open zones' edges, the doors and windows of the data cut in), the stairs (visual steps, ramp collision), the 34
+  gates, the props as boxes, the masts, the markers), `Tools/ue_scripts/setup_hub_blockout_materials.py` (flat colours),
+  `create_hub_blockout_map.py` (`L_HubBlockout`: sky, sea and rig as in the visual test map, the ship at her berth, the calm zones,
+  the player's boat moored at the fitting berth, the player on the starboard quay, labels at the NPC spots and gates, lanterns),
+  `hub_checks.py` and `Tools/hub_blockout_checks.py` (the measurements). The boat got `MooringPierHeight` (the gangway's and lines'
+  shore end: the cove's pier 111 cm, the hub's quays 150 cm).
+- **Data added or changed** (`hub_data.js`, the JSON and the sheets re-rendered): the hull section in numbers (`section`,
+  `ancientTop`: the values of `outside.hull_section`, nothing new); the berths moved off the basin wall: fitting berth y 8.3 → 7.9,
+  fleet berths -8.3 → -7.9 and -7.8 → -7.5 (at 8.3 the 3.4 m boat lay on the wall: 18 contacts moored; at 7.9 one at 0.0 cm).
+- **Measured** (short runs, each part alone):
+  - Walking from the fitting berth (2.5 m/s, simulated input steering through every door and flight): the Slip 20 m in 7.7 s, the
+    Tally House 27 m in 10.0 s, the Keelgate 85 m in 32.7 s, the Chandlery 162 m in 63.1 s (about 38 s sprinting). Every door,
+    stair and gallery on the way passes.
+  - Headroom: 3.70 m clear over every open floor (the Tally House 3.15 m in its hull corner), none under 2.2 m; the only low
+    readings are within 0.25 m of the bulwark, where the hull's tumblehome leans over the deck's edge.
+  - The boat: sails in under the arch at about 8 kn along the centreline (0.9 m off it at most, 7.4 m from the quays), coasts on to
+    the slipway and grounds softly; turns on the spot with the oar (171 degrees in 40 s, drifting 4.8 m, 3.6 m clear of the quays);
+    sails out cleanly; lies moored at the fitting berth with the gangway on the quay. The arch is 21.5-25.5 m clear, the boat's mast
+    10.5 m.
+  - The sea at Storm (the CPU's long waves, 60 s): with the prompt's calm zones (30 %, basin 10 %) it reached +1.56 m under the hull
+    and +0.51 m in the basin; with 20 % and 7 % it stays under +1.05 m and +0.36 m (targets 1.2 and 0.4).
+  - Light: with the game's presets (lanterns out by day, the exposure clamped for the open sea, EV 11-15.5 by day) the Tally House
+    was black (mean 0 of 255) and the Keelgate dim (14). With an exposure volume per enclosed space (minimum EV 3) and lanterns that
+    burn by day (60 cd at the data's spots): Day / Dusk means of 109 / 40 (Slip), 58 / 35 (Tally House), 116 / 47 (Keelgate),
+    111 / 65 (Chandlery). Evidence: `Docs/Evidence/D61/`.
+  - The berth: the floor is 47.5 m or more under her keel (8 of 40 points over no floor at all); she does not hide the Spire from
+    the pier (292 vs 25 degrees).
+- **For the owner's review** (proposals, nothing changed yet):
+  1. The berth and the home island (D60): the design's berth (230, -555) m lies west-north-west of the cove with "stern to the cove
+     so you sail straight from the pier into her dock", but the pier is now inside the lagoon and its only way out is the east
+     channel. Proposal: (81, 415) m, bow to 92 degrees: her stern 130 m off the channel's mouth, framed in the channel from inside the
+     lagoon (checked: 47.5 m of water under her, the Spire clear).
+  2. The calm zones: the visual test map already uses all four (lagoon, island lee, Ruin Isle, home waters); hers make six. Raise the
+     ocean's limit to eight (shader and CPU) in phase 4.
+  3. The Chandlery is 63 s away on foot (over the 40 s target): open the Keel Walk (L5, "the first shortcut") to the Keelgate and its
+     hoist, or a companion from the dock head to the main deck.
+  4. Interiors need their own exposure and lanterns lit by day (both in the review map now).
+  5. Data to settle: the derrick (9 m high at y 12.6) stands under the arcade's roof (z 5.5); the slipway starts at x 30 in
+     `hub.ramp` but at 32 in `spaces.dock` (built from the latter); the deck outline is 40 m wide but the hull section has 37.8 m at
+     the main deck (the Chandlery's back wall at y -19 then meets the bulwark).

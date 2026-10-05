@@ -471,7 +471,7 @@ defSheet('exploded', 'The decks, pulled apart', 'Every floor of the ship, one ab
   lk('The Deep: ancient, behind the Keelgate', 92, 0, 'deep', 20);
   // The route, level by level.
   const route = (pts, row) => line(c, pts.map(([x, y]) => P(x, y, lv(row).z, row)), { w: 3.4, col: rgba(C.route, 1), dash: [2, 8] });
-  route([[-6, 0], [34, 8.3]], 'quay'); route([[37, 12], [46, 12], [56, 9.4]], 'quay'); route([[42, 12.6], [33, 15.5], [44, 15.5]], 'quay');
+  route([[-6, 0], [34, 7.9]], 'quay'); route([[37, 12], [46, 12], [56, 9.4]], 'quay'); route([[42, 12.6], [33, 15.5], [44, 15.5]], 'quay');
   route([[44, 15.5], [58, 15.5], [64, 10.5], [73, 9], [79, 9.5]], 'lower');
   route([[86, 9.5], [90, 8], [78, -5.4]], 'quay'); conn(82.5, 9.5, 'quay', 'lower', { col: rgba(C.route, 0.9), w: 2.4 });
   route([[79, 9.5], [93.5, 6], [93.5, -3]], 'lower'); conn(93.5, -3, 'lower', 'middle', { col: rgba(C.route, 0.9), w: 2.4 });
@@ -521,7 +521,7 @@ defSheet('cross', 'Cross-sections', 'A: through the Stern Dock at x 22 m, lookin
     zoneName(c, 'Wing quarters', F(-15, 0)[0], F(0, 11.5)[1], 'locked', 17); zoneName(c, 'Sterncastle', F(-15, 0)[0], F(0, 23.5)[1], 'locked', 17);
     zoneName(c, 'stores', F(16.6, 0)[0], F(0, 3.2)[1], 'locked', 13); zoneName(c, 'stores', F(-16.6, 0)[0], F(0, 3.2)[1], 'locked', 13);
     // Your boat at the starboard quay (end-on), the fitting crane.
-    const bc = 8.3, bh = [F(bc - 1.7, 0.95), F(bc + 1.7, 0.95), F(bc + 1.3, 0.1), F(bc + 0.15, -0.6), F(bc + 0.12, -1.45), F(bc - 0.12, -1.45), F(bc - 0.15, -0.6), F(bc - 1.3, 0.1)];
+    const bc = 7.9, bh = [F(bc - 1.7, 0.95), F(bc + 1.7, 0.95), F(bc + 1.3, 0.1), F(bc + 0.15, -0.6), F(bc + 0.12, -1.45), F(bc - 0.12, -1.45), F(bc - 0.15, -0.6), F(bc - 1.3, 0.1)];
     fill(c, bh, rgba(C.oxblood)); line(c, bh, { closed: true, w: 1.4 }); seg(c, F(bc, 0.95), F(bc, 11.45), { w: 2.4, col: rgba(C.timberDark) });
     figure(c, ...F(12, 1.5), s, { w: 1.6 }); figure(c, ...F(-11.5, 1.5), s, { w: 1.6 });
     callout(c, '25.5 m clear under the arch', 120, 210, F(-2, 25.7), { size: 19 });

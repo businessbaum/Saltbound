@@ -65,8 +65,8 @@ function drawDeckPlan(c, lv, P, s, o = {}) {
     }
     seg(c, P(0, -10), P(44, -10), { w: 1.6, col: rgba(C.water, 1) }); seg(c, P(0, 10), P(44, 10), { w: 1.6, col: rgba(C.water, 1) });
     const rp = T.rect({ x0: HUB.ramp.x0 + 2, x1: 44, y0: -5, y1: 5 }); hatch(c, rp, { ang: 90, gap: Math.max(4, s * 0.5), col: ink(0.45) }); line(c, rp, { closed: true, w: 1.4 });
-    T.boat(32, 10, 8.3, 3.4, { bow: '+x' });
-    T.boat(8, 10, -8.3, 3.4, { bow: '+x', dash: [5, 4] }); T.boat(22, 14, -7.8, 4.4, { bow: '+x', transom: true, dash: [5, 4] });
+    T.boat(32, 10, 7.9, 3.4, { bow: '+x' });
+    T.boat(8, 10, -7.9, 3.4, { bow: '+x', dash: [5, 4] }); T.boat(22, 14, -7.5, 4.4, { bow: '+x', transom: true, dash: [5, 4] });
     T.circle(40, 12.5, 0.45, C.timberDark);
     T.stairs(HUB.stair, '+x');
     // The Slip: hall and shop.
@@ -154,7 +154,7 @@ function drawDeckPlan(c, lv, P, s, o = {}) {
   if (svc[lv]) svc[lv]();
   if (o.route) {
     const R = {
-      quay: [[[-6, 0], [34, 8.3]], [[37, 12], [46, 12], [56, 9.2]], [[42, 12.6], [33, 15.5], [44, 15.5]], [[86, 9.5], [88, 7], [78, -4.6]]],
+      quay: [[[-6, 0], [34, 7.9]], [[37, 12], [46, 12], [56, 9.2]], [[42, 12.6], [33, 15.5], [44, 15.5]], [[86, 9.5], [88, 7], [78, -4.6]]],
       lower: [[[44, 15.5], [58, 15.5], [64, 10.5], [73, 9], [79, 9.5]], [[79, 9.5], [93.5, 6], [93.5, -1]]],
       middle: [[[93.5, -7], [90, -9.5], [86, -9.5]]], upper: [[[79, -9.5], [74.5, -8], [74.5, 0]]], main: [[[74.5, 7], [94, 7.5], [102, -3], [105, -6.4]]],
     };

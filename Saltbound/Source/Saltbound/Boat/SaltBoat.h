@@ -299,6 +299,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "m")) float MooringRadius = 8.f;
 	/** Where the mooring lines reach the pier: this far to starboard (+) or port (-) of the bitts at the start. */
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "cm")) float MooringReach = 240.f;
+	/** How high the pier (or quay) stands over the water at the start: the gangway rests on it, the lines are made fast a
+	 *  little higher. The cove's pier is 111 cm; the hub's quays 150 cm (D61, set on the boat in the hub's blockout map). */
+	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "cm")) float MooringPierHeight = 111.f;
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "s")) float AnchorDropTime = 3.f;
 	UPROPERTY(EditAnywhere, Category = "Boat|Lines", meta = (Units = "s")) float AnchorRaiseTime = 4.f;
 	/** Anchored (D43): the boat comes to a smooth stop and holds its place and heading, whatever the sail does.
