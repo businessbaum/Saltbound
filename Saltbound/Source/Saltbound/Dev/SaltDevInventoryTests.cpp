@@ -22,6 +22,7 @@
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
 #include "Saltbound.h"
+#include "UI/SaltChartWidget.h"
 #include "UI/SaltHUDWidget.h"
 #include "UI/SaltLandfallWidget.h"
 #include "UI/SaltSatchelWidget.h"
@@ -328,7 +329,7 @@ namespace
 			bTaken ? 1 : 0, Satchel->CountOf(TEXT("GlassFloat")), Pickup->IsHidden() ? 1 : 0, Saves->IsCollected(TEXT("DevTest_GlassFloat")) ? 1 : 0));
 
 		// The satchel screen: inventory page with the float in slot 0, then the map with the player's marker.
-		PC->SetSatchelOpen(true, 0);
+		PC->SetSatchelOpen(true);
 		USaltSatchelWidget* W = PC->GetSatchel();
 		const bool bOpen = PC->IsSatchelOpen() && PC->bShowMouseCursor && !World->IsPaused();
 		if (W)
@@ -367,16 +368,6 @@ namespace
 			}
 			Satchel->Remove(TEXT("Seashell"), 2);
 			W->SelectSlot(0);
-		}
-		if (W)
-		{
-			W->SetPage(USaltSatchelWidget::Map);
-			W->SetChart(0);
-			const FVector2D Expected = W->WorldToChart(Player->GetActorLocation());
-			const FVector2D Shown2 = W->GetPlayerMarkerPosition();
-			const bool bOnChart = Expected.X > 14.0 && Expected.Y > 14.0 && Expected.X < USaltSatchelWidget::MapSize - 14.0 && Expected.Y < USaltSatchelWidget::MapSize - 14.0;
-			Report(TEXT("MapMarksPlayer"), W->GetPage() == USaltSatchelWidget::Map && bOnChart && FVector2D::Distance(Expected, Shown2) < 1.0,
-				FString::Printf(TEXT("page=%d expected=(%.1f, %.1f) marker=(%.1f, %.1f)"), W->GetPage(), Expected.X, Expected.Y, Shown2.X, Shown2.Y));
 		}
 		PC->SetSatchelOpen(false);
 		Report(TEXT("SatchelCloses"), !PC->IsSatchelOpen() && !PC->bShowMouseCursor, FString::Printf(TEXT("open=%d cursor=%d"),
@@ -502,25 +493,25 @@ namespace
 				return Cfg->DefaultContext->GetMappings().ContainsByPredicate([&](const FEnhancedActionKeyMapping& M) { return M.Action == Action && M.Key == Key; });
 			};
 			Report(TEXT("WheelOnQ"), Mapped(Cfg->ToolWheel, EKeys::Q) && Mapped(Cfg->ToolWheel, EKeys::Gamepad_LeftShoulder) && !Mapped(Cfg->ToolWheel, EKeys::Tab)
-				&& Mapped(Cfg->Inventory, EKeys::Tab) && Mapped(Cfg->Inventory, EKeys::I) && Cfg->Tools.Num() == 6 && Mapped(Cfg->Tools[0], EKeys::One)
-				&& Mapped(Cfg->Tools[5], EKeys::Six), TEXT("Q / LB: wheel; Tab / I: satchel; 1..6: tools"));
+				&& Mapped(Cfg->Inventory, EKeys::Tab) && Mapped(Cfg->Inventory, EKeys::I) && !Mapped(Cfg->Inventory, EKeys::M) && Cfg->Tools.Num() == 5
+				&& Mapped(Cfg->Tools[0], EKeys::One) && Mapped(Cfg->Tools[4], EKeys::Five), TEXT("Q / LB: wheel; Tab / I: satchel; 1..5: tools; no map key"));
 			const FName OwnHeld = Player->GetHeldTool();
 			Player->SetHeldTool(NAME_None);
 			PC->OpenToolWheel();
-			const bool bOpened = PC->IsToolWheelOpen() && Wheel->IsOpen() && Wheel->GetSelected() == 5;
+			const bool bOpened = PC->IsToolWheelOpen() && Wheel->IsOpen() && Wheel->GetSelected() == 4;
 			PC->AimToolWheel(FVector2D(0.f, 60.f), false);          // the mouse up: the compass at the top
 			const int32 Up = Wheel->GetSelected();
-			PC->AimToolWheel(FVector2D(-300.f, -300.f), false);     // left and down: the satchel, lower left
+			PC->AimToolWheel(FVector2D(-300.f, -300.f), false);     // left and down: the satchel, lower left (126 degrees)
 			const int32 LowerLeft = Wheel->GetSelected();
 			PC->AimToolWheel(FVector2D(0.2f, 0.f), true);            // inside the stick's dead zone: no change
 			const int32 Dead = Wheel->GetSelected();
-			PC->AimToolWheel(FVector2D(0.87f, -0.5f), true);         // the stick right and down: the chart, lower right
+			PC->AimToolWheel(FVector2D(0.87f, -0.5f), true);         // the stick right and down: the lantern, lower right (54)
 			const int32 LowerRight = Wheel->GetSelected();
-			PC->AimToolWheel(FVector2D(0.87f, 0.5f), true);          // right and up: the spyglass
+			PC->AimToolWheel(FVector2D(0.87f, 0.5f), true);          // right and up: the spyglass (-18)
 			const int32 UpperRight = Wheel->GetSelected();
 			PC->CloseToolWheel(true);
 			const FName Taken = Player->GetHeldTool();
-			Report(TEXT("WheelByAngle"), bOpened && Up == 0 && LowerLeft == 4 && Dead == 4 && LowerRight == 2 && UpperRight == 1,
+			Report(TEXT("WheelByAngle"), bOpened && Up == 0 && LowerLeft == 3 && Dead == 3 && LowerRight == 2 && UpperRight == 1,
 				FString::Printf(TEXT("opened on empty hands=%d up=%d lower left=%d dead zone=%d lower right=%d upper right=%d"), bOpened ? 1 : 0, Up, LowerLeft,
 					Dead, LowerRight, UpperRight));
 			Report(TEXT("WheelTakesTool"), Taken == TEXT("Spyglass") && !PC->IsToolWheelOpen(), FString::Printf(TEXT("in hand=%s"), *Taken.ToString()));
@@ -529,15 +520,15 @@ namespace
 			PC->HandleMenuKey();
 			Report(TEXT("WheelCancels"), !PC->IsToolWheelOpen() && !PC->IsMenuOpen() && Player->GetHeldTool() == TEXT("Spyglass"),
 				FString::Printf(TEXT("open=%d menu=%d in hand=%s"), PC->IsToolWheelOpen() ? 1 : 0, PC->IsMenuOpen() ? 1 : 0, *Player->GetHeldTool().ToString()));
-			PC->SelectTool(3);
-			const FName Four = Player->GetHeldTool();
-			PC->SelectTool(5);
-			const FName Six = Player->GetHeldTool();
+			PC->SelectTool(2);
+			const FName Three = Player->GetHeldTool();
 			PC->SelectTool(4);
+			const FName Five = Player->GetHeldTool();
+			PC->SelectTool(3);
 			const bool bSatchel = PC->IsSatchelOpen();
 			PC->SetSatchelOpen(false);
-			Report(TEXT("WheelKeys"), Four == TEXT("Lantern") && Six.IsNone() && bSatchel, FString::Printf(TEXT("4=%s 6=%s 5 opens the satchel=%d"),
-				*Four.ToString(), *Six.ToString(), bSatchel ? 1 : 0));
+			Report(TEXT("WheelKeys"), Three == TEXT("Lantern") && Five.IsNone() && bSatchel, FString::Printf(TEXT("3=%s 5=%s 4 opens the satchel=%d"),
+				*Three.ToString(), *Five.ToString(), bSatchel ? 1 : 0));
 			Player->SetToolOwned(TEXT("Compass"), false);
 			PC->SelectTool(0);
 			const bool bRefused = Player->GetHeldTool() != TEXT("Compass");
@@ -548,6 +539,34 @@ namespace
 		else
 		{
 			Report(TEXT("WheelOnQ"), false, TEXT("no HUD tool wheel"));
+		}
+
+		// D57: the chart on the mast follows the boat (its window centred on her, her heading), E looks at it closely.
+		ASaltBoat* ChartBoat = nullptr;
+		for (TActorIterator<ASaltBoat> It(World); It; ++It) { ChartBoat = *It; break; }
+		if (ChartBoat && ChartBoat->GetMastChartUse())
+		{
+			const FVector2D C = ChartBoat->GetChartCentre();
+			const float U = ChartBoat->GetMastChartParameter(TEXT("CentreU")), V = ChartBoat->GetMastChartParameter(TEXT("CentreV"));
+			const float H = FMath::RadiansToDegrees(ChartBoat->GetMastChartParameter(TEXT("Heading")));
+			Report(TEXT("MastChartFollowsBoat"), FMath::Abs(U - C.X) < 2e-4f && FMath::Abs(V - C.Y) < 2e-4f && FMath::Abs(FRotator::NormalizeAxis(H - ChartBoat->GetYawDeg())) < 1.f,
+				FString::Printf(TEXT("chart centre (%.4f, %.4f) for the boat at (%.4f, %.4f), heading %.1f (%.1f)"), U, V, C.X, C.Y, H, ChartBoat->GetYawDeg()));
+			ChartBoat->GetMastChartUse()->Interact(Player);
+			USaltChartWidget* CW = PC->GetChartWidget();
+			if (CW)
+			{
+				CW->Update();
+			}
+			const bool bChartOpen = PC->IsChartOpen() && CW && FVector2D::Distance(CW->GetShownCentre(), C) < 1e-3;
+			const TArray<FName> Named = CW ? CW->GetNamedPlaces() : TArray<FName>();
+			PC->CloseChart();
+			Report(TEXT("MastChartLook"), bChartOpen && Named.Contains(TEXT("SaltboundCove")) && !Named.Contains(TEXT("RuinIsle")) && !PC->IsChartOpen(),
+				FString::Printf(TEXT("open=%d names %s; closed=%d"), bChartOpen ? 1 : 0, *FString::JoinBy(Named, TEXT(","), [](const FName& N) { return N.ToString(); }),
+					PC->IsChartOpen() ? 0 : 1));
+		}
+		else
+		{
+			Report(TEXT("MastChartFollowsBoat"), false, TEXT("no boat with a mast chart"));
 		}
 
 		// Saved and loaded: the satchel's contents and the taken pickup.
@@ -592,7 +611,7 @@ namespace
 
 	FAutoConsoleCommandWithWorldAndArgs CmdSatchel(
 		TEXT("sb.Dev.Satchel"),
-		TEXT("Open the satchel on a page: sb.Dev.Satchel 0 (inventory) | 1 (map) [chart 0 home | 1 sea] | off."),
+		TEXT("Open the satchel: sb.Dev.Satchel [off]."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			ASaltPlayerController* PC = World ? Cast<ASaltPlayerController>(UGameplayStatics::GetPlayerController(World, 0)) : nullptr;
@@ -605,11 +624,7 @@ namespace
 				PC->SetSatchelOpen(false);
 				return;
 			}
-			PC->SetSatchelOpen(true, Args.Num() > 0 ? FCString::Atoi(*Args[0]) : 0);
-			if (Args.Num() > 1 && PC->GetSatchel())
-			{
-				PC->GetSatchel()->SetChart(FCString::Atoi(*Args[1]));
-			}
+			PC->SetSatchelOpen(true);
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdSatchelDemo(
@@ -633,7 +648,7 @@ namespace
 			}
 			Satchel->SetSlots({ { TEXT("Driftwood"), 20 }, { TEXT("Driftwood"), 7 }, { TEXT("Seashell"), 30 }, { TEXT("Seashell"), 12 },
 				{ TEXT("RopeCoil"), 2 }, { TEXT("GlassFloat"), 3 }, { TEXT("AncientShard"), 1 } });
-			PC->SetSatchelOpen(true, 0);
+			PC->SetSatchelOpen(true);
 			if (USaltSatchelWidget* W = PC->GetSatchel())
 			{
 				W->SelectSlot(6);
@@ -735,6 +750,26 @@ namespace
 			{
 				Player->SetHeldTool(Args.Num() > 0 && Args[0] != TEXT("none") ? FName(*Args[0]) : NAME_None);
 			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdChart(
+		TEXT("sb.Dev.Chart"),
+		TEXT("Look at the chart on the boat's mast: sb.Dev.Chart [off]."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ASaltPlayerController* PC = World ? Cast<ASaltPlayerController>(UGameplayStatics::GetPlayerController(World, 0)) : nullptr;
+			ASaltBoat* Boat = nullptr;
+			for (TActorIterator<ASaltBoat> It(World); World && It; ++It) { Boat = *It; break; }
+			if (!PC || !Boat)
+			{
+				return;
+			}
+			if (Args.Num() > 0 && Args[0] == TEXT("off"))
+			{
+				PC->CloseChart();
+				return;
+			}
+			PC->OpenChart(Boat);
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdGive(

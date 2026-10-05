@@ -34,6 +34,26 @@ namespace SaltPlaces
 	SALTBOUND_API FText FromHome(const FSaltPlace& Place);
 }
 
+/**
+ * The charts (D57): no map in the satchel or among the tools; a small chart is pinned to the start boat's mast. It shows a
+ * window of the region chart (T_Map_Region, Tools/textures/gen_ui.py, the open sea at about 3 m a pixel) round the boat,
+ * north up, live. Keep these in sync with gen_ui.py (MAPS) and Tools/ue_scripts/setup_chart_materials.py.
+ */
+namespace SaltChart
+{
+	/** The region chart's square: centre (m, north +X, east +Y) and size (m). */
+	inline const FVector2D CentreM(3000.0, 0.0);
+	constexpr float SizeM = 12000.f;
+	/** The mast chart shows this much round the boat (m, across), on a sheet this much taller than wide (0.33 / 0.26 m). */
+	constexpr float WindowM = 1600.f;
+	constexpr float SheetAspect = 0.33f / 0.26f;
+	/** Where a world position (cm) lies on the region chart (0..1: u east, v south). */
+	inline FVector2D ToUV(const FVector& WorldCm)
+	{
+		return FVector2D(0.5 + (WorldCm.Y * 0.01 - CentreM.Y) / SizeM, 0.5 - (WorldCm.X * 0.01 - CentreM.X) / SizeM);
+	}
+}
+
 DECLARE_MULTICAST_DELEGATE_OneParam(FSaltLandfallEvent, FName /*PlaceId*/);
 
 /**

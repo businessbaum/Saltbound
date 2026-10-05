@@ -37,12 +37,11 @@ public:
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Interact;
 	/** Opens the pause menu (Esc; F10 also works in the editor, where Esc ends the play session). */
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Menu;
-	/** Opens the satchel on its inventory page (Tab, I, gamepad Back) or its map page (M). D50. */
+	/** Opens the satchel (Tab, I, gamepad Back). D50; the map left it (D57: the chart is on the mast). */
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Inventory;
-	UPROPERTY(Transient) TObjectPtr<UInputAction> Map;
 	/** The tool wheel (D55): held open with Q or LB; letting go takes the tool. */
 	UPROPERTY(Transient) TObjectPtr<UInputAction> ToolWheel;
-	/** Keys 1 to 6: take a tool directly (the wheel's order). */
+	/** Keys 1 to 5: take a tool directly (the wheel's order). */
 	UPROPERTY(Transient) TArray<TObjectPtr<UInputAction>> Tools;
 
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> DefaultContext;

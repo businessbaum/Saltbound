@@ -223,6 +223,8 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D57 (awaiting the owner's check):** no map in the satchel or on the tool wheel (five tools now); a small live chart is
+  pinned to the mast (1.6 km round the boat, north up), E to look at it closely. The map table waits for the bigger boat.
 - **D56 (awaiting the owner's check):** flags that ripple like cloth; in big waves the eyes take part of the deck's swell
   (knees) and the waves no longer turn the boat round (the rig's forces heel it but do not twist it).
 - **D55 (in progress, awaiting the owner's check):** the new UI from the approved design. Done: the fonts, the shared parts,
@@ -295,9 +297,9 @@ the sail and cast off.
 | Interact / leave station (raising the anchor: hold E) | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
 | Pause menu / settings | Esc (in the editor: F10) | Start |
-| Satchel / map | Tab or I / M (arrows choose a pocket, R turn the item, G drop one; Tab, I or Esc close) | Back |
-| Tool wheel | Hold Q, aim with the mouse, let go to take the tool; Esc cancels; 1 to 6 take a tool directly | Hold LB, aim with the right stick; B cancels |
-| On the boat | Steering oar (starboard quarter, E at its handle): A / D steer. Pin rails by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Bell rope: E rings the bell; lantern: E lights / douses it. Ladders (both sides, midship): E takes hold (from the water or the deck), W / S climb, E lets go; off the bottom into the sea, over the top on board | |
+| Satchel | Tab or I (arrows choose a pocket, R turn the item, G drop one; Tab, I or Esc close) | Back |
+| Tool wheel | Hold Q, aim with the mouse, let go to take the tool; Esc cancels; 1 to 5 take a tool directly | Hold LB, aim with the right stick; B cancels |
+| On the boat | Steering oar (starboard quarter, E at its handle): A / D steer. Pin rails by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Bell rope: E rings the bell; lantern: E lights / douses it. Chart on the mast (aft, to starboard): E looks at it closely (E / Esc put it back). Ladders (both sides, midship): E takes hold (from the water or the deck), W / S climb, E lets go; off the bottom into the sea, over the top on board | |
 | Store (barrel or crate on the boat, E at its lid) | Click moves the stack, Shift-click one; arrows choose, Enter moves the stack; E / Esc close | D-pad, A (the stack), X (one), B close |
 
 Developer console (`~`, non-shipping builds):
@@ -311,7 +313,7 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`, `sb.Dev.RunMenuTests`,
   `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched), `sb.Dev.RunInventoryTests`,
-  `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel 0|1 [chart]|off`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`, `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`, `sb.Dev.CameraTrace [s] [deck]`, `sb.Boat.RigTurn 0|1`, `sb.Camera.DeckKnees 0|1`
+  `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel [off]`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`, `sb.Dev.Chart [off]`, `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`, `sb.Dev.CameraTrace [s] [deck]`, `sb.Boat.RigTurn 0|1`, `sb.Camera.DeckKnees 0|1`
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`
   (SB_BOAT state line), `sb.Boat.Place X Y Yaw [Speed m/s]`, `sb.Boat.Hold Free|Moored|Anchored`,

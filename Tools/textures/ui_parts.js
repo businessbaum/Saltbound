@@ -328,14 +328,15 @@ part('T_UI_WheelDivider', 240, 20, 2, c => {
   c.save(); c.strokeStyle = 'rgba(227,211,178,.55)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-110, 62); c.lineTo(-14, 62); c.moveTo(14, 62); c.lineTo(110, 62); c.stroke();
   c.fillStyle = '#5ae6d2'; c.beginPath(); c.moveTo(0, 56); c.lineTo(6, 62); c.lineTo(0, 68); c.lineTo(-6, 62); c.fill(); c.restore();
 });
-/* The hints along the bottom: Q "hold, aim, let go" . 1 - 6 "pick directly" (the wheel is on Q, owner). Baseline 1000;
+/* The hints along the bottom: Q "hold, aim, let go" . 1 - 5 "pick directly" (the wheel is on Q, owner; five tools since
+   the chart moved to the mast, D57). Baseline 1000;
    frame 1080p x 600..1320, y 950..1040. */
 part('T_UI_WheelHints', 720, 90, 1, c => {
   c.translate(-600, -950);
   const sh = { shadow: ['rgba(0,0,0,.9)', 8, 0, 2] }, y = 1000;
   let x = W / 2 - 290; x += keycap(c, 'Q', x, y - 30, 40) + 14;
   txt(c, 'hold, aim, let go', x, y, '400 26px Alegreya,Georgia,serif', '#efe4cb', sh); x += 230;
-  x += keycap(c, '1', x, y - 30, 40) + 6; txt(c, '–', x, y - 2, '400 26px Alegreya', '#efe4cb'); x += 20; x += keycap(c, '6', x, y - 30, 40) + 14;
+  x += keycap(c, '1', x, y - 30, 40) + 6; txt(c, '–', x, y - 2, '400 26px Alegreya', '#efe4cb'); x += 20; x += keycap(c, '5', x, y - 30, 40) + 14;
   txt(c, 'pick directly', x, y, '400 26px Alegreya,Georgia,serif', '#efe4cb', sh);
 });
 

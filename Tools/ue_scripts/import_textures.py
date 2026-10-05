@@ -24,7 +24,13 @@ def dest_for(group):
 
 
 def configure(tex, name, group=""):
-    if group == "UI":
+    if name == "T_Map_Region":
+        # D57: the chart on the mast is seen in the world at a distance (and closer in its close look): mips, BC7.
+        tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_BC7)
+        tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_WORLD)
+        tex.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_FROM_TEXTURE_GROUP)
+        tex.set_editor_property("srgb", True)
+    elif group == "UI":
         # Small parts stay uncompressed (crisp); the big painted screens (the bag, the crate) are BC7 (D55).
         big = max(tex.blueprint_get_size_x(), tex.blueprint_get_size_y()) > 700
         tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_BC7 if big else unreal.TextureCompressionSettings.TC_EDITOR_ICON)

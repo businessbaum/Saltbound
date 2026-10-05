@@ -9,8 +9,6 @@ const TArray<FSaltToolDef>& SaltTools::All()
 			TEXT("T_UI_Tool_Compass"), ESaltToolUse::Held, false },
 		{ TEXT("Spyglass"), NSLOCTEXT("Saltbound", "ToolSpyglass", "Spyglass"), NSLOCTEXT("Saltbound", "ToolSpyglassHint", "Look far ahead"),
 			TEXT("T_UI_Tool_Spyglass"), ESaltToolUse::Held, false },
-		{ TEXT("Chart"), NSLOCTEXT("Saltbound", "ToolChart", "Chart"), NSLOCTEXT("Saltbound", "ToolChartHint", "See where you are"),
-			TEXT("T_UI_Tool_Chart"), ESaltToolUse::Chart, true },
 		{ TEXT("Lantern"), NSLOCTEXT("Saltbound", "ToolLantern", "Lantern"), NSLOCTEXT("Saltbound", "ToolLanternHint", "Light for the night"),
 			TEXT("T_UI_Tool_Lantern"), ESaltToolUse::Held, false },
 		{ TEXT("Satchel"), NSLOCTEXT("Saltbound", "ToolSatchel", "Satchel"), NSLOCTEXT("Saltbound", "ToolSatchelHint", "Open the satchel"),

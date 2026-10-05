@@ -11,9 +11,9 @@ class UImage;
 class USaltPaintedText;
 
 /**
- * Centred on the screen: a light blur and darkening, a soft dark disc, the hemp rope ring (radius 262), and on it six
- * leather medallions with brass bezels lashed to the rope (compass, spyglass, chart, lantern, satchel, empty hands,
- * clockwise from the top; keys 1 to 6 outside them). The chosen one is bigger with an amber halo and a bright rim; its
+ * Centred on the screen: a light blur and darkening, a soft dark disc, the hemp rope ring (radius 262), and on it the
+ * tools' leather medallions with brass bezels lashed to the rope (compass, spyglass, lantern, satchel, empty hands,
+ * clockwise from the top; keys 1 to 5 outside them). The chosen one is bigger with an amber halo and a bright rim; its
  * name, hint and "let go of Q to take it" are in the middle. Opens and closes by scaling from 0.9 with a fade (0.12 s),
  * the medallions popping in 20 ms apart. A tool not owned yet shows an empty medallion. The player controller drives
  * it (opening, aiming, taking); this only shows it.

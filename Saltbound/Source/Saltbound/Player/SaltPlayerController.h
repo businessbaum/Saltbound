@@ -12,6 +12,8 @@ class USaltMenuWidget;
 class USaltSatchelWidget;
 class USaltStoreWidget;
 class USaltInventoryComponent;
+class USaltChartWidget;
+class ASaltBoat;
 
 UCLASS()
 class SALTBOUND_API ASaltPlayerController : public APlayerController
@@ -39,8 +41,8 @@ public:
 	bool IsMenuOpen() const;
 	USaltMenuWidget* GetMenu() const { return MenuWidget; }
 
-	/** The satchel (D50): inventory and map. The world goes on while it is open. Page: 0 inventory, 1 map. */
-	void SetSatchelOpen(bool bOpen, int32 Page = 0);
+	/** The satchel (D50). The world goes on while it is open. */
+	void SetSatchelOpen(bool bOpen);
 	bool IsSatchelOpen() const;
 	USaltSatchelWidget* GetSatchel() const { return SatchelWidget; }
 
@@ -50,6 +52,12 @@ public:
 	bool IsStoreOpen() const;
 	USaltStoreWidget* GetStoreWidget() const { return StoreWidget; }
 
+	/** A close look at the chart on a boat's mast (D57): the same live chart, large. E / Esc put it back. */
+	void OpenChart(ASaltBoat* Boat);
+	void CloseChart();
+	bool IsChartOpen() const;
+	USaltChartWidget* GetChartWidget() const { return ChartWidget; }
+
 	/** The tool wheel (D55, UI_Design.md section 4): held open with Q or LB; the mouse or the right stick aims at a tool
 	 *  (instead of turning the camera), letting go takes it, Esc / B cancel. The world goes on. */
 	void OpenToolWheel();
@@ -57,9 +65,9 @@ public:
 	bool IsToolWheelOpen() const { return bToolWheel; }
 	/** Mouse counts (accumulated as a pointer, 40 px dead zone) or the stick (0.35 dead zone); y up. */
 	void AimToolWheel(FVector2D Input, bool bStick);
-	/** Keys 1 to 6 (Index 0..5): takes that tool, closing the wheel if it is open. */
+	/** Keys 1 to 5 (Index 0..4): takes that tool, closing the wheel if it is open. */
 	void SelectTool(int32 Index);
-	/** Does what the tool does: takes it in hand, opens the satchel or the chart, or empties the hands. */
+	/** Does what the tool does: takes it in hand, opens the satchel, or empties the hands. */
 	bool UseTool(int32 Index);
 
 protected:
@@ -76,11 +84,13 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USaltStoreWidget> StoreWidget;
 
+	UPROPERTY(Transient)
+	TObjectPtr<USaltChartWidget> ChartWidget;
+
 	/** UI-only input with the cursor on (bOn), or back to the game. */
 	void SetUIInput(bool bOn, UUserWidget* Focus);
 
-	void OpenInventory() { SetSatchelOpen(true, 0); }
-	void OpenMap() { SetSatchelOpen(true, 1); }
+	void OpenInventory() { SetSatchelOpen(true); }
 
 	UPROPERTY(Transient)
 	TObjectPtr<USaltInputConfig> InputConfig;

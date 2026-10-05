@@ -16,14 +16,15 @@ using namespace SaltUI;
 namespace
 {
 	// The layout at 1080p (section 4; the pictures are Tools/textures/ui_parts.js): the ring's centre and radius, the
-	// medallions' radii (70, chosen 84) at -90 + 60 i degrees, the keys at R + r + 34.
+	// medallions' radii (70, chosen 84) evenly round it from the top (the design had six; five since the chart moved to
+	// the mast, D57), the keys at R + r + 34.
 	const FVector2D WheelCentre(960.f, 540.f);
 	constexpr float WheelRadius = 262.f;
 	constexpr float MedallionR = 70.f;
 	constexpr float MedallionSelR = 84.f;
-	constexpr int32 WheelSlots = 6;
 
-	float SlotAngle(int32 I) { return FMath::DegreesToRadians(-90.f + 60.f * I); }
+	int32 WheelSlotCount() { return FMath::Max(SaltTools::All().Num(), 1); }
+	float SlotAngle(int32 I) { return FMath::DegreesToRadians(-90.f + 360.f / WheelSlotCount() * I); }
 
 	void PlaceAt(UWidget* W, FVector2D Centre, FVector2D Size)
 	{
@@ -81,7 +82,7 @@ TSharedRef<SWidget> USaltToolWheelWidget::RebuildWidget()
 		};
 		Picture(TEXT("T_UI_WheelRing"), FVector2D(720.f, 720.f), WheelCentre);
 		Lashings.Reset();
-		for (int32 I = 0; I < WheelSlots * 2; ++I)
+		for (int32 I = 0; I < WheelSlotCount() * 2; ++I)
 		{
 			Lashings.Add(Picture(TEXT("T_UI_WheelLashing"), FVector2D(80.f, 48.f), WheelCentre));
 		}
@@ -91,11 +92,11 @@ TSharedRef<SWidget> USaltToolWheelWidget::RebuildWidget()
 		Rims.Reset();
 		Keys.Reset();
 		const TArray<FSaltToolDef>& Tools = SaltTools::All();
-		for (int32 I = 0; I < WheelSlots; ++I)
+		for (int32 I = 0; I < WheelSlotCount(); ++I)
 		{
 			Halos.Add(Picture(TEXT("T_UI_WheelHalo"), FVector2D(360.f, 360.f), WheelCentre));
 		}
-		for (int32 I = 0; I < WheelSlots; ++I)
+		for (int32 I = 0; I < WheelSlotCount(); ++I)
 		{
 			Medallions.Add(Picture(TEXT("T_UI_WheelMedallion"), FVector2D(240.f, 240.f), WheelCentre));
 			Pictures.Add(Picture(Tools.IsValidIndex(I) ? Tools[I].Picture : nullptr, FVector2D(180.f, 180.f), WheelCentre));
@@ -124,13 +125,13 @@ TSharedRef<SWidget> USaltToolWheelWidget::RebuildWidget()
 		{
 			T->SetVisibility(ESlateVisibility::HitTestInvisible);
 		}
-		// Along the bottom: Q "hold, aim, let go" . 1 - 6 "pick directly".
+		// Along the bottom: Q "hold, aim, let go" . 1 - 5 "pick directly".
 		UImage* Hints = WidgetTree->ConstructWidget<UImage>();
 		Hints->SetBrush(ImageBrush(Tex(TEXT("T_UI_WheelHints")), FVector2D(720.f, 90.f)));
 		Hints->SetVisibility(ESlateVisibility::HitTestInvisible);
 		At(Group, Hints, FVector2D(600.f, 950.f), FVector2D(720.f, 90.f));
-		SelAlpha.Init(0.f, WheelSlots);
-		Owned.Init(true, WheelSlots);
+		SelAlpha.Init(0.f, WheelSlotCount());
+		Owned.Init(true, WheelSlotCount());
 	}
 	return Super::RebuildWidget();
 }
@@ -138,7 +139,7 @@ TSharedRef<SWidget> USaltToolWheelWidget::RebuildWidget()
 void USaltToolWheelWidget::Open(int32 InSelected, const TArray<bool>& InOwned)
 {
 	Owned = InOwned;
-	Owned.SetNum(WheelSlots);
+	Owned.SetNum(WheelSlotCount());
 	for (int32 I = 0; I < Pictures.Num(); ++I)
 	{
 		// A tool not owned yet: the medallion stays empty.
@@ -147,10 +148,10 @@ void USaltToolWheelWidget::Open(int32 InSelected, const TArray<bool>& InOwned)
 	if (!bOpen)
 	{
 		OpenTime = 0.f;
-		SelAlpha.Init(0.f, WheelSlots);
+		SelAlpha.Init(0.f, WheelSlotCount());
 	}
 	bOpen = true;
-	Selected = FMath::Clamp(InSelected, 0, WheelSlots - 1);
+	Selected = FMath::Clamp(InSelected, 0, WheelSlotCount() - 1);
 	if (SelAlpha.IsValidIndex(Selected))
 	{
 		SelAlpha[Selected] = 1.f;
@@ -170,7 +171,7 @@ void USaltToolWheelWidget::Close()
 
 void USaltToolWheelWidget::SetSelected(int32 Index)
 {
-	if (Index >= 0 && Index < WheelSlots && Index != Selected)
+	if (Index >= 0 && Index < WheelSlotCount() && Index != Selected)
 	{
 		Selected = Index;
 		UpdateText();
@@ -192,7 +193,7 @@ void USaltToolWheelWidget::UpdateText()
 
 void USaltToolWheelWidget::Layout()
 {
-	for (int32 I = 0; I < WheelSlots && I < Medallions.Num(); ++I)
+	for (int32 I = 0; I < WheelSlotCount() && I < Medallions.Num(); ++I)
 	{
 		const float A = SlotAngle(I);
 		const float E = FMath::InterpEaseInOut(0.f, 1.f, SelAlpha[I], 2.f);

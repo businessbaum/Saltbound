@@ -9,11 +9,10 @@ enum class ESaltToolUse : uint8
 {
 	Held,       // in the hand: compass, spyglass, lantern
 	Satchel,    // opens the satchel
-	Chart,      // opens the chart (the map screen)
 	PutAway,    // empty hands
 };
 
-/** One entry of the wheel, in its order (keys 1 to 6, clockwise from the top). */
+/** One entry of the wheel, in its order (keys 1 to 5, clockwise from the top). No chart: the chart is on the mast (D57). */
 struct FSaltToolDef
 {
 	FName Id;
@@ -22,7 +21,7 @@ struct FSaltToolDef
 	/** Its medallion picture under /Game/Saltbound/UI/Textures (Tools/textures/ui_parts.js). */
 	const TCHAR* Picture = nullptr;
 	ESaltToolUse Use = ESaltToolUse::Held;
-	/** Always there (the chart, the satchel, empty hands); the others must be owned (the player starts with the compass,
+	/** Always there (the satchel, empty hands); the others must be owned (the player starts with the compass,
 	 *  the spyglass and the lantern, owner). */
 	bool bAlwaysOwned = false;
 };

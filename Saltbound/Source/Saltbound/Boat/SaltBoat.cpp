@@ -7,6 +7,7 @@
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Core/SaltContent.h"
+#include "Core/SaltPlaces.h"
 #include "Core/SaltSaveSubsystem.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/OverlapResult.h"
@@ -383,6 +384,12 @@ ASaltBoat::ASaltBoat()
 	LanternLight->SetVisibility(false);
 	LanternUse = Interaction(TEXT("LanternUse"), LanternPivot() + FVector(0.f, 0.f, -0.2f), FVector(14.f, 14.f, 20.f));
 	LanternUse->PromptText = NSLOCTEXT("Saltbound", "BoatLanternLight", "Light the lantern");
+
+	// D57: the chart on the mast. Its mesh is built in the boat's frame (build_boat.py, build_mast_chart), so it sits on
+	// the hull at no offset; the board faces aft and to starboard, its middle 1.1 m above the deck.
+	MastChart = Part(TEXT("MastChart"), Hull);
+	MastChartUse = Interaction(TEXT("MastChartUse"), FVector(MastX - 0.13f, 0.13f, SheerZ(MastX) + 1.10f), FVector(14.f, 14.f, 20.f));
+	MastChartUse->PromptText = NSLOCTEXT("Saltbound", "BoatChartLook", "Look at the chart");
 }
 
 void ASaltBoat::OnConstruction(const FTransform& Transform)
@@ -421,6 +428,7 @@ void ASaltBoat::ResolveContent()
 	Resolve(Bell, TEXT("Bell"));
 	Resolve(BellClapper, TEXT("BellClapper"));
 	Resolve(Lantern, TEXT("Lantern"));
+	Resolve(MastChart, TEXT("MastChart"));
 	UMaterialInterface* RopeMaterial = LoadObject<UMaterialInterface>(nullptr, SaltContent::RopeMaterial);
 	for (UCableComponent* C : { AnchorLine.Get(), MooringLineFore.Get(), MooringLineAft.Get(), ThroatHalyard.Get(), PeakHalyard.Get() })
 	{
@@ -477,9 +485,12 @@ void ASaltBoat::BeginPlay()
 	CrateLid->OnInteract.AddDynamic(this, &ASaltBoat::HandleStore);
 	BellRope->OnInteract.AddDynamic(this, &ASaltBoat::HandleBell);
 	LanternUse->OnInteract.AddDynamic(this, &ASaltBoat::HandleLantern);
+	MastChartUse->OnInteract.AddDynamic(this, &ASaltBoat::HandleChart);
 	// The clapper swings after the bell has moved this frame.
 	ClapperSwing->AddTickPrerequisiteComponent(BellSwing);
 	SetupSailMaterials();
+	const int32 ChartSlot = MastChart->GetMaterialIndex(TEXT("MI_MastChart"));
+	MastChartMaterial = ChartSlot != INDEX_NONE ? MastChart->CreateAndSetMaterialInstanceDynamic(ChartSlot) : nullptr;
 	const int32 GlassSlot = Lantern->GetMaterialIndex(TEXT("MI_LanternGlass"));
 	LanternGlassMaterial = GlassSlot != INDEX_NONE ? Lantern->CreateAndSetMaterialInstanceDynamic(GlassSlot) : nullptr;
 	SetLanternLit(bLanternLit);
@@ -871,6 +882,41 @@ void ASaltBoat::HandleLantern(USaltInteractableComponent* Interactable, ASaltPla
 	SetLanternLit(!bLanternLit);
 }
 
+FVector2D ASaltBoat::GetChartCentre() const
+{
+	return SaltChart::ToUV(GetActorLocation());
+}
+
+float ASaltBoat::GetMastChartParameter(FName Name) const
+{
+	float Value = -1.f;
+	if (MastChartMaterial)
+	{
+		MastChartMaterial->GetScalarParameterValue(FMaterialParameterInfo(Name), Value);
+	}
+	return Value;
+}
+
+void ASaltBoat::UpdateMastChart()
+{
+	// The chart follows the boat: its window centred on her, north up, her arrow along her heading.
+	if (MastChartMaterial)
+	{
+		const FVector2D C = GetChartCentre();
+		MastChartMaterial->SetScalarParameterValue(TEXT("CentreU"), (float)C.X);
+		MastChartMaterial->SetScalarParameterValue(TEXT("CentreV"), (float)C.Y);
+		MastChartMaterial->SetScalarParameterValue(TEXT("Heading"), FMath::DegreesToRadians(GetYawDeg()));
+	}
+}
+
+void ASaltBoat::HandleChart(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
+{
+	if (ASaltPlayerController* PC = Player ? Cast<ASaltPlayerController>(Player->GetController()) : nullptr)
+	{
+		PC->OpenChart(this);
+	}
+}
+
 void ASaltBoat::SetLanternLit(bool bLit)
 {
 	bLanternLit = bLit;
@@ -995,6 +1041,7 @@ void ASaltBoat::Tick(float DeltaSeconds)
 	UpdateAnchor(Dt);
 	UpdateRopes(Dt);
 	UpdateLantern(Dt);
+	UpdateMastChart();
 	UpdateGangway();
 	UpdateTrail(Dt);
 	PushOceanMask(bMasksOcean);

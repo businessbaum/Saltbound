@@ -10,6 +10,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Player/SaltInputConfig.h"
 #include "Player/SaltPlayerCharacter.h"
+#include "UI/SaltChartWidget.h"
 #include "UI/SaltHUDWidget.h"
 #include "UI/SaltMenuWidget.h"
 #include "UI/SaltSatchelWidget.h"
@@ -127,6 +128,33 @@ void ASaltPlayerController::OpenStore(USaltInventoryComponent* Store)
 	SetUIInput(true, StoreWidget);
 }
 
+bool ASaltPlayerController::IsChartOpen() const
+{
+	return ChartWidget && ChartWidget->IsInViewport();
+}
+
+void ASaltPlayerController::OpenChart(ASaltBoat* Boat)
+{
+	if (!IsLocalController() || !Boat || IsMenuOpen() || IsSatchelOpen() || IsStoreOpen() || IsChartOpen() || bToolWheel)
+	{
+		return;
+	}
+	ChartWidget = CreateWidget<USaltChartWidget>(this, USaltChartWidget::StaticClass());
+	ChartWidget->SetBoat(Boat);
+	ChartWidget->AddToViewport(8);
+	SetUIInput(true, ChartWidget);
+}
+
+void ASaltPlayerController::CloseChart()
+{
+	if (IsChartOpen())
+	{
+		ChartWidget->RemoveFromParent();
+		ChartWidget = nullptr;
+		SetUIInput(false, nullptr);
+	}
+}
+
 void ASaltPlayerController::CloseStore()
 {
 	if (IsStoreOpen())
@@ -142,18 +170,13 @@ bool ASaltPlayerController::IsSatchelOpen() const
 	return SatchelWidget && SatchelWidget->IsInViewport();
 }
 
-void ASaltPlayerController::SetSatchelOpen(bool bOpen, int32 Page)
+void ASaltPlayerController::SetSatchelOpen(bool bOpen)
 {
 	if (!IsLocalController() || (bOpen && (IsMenuOpen() || IsStoreOpen())))
 	{
 		return;
 	}
-	if (bOpen && IsSatchelOpen())
-	{
-		SatchelWidget->SetPage(Page);
-		return;
-	}
-	if (!bOpen && !IsSatchelOpen())
+	if (bOpen == IsSatchelOpen())
 	{
 		return;
 	}
@@ -169,7 +192,6 @@ void ASaltPlayerController::SetSatchelOpen(bool bOpen, int32 Page)
 			SatchelWidget = CreateWidget<USaltSatchelWidget>(this, USaltSatchelWidget::StaticClass(), TEXT("SaltSatchel"));
 		}
 		SatchelWidget->AddToViewport(8);
-		SatchelWidget->SetPage(Page);
 		bShowMouseCursor = true;
 		FInputModeUIOnly Mode;
 		Mode.SetWidgetToFocus(SatchelWidget->TakeWidget());
@@ -191,7 +213,6 @@ void ASaltPlayerController::SetupInputComponent()
 	{
 		Input->BindAction(GetInputConfig()->Menu, ETriggerEvent::Started, this, &ASaltPlayerController::HandleMenuKey);
 		Input->BindAction(GetInputConfig()->Inventory, ETriggerEvent::Started, this, &ASaltPlayerController::OpenInventory);
-		Input->BindAction(GetInputConfig()->Map, ETriggerEvent::Started, this, &ASaltPlayerController::OpenMap);
 		Input->BindAction(GetInputConfig()->ToolWheel, ETriggerEvent::Started, this, &ASaltPlayerController::OpenToolWheel);
 		Input->BindAction(GetInputConfig()->ToolWheel, ETriggerEvent::Completed, this, &ASaltPlayerController::TakeFromToolWheel);
 		for (int32 I = 0; I < GetInputConfig()->Tools.Num(); ++I)
@@ -276,9 +297,10 @@ void ASaltPlayerController::AimToolWheel(FVector2D Input, bool bStick)
 		}
 		Dir = WheelPointer;
 	}
-	// The medallions sit at -90 + 60 i degrees: the one in the pointer's direction.
+	// The medallions sit evenly round the ring from the top: the one in the pointer's direction.
+	const int32 N = FMath::Max(SaltTools::All().Num(), 1);
 	const float Deg = FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X));
-	Wheel->SetSelected(((FMath::RoundToInt((Deg + 90.f) / 60.f) % 6) + 6) % 6);
+	Wheel->SetSelected(((FMath::RoundToInt((Deg + 90.f) / (360.f / N)) % N) + N) % N);
 }
 
 void ASaltPlayerController::SelectTool(int32 Index)
@@ -314,10 +336,7 @@ bool ASaltPlayerController::UseTool(int32 Index)
 		SaltCharacter->SetHeldTool(Tool.Id);
 		break;
 	case ESaltToolUse::Satchel:
-		SetSatchelOpen(true, 0);
-		break;
-	case ESaltToolUse::Chart:
-		SetSatchelOpen(true, 1);
+		SetSatchelOpen(true);
 		break;
 	case ESaltToolUse::PutAway:
 		SaltCharacter->SetHeldTool(NAME_None);

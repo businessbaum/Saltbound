@@ -146,6 +146,11 @@ public:
 	USaltSwingComponent* GetLanternSwing() const { return LanternSwing; }
 	USaltInteractableComponent* GetBellRope() const { return BellRope; }
 	USaltInteractableComponent* GetLanternUse() const { return LanternUse; }
+	/** The chart on the mast (D57): where the boat is on the region chart (its window's centre, 0..1) and the E to look. */
+	FVector2D GetChartCentre() const;
+	USaltInteractableComponent* GetMastChartUse() const { return MastChartUse; }
+	/** The value the chart's material shows (tests). */
+	float GetMastChartParameter(FName Name) const;
 	UPointLightComponent* GetLanternLight() const { return LanternLight; }
 	UCableComponent* GetHalyard(bool bPeak) const { return bPeak ? PeakHalyard : ThroatHalyard; }
 	USceneComponent* GetGaffHalyardPoint(bool bPeak) const { return bPeak ? GaffSpanBlock : GaffThroatEye; }
@@ -210,6 +215,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Lantern;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UPointLightComponent> LanternLight;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> LanternUse;
+	/** D57: the chart pinned to a board on the mast (aft and to starboard, chest height), live; E to look at it closely. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> MastChart;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltInteractableComponent> MastChartUse;
 	/** Mooring lines from the bitts to the pier while moored (their pier ends stay fixed in the world). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> MooringPierFore;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> MooringPierAft;
@@ -358,6 +366,8 @@ private:
 	UFUNCTION() void HandleStore(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleBell(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleLantern(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
+	UFUNCTION() void HandleChart(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
+	void UpdateMastChart();
 	/** The lantern's light and glass follow its state, with a little flicker while it burns. */
 	void UpdateLantern(float DeltaSeconds);
 	void UpdateGangway();
@@ -409,6 +419,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> PennantMaterial;
 	UPROPERTY(Transient) TArray<TObjectPtr<UMaterialInstanceDynamic>> EnsignMaterials;
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> LanternGlassMaterial;
+	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> MastChartMaterial;
 	bool bLanternLit = false;
 	float LanternFlicker = 0.f;
 	float Fill = 0.f;                        // belly fill (spring: pops when the sail catches the wind)

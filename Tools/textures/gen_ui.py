@@ -10,6 +10,9 @@ Writes RGBA PNGs to Art/Textures/UI/ (imported by Tools/ue_scripts/import_textur
   T_Icon_<Item>       item icons, painted at 4x and reduced: Driftwood, Seashell, RopeCoil, AncientShard, GlassFloat
   T_Map_Home          chart of the home waters: 3 km square round the cove (X -500..2500 m, Y -1500..1500 m)
   T_Map_Sea           chart of the open sea: 12 km square (X -3000..9000 m, Y -6000..6000 m)
+  T_Map_Region        D57: the open sea's area as one seamless chart at 4096 px (about 3 m a pixel), without a frame, a
+                      compass rose or burnt edges: the chart on the mast and its close look show a window of it round the
+                      boat (M_SB_Chart, M_UI_Chart; keep the bounds in sync with SaltChart in Core/SaltPlaces.h)
   T_MapMarker_Player / _Boat   map markers, pointing up (+X world, north on the chart)
 
 Charts: north (up) is world +X, east (right) world +Y. Labels and the scale are drawn by the UI (SaltSatchelWidget),
@@ -242,7 +245,9 @@ MAPS = {
     # name: (centre X m, centre Y m, size m, grid m)
     "T_Map_Home": (1000.0, 0.0, 3000.0, 500.0),
     "T_Map_Sea": (3000.0, 0.0, 12000.0, 1000.0),
+    "T_Map_Region": (3000.0, 0.0, 12000.0, 500.0),
 }
+REGION = {"T_Map_Region": 4096}
 ISLE = (1600.0, 600.0)
 FAR = [((5500.0, 2500.0), 20.0, (159.0, 130.0), 71), ((7000.0, -1500.0), 140.0, (134.0, 119.0), 72),
        ((4200.0, -4800.0), 75.0, (223.0, 87.0), 73)]
@@ -255,6 +260,8 @@ def isle_coast(a):
 
 
 def chart(name, size_px=1024):
+    region = name in REGION
+    size_px = REGION.get(name, size_px)
     cx, cy, size, grid = MAPS[name]
     px = size / size_px
     j, i = np.mgrid[0:size_px, 0:size_px] + 0.5
@@ -300,7 +307,8 @@ def chart(name, size_px=1024):
     rgb = parchment(size_px, 61)
     # Burnt, darker edges.
     vig = np.clip(np.hypot(i / size_px - 0.5, j / size_px - 0.5) * 2.0, 0, 1) ** 3
-    rgb *= (1 - 0.35 * vig)[..., None]
+    if not region:
+        rgb *= (1 - 0.35 * vig)[..., None]
     # Shallows: a teal wash; land: darker parchment.
     rgb = rgb * (1 - 0.35 * shallow[..., None]) + np.array([0.64, 0.76, 0.66])[None, None, :] * 0.35 * shallow[..., None]
     rgb = rgb * (1 - land[..., None]) + (parchment(size_px, 71) * np.array([0.86, 0.82, 0.7]))[...] * land[..., None]
@@ -334,14 +342,14 @@ def chart(name, size_px=1024):
         d.point((x0, y0), fill=INK + (150,))
     # Little wave marks scattered on the open water.
     rng = np.random.default_rng(5)
-    for _ in range(140):
+    for _ in range(140 if not region else 2200):
         u, v = rng.uniform(40, size_px - 40, 2)
         if shallow[int(v), int(u)] > 0.1:
             continue
         d.arc((u - 8, v - 4, u, v + 4), 200, 340, fill=INK + (90,), width=1)
         d.arc((u, v - 4, u + 8, v + 4), 200, 340, fill=INK + (90,), width=1)
-    # Compass rose (north up) in the top right corner, with an "N" drawn in strokes.
-    rx, ry, rr = size_px - 110, 110, 62
+    # Compass rose (north up) in the top right corner, with an "N" drawn in strokes (not on the seamless region chart).
+    rx, ry, rr = (size_px - 110, 110, 62) if not region else (-1000, -1000, 62)
     for k in range(8):
         a = k * math.pi / 4 - math.pi / 2
         ln = rr if k % 2 == 0 else rr * 0.6
@@ -361,8 +369,9 @@ def chart(name, size_px=1024):
     d.line([(ku + sc, kv + sc), (ku + sc, kv - sc * 0.2)], fill=ink, width=2)
     d.arc((ku - sc, kv - sc * 1.2, ku + sc, kv + sc * 0.8), 180, 360, fill=ink, width=2)
     # Double border.
-    d.rectangle((10, 10, size_px - 11, size_px - 11), outline=ink, width=3)
-    d.rectangle((18, 18, size_px - 19, size_px - 19), outline=INK + (160,), width=1)
+    if not region:
+        d.rectangle((10, 10, size_px - 11, size_px - 11), outline=ink, width=3)
+        d.rectangle((18, 18, size_px - 19, size_px - 19), outline=INK + (160,), width=1)
     save(img, name)
 
 

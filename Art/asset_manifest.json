@@ -326,5 +326,11 @@
     "dest": "/Game/Saltbound/Props/Tools",
     "nanite": false,
     "collision": "none"
+  },
+  "SM_Boat_MastChart": {
+    "fbx": "Boat/SM_Boat_MastChart.fbx",
+    "dest": "/Game/Saltbound/Boat",
+    "nanite": false,
+    "collision": "none"
   }
 }

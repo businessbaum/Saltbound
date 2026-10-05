@@ -134,7 +134,9 @@ def mats():
                  "MI_Paint_HullFaded": (0.55, 0.2, 0.14), "MI_Paint_HullDark": (0.35, 0.08, 0.06),
                  "MI_Paint_CreamAged": (0.82, 0.74, 0.56), "MI_EnsignRed": (0.5, 0.1, 0.07), "MI_EnsignCream": (0.85, 0.78, 0.6),
                  "MI_Glass_Dark": (0.2, 0.3, 0.3), "MI_Metal_Brass": (0.6, 0.45, 0.2), "MI_Canvas": (0.7, 0.66, 0.56),
-                 "MI_Wood_Tarred": (0.12, 0.09, 0.07), "MI_CandleFlame": (1.0, 0.7, 0.3), "MI_LanternGlass": (0.75, 0.5, 0.25)}.items():
+                 "MI_Wood_Tarred": (0.12, 0.09, 0.07), "MI_CandleFlame": (1.0, 0.7, 0.3), "MI_LanternGlass": (0.75, 0.5, 0.25),
+                 # D57: the chart sheet on the mast (M_SB_Chart draws the live chart on it from its UV).
+                 "MI_MastChart": (0.85, 0.78, 0.6)}.items():
         M[n] = sb.get_material(n, (*c, 1))
 
 
@@ -1864,6 +1866,80 @@ def build_lantern():
     export(obj, cols)
 
 
+# The chart on the mast (D57, owner): a small chart pinned to a board on the mast, where the helmsman sees it.
+MAST_CHART_UP = 1.10                    # centre above the deck (m): chest height, below the lantern (1.36 m) and the boom
+MAST_CHART_YAW = 135.0                  # the way it faces: aft and to starboard (the steering oar is on the starboard quarter)
+MAST_CHART_SIZE = (0.30, 0.38)          # the board (m); the sheet is 0.26 x 0.33 (aspect 1.27, SaltChart in C++)
+
+
+def build_mast_chart():
+    """The chart on the mast (SM_Boat_MastChart), in the boat's frame (it sits on the hull at no offset): a light teak
+    board held off the mast by two chocks and two iron bands round the mast, the chart sheet on its face (its own
+    material slot MI_MastChart, UV 0..1 across it, U to the right as you face it, V down) and four brass tacks."""
+    deck = sheer_z(MAST_X)
+    zc = deck + MAST_CHART_UP
+    ax, ay = axis_at(zc)
+    yaw = math.radians(MAST_CHART_YAW)
+    n = Vector((math.cos(yaw), math.sin(yaw), 0.0))          # out of the board, towards the viewer
+    t = Vector((n.y, -n.x, 0.0))                              # the viewer's right (facing f = -n, Unreal right = (-fy, fx))
+    axis = Vector((ax, ay, 0.0))
+    r_mast = girth_at_height(zc)
+    w, h = MAST_CHART_SIZE
+    thick = 0.022
+    back = r_mast + 0.035                                     # chocks between the mast and the board
+    centre = axis + n * (back + thick / 2) + Vector((0, 0, zc))
+    parts = []
+    rot = (0.0, 0.0, math.atan2(t.y, t.x))                    # board along t (its length), height along Z
+    board = block("chart_board", (w, thick, h), tuple(centre), "MI_Wood_TeakLight", 0.006)
+    sb.transform_obj(board, (0.0, 0.0, -rot[2]), tuple(U(tuple(centre))))
+    parts.append(board)
+    for dz in (-0.13, 0.13):
+        c = axis + n * (r_mast + 0.0175) + Vector((0, 0, zc + dz))
+        chock = block("chart_chock", (0.24, 0.035, 0.05), tuple(c), "MI_Wood_TeakDark", 0.006)
+        sb.transform_obj(chock, (0.0, 0.0, -rot[2]), tuple(U(tuple(c))))
+        parts.append(chock)
+        parts.append(ring("chart_band", r_mast + 0.006, 0.007, (ax, ay, zc + dz), (0, 0, 1), "MI_Metal_Iron", 28))
+    # The chart sheet: a thin quad pair on the board's face, with its UV across it.
+    sw, sh = 0.26, 0.33
+    face = centre + n * (thick / 2 + 0.0015)
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    corners = [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)]  # (u, v) offsets; v down
+    def corner(cu, cv, off):
+        p = face + t * (cu * sw) + Vector((0, 0, -cv * sh)) + n * off
+        return bm.verts.new(U(tuple(p)))
+    front = [corner(cu, cv, 0.0) for cu, cv in corners]
+    backv = [corner(cu, cv, -0.0015) for cu, cv in corners]
+    f = bm.faces.new(front)
+    for loop, (cu, cv) in zip(f.loops, corners):
+        loop[uv].uv = (cu + 0.5, 1.0 - (cv + 0.5))
+    bk = bm.faces.new(list(reversed(backv)))
+    for loop in bk.loops:
+        loop[uv].uv = (0.0, 0.0)
+    for i in range(4):
+        j = (i + 1) % 4
+        e = bm.faces.new((front[j], front[i], backv[i], backv[j]))
+        for loop in e.loops:
+            loop[uv].uv = (0.0, 0.0)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    sheet = mesh_object("chart_sheet", bm, ["MI_MastChart"])
+    parts.append(sheet)
+    for cu, cv in ((-0.46, -0.46), (0.46, -0.46), (0.46, 0.46), (-0.46, 0.46)):
+        p = face + t * (cu * sw) + Vector((0, 0, -cv * sh)) + n * 0.002
+        parts.append(lathe("chart_tack", [(0.0, 0.0), (0.006, 0.0), (0.0055, 0.0018), (0.003, 0.0028), (0.0, 0.003)], (0, 0, 0), "MI_Metal_Brass", 12))
+        tack = parts[-1]
+        # Turn the tack's axis (+Z) to the board's normal and move it onto the sheet.
+        m = Matrix.Translation(U(tuple(p))) @ Vector((0, 0, 1)).rotation_difference(U(tuple(n))).to_matrix().to_4x4()
+        tack.data.transform(m)
+    obj = finish(parts, "SM_Boat_MastChart", wear=0.4, chips=0.0)
+    export(obj)
+
+
+def girth_at_height(z):
+    """The mast's radius at height z (absolute), a little over its turned radius for the hewn surface."""
+    return mast_r(z - sheer_z(MAST_X)) + 0.008
+
+
 def build_anchor():
     """Fisherman's anchor, hanging from its ring (pivot at the ring, shank down -Z): iron shank, crown and arms with
     flukes, a wooden stock with iron bands across the top."""
@@ -1891,13 +1967,14 @@ def build_anchor():
 
 
 def main():
-    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway", "anchor", "windlass", "pennant", "oar", "ensign", "bell", "lantern"]
+    args = sb.script_args() or ["hull", "spars", "sail", "rudder", "wheel", "gangway", "anchor", "windlass", "pennant", "oar", "ensign", "bell", "lantern",
+                                "mastchart"]
     builds = [("hull", build_hull),
               ("spars", lambda: build_spar("SM_Boat_Boom", BOOM_L, 0.085, 0.068, 0.14, "boom")),
               ("spars", lambda: build_spar("SM_Boat_Gaff", GAFF_L, 0.075, 0.06, 0.13, "gaff")),
               ("sail", build_sail), ("rudder", build_rudder), ("wheel", build_wheel), ("gangway", build_gangway),
               ("anchor", build_anchor), ("windlass", build_windlass), ("pennant", build_pennant), ("oar", build_steering_oar), ("ensign", build_ensign),
-              ("bell", build_bell), ("lantern", build_lantern)]
+              ("bell", build_bell), ("lantern", build_lantern), ("mastchart", build_mast_chart)]
     for part, fn in builds:
         if part in args:
             sb.reset_scene()

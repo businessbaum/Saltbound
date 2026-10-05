@@ -1,5 +1,5 @@
 // Saltbound - the satchel (D50, restyled D55): a leather bag thrown open, items lying in round dishes pressed into the
-// leather, the selected one described on a parchment tag on twine; and the map (M) as its own screen.
+// leather, the selected one described on a parchment tag on twine. (The map left it, D57: the chart is on the mast.)
 
 #pragma once
 
@@ -70,36 +70,12 @@ private:
 	float Clock = 0.f;
 };
 
-/** A button on the map screen that picks the chart (a wooden tab; the open chart's is parchment). */
-UCLASS()
-class SALTBOUND_API USaltSatchelTab : public UUserWidget
-{
-	GENERATED_BODY()
-
-public:
-	void Setup(USaltSatchelWidget* InOwner, int32 InPage, const FText& InLabel, bool bInChart = false);
-	void SetActive(bool bActive);
-
-protected:
-	virtual TSharedRef<SWidget> RebuildWidget() override;
-
-private:
-	UFUNCTION() void HandleClicked();
-
-	UPROPERTY(Transient) TObjectPtr<USaltMenuButton> Button;
-	UPROPERTY(Transient) TObjectPtr<UTextBlock> LabelText;
-	TWeakObjectPtr<USaltSatchelWidget> Owner;
-	int32 Page = 0;
-	bool bChart = false;
-	FText Label;
-};
-
 /**
- * The satchel screen (I or Tab) and the map screen (M), one widget with two pages. The world keeps running.
+ * The satchel screen (I or Tab). The world keeps running.
  * Satchel: 24 pockets (8 x 3); the selected one's name, how many it holds and how many fit, its description and what you
  * can do with it on a parchment tag that hangs on twine from a brass D-ring and swings when the selection changes.
  * Keys: I / Tab / Esc close, mouse or arrows / d-pad choose a pocket, R turns the item in your hand, G drops one,
- * E uses it (later). Map: a parchment chart with place names and the player's and the boat's markers (unchanged, D50).
+ * E uses it (later).
  */
 UCLASS()
 class SALTBOUND_API USaltSatchelWidget : public UUserWidget
@@ -109,25 +85,15 @@ class SALTBOUND_API USaltSatchelWidget : public UUserWidget
 public:
 	USaltSatchelWidget(const FObjectInitializer& ObjectInitializer);
 
-	enum EPage : int32 { Inventory = 0, Map = 1 };
-
-	void SetPage(int32 Page);
-	int32 GetPage() const { return CurrentPage; }
 	void SelectSlot(int32 Index);
 	int32 GetSelectedSlot() const { return Selected; }
 	FText GetSelectedName() const;
 	/** The tag's text lines (tests): name, count line, description. */
 	FText GetTagLine(int32 Line) const;
-	void SetChart(int32 Chart);
-	int32 GetChart() const { return CurrentChart; }
-	/** Where a world position (cm) lies on the chart, in the chart image's pixels (its size is MapSize). */
-	FVector2D WorldToChart(const FVector& World) const;
-	FVector2D GetPlayerMarkerPosition() const;
 	void Refresh();
 	/** Drops one of the selected item in front of the player (G). */
 	bool DropSelected();
 
-	static constexpr float MapSize = 520.f;
 	static constexpr int32 Columns = 8;
 
 protected:
@@ -139,13 +105,9 @@ protected:
 
 private:
 	UWidget* BuildSatchelScreen();
-	UWidget* BuildMapScreen();
-	UWidget* BuildMapPage();
 	UWidget* BuildTag();
-	void UpdateMarkers();
 	void RequestClose();
 
-	UPROPERTY(Transient) TObjectPtr<UWidgetSwitcher> Screens;
 	UPROPERTY(Transient) TArray<TObjectPtr<USaltItemSlotWidget>> SlotWidgets;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> CountDark;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> CountLip;
@@ -155,19 +117,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> TagDescription;
 	UPROPERTY(Transient) TObjectPtr<UVerticalBox> TagActions;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> UseText;
-	UPROPERTY(Transient) TObjectPtr<UImage> ChartImage;
-	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> ChartOverlay;
-	UPROPERTY(Transient) TObjectPtr<UImage> PlayerMarker;
-	UPROPERTY(Transient) TObjectPtr<UImage> BoatMarker;
-	UPROPERTY(Transient) TArray<TObjectPtr<UTextBlock>> PlaceLabels;
-	UPROPERTY(Transient) TObjectPtr<UTextBlock> ChartTitle;
-	UPROPERTY(Transient) TObjectPtr<UTextBlock> BoatDistance;
-	UPROPERTY(Transient) TObjectPtr<UTextBlock> ScaleLabel;
-	UPROPERTY(Transient) TArray<TObjectPtr<UTexture2D>> ChartTextures;
-	UPROPERTY(Transient) TArray<TObjectPtr<USaltSatchelTab>> ChartButtons;
 
-	int32 CurrentPage = 0;
-	int32 CurrentChart = 0;
 	int32 Selected = 0;
 	/** The tag's swing (degrees from its resting tilt) and its rate. */
 	float TagSwing = 0.f;

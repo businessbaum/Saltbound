@@ -1239,3 +1239,26 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Lesson:** `sb.Boat.Place` takes centimetres; the first measurements ran in the cove (the boat touched rocks and the
   seabed) and were misleading. Measure in open water (`250000 -80000`).
 - Tests: boat 44/44, inventory 34/34, save 5/5, swim 5/5.
+
+### D57 · The chart moves to the mast: no map in the satchel or among the tools (Adopted)
+- **Owner (2026-10-05):** "There will be now map in the player inventory or in the tools. There will be 2 map stages. 1. the
+  map on the start ship, a small map pinned to the ship mast. This tiny map has a smaller covered area, it updates live
+  the position of the ship and its soroundings, and it can be inspected for better view with e. 2. on the larger ships
+  there will be a detailed map table with a much bigger area and more options. we will talk about that when desingning
+  the new ship."
+- **Removed:** the satchel's map screen (and its chart buttons), the M key, the chart on the tool wheel. The wheel now has
+  five tools (compass, spyglass, lantern, satchel, empty hands), evenly round the ring, keys 1 to 5 ("1 - 5 pick
+  directly"); it lays out any number of tools. The old charts (`T_Map_Home`, `T_Map_Sea`) stay generated but unused.
+- **The chart on the mast (stage 1):** `SM_Boat_MastChart` (`build_boat.py`, `build_mast_chart`): a light teak board on the
+  mast's aft-starboard side (it faces the helm on the starboard quarter), its middle 1.1 m above the deck, clear below the
+  lantern and the boom (the sail's hoops run above the boom), held off the mast by two chocks under two iron bands; the
+  chart sheet (0.26 x 0.33 m) on it with four brass tacks.
+  - It shows a window of a new seamless region chart (`T_Map_Region`, the open sea's 12 km at 4096 px, about 3 m a
+    pixel, `gen_ui.py`) 1.6 km across round the boat, north up, live: the boat is an ink-rimmed red arrow in its middle
+    along her heading (`M_SB_Chart` / `MI_MastChart`, `Tools/ue_scripts/setup_chart_materials.py`; `ASaltBoat` sets the
+    window's centre and the heading every frame). `SaltChart` in `Core/SaltPlaces.h` holds the numbers.
+  - **E** ("Look at the chart") holds it up: the same live chart large (`USaltChartWidget`, `M_UI_Chart`), the places in
+    view named in ink, north and a 200 m scale; E / Esc put it back.
+- **Stage 2 (the map table on the bigger boat, D51)** waits for that boat's design, with the owner.
+- Dev: `sb.Dev.Chart [off]`. Tests: `MastChartFollowsBoat`, `MastChartLook`, the wheel's tests for five tools and no map
+  key (`WheelOnQ`); `MapMarksPlayer` is gone. Inventory 35/35.
