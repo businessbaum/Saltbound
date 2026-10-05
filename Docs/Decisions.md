@@ -1211,6 +1211,11 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     which is skipped; the wheel keeps the design's painted pictures.
   - `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`; tests `HeldCompassNorth`, `HeldSpyglass`, `HeldLantern`. Inventory 34/34.
   - `build_boat.py` now runs its builds only as the build script, so other scripts can use its parts.
+- **Blender hero pieces (spec section 11): kept as the design's painted parts for now.** A pilot rendered the wheel's
+  rope ring as real three-strand hemp (`Art/Blender/Scripts/build_ui_pieces.py`, Cycles, top-down, key light from the
+  upper left). Three lighting passes gave a clean but plain CG rope that read weaker than the approved painted ring (its
+  fibre highlights, deep grooves and warm gradient), and the owner's style asks for hand-painted detail (D16, D38). So
+  the approved canvas parts stay; the script is the starting point if the owner wants 3D pieces (brass, wax, the crate).
 
 ### D56 · Flags that move like cloth, a calmer view on a heaving deck, waves that no longer steer the boat (Adopted)
 - **Owner (2026-10-05):** "the flag physik looks like concrete, there is no movement like a flag in it"; "the camera is
