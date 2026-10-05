@@ -1,4 +1,4 @@
-// Saltbound - user settings: display (vsync, frame cap, resolution scale, window mode) and look (FOV, mouse).
+// Saltbound - user settings: display (vsync, frame cap, resolution scale, window mode), look (FOV, mouse) and the prompt.
 
 #pragma once
 
@@ -29,6 +29,9 @@ public:
 	UPROPERTY(Config) float FieldOfView = 80.f;
 	UPROPERTY(Config) float MouseSensitivity = 1.f;
 	UPROPERTY(Config) bool bInvertLookY = false;
+	/** Where the interaction prompt shows (owner, D60): pinned on the object it belongs to, or low on the screen where
+	 *  subtitles go. */
+	UPROPERTY(Config) bool bPromptOnObject = true;
 
 protected:
 	virtual bool IsVersionValid() override;

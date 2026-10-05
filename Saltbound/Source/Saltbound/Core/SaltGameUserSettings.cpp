@@ -29,6 +29,7 @@ void USaltGameUserSettings::SetToDefaults()
 	FieldOfView = 80.f;
 	MouseSensitivity = 1.f;
 	bInvertLookY = false;
+	bPromptOnObject = true;
 }
 
 void USaltGameUserSettings::ApplyDisplay()

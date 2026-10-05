@@ -4,8 +4,10 @@
 #include "Boat/SaltBoat.h"
 #include "Boat/SaltHullShape.h"
 #include "Camera/CameraComponent.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
 #include "Containers/Ticker.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/SaltGameUserSettings.h"
 #include "Core/SaltItems.h"
 #include "Core/SaltPlaces.h"
 #include "Core/SaltSaveSubsystem.h"
@@ -50,6 +52,8 @@ namespace
 			float StepAt = 0.f;
 			float Value = 0.f;
 			bool bFlag = false;
+			bool bPromptLow = false;
+			bool bOwnPromptOnObject = true;
 			FString OwnSlot;
 			ESaltBoatHold OwnHold = ESaltBoatHold::Moored;
 			TArray<FSaltItemStack> OwnSatchel;
@@ -101,13 +105,50 @@ namespace
 				break;
 			}
 			case 1:
-				Aim();
+			{
+				// D60: the prompt pinned on the windlass (looked at a little to its side, so it is not in the middle), then
+				// low on the screen.
+				USaltGameUserSettings* Settings = USaltGameUserSettings::Get();
+				const FVector2D View = Hud->GetCachedGeometry().GetLocalSize();
+				if (T < 0.6f)
+				{
+					const FVector Eye = P->GetCamera()->GetComponentLocation();
+					const FVector To = Boat->GetWindlass()->GetComponentLocation();
+					const FVector Side = FVector::CrossProduct(FVector::UpVector, (To - Eye).GetSafeNormal()).GetSafeNormal();
+					PC->SetControlRotation((To + Side * 18.f - Eye).Rotation());
+				}
+				else
+				{
+					Aim();
+				}
+				if (T > 0.6f && !S->bPromptLow && Settings)
+				{
+					FVector2D Want;
+					const bool bProjected = UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, Boat->GetWindlass()->GetPromptLocation(), Want, true);
+					const FVector2D At = Hud->GetShownPromptPosition();
+					S->bOwnPromptOnObject = Settings->bPromptOnObject;
+					Report(TEXT("PromptOnObject"), !Settings->bPromptOnObject || (bProjected && Hud->IsShownPromptPinned() && FVector2D::Distance(At, Want) < 3.f
+						&& FVector2D::Distance(At, View * 0.5f) > 10.f),
+						FString::Printf(TEXT("setting=%d pinned=%d at (%.0f, %.0f), the windlass at (%.0f, %.0f) of %.0f x %.0f, prompt '%s'"),
+							Settings->bPromptOnObject ? 1 : 0, Hud->IsShownPromptPinned() ? 1 : 0, At.X, At.Y, Want.X, Want.Y, View.X, View.Y,
+							*Hud->GetShownPrompt().ToString()));
+					Settings->bPromptOnObject = false;
+					S->bPromptLow = true;
+				}
 				if (T > 1.2f)
 				{
+					const FVector2D At = Hud->GetShownPromptPosition();
+					Report(TEXT("PromptLow"), !Hud->IsShownPromptPinned() && FMath::Abs(At.X - View.X * 0.5f) < 1.f && FMath::Abs(At.Y - (View.Y - 180.f)) < 1.f,
+						FString::Printf(TEXT("pinned=%d at (%.0f, %.0f) of %.0f x %.0f"), Hud->IsShownPromptPinned() ? 1 : 0, At.X, At.Y, View.X, View.Y));
+					if (Settings)
+					{
+						Settings->bPromptOnObject = S->bOwnPromptOnObject;
+					}
 					P->DebugInteract();
 					Next();
 				}
 				break;
+			}
 			case 2:
 				Aim();
 				S->Value = FMath::Max(S->Value, Hud->GetShownHoldProgress());

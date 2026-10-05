@@ -3,6 +3,7 @@
 #include "World/SaltInstanceScatter.h"
 
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 
@@ -19,7 +20,7 @@ ASaltInstanceScatter::ASaltInstanceScatter()
 }
 
 void ASaltInstanceScatter::SetInstances(UStaticMesh* Mesh, UMaterialInterface* Material, const TArray<FTransform>& WorldTransforms,
-	float CullStart, float CullEnd, bool bCastShadow)
+	float CullStart, float CullEnd, bool bCastShadow, bool bCollide)
 {
 	Instances->ClearInstances();
 	Instances->SetStaticMesh(Mesh);
@@ -29,6 +30,14 @@ void ASaltInstanceScatter::SetInstances(UStaticMesh* Mesh, UMaterialInterface* M
 	}
 	Instances->SetCullDistances((int32)CullStart, (int32)CullEnd);
 	Instances->SetCastShadow(bCastShadow);
+	if (bCollide)
+	{
+		Instances->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+	}
+	else
+	{
+		Instances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
 	Instances->AddInstances(WorldTransforms, false, true, false);
 	Instances->MarkRenderStateDirty();
 }

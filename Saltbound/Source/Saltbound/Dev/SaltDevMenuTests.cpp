@@ -43,7 +43,7 @@ namespace
 
 		PC->SetMenuOpen(true);
 		USaltMenuWidget* M = PC->GetMenu();
-		Report(TEXT("MenuOpens"), PC->IsMenuOpen() && World->IsPaused() && PC->bShowMouseCursor && M && M->GetRowCount() == 12,
+		Report(TEXT("MenuOpens"), PC->IsMenuOpen() && World->IsPaused() && PC->bShowMouseCursor && M && M->GetRowCount() == 13,
 			FString::Printf(TEXT("open=%d paused=%d cursor=%d rows=%d"), PC->IsMenuOpen() ? 1 : 0, World->IsPaused() ? 1 : 0,
 				PC->bShowMouseCursor ? 1 : 0, M ? M->GetRowCount() : 0));
 		if (!M)
@@ -82,6 +82,16 @@ namespace
 		const float CameraFov = Player->GetCamera()->FieldOfView;
 		Report(TEXT("MenuFieldOfView"), S->FieldOfView != Fov && FMath::IsNearlyEqual(CameraFov, S->FieldOfView),
 			FString::Printf(TEXT("before=%.0f after=%.0f camera=%.0f"), Fov, S->FieldOfView, CameraFov));
+
+		// D60: where the prompt shows, on the object or low on the screen.
+		const bool bOnObject = S->bPromptOnObject;
+		const int32 PromptRow = M->FindRow(USaltMenuWidget::ERow::PromptPlace);
+		M->ChangeRow(PromptRow, 1);
+		const FString PromptShown = M->DescribeRow(PromptRow);
+		const bool bFlipped = S->bPromptOnObject != bOnObject;
+		M->ChangeRow(PromptRow, 1);
+		Report(TEXT("MenuPromptPlace"), bFlipped && S->bPromptOnObject == bOnObject,
+			FString::Printf(TEXT("before=%d flipped=%d shown='%s' back=%d"), bOnObject ? 1 : 0, bFlipped ? 1 : 0, *PromptShown, S->bPromptOnObject ? 1 : 0));
 
 		M->SelectRow(3);
 		Report(TEXT("MenuSelect"), M->GetSelectedRow() == 3, FString::Printf(TEXT("selected=%d"), M->GetSelectedRow()));

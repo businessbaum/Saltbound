@@ -15,11 +15,12 @@ class USaltLandfallWidget;
 class USaltToolWheelWidget;
 class USaltPaintedText;
 class USaltKeyPrompt;
+class USaltInteractableComponent;
 
 /**
  * Builds its widget tree in code (no widget asset). Deliberately quiet: a small dot that brightens on usable objects,
- * the prompt fixed under it (UI_Design.md sections 7 and 8), the save sign in the bottom-right corner while the game
- * saves (section 14).
+ * the prompt (UI_Design.md sections 7 and 8) pinned on the object it belongs to or low on the screen where subtitles go
+ * (the player's choice, D60), the save sign in the bottom-right corner while the game saves (section 14).
  */
 UCLASS()
 class SALTBOUND_API USaltHUDWidget : public UUserWidget
@@ -43,6 +44,10 @@ public:
 	float GetSpyglassMaskOpacity() const;
 	/** The controls row as shown (tests): its action, empty when hidden. */
 	FText GetShownControls() const;
+	/** Where the shown prompt row's middle is (tests, D60): in the HUD's own units, (0, 0) at the top left. */
+	FVector2D GetShownPromptPosition() const { return Rows[ActiveRow].At; }
+	/** True when the shown prompt is pinned on its object. */
+	bool IsShownPromptPinned() const { return Rows[ActiveRow].bPinned; }
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -58,10 +63,17 @@ private:
 		float Alpha = 0.f;
 		float Age = 0.f;
 		bool bShowing = false;
+		/** The object the prompt belongs to (none for leaving a station or a ladder), its row's width and where it is. */
+		TWeakObjectPtr<const USaltInteractableComponent> Target;
+		float Width = 0.f;
+		FVector2D At = FVector2D::ZeroVector;
+		bool bPinned = false;
 	};
 
 	void LayoutRow(int32 Index);
 	void TickPrompt(float DeltaSeconds);
+	/** D60: each row on its object (projected every frame, kept on the screen) or low in the middle. */
+	void PlaceRow(int32 Index, bool bOnObject);
 	/** D58: the controls in use (a station's, a ladder's) in the key-scrap prompt along the bottom, a status line under it. */
 	void TickControls(float DeltaSeconds);
 	void TickSaveSign(float DeltaSeconds);
@@ -86,6 +98,8 @@ private:
 
 	FPromptRow Rows[2];
 	int32 ActiveRow = 0;
+	/** The HUD's size in its own units (1080 high at 1080p and up). */
+	FVector2D ViewSize = FVector2D(1920.f, 1080.f);
 	float ShownHold = 0.f;
 	float Clock = 0.f;
 

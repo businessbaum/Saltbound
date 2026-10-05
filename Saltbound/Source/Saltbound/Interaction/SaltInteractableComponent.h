@@ -37,6 +37,12 @@ public:
 
 	bool IsHold() const { return HoldTime > 0.f; }
 
+	/** Where the prompt is pinned when it shows on the object (D60): the volume's middle moved by this (cm, local). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction")
+	FVector PromptOffset = FVector::ZeroVector;
+
+	FVector GetPromptLocation() const { return GetComponentTransform().TransformPosition(PromptOffset); }
+
 	UPROPERTY(BlueprintAssignable, Category = "Interaction")
 	FSaltInteractSignature OnInteract;
 

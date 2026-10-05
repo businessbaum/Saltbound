@@ -1,4 +1,5 @@
-// Saltbound - the in-game HUD (D55): focus dot, key-scrap prompt and hold, save sign, station hint, notices.
+// Saltbound - the in-game HUD (D55): focus dot, key-scrap prompt and hold (on the object or low, D60), save sign, station
+// hint, notices.
 
 #include "UI/SaltHUDWidget.h"
 
@@ -6,7 +7,9 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
 #include "Components/TextBlock.h"
+#include "Core/SaltGameUserSettings.h"
 #include "Core/SaltPlaces.h"
 #include "Core/SaltSaveSubsystem.h"
 #include "HAL/IConsoleManager.h"
@@ -25,10 +28,12 @@ namespace
 {
 	const FLinearColor PromptColor(0.96f, 0.92f, 0.84f, 1.f); // warm off-white (dot, hint, notices)
 
-	// Layout at 1080p (UI_Design.md section 7): the prompt row is centred 66 px under the screen centre; the 58 px key
-	// scrap (in a 120 px frame), 18 px, then the action in IM Fell English 36 px with its baseline 12 px under the key's
-	// centre. IM Fell English: ascent 0.905 em, line 1.268 em, so the text's centre sits 12 - 0.271 * 36 px under it.
-	constexpr float RowY = 66.f;
+	// Layout at 1080p (UI_Design.md section 7): the 58 px key scrap (in a 120 px frame), 18 px, then the action in IM
+	// Fell English 36 px with its baseline 12 px under the key's centre. IM Fell English: ascent 0.905 em, line 1.268 em,
+	// so the text's centre sits 12 - 0.271 * 36 px under it. Where the row goes (owner, D60): its middle on the object's
+	// prompt point, or 180 px above the bottom edge in the middle (where subtitles go, above the controls row).
+	constexpr float RowLowUp = 180.f;
+	constexpr float RowEdge = 40.f;
 	constexpr float KeySize = 58.f;
 	constexpr float KeyFrame = 120.f;
 	constexpr float KeyGap = 18.f;
@@ -53,6 +58,20 @@ namespace
 		TEXT("sb.Dev.Hold <0..1>: show the hold prompt with this much ink for captures (-1 = off)."), ECVF_Cheat);
 	TAutoConsoleVariable<int32> CVarDevSaveSign(TEXT("sb.Dev.SaveSign"), 0,
 		TEXT("sb.Dev.SaveSign 1: keep the save sign turning for captures (0 = only while saving)."), ECVF_Cheat);
+	FAutoConsoleCommand CmdPromptOnObject(TEXT("sb.PromptOnObject"),
+		TEXT("sb.PromptOnObject 1|0: the interaction prompt on its object or low on the screen (the pause menu's Prompt position)."),
+		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& Args)
+		{
+			if (USaltGameUserSettings* S = USaltGameUserSettings::Get())
+			{
+				if (Args.Num() > 0)
+				{
+					S->bPromptOnObject = FCString::Atoi(*Args[0]) != 0;
+					S->SaveSettings();
+				}
+				UE_LOG(LogTemp, Display, TEXT("SB_PROMPT on the object=%d"), S->bPromptOnObject ? 1 : 0);
+			}
+		}));
 #endif
 
 	UTextBlock* MakeText(UWidgetTree* Tree, FName Name, int32 Size)
@@ -109,9 +128,9 @@ TSharedRef<SWidget> USaltHUDWidget::RebuildWidget()
 			UCanvasPanel* RowRoot = WidgetTree->ConstructWidget<UCanvasPanel>();
 			if (UCanvasPanelSlot* S = Root->AddChildToCanvas(RowRoot))
 			{
-				S->SetAnchors(FAnchors(0.5f, 0.5f));
+				// Placed every frame (PlaceRow): the row's middle at the slot's position.
+				S->SetAnchors(FAnchors(0.f, 0.f));
 				S->SetAlignment(FVector2D(0.f, 0.f));
-				S->SetPosition(FVector2D(0.f, RowY));
 				S->SetSize(FVector2D(1.f, 1.f));
 			}
 			RowRoot->SetRenderOpacity(0.f);
@@ -277,7 +296,8 @@ void USaltHUDWidget::LayoutRow(int32 Index)
 	USaltPaintedText* Label = RowLabels[Index];
 	Label->SetText(Rows[Index].Text);
 	const float TextW = Label->MeasureWidth();
-	const float X0 = -(KeySize + KeyGap + TextW) * 0.5f;
+	Rows[Index].Width = KeySize + KeyGap + TextW;
+	const float X0 = -Rows[Index].Width * 0.5f;
 	if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(RowScraps[Index]->Slot))
 	{
 		S->SetPosition(FVector2D(X0 + KeySize * 0.5f, 0.f));
@@ -292,12 +312,16 @@ void USaltHUDWidget::TickPrompt(float DeltaSeconds)
 {
 	const ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn());
 	FText Want = Player ? Player->GetPromptText() : FText::GetEmpty();
+	// The object the prompt belongs to (none at a station or on a ladder: leaving them is the player's own act).
+	const USaltInteractableComponent* WantTarget = Player ? Player->GetFocusedInteractable() : nullptr;
+	const USaltGameUserSettings* Settings = USaltGameUserSettings::Get();
+	const bool bOnObject = !Settings || Settings->bPromptOnObject;
 	float Hold = 0.f;
 	float Pulse = 1.f;
 	if (Player)
 	{
-		const USaltInteractableComponent* Target = Player->GetHoldTarget();
-		if (Target && Target == Player->GetFocusedInteractable())
+		const USaltInteractableComponent* Held = Player->GetHoldTarget();
+		if (Held && Held == WantTarget)
 		{
 			Hold = Player->GetHoldProgress();
 		}
@@ -308,6 +332,7 @@ void USaltHUDWidget::TickPrompt(float DeltaSeconds)
 			Hold = 1.f;
 			Pulse = FMath::Lerp(1.06f, 1.f, Since / 0.15f);
 			Want = Rows[ActiveRow].Text;
+			WantTarget = Rows[ActiveRow].Target.Get();
 		}
 		else if (Since < 0.6f)
 		{
@@ -326,9 +351,10 @@ void USaltHUDWidget::TickPrompt(float DeltaSeconds)
 	}
 #endif
 
-	// A new target: the old row fades out while the new one fades in.
+	// A new target: the old row fades out while the new one fades in (on the objects, also when the words are the same).
 	FPromptRow& Active = Rows[ActiveRow];
-	if (!Want.EqualTo(Active.Text) || (!Want.IsEmpty() && !Active.bShowing))
+	const bool bNewObject = bOnObject && !Want.IsEmpty() && Active.Target.Get() != WantTarget;
+	if (!Want.EqualTo(Active.Text) || (!Want.IsEmpty() && !Active.bShowing) || bNewObject)
 	{
 		Active.bShowing = false;
 		if (!Want.IsEmpty())
@@ -339,6 +365,9 @@ void USaltHUDWidget::TickPrompt(float DeltaSeconds)
 			Next.bShowing = true;
 			Next.Age = 0.f;
 			Next.Alpha = 0.f;
+			Next.Target = WantTarget;
+			Next.bPinned = false;
+			Next.At = FVector2D(ViewSize.X * 0.5f, ViewSize.Y - RowLowUp);
 			LayoutRow(ActiveRow);
 		}
 		else
@@ -356,6 +385,7 @@ void USaltHUDWidget::TickPrompt(float DeltaSeconds)
 		{
 			continue;
 		}
+		PlaceRow(I, bOnObject);
 		// Fade in and rise 6 px in 0.15 s while the scrap's tilt settles from -6 to -3 degrees.
 		const float In = EaseOut(Row.Age / FadeIn);
 		RowRoots[I]->SetRenderOpacity(Row.Alpha);
@@ -371,6 +401,32 @@ void USaltHUDWidget::TickPrompt(float DeltaSeconds)
 		}
 	}
 	ShownHold = Rows[ActiveRow].bShowing ? Hold : 0.f;
+}
+
+void USaltHUDWidget::PlaceRow(int32 Index, bool bOnObject)
+{
+	FPromptRow& Row = Rows[Index];
+	const USaltInteractableComponent* Target = Row.Target.Get();
+	FVector2D P;
+	if (bOnObject && Target && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(GetOwningPlayer(), Target->GetPromptLocation(), P, true))
+	{
+		// The row's middle on the object's prompt point, kept whole on the screen.
+		const float HalfW = Row.Width * 0.5f + RowEdge;
+		const float HalfH = KeyFrame * 0.5f;
+		Row.At = FVector2D(FMath::Clamp(P.X, HalfW, FMath::Max(ViewSize.X - HalfW, HalfW)),
+			FMath::Clamp(P.Y, HalfH, FMath::Max(ViewSize.Y - HalfH, HalfH)));
+		Row.bPinned = true;
+	}
+	else if (!bOnObject || !Row.bPinned)
+	{
+		Row.At = FVector2D(ViewSize.X * 0.5f, ViewSize.Y - RowLowUp);
+		Row.bPinned = false;
+	}
+	// (A pinned row whose object is gone, a pickup just taken, fades out where it was.)
+	if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(RowRoots[Index]->Slot))
+	{
+		S->SetPosition(Row.At);
+	}
 }
 
 void USaltHUDWidget::HandleSaveStarted()
@@ -461,6 +517,11 @@ void USaltHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	const float DotScale = bFocus ? 1.4f : 1.f;
 	Dot->SetRenderScale(FVector2D(DotScale, DotScale));
 
+	const FVector2D Size = MyGeometry.GetLocalSize();
+	if (Size.X > 1.f && Size.Y > 1.f)
+	{
+		ViewSize = Size;
+	}
 	TickPrompt(InDeltaTime);
 	TickControls(InDeltaTime);
 	TickSaveSign(InDeltaTime);

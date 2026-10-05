@@ -185,7 +185,7 @@ TSharedRef<SWidget> USaltMenuWidget::RebuildWidget()
 	if (WidgetTree && !WidgetTree->RootWidget)
 	{
 		Rows = { ERow::Resume, ERow::Save, ERow::Load, ERow::VSync, ERow::FrameCap, ERow::ResolutionScale, ERow::WindowMode, ERow::FieldOfView,
-			ERow::MouseSensitivity, ERow::InvertLook, ERow::Defaults, ERow::Quit };
+			ERow::MouseSensitivity, ERow::InvertLook, ERow::PromptPlace, ERow::Defaults, ERow::Quit };
 
 		// Dimmed game behind a small dark panel in the middle.
 		UBorder* Backdrop = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("Backdrop"));
@@ -213,8 +213,8 @@ TSharedRef<SWidget> USaltMenuWidget::RebuildWidget()
 		}
 
 		static const TCHAR* Labels[] = { TEXT("Resume"), TEXT("Save game"), TEXT("Load last save"), TEXT("V-Sync"), TEXT("Frame rate limit"), TEXT("Resolution scale"),
-			TEXT("Window mode"), TEXT("Field of view"), TEXT("Mouse sensitivity"), TEXT("Invert look"), TEXT("Restore defaults"),
-			TEXT("Quit to desktop") };
+			TEXT("Window mode"), TEXT("Field of view"), TEXT("Mouse sensitivity"), TEXT("Invert look"), TEXT("Prompt position"),
+			TEXT("Restore defaults"), TEXT("Quit to desktop") };
 		RowWidgets.Reset();
 		for (int32 I = 0; I < Rows.Num(); ++I)
 		{
@@ -303,6 +303,9 @@ FText USaltMenuWidget::ValueOf(ERow Row) const
 		return FText::FromString(FString::Printf(TEXT("%.2f"), S->MouseSensitivity));
 	case ERow::InvertLook:
 		return OnOff(S->bInvertLookY);
+	case ERow::PromptPlace:
+		return S->bPromptOnObject ? NSLOCTEXT("Saltbound", "PromptOnObject", "On the object")
+			: NSLOCTEXT("Saltbound", "PromptLow", "Bottom of the screen");
 	default:
 		return FText::GetEmpty();
 	}
@@ -362,6 +365,11 @@ void USaltMenuWidget::ChangeRow(int32 Row, int32 Delta)
 		break;
 	case ERow::InvertLook:
 		S->bInvertLookY = !S->bInvertLookY;
+		bDisplay = false;
+		break;
+	case ERow::PromptPlace:
+		// The HUD reads it every frame.
+		S->bPromptOnObject = !S->bPromptOnObject;
 		bDisplay = false;
 		break;
 	default:
