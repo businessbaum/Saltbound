@@ -576,13 +576,6 @@
     "collision": "none",
     "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
   },
-  "SM_Hub_Ancient": {
-    "fbx": "Hub/SM_Hub_Ancient.fbx",
-    "dest": "/Game/Saltbound/Hub/Art",
-    "nanite": true,
-    "collision": "none",
-    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
-  },
   "SM_Hub_Stern": {
     "fbx": "Hub/SM_Hub_Stern.fbx",
     "dest": "/Game/Saltbound/Hub/Art",
@@ -611,33 +604,54 @@
     "collision": "none",
     "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
   },
-  "SM_Hub_SeaGate": {
-    "fbx": "Hub/SM_Hub_SeaGate.fbx",
+  "SM_Hub_DoorStbdAft": {
+    "fbx": "Hub/SM_Hub_DoorStbdAft.fbx",
     "dest": "/Game/Saltbound/Hub/Art",
     "nanite": true,
     "collision": "ucx",
-    "_note": "D62 the sea gate (build_hub_seagate.py): ASaltSeaGate moves the gate, the ropes and the capstans"
+    "_note": "D64 the hidden side doors (build_hub_doors.py): one leaf, pivot on its hinge axis at z0; Art/Generated/hub_doors.json has the pivots, swing and rope eyes"
+  },
+  "SM_Hub_DoorStbdFore": {
+    "fbx": "Hub/SM_Hub_DoorStbdFore.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D64 the hidden side doors (build_hub_doors.py): one leaf, pivot on its hinge axis at z0; Art/Generated/hub_doors.json has the pivots, swing and rope eyes"
+  },
+  "SM_Hub_DoorPortAft": {
+    "fbx": "Hub/SM_Hub_DoorPortAft.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D64 the hidden side doors (build_hub_doors.py): one leaf, pivot on its hinge axis at z0; Art/Generated/hub_doors.json has the pivots, swing and rope eyes"
+  },
+  "SM_Hub_DoorPortFore": {
+    "fbx": "Hub/SM_Hub_DoorPortFore.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D64 the hidden side doors (build_hub_doors.py): one leaf, pivot on its hinge axis at z0; Art/Generated/hub_doors.json has the pivots, swing and rope eyes"
+  },
+  "SM_Hub_DoorFrame": {
+    "fbx": "Hub/SM_Hub_DoorFrame.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D64 the side doors' fixed parts (build_hub_doors.py): hinge posts (UCX), jambs, capstan bases, rope blocks and runs; ship pivot (x 80)"
   },
   "SM_Hub_GateRope": {
     "fbx": "Hub/SM_Hub_GateRope.fbx",
     "dest": "/Game/Saltbound/Hub/Art",
     "nanite": true,
     "collision": "none",
-    "_note": "D62 the sea gate (build_hub_seagate.py): ASaltSeaGate moves the gate, the ropes and the capstans"
+    "_note": "D64 a door leaf's rope from its eye to its block (build_hub_doors.py): 27 m down -Z from its pivot; scale to the length shown"
   },
   "SM_Hub_Capstan": {
     "fbx": "Hub/SM_Hub_Capstan.fbx",
     "dest": "/Game/Saltbound/Hub/Art",
     "nanite": true,
     "collision": "ucx",
-    "_note": "D62 the sea gate (build_hub_seagate.py): ASaltSeaGate moves the gate, the ropes and the capstans"
-  },
-  "SM_Hub_SeaGateFrame": {
-    "fbx": "Hub/SM_Hub_SeaGateFrame.fbx",
-    "dest": "/Game/Saltbound/Hub/Art",
-    "nanite": true,
-    "collision": "ucx",
-    "_note": "D62 the sea gate (build_hub_seagate.py): ASaltSeaGate moves the gate, the ropes and the capstans"
+    "_note": "D64 the doors' capstans on the aft quay (build_hub_doors.py): the turning part, pivot on the deck at its axis"
   },
   "SM_Hub_MastMizzen": {
     "fbx": "Hub/SM_Hub_MastMizzen.fbx",

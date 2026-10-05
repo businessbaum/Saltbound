@@ -1,0 +1,154 @@
+{
+ "_comment": "D64 the side doors (build_hub_doors.py), ship metres. Each leaf mesh's pivot is its hinge axis at z0; open = yaw open_yaw (Unreal, + turns +X to +Y). The aft leaf opens first and shuts last; the fore leaf follows lag_deg behind it. eye: where the leaf's rope takes hold; block: the fixed block it runs to (then down to the capstan, in SM_Hub_DoorFrame).",
+ "lag_deg": 10,
+ "z_bottom_mid": -2.5,
+ "z_top_mid": 12.912,
+ "leaf_z_at_x": {
+  "32.0": [
+   -2.424,
+   13.003
+  ],
+  "36.0": [
+   -2.5,
+   12.912
+  ],
+  "40.0": [
+   -2.545,
+   12.858
+  ]
+ },
+ "capstans": [
+  [
+   28,
+   16.5,
+   1.5
+  ],
+  [
+   28,
+   -16.5,
+   1.5
+  ]
+ ],
+ "leaves": [
+  {
+   "mesh": "SM_Hub_DoorStbdAft",
+   "side": "starboard",
+   "leaf": "aft",
+   "pivot": [
+    30.6,
+    17.68,
+    -2.5
+   ],
+   "open_yaw": -90.0,
+   "x": [
+    32.0,
+    36.0
+   ],
+   "eye_shut": [
+    35.4,
+    18.983,
+    12.155
+   ],
+   "eye_open": [
+    31.903,
+    12.88,
+    12.155
+   ],
+   "block": [
+    30.45,
+    15.0,
+    12.93
+   ]
+  },
+  {
+   "mesh": "SM_Hub_DoorStbdFore",
+   "side": "starboard",
+   "leaf": "fore",
+   "pivot": [
+    41.4,
+    17.68,
+    -2.5
+   ],
+   "open_yaw": 90.0,
+   "x": [
+    36.0,
+    40.0
+   ],
+   "eye_shut": [
+    36.6,
+    18.986,
+    12.134
+   ],
+   "eye_open": [
+    40.095,
+    12.88,
+    12.134
+   ],
+   "block": [
+    41.6,
+    15.0,
+    12.93
+   ]
+  },
+  {
+   "mesh": "SM_Hub_DoorPortAft",
+   "side": "port",
+   "leaf": "aft",
+   "pivot": [
+    30.6,
+    -17.68,
+    -2.5
+   ],
+   "open_yaw": 90.0,
+   "x": [
+    32.0,
+    36.0
+   ],
+   "eye_shut": [
+    35.4,
+    -18.983,
+    12.155
+   ],
+   "eye_open": [
+    31.903,
+    -12.88,
+    12.155
+   ],
+   "block": [
+    30.45,
+    -15.0,
+    12.93
+   ]
+  },
+  {
+   "mesh": "SM_Hub_DoorPortFore",
+   "side": "port",
+   "leaf": "fore",
+   "pivot": [
+    41.4,
+    -17.68,
+    -2.5
+   ],
+   "open_yaw": -90.0,
+   "x": [
+    36.0,
+    40.0
+   ],
+   "eye_shut": [
+    36.6,
+    -18.986,
+    12.134
+   ],
+   "eye_open": [
+    40.095,
+    -12.88,
+    12.134
+   ],
+   "block": [
+    41.6,
+    -15.0,
+    12.93
+   ]
+  }
+ ]
+}

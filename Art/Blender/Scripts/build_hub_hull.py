@@ -1,21 +1,28 @@
-"""The hub ship's hull from outside (D62; phase 2 of Docs/Design/HubShip/HubShip_Agent_Prompt.md): a giant, old galleon,
-hand-made like the player's boat (D38, D52, D53).
+"""The hub ship's hull from outside (D62, reworked for D64): a giant, old galleon, hand-made like the player's boat (D38, D52,
+D53), planked all the way down to the keel.
 
-Every number comes from Docs/Design/HubShip/HubShip_Data.json through hub_layout.py (the hull's lines, the profile with
-the tiered sterncastle, the bands, the ports, the openings of the open spaces). Build choices that are not in the data are
-named constants here (the strake width, the plank thickness, the port spacing).
+Every number comes from Docs/Design/HubShip/HubShip_Data.json through hub_layout.py (the hull's form with its run, entry and
+round stern, the profile, the sheer, the decks 3 m apart, the doors, the masts' channels). Build choices that are not in the
+data are named constants here (the strake width, the plank thickness, the wales, the port spacing).
 
-Visual only: the blockout (build_hub_blockout.py) stays in the map as hidden collision, so every walk, boat and headroom
-check of D61 still holds while the art replaces it piece by piece.
+The form: the planking follows H.half_width with the section's knuckles rounded (a monotone cubic through the data's section
+points; it never lies inside the data's hull, so the rooms' lining stays clear of it). Strakes follow lines that rise with the
+sheer towards the ends (the sheer fades out below the waterline and up into the castles, so the bottom runs level into the
+keel and the castles' bands stay level with their decks). Below the bilge's knuckle the lines are closer, so the strakes keep
+their width round the bilge; the flat bottom is planked fore and aft beside the keel.
 
-Meshes (pivot at the ship's x 80 on the waterline, bow to +X; /Game/Saltbound/Hub/Art; Nanite):
-  SM_Hub_HullStern   the sterncastle's sides (x 0..44.6), both sides
-  SM_Hub_HullWaistS  the waist's starboard side (x 44.6..134.6)
-  SM_Hub_HullWaistP  the waist's port side
+The hidden doors (hub.doors): the planking, wales, bands and port lids at x 32..40 from the strake seam at about -2.5 to the
+one under 13.0 belong to the door leaves (build_hub_doors.py builds them with the same generator); here they are left out.
+
+Meshes (pivot at the ship's x 80 on the waterline, bow to +X; /Game/Saltbound/Hub/Art; Nanite; visual only):
+  SM_Hub_HullStern   both sides aft of the quarterdeck's front (x < 48.3), the keel there, the door openings
+  SM_Hub_HullWaistS  the waist's starboard side (x 48.3..134.3), the flat bottom and keel under it
+  SM_Hub_HullWaistP  the waist's port side and the bottom's port half
   SM_Hub_HullBow     the forecastle's and the bow's sides up to the stem
-  SM_Hub_Ancient     the ancient lower hull all round (pale seamless stone, two thin turquoise lines), the stern face below +3
-Run: Tools/Build-BlenderAsset.ps1 build_hub_hull [sides] [ancient]
+Writes Art/Generated/hub_outside.json: every port, window and lid on the sides (side, x, z, kind) for the rooms behind them.
+Run: Tools/Build-BlenderAsset.ps1 build_hub_hull
 """
+import json
 import math
 import os
 import random
@@ -31,15 +38,23 @@ import hub_timber as T  # noqa: E402
 import sb_blender as sb  # noqa: E402
 
 HUB, Z = H.HUB, H.Z
-STONE = float(HUB["ancientTop"])     # timber above, the ancient hull below
-STRAKE = 0.55                        # strake width (m): chunky for a ship this size, about 30 courses to the main deck
-PLANK_T = 0.14                       # plank thickness
+FORM = HUB["form"]
+COUNTER = float(FORM["stern"]["counter"])           # the counter: the tuck below, the round stern above
+POST_X = float(FORM["stern"]["post_x"])             # the sternpost's aft face and the tuck
+ROUND = float(FORM["stern"]["round"])               # the stern face's corners lie this far forward of its middle
+KEEL = float(HUB["keel"])
+DOORS = HUB["doors"]
+STRAKE = 0.55                        # strake width (m) up the sides: chunky for a ship this size
+BILGE_STRAKE = 0.62                  # strake width round the bilge (z -12..-6), measured along the midship section
+BOTTOM_W = 0.62                      # bottom planks beside the keel
+PLANK_T = 0.14                       # plank thickness (outside the data's surface)
 GAP = 0.03                           # the caulked seam between strakes
 BOARD_LEN = (5.0, 9.5)               # board lengths along a strake (butts staggered from strake to strake)
 TOP = max(z for _, z in HUB["profile"])
-PARTS_X = (44.6, 134.6)              # the sides are split here into stern / waist / bow meshes
+PARTS_X = (48.3, 134.3)              # the sides are split here into stern / waist / bow meshes (at the castles' steps)
+KEEL_HW, KEEL_DOWN = 0.62, 0.42      # the keel's half-width and how far it stands below the bottom
 
-# Material colours for the Blender previews; Unreal uses the MI_* of the same name (setup_hub_materials.py).
+# Material colours for the Blender previews; Unreal uses the MI_* of the same name (setup_hub_materials.py and the boat's).
 COLOURS = {
     "MI_Hub_HullTar": (0.16, 0.11, 0.08), "MI_Hub_HullTarFaded": (0.24, 0.18, 0.13), "MI_Hub_HullTarDark": (0.1, 0.07, 0.05),
     "MI_Hub_Ochre": (0.62, 0.43, 0.16), "MI_Hub_OchreFaded": (0.7, 0.55, 0.3), "MI_Hub_AncientStone": (0.84, 0.82, 0.74),
@@ -47,8 +62,9 @@ COLOURS = {
     "MI_Paint_Cream": (0.86, 0.8, 0.64), "MI_Paint_CreamAged": (0.76, 0.68, 0.5), "MI_Metal_Iron": (0.08, 0.08, 0.08),
     "MI_Metal_Brass": (0.6, 0.45, 0.2), "MI_Glass_Dark": (0.12, 0.16, 0.17), "MI_LanternGlass": (1.0, 0.7, 0.35),
     "MI_Wood_Varnish": (0.36, 0.2, 0.08), "MI_Paint_Hull": (0.42, 0.11, 0.07), "MI_Paint_HullFaded": (0.5, 0.2, 0.13),
+    "MI_Paint_HullDark": (0.3, 0.07, 0.05),
     "MI_Wood_Teak": (0.5, 0.33, 0.17), "MI_Wood_TeakDark": (0.38, 0.24, 0.12), "MI_Wood_TeakLight": (0.6, 0.42, 0.22),
-    "MI_Rope_Hemp": (0.55, 0.45, 0.28), "MI_Hub_Void": (0.01, 0.01, 0.01),
+    "MI_Rope_Hemp": (0.55, 0.45, 0.28), "MI_Hub_Void": (0.01, 0.01, 0.01), "MI_Hub_RopeTar": (0.12, 0.1, 0.08),
 }
 
 
@@ -69,36 +85,71 @@ def smooth01(t):
     return t * t * (3.0 - 2.0 * t)
 
 
-# --- the hull's lines ----------------------------------------------------------------------------------------------------
-def sheer(x):
-    """How far the strake lines rise at x (hub.sheer): towards the stern face and towards the stem."""
-    sh = HUB["sheer"]
-    if x < sh["aft"]:
-        t = (sh["aft"] - x) / sh["aft"]
-        return sh["stern"] * t * t
-    if x > sh["fore"]:
-        t = (x - sh["fore"]) / (162.0 - sh["fore"])
-        return sh["bow"] * t * t
-    return 0.0
+# --- the hull's form ------------------------------------------------------------------------------------------------------
+_SZ = [float(z) for z, _ in H.SECTION]
+_SW = [float(w) for _, w in H.SECTION]
 
 
-def line_z(z0, x):
-    """A strake line at midship height z0, risen by the sheer; the ancient band stays level (the sheer fades in above it)."""
-    k = min(max((z0 - STONE) / 6.0, 0.0), 1.0)
-    return z0 + sheer(x) * k
+def _pchip_slopes():
+    h = [b - a for a, b in zip(_SZ[:-1], _SZ[1:])]
+    d = [(w1 - w0) / hh for w0, w1, hh in zip(_SW[:-1], _SW[1:], h)]
+    m = [d[0]]
+    for k in range(1, len(d)):
+        if d[k - 1] * d[k] <= 0.0:
+            m.append(0.0)
+        else:
+            w1, w2 = 2.0 * h[k] + h[k - 1], h[k] + 2.0 * h[k - 1]
+            m.append((w1 + w2) / (w1 / d[k - 1] + w2 / d[k]))
+    m.append(d[-1])
+    return m
 
 
-def stone_top(x):
-    """The ancient hull's top: +3 all along, rising a little at the stem (outside.bow)."""
-    return STONE + 2.0 * smooth01((x - 148.0) / 12.0)
+_SM = _pchip_slopes()
+
+
+def sec_lin(z):
+    return H._interp(H.SECTION, z)
+
+
+def sec_smooth(z):
+    """The section's half-width with its knuckles rounded (monotone cubic through the data's points; clamped like the data)."""
+    if z <= _SZ[0]:
+        return _SW[0]
+    if z >= _SZ[-1]:
+        return _SW[-1]
+    for k in range(len(_SZ) - 1):
+        if z <= _SZ[k + 1]:
+            h = _SZ[k + 1] - _SZ[k]
+            t = (z - _SZ[k]) / h
+            h00, h10, h01, h11 = 2 * t ** 3 - 3 * t ** 2 + 1, t ** 3 - 2 * t ** 2 + t, -2 * t ** 3 + 3 * t ** 2, t ** 3 - t ** 2
+            return h00 * _SW[k] + h10 * h * _SM[k] + h01 * _SW[k + 1] + h11 * h * _SM[k + 1]
+    return _SW[-1]
+
+
+def hw(x, z):
+    """The planked hull's half-width: the data's (H.half_width) with the section's knuckles rounded."""
+    return H.half_width(x, z) * sec_smooth(z) / max(sec_lin(z), 1e-6)
+
+
+def surf(x, z, side):
+    return Vector((x, side * hw(x, z), z))
 
 
 def top(x):
     return H.profile_top(x)
 
 
-def surf(x, z, side):
-    return Vector((x, side * H.half_width(x, z), z))
+def bottom(x):
+    return H.profile_bottom(x)
+
+
+def stern_lean(z):
+    return H.stern_lean(z)
+
+
+def corner_x(z):
+    """Where the side meets the stern: the tuck's edge (x 1.6) below the counter, the round stern face's corner above."""
+    return POST_X if z < COUNTER else ROUND - stern_lean(z)
 
 
 def end_x(z):
@@ -118,301 +169,16 @@ def outward(x, z, side, a):
     return n
 
 
-def grime_hull(p):
-    """G: wet and green just over the ancient band, streaks fade upwards."""
-    return min(max((STONE + 1.4 - p.z) / 1.4, 0.0), 1.0) * 0.8
-
-
-# --- openings in the sides -----------------------------------------------------------------------------------------------
-def data_openings():
-    """The open spaces' windows and ports through the hull side (spaces' props on a wall at |y| >= 19): (side, x0, x1,
-    z0, z1) in absolute z. Their rooms are behind them."""
-    out = []
-    floors = {"slip": Z["quay"], "tally": Z["lower"], "keelgate": Z["quay"], "chandlery": Z["main"]}
-    for name, fl in floors.items():
-        for pr in H.space(name)["props"]:
-            wall = pr.get("wall", "")
-            if not wall.startswith("y="):
-                continue
-            y = float(wall[2:])
-            if abs(y) < 18.9:
-                continue
-            spans = pr.get("spans")
-            if spans is None and "note" in pr and "x 47..48.5" in pr["note"]:
-                spans = [[47.0, 48.5], [60.5, 62.0]]              # spaces.slip.hall_windows: the shop's windows (its note)
-                z0, z1 = 1.6, 3.2
-            else:
-                z0, z1 = pr.get("z0", 0.8), pr.get("z1", 2.0)
-            for x0, x1 in spans or []:
-                out.append((1 if y > 0 else -1, float(x0), float(x1), fl + z0, fl + z1))
-    return out
-
-
-# --- the sides: strakes --------------------------------------------------------------------------------------------------
-def strake_lines():
-    zs, z = [], STONE
-    while z < TOP + STRAKE:
-        zs.append(round(z, 4))
-        z += STRAKE
-    return zs
-
-
-def runs_for(side, za, zb, cuts, holes):
-    """The x runs where strake (za..zb) exists: under the profile's top, over the stone, aft of the stem; broken at the
-    part boundaries (cuts) and round the openings it crosses (holes: (x0, x1, z0, z1))."""
-    xs, step = [], 0.25
-    x = 0.06
-    ok_prev, start = False, None
-    runs = []
-    while x <= 163.0:
-        zl = max(line_z(za, x), stone_top(x))
-        zu = min(line_z(zb, x), top(x) - 0.02)
-        zm = 0.5 * (zl + zu)
-        ok = zu - zl >= 0.14 and x <= end_x(zm)
-        if ok and not ok_prev:
-            start = x
-        if not ok and ok_prev:
-            runs.append((start, x - step))
-        ok_prev = ok
-        x += step
-    if ok_prev:
-        runs.append((start, x - step))
-    out = []
-    for a, b in runs:
-        pieces = [(a, b)]
-        for c in cuts:
-            nxt = []
-            for p, q in pieces:
-                nxt += [(p, c), (c, q)] if p < c < q else [(p, q)]
-            pieces = nxt
-        for hx0, hx1, hz0, hz1 in holes:
-            nxt = []
-            for p, q in pieces:
-                zl, zu = line_z(za, 0.5 * (hx0 + hx1)), line_z(zb, 0.5 * (hx0 + hx1))
-                if zu > hz0 and zl < hz1 and p < hx1 and q > hx0:
-                    if hx0 - p > 0.1:
-                        nxt.append((p, hx0))
-                    if q - hx1 > 0.1:
-                        nxt.append((hx1, q))
-                else:
-                    nxt.append((p, q))
-            pieces = nxt
-        out += [(p, q) for p, q in pieces if q - p > 0.12]
-    return out
-
-
-def strake_frame(side, za, zb, xa, xb, proud):
-    def f(s):
-        x = xa + (xb - xa) * s
-        zl = max(line_z(za, x), stone_top(x))
-        zu = min(line_z(zb, x), top(x) - 0.02)
-        pl, pu = surf(x, zl, side), surf(x, zu, side)
-        acr = pu - pl
-        w = max(acr.length, 1e-4)
-        a = acr / w
-        n = outward(x, 0.5 * (zl + zu), side, a)
-        return (pl + pu) * 0.5 + n * (PLANK_T * 0.5 + proud), a, n, max(w - GAP, 0.02) / (STRAKE - GAP)
-    return f
-
-
-def plank_mat(rng):
-    r = rng.random()
-    return "MI_Hub_HullTarFaded" if r < 0.22 else ("MI_Hub_HullTarDark" if r < 0.36 else "MI_Hub_HullTar")
-
-
-def planking(part_of, holes_by_side):
-    """Carvel strakes on both sides, each in boards of 5-9.5 m with the butts staggered; each board its own shade, a few
-    millimetres proud or sunk; now and then a newer repair board (lighter, its edges less worn)."""
-    rng = random.Random(62)
-    lines = strake_lines()
-    for side in (1, -1):
-        holes = holes_by_side[side]
-        for j, (za, zb) in enumerate(zip(lines[:-1], lines[1:])):
-            for ra, rb in runs_for(side, za, zb, PARTS_X + (H.HUB["poopX"] + 0.6,), holes):
-                core_strip(part_of(0.5 * (ra + rb), side), side, za, zb, ra, rb)
-                # Board ends: start at a random offset so the butts do not line up with the strake below.
-                x = ra
-                first = rng.uniform(1.5, BOARD_LEN[1])
-                ends = []
-                while x < rb - 1e-6:
-                    ln = first if not ends else rng.uniform(*BOARD_LEN)
-                    xe = min(x + ln, rb)
-                    if rb - xe < 1.2:
-                        xe = rb
-                    ends.append((x, xe))
-                    x = xe
-                for xa, xb in ends:
-                    proud = rng.uniform(-0.008, 0.012)
-                    repair = rng.random() < 0.035
-                    mat = "MI_Hub_HullTarFaded" if repair else plank_mat(rng)
-                    fr = strake_frame(side, za, zb, xa + 0.006, xb - 0.006, proud)
-                    part = part_of(0.5 * (xa + xb), side)
-                    part.board(fr, T.length_of(fr), STRAKE - GAP, PLANK_T, mat, nseed(), seg=0.6,
-                               wear=0.35 if repair else rng.uniform(0.6, 1.0), grime=grime_hull,
-                               bend=0.02, twist=0.6, drift=0.03, slant=0.03, chamfer=rng.uniform(0.02, 0.035))
-
-
-def core_strip(part, side, za, zb, ra, rb):
-    """The dark caulked shell under one strake's run, so the seams read as tarred grooves (as the boat's hull_core); it
-    follows the runs, so the openings stay open."""
-    n = max(1, int(math.ceil((rb - ra) / 1.0)))
-    xs = [ra + (rb - ra) * k / n for k in range(n + 1)]
-    for xa, xb in zip(xs[:-1], xs[1:]):
-        pts = []
-        for x, up in ((xa, False), (xb, False), (xb, True), (xa, True)):
-            z = min(line_z(zb, x), top(x) - 0.02) if up else max(line_z(za, x), stone_top(x))
-            pts.append(surf(x, z, side))
-        part.polygon(pts, "MI_Caulk_Dark", tone=0.2, facing=outward(0.5 * (xa + xb), 0.5 * (za + zb), side, Vector((0, 0, 1))))
-
-
-def core(part_of):
-    """(Unused since the core follows the strakes: core_strip.)"""
-    for side in (1, -1):
-        stations = [0.0]
-        while stations[-1] < 162.0:
-            x = stations[-1]
-            stations.append(x + (0.5 if x > 140.0 else 1.0))
-        knots = [STONE - 0.2] + [STONE + 0.5 * k for k in range(1, 70)]
-        for xa, xb in zip(stations[:-1], stations[1:]):
-            part = part_of(0.5 * (xa + xb), side)
-            for za, zb in zip(knots[:-1], knots[1:]):
-                ta, tb = top(0.5 * (xa + xb)), stone_top(0.5 * (xa + xb)) - 0.2
-                z0, z1 = max(za, tb), min(zb, ta)
-                if z1 - z0 < 0.01:
-                    continue
-                xe = end_x(0.5 * (z0 + z1)) + 0.3
-                if xa >= xe:
-                    continue
-                xb_ = min(xb, xe)
-                pts = [surf(xa, z0, side), surf(xb_, z0, side), surf(xb_, z1, side), surf(xa, z1, side)]
-                if side > 0:
-                    pts.reverse()
-                part.polygon([tuple(p) for p in pts], "MI_Caulk_Dark", tone=0.2)
-
-
-# --- bands and wales -----------------------------------------------------------------------------------------------------
-BANDS = [  # (centre z at midship, height, proud, material): outside.sides: ochre at 5.5, 17.5, 33.5 (0.9 m), thinner ones
-    (STONE + 0.3, 0.6, 0.26, "MI_Wood_Tarred"),            # the heavy wale over the joint with the ancient hull
-    (Z["lower"], 0.9, 0.24, "MI_Hub_Ochre"), (Z["middle"], 0.4, 0.14, "MI_Hub_Ochre"), (Z["upper"], 0.4, 0.14, "MI_Hub_Ochre"),
-    (Z["main"], 0.9, 0.24, "MI_Hub_Ochre"), (Z["sc1"], 0.4, 0.14, "MI_Hub_Ochre"), (Z["sc2"], 0.9, 0.2, "MI_Hub_Ochre"),
-    (Z["sc3"], 0.4, 0.14, "MI_Hub_Ochre"), (Z["poop"], 0.9, 0.24, "MI_Hub_Ochre"),
-]
-
-
-def band_frame(side, zc, h, xa, xb, proud):
-    def f(s):
-        x = xa + (xb - xa) * s
-        zl, zu = line_z(zc - h * 0.5, x), line_z(zc + h * 0.5, x)
-        zl = max(zl, stone_top(x) - 0.3)
-        zu = min(zu, top(x) - 0.03)
-        pl, pu = surf(x, zl, side), surf(x, zu, side)
-        acr = pu - pl
-        w = max(acr.length, 1e-4)
-        a = acr / w
-        n = outward(x, 0.5 * (zl + zu), side, a)
-        return (pl + pu) * 0.5 + n * (PLANK_T + proud * 0.5), a, n, w / h
-    return f
-
-
-def bands(part_of, holes_by_side):
-    rng = random.Random(77)
-    for side in (1, -1):
-        for zc, h, proud, mat in BANDS:
-            for ra, rb in runs_for(side, zc - h * 0.5, zc + h * 0.5, PARTS_X + (H.HUB["poopX"] + 0.6,), holes_by_side[side]):
-                x = ra
-                while x < rb - 1e-6:
-                    xe = min(x + rng.uniform(7.0, 12.0), rb)
-                    if rb - xe < 2.0:
-                        xe = rb
-                    m = mat if mat != "MI_Hub_Ochre" or rng.random() > 0.25 else "MI_Hub_OchreFaded"
-                    fr = band_frame(side, zc, h, x + 0.01, xe - 0.01, proud)
-                    part_of(0.5 * (x + xe), side).beam(fr, T.length_of(fr), h, proud, m, nseed(), seg=0.6, wear=0.9,
-                                                        grime=grime_hull, bend=0.015, twist=0.4, chamfer=min(proud, h) * 0.3)
-                    x = xe
-
-
-# --- the ancient lower hull ----------------------------------------------------------------------------------------------
-def ancient(p):
-    """Pale seamless stone from the keel up to the band, a rounded lip under the wale; two thin glow lines (outside.sides:
-    the ancient band from -1.5 to +3 with two turquoise lines)."""
-    stations = [0.0]
-    while stations[-1] < 162.0:
-        x = stations[-1]
-        stations.append(x + (0.5 if x > 130.0 or x < 4.0 else 1.5))
-
-    def ring(x):
-        zb, zt = H.profile_bottom(x), stone_top(x)
-        zs = [zb, -10.0, -8.0, -6.0, -4.0, -2.0, -1.0, 0.0, 1.0, 2.0, zt - 0.35, zt - 0.12, zt]
-        zs = sorted({min(max(z, zb), zt) for z in zs})
-        pts = []
-        for z in zs:
-            w = H.half_width(x, z)
-            if zt - 0.35 < z < zt:
-                w += 0.08 * math.sin(math.pi * (z - (zt - 0.35)) / 0.35)          # the lip
-            pts.append((w, z))
-        return pts
-
-    rings = []
-    for x in stations:
-        xe = H.stem_x(0.0)
-        if x > xe + 0.3:
-            break
-        rings.append((x, ring(x)))
-    for side in (1, -1):
-        for (xa, ra), (xb, rb) in zip(rings[:-1], rings[1:]):
-            n = min(len(ra), len(rb))
-            for k in range(n - 1):
-                (wa0, za0), (wa1, za1) = ra[k], ra[k + 1]
-                (wb0, zb0), (wb1, zb1) = rb[k], rb[k + 1]
-                pts = [(xa, side * wa0, za0), (xb, side * wb0, zb0), (xb, side * wb1, zb1), (xa, side * wa1, za1)]
-                if side > 0:
-                    pts.reverse()
-                p.polygon(pts, "MI_Hub_AncientStone", tone=0.5, grime=lambda q: min(max((0.6 - q.z) / 1.2, 0.0), 1.0), smooth=True)
-        # The stern face below the band: full width under the basin's floor, the wings beside the mouth, solid stone under
-        # the quays (outside.stern).
-        floor = HUB["basin"]["floor"]
-        zb0 = H.profile_bottom(0.0)
-        for (za, zb, y0) in ((zb0, floor, 0.0), (floor, Z["quay"], HUB["basin"]["y1"]), (Z["quay"], STONE, HUB["quayY"])):
-            zs = [za + (zb - za) * k / 6 for k in range(7)]
-            for z0, z1 in zip(zs[:-1], zs[1:]):
-                pts = [(0.0, side * y0, z0), (0.0, side * H.half_width(0.0, z0), z0), (0.0, side * H.half_width(0.0, z1), z1), (0.0, side * y0, z1)]
-                p.polygon(pts, "MI_Hub_AncientStone", tone=0.5, grime=lambda q: min(max((0.6 - q.z) / 1.2, 0.0), 1.0), facing=(-1.0, 0.0, 0.0))
-        for zl in (-0.6, 1.9):
-            y0 = HUB["basin"]["y1"] if zl < Z["quay"] else HUB["quayY"]
-            p.polygon([(-0.012, side * y0, zl - 0.04), (-0.012, side * H.half_width(0.0, zl - 0.04), zl - 0.04),
-                       (-0.012, side * H.half_width(0.0, zl + 0.04), zl + 0.04), (-0.012, side * y0, zl + 0.04)], "MI_AncientGlow",
-                      tone=0.5, facing=(-1.0, 0.0, 0.0))
-        # The two lines: thin strips just proud of the stone, all along.
-        for zl in (-0.6, 1.9):
-            for (xa, _), (xb, _) in zip(rings[:-1], rings[1:]):
-                pts = []
-                for x in (xa, xb):
-                    for z in (zl - 0.04, zl + 0.04):
-                        pts.append((x, side * (H.half_width(x, z) + 0.012), z))
-                q = [pts[0], pts[2], pts[3], pts[1]]
-                if side > 0:
-                    q.reverse()
-                p.polygon(q, "MI_AncientGlow", tone=0.5)
-
-
-# --- ports, windows, channels, cap rails ----------------------------------------------------------------------------------
-JAMB = 0.2                          # frame timbers round an opening
-PORT = 1.0                          # outside.sides: lidded square ports of 1 m below the main deck
-WIN_W, WIN_H = 1.3, 2.0             # cream-framed windows above it
-PORT_ROWS = ((Z["lower"] + 1.0, 2.0), (Z["middle"] + 1.0, 0.0), (Z["upper"] + 1.0, 2.0))   # sill z, x offset (staggered)
-WIN_ROWS = (Z["sc1"] + 0.8, Z["sc2"] + 0.8, Z["sc3"] + 0.8)
-CHANNELS = {m: (float(HUB["rig"]["channels"][m]), HUB["rig"]["shrouds"][m]) for m in HUB["rig"]["shrouds"]}   # length, deadeyes
-GALLERY = (3.0, 13.0)               # outside.stern: the quarter galleries' x on the wings (z 21.5..32)
-
-
-def hull_frame(x, z, side):
-    """(point on the hull, T along the ship, A up the side, N outward) at (x, z)."""
+def hull_frame(x, z, side, slope=0.0):
+    """(point on the hull, T along the ship, A up the side, N outward) at (x, z); slope tilts T and A with the sheer."""
     p = surf(x, z, side)
     a = (surf(x, z + 0.05, side) - surf(x, z - 0.05, side)).normalized()
     n = outward(x, z, side, a)
     t = a.cross(n).normalized()
     if t.x < 0.0:
         t = -t
+    if slope:
+        t, a = (t + a * slope).normalized(), (a - t * slope).normalized()
     return p, t, a, n
 
 
@@ -429,6 +195,435 @@ def lbeam(part, F, u0, v0, u1, v1, width, thick, d, mat, wear=0.8, **kw):
         return
     across = n.cross((pb - pa).normalized())
     part.beam(T.straight(pa, pb, across, n), (pb - pa).length, width, thick, mat, nseed(), wear=wear, **kw)
+
+
+# --- the sheer ------------------------------------------------------------------------------------------------------------
+def sheer(x):
+    """How far the lines rise at x (hub.sheer): towards the stern and towards the stem."""
+    sh = HUB["sheer"]
+    if x < sh["aft"]:
+        t = min((sh["aft"] - x) / sh["aft"], 1.05)
+        return sh["stern"] * t * t
+    if x > sh["fore"]:
+        t = (x - sh["fore"]) / (162.0 - sh["fore"])
+        return sh["bow"] * t * t
+    return 0.0
+
+
+def sheer_k(z0):
+    """How much of the sheer a line at midship height z0 takes: none on the bottom, all from the waterline belt to the gun
+    deck, fading out up the castles (their bands stay level with their decks, under the level rails)."""
+    return smooth01((z0 + 7.0) / 6.0) * (1.0 - smooth01((z0 - Z["gun"]) / (TOP - 8.0 - Z["gun"])))
+
+
+def line_z(z0, x):
+    return z0 + sheer(x) * sheer_k(z0)
+
+
+def line_slope(z0, x):
+    return (line_z(z0, x + 0.5) - line_z(z0, x - 0.5))
+
+
+def grime_hull(p):
+    """G: wet and green at the waterline, fading up; streaks under it."""
+    return min(max((1.2 - abs(p.z - 0.2)) / 1.2, 0.0), 1.0) * 0.85
+
+
+# --- the strake lines -------------------------------------------------------------------------------------------------------
+def _grid_origin():
+    """The midship height of the seam that lies at the doors' z0 at their middle: the side's seams are laid STRAKE apart from
+    it, so the doors' bottom and top edges are seams (z0 at the middle; the top one at z1 at the aft jamb, where the sheer
+    lifts it most)."""
+    z0 = float(DOORS["z0"])
+    for _ in range(20):
+        z0 -= line_z(z0, 0.5 * (DOORS["x0"] + DOORS["x1"])) - DOORS["z0"]
+    return z0
+
+
+def strake_lines():
+    """Midship heights of the strake seams: from the keel's chine (z -12) round the bilge in equal steps of about
+    BILGE_STRAKE along the midship section, then STRAKE apart (on the doors' grid) up to the top."""
+    g0 = _grid_origin()
+    k0 = int(math.floor((-6.0 - g0) / STRAKE))
+    first = g0 + STRAKE * k0                               # the lowest grid seam over the bilge's knuckle
+    girth, zz, marks = 0.0, KEEL, [(KEEL, 0.0)]
+    while zz < first - 1e-9:
+        z1 = min(zz + 0.02, first)
+        girth += math.hypot(z1 - zz, sec_smooth(z1) - sec_smooth(zz))
+        zz = z1
+        marks.append((zz, girth))
+    n = max(1, int(round(girth / BILGE_STRAKE)))
+    zs = [KEEL]
+    for k in range(1, n):
+        g = girth * k / n
+        zs.append(round(next(z for z, gg in marks if gg >= g), 4))
+    z = first
+    while z < TOP + 2.6:
+        zs.append(round(z, 4))
+        z += STRAKE
+    return zs
+
+
+LINES = strake_lines()
+
+
+def nearest_line(z, x, below=None):
+    """The index of the seam line nearest z at x (or the highest one at or below z when below is True)."""
+    best = None
+    for j, z0 in enumerate(LINES):
+        zz = line_z(z0, x)
+        if below and zz > z + 0.02:
+            continue
+        if best is None or abs(zz - z) < abs(line_z(LINES[best], x) - z):
+            best = j
+    return best
+
+
+# The doors: their bottom and top edges follow seams (the top one stays under z1 even at the aft jamb, where the sheer lifts it).
+DOOR_X = (float(DOORS["x0"]), 0.5 * (DOORS["x0"] + DOORS["x1"]), float(DOORS["x1"]))
+DOOR_J = (nearest_line(DOORS["z0"], DOOR_X[1]), nearest_line(DOORS["z1"], DOOR_X[0], below=True))
+
+
+def door_band(z0a, z0b):
+    """True when a band between midship heights z0a..z0b lies on the doors (within their seams)."""
+    return z0a >= LINES[DOOR_J[0]] - 1e-6 and z0b <= LINES[DOOR_J[1]] + 1e-6
+
+
+def door_leaf(x, z0a, z0b, side):
+    """The leaf a piece at x with midship band z0a..z0b belongs to: (side, 'A' aft / 'F' fore) or None."""
+    if DOOR_X[0] < x < DOOR_X[2] and door_band(z0a, z0b):
+        return (side, "A" if x < DOOR_X[1] else "F")
+    return None
+
+
+# --- routing: which part a piece goes into -----------------------------------------------------------------------------------
+class Router:
+    """Where the generated pieces go. hull: the four side meshes (door pieces skipped); doors: only the door pieces, into the
+    leaf parts."""
+
+    def __init__(self, parts, doors=None, x_range=(-5.0, 170.0)):
+        self.parts, self.doors, self.x_range = parts, doors, x_range
+
+    def __call__(self, x, side, z0a=None, z0b=None):
+        leaf = door_leaf(x, z0a, z0b, side) if z0a is not None else None
+        if self.doors is not None:
+            return self.doors.get(leaf) if leaf else None
+        if leaf:
+            return None
+        if x < PARTS_X[0]:
+            return self.parts["stern"]
+        if x > PARTS_X[1]:
+            return self.parts["bow"]
+        return self.parts["waistS"] if side > 0 else self.parts["waistP"]
+
+    def wanted(self, xa, xb):
+        return xb > self.x_range[0] and xa < self.x_range[1]
+
+
+# --- the sides: strakes -------------------------------------------------------------------------------------------------------
+def band_edges(za, zb, x):
+    """The z of a band's lower and upper edge at x (lines za..zb, clipped by the bottom and the top)."""
+    return max(line_z(za, x), bottom(x)), min(line_z(zb, x), top(x) - 0.02)
+
+
+def runs_for(za, zb, cuts, holes, x_lo=-2.0, x_hi=163.0):
+    """The x runs where the band (lines za..zb) exists on the side: under the top, over the bottom, between the stern's
+    corner and the stem; broken at the cuts and round the openings it crosses (holes: (x0, x1, z0, z1))."""
+    step = 0.25
+    x = max(x_lo, -1.2)
+    ok_prev, start = False, None
+    runs = []
+    while x <= min(x_hi, 163.0):
+        zl, zu = band_edges(za, zb, x)
+        zm = 0.5 * (zl + zu)
+        ok = zu - zl >= 0.12 and corner_x(zu) + 0.04 <= x <= end_x(zm) and x >= corner_x(zl) + 0.04
+        if ok and not ok_prev:
+            start = x
+        if not ok and ok_prev:
+            runs.append((start, x - step))
+        ok_prev = ok
+        x += step
+    if ok_prev:
+        runs.append((start, x - step))
+    out = []
+    for a, b in runs:
+        # Refine the ends to 2 cm (the scan's step leaves gaps at the stern's corner and the stem).
+        a, b = _refine(za, zb, a, a - step, -1), _refine(za, zb, b, b + step, 1)
+        pieces = [(a, b)]
+        for c in cuts:
+            nxt = []
+            for p, q in pieces:
+                nxt += [(p, c), (c, q)] if p + 0.05 < c < q - 0.05 else [(p, q)]
+            pieces = nxt
+        for hx0, hx1, hz0, hz1 in holes:
+            nxt = []
+            for p, q in pieces:
+                zl, zu = line_z(za, 0.5 * (hx0 + hx1)), line_z(zb, 0.5 * (hx0 + hx1))
+                if zu > hz0 + 0.01 and zl < hz1 - 0.01 and p < hx1 and q > hx0:
+                    if hx0 - p > 0.1:
+                        nxt.append((p, hx0))
+                    if q - hx1 > 0.1:
+                        nxt.append((hx1, q))
+                else:
+                    nxt.append((p, q))
+            pieces = nxt
+        out += [(p, q) for p, q in pieces if q - p > 0.12]
+    return out
+
+
+def _refine(za, zb, x_in, x_out, sgn):
+    """Bisect between a scan point inside the band's run and one outside it."""
+    def ok(x):
+        zl, zu = band_edges(za, zb, x)
+        return zu - zl >= 0.12 and corner_x(zu) + 0.04 <= x <= end_x(0.5 * (zl + zu)) and x >= corner_x(zl) + 0.04
+    if ok(x_out):
+        return x_in
+    for _ in range(8):
+        m = 0.5 * (x_in + x_out)
+        if ok(m):
+            x_in = m
+        else:
+            x_out = m
+    return x_in
+
+
+def strake_frame(side, za, zb, xa, xb, proud):
+    def f(s):
+        x = xa + (xb - xa) * s
+        zl, zu = band_edges(za, zb, x)
+        pl, pu = surf(x, zl, side), surf(x, zu, side)
+        acr = pu - pl
+        w = max(acr.length, 1e-4)
+        a = acr / w
+        n = outward(x, 0.5 * (zl + zu), side, a)
+        return (pl + pu) * 0.5 + n * (PLANK_T * 0.5 + proud), a, n, max(w - GAP, 0.02) / (STRAKE - GAP)
+    return f
+
+
+def plank_mat(rng):
+    r = rng.random()
+    return "MI_Hub_HullTarFaded" if r < 0.22 else ("MI_Hub_HullTarDark" if r < 0.36 else "MI_Hub_HullTar")
+
+
+def cuts_for(za, zb):
+    return PARTS_X + (DOOR_X if door_band(za, zb) else ())
+
+
+def planking(route, holes_by_side):
+    """Carvel strakes on both sides, each in boards of 5-9.5 m with the butts staggered; each board its own shade, a few
+    millimetres proud or sunk; now and then a newer repair board (lighter, its edges less worn)."""
+    rng = random.Random(62)
+    for side in (1, -1):
+        holes = holes_by_side[side]
+        for j, (za, zb) in enumerate(zip(LINES[:-1], LINES[1:])):
+            for ra, rb in runs_for(za, zb, cuts_for(za, zb), holes, *route.x_range):
+                core_strip(route, side, za, zb, ra, rb)
+                x = ra
+                first = rng.uniform(1.5, BOARD_LEN[1])
+                ends = []
+                while x < rb - 1e-6:
+                    ln = first if not ends else rng.uniform(*BOARD_LEN)
+                    xe = min(x + ln, rb)
+                    if rb - xe < 1.2:
+                        xe = rb
+                    ends.append((x, xe))
+                    x = xe
+                for xa, xb in ends:
+                    proud = rng.uniform(-0.008, 0.012)
+                    repair = rng.random() < 0.035
+                    mat = "MI_Hub_HullTarFaded" if repair else plank_mat(rng)
+                    wear, chamfer = (0.35 if repair else rng.uniform(0.6, 1.0)), rng.uniform(0.02, 0.035)
+                    part = route(0.5 * (xa + xb), side, za, zb)
+                    if part is None:
+                        continue
+                    fr = strake_frame(side, za, zb, xa + 0.006, xb - 0.006, proud)
+                    deep = line_z(zb, 0.5 * (xa + xb)) < -3.0                 # under water: fewer rings
+                    part.board(fr, T.length_of(fr, 8), STRAKE - GAP, PLANK_T, mat, nseed(), seg=1.2 if deep else 0.6,
+                               wear=wear, grime=grime_hull, bend=0.02, twist=0.6, drift=0.03, slant=0.03, chamfer=chamfer)
+
+
+def core_strip(route, side, za, zb, ra, rb):
+    """The dark caulked shell under one strake's run, so the seams read as tarred grooves (as the boat's hull_core); it
+    follows the runs, so the openings stay open."""
+    n = max(1, int(math.ceil((rb - ra) / 1.0)))
+    xs = [ra + (rb - ra) * k / n for k in range(n + 1)]
+    for xa, xb in zip(xs[:-1], xs[1:]):
+        part = route(0.5 * (xa + xb), side, za, zb)
+        if part is None:
+            continue
+        pts = []
+        for x, up in ((xa, False), (xb, False), (xb, True), (xa, True)):
+            zl, zu = band_edges(za, zb, x)
+            pts.append(surf(x, zu if up else zl, side))
+        part.polygon(pts, "MI_Caulk_Dark", tone=0.2, facing=outward(0.5 * (xa + xb), 0.5 * (za + zb), side, Vector((0, 0, 1))))
+
+
+# --- the bottom and the keel --------------------------------------------------------------------------------------------------
+BOTTOM_X = (4.6, 131.5)
+
+
+def chine_y(x):
+    """The flat bottom's half-width at x (where the side meets it)."""
+    return hw(x, bottom(x))
+
+
+def bottom_planks(route):
+    """The flat bottom beside the keel: planks fore and aft, the outer ones ending under a chine plank that follows the edge."""
+    rng = random.Random(64)
+    x0, x1 = BOTTOM_X
+    for side in (1, -1):
+        part_of = lambda x: route(x, side)                                                     # noqa: E731
+        k = 0
+        while True:
+            yc = KEEL_HW - 0.05 + BOTTOM_W * (k + 0.5)
+            k += 1
+            if yc + BOTTOM_W * 0.5 > 6.3:
+                break
+            # Where this plank fits inside the chine plank's middle.
+            xs = [x for x in [x0 + 0.25 * i for i in range(int((x1 - x0) / 0.25) + 1)] if yc + BOTTOM_W * 0.5 < chine_y(x) - 0.3]
+            if not xs:
+                continue
+            a, b = xs[0], xs[-1]
+            x = a
+            while x < b - 0.2:
+                xe = min(x + rng.uniform(6.0, 10.0), b)
+                if b - xe < 1.5:
+                    xe = b
+                part = part_of(0.5 * (x + xe))
+                if part is not None and route.wanted(x, xe):
+                    pts = [Vector((xx, side * yc, bottom(xx) - PLANK_T * 0.5)) for xx in (x + 0.01, 0.5 * (x + xe), xe - 0.01)]
+                    fr = T.polyline(pts, Vector((0.0, 1.0, 0.0)), Vector((0.0, 0.0, -1.0)))
+                    part.board(fr, T.length_of(fr), BOTTOM_W - GAP, PLANK_T, plank_mat(rng), nseed(), seg=1.5, wear=0.5, bend=0.01,
+                               twist=0.3, chamfer=0.025)
+                    part.polygon([(x, side * (yc - BOTTOM_W * 0.5), bottom(x)), (xe, side * (yc - BOTTOM_W * 0.5), bottom(xe)),
+                                  (xe, side * (yc + BOTTOM_W * 0.5), bottom(xe)), (x, side * (yc + BOTTOM_W * 0.5), bottom(x))],
+                                 "MI_Caulk_Dark", tone=0.2, facing=(0.0, 0.0, -1.0))
+                x = xe
+        # The chine piece over the corner where the bottom meets the side: it takes the bottom planks' ends and the side
+        # strakes' ends where the bottom rises towards the ends.
+        x = x0
+        while x < x1 - 0.2:
+            xe = min(x + rng.uniform(5.0, 8.0), x1)
+            part = part_of(0.5 * (x + xe))
+            if part is not None and route.wanted(x, xe):
+                n = max(2, int((xe - x) / 1.0))
+
+                def chine_frame(s, x=x, xe=xe):
+                    xx = x + (xe - x) * s
+                    zb = bottom(xx)
+                    up = (surf(xx, zb + 0.6, side) - surf(xx, zb, side)).normalized()        # up the side from the chine
+                    out_b = Vector((0.0, 0.0, -1.0))
+                    out_s = outward(xx, zb + 0.3, side, up)
+                    nrm = (out_b + out_s).normalized()
+                    acr = (up + Vector((0.0, side, 0.0))).normalized()                     # across the corner
+                    acr = (acr - nrm * acr.dot(nrm)).normalized()
+                    return Vector((xx, side * chine_y(xx), zb)) + nrm * 0.12, acr, nrm, 1.0
+                part.beam(chine_frame, T.length_of(chine_frame, n), 1.1, 0.26, "MI_Hub_HullTarDark", nseed(), seg=1.5, wear=0.6, bend=0.01,
+                          twist=0.3, drift=0.0)
+            x = xe
+
+
+def keel(route):
+    """The keel along the bottom's middle: oak in lengths scarfed together, standing below the bottom (the stem and the
+    sternpost are the ends' timbers)."""
+    rng = random.Random(65)
+    x = BOTTOM_X[0] - 0.3
+    while x < 132.0:
+        xe = min(x + rng.uniform(9.0, 13.0), 132.6)
+        if 132.6 - xe < 3.0:
+            xe = 132.6
+        part = route(0.5 * (x + xe), 1)
+        if part is not None and route.wanted(x, xe):
+            n = max(2, int((xe - x) / 1.5))
+            # Its bottom KEEL_DOWN under the bottom planks' face, its top 0.3 up inside the hull.
+            depth = PLANK_T + KEEL_DOWN + 0.3
+            pts = [Vector((xx, 0.0, bottom(xx) + 0.3 - depth * 0.5)) for xx in [x + 0.01 + (xe - x - 0.02) * i / n for i in range(n + 1)]]
+            fr = T.polyline(pts, Vector((0.0, 1.0, 0.0)), Vector((0.0, 0.0, 1.0)))
+            part.beam(fr, T.length_of(fr), 2 * KEEL_HW, depth, "MI_Hub_HullTarDark", nseed(), seg=1.5, wear=0.8,
+                      grime=lambda q: 0.6)
+        x = xe
+
+
+# --- bands and wales ------------------------------------------------------------------------------------------------------------
+# (midship centre z, height, proud, material, moulded): the waterline belt of three heavy tarred wales, wales at the deck lines,
+# broad ochre bands at the main deck, the quarterdeck and the poop.
+WALES = [
+    (-0.55, 0.55, 0.34, "MI_Wood_Tarred", True), (0.45, 0.6, 0.38, "MI_Wood_Tarred", True), (Z["quay"] - 0.02, 0.6, 0.36, "MI_Wood_Tarred", True),
+    (Z["lower"], 0.42, 0.22, "MI_Hub_Ochre", True), (Z["middle"], 0.4, 0.2, "MI_Wood_Tarred", True),
+    (Z["upper"], 0.42, 0.22, "MI_Hub_Ochre", True), (Z["gun"], 0.45, 0.24, "MI_Wood_Tarred", True),
+    (Z["main"], 0.85, 0.26, "MI_Hub_Ochre", False),
+    (Z["sc1"], 0.38, 0.18, "MI_Hub_Ochre", True), (Z["sc2"], 0.85, 0.24, "MI_Hub_Ochre", False),
+    (Z["sc3"], 0.38, 0.18, "MI_Hub_Ochre", True), (Z["poop"], 0.85, 0.24, "MI_Hub_Ochre", False),
+]
+
+
+def moulding_section(h, p):
+    """A wale's section (across up the hull, out from it): a flat back, a fillet and a full half-round face that catches the
+    light (D64, owner: more shape)."""
+    f = min(0.05, h * 0.12)
+    sec = [(-h * 0.5, 0.0, ""), (h * 0.5, 0.0, ""), (h * 0.5, p * 0.28, "c"), (h * 0.5 - f, p * 0.36, "c")]
+    n = 7
+    for k in range(1, n):
+        th = math.pi * k / n
+        sec.append(((h * 0.5 - f) * math.cos(th), p * 0.36 + p * 0.64 * math.sin(th), "t" if 1 < k < n - 1 else "c"))
+    sec += [(-h * 0.5 + f, p * 0.36, "c"), (-h * 0.5, p * 0.28, "c")]
+    return sec
+
+
+def band_frame(side, z0, h, xa, xb, out=0.0):
+    def f(s):
+        x = xa + (xb - xa) * s
+        zl, zu = line_z(z0 - h * 0.5, x), line_z(z0 + h * 0.5, x)
+        zu = min(zu, top(x) - 0.03)
+        zl = min(zl, zu - 0.05)
+        pl, pu = surf(x, zl, side), surf(x, zu, side)
+        acr = pu - pl
+        w = max(acr.length, 1e-4)
+        a = acr / w
+        n = outward(x, 0.5 * (zl + zu), side, a)
+        return (pl + pu) * 0.5 + n * (PLANK_T + out), a, n, w / h
+    return f
+
+
+def wales(route, holes_by_side):
+    rng = random.Random(77)
+    for side in (1, -1):
+        for z0, h, proud, mat, moulded in WALES:
+            za, zb = z0 - h * 0.5, z0 + h * 0.5
+            for ra, rb in runs_for(za, zb, cuts_for(za, zb), holes_by_side[side], *route.x_range):
+                x = ra
+                while x < rb - 1e-6:
+                    xe = min(x + rng.uniform(7.0, 12.0), rb)
+                    if rb - xe < 2.0:
+                        xe = rb
+                    part = route(0.5 * (x + xe), side, za, zb)
+                    x0, x = x, xe
+                    if part is None:
+                        continue
+                    m = mat if mat != "MI_Hub_Ochre" or rng.random() > 0.25 else "MI_Hub_OchreFaded"
+                    if moulded:
+                        fr = band_frame(side, z0, h, x0 + 0.01, xe - 0.01)
+                        part.sweep(fr, T.length_of(fr, 8), moulding_section(h, proud), m, nseed(), seg=0.7, wear=0.9,
+                                   grime=grime_hull, bend=0.015, twist=0.3, drift=0.02, wobble=0.006, slant=0.03)
+                    else:
+                        fr = band_frame(side, z0, h, x0 + 0.01, xe - 0.01, proud * 0.5)
+                        part.beam(fr, T.length_of(fr, 8), h, proud, m, nseed(), seg=0.7, wear=0.9, grime=grime_hull, bend=0.015,
+                                  twist=0.4, chamfer=min(proud, h) * 0.3)
+                        # A thin tarred fillet along each edge of the broad bands: they read as mouldings, not stripes.
+                        for e in (-1.0, 1.0):
+                            fe = band_frame(side, z0 + e * (h * 0.5 + 0.05), 0.1, x0 + 0.01, xe - 0.01, 0.0)
+                            part.beam(fe, T.length_of(fe, 8), 0.1, proud + 0.06, "MI_Wood_Tarred", nseed(), seg=0.9, wear=0.6,
+                                      bend=0.01, twist=0.2)
+
+
+# --- ports, windows, channels, cap rails ------------------------------------------------------------------------------------------
+JAMB = 0.2                          # frame timbers round an opening
+PORT = 1.0                          # outside.sides: lidded square ports of 1 m below the main deck
+WIN_W, WIN_H = 1.3, 2.0             # cream-framed windows above it
+PORT_ROWS = [(Z[k] + 1.0, (k in ("lower", "upper"))) for k in ("quay", "lower", "middle", "upper", "gun")]   # (sill z0, offset row)
+WIN_ROWS = [Z[k] + 0.8 for k in ("main", "sc1", "sc2", "sc3")]
+CHANNELS = {m: (float(HUB["rig"]["channels"][m]), HUB["rig"]["shrouds"][m]) for m in HUB["rig"]["shrouds"]}   # length, deadeyes
+QG = HUB["galleries"]["quarter"]
 
 
 def mast_x(mid):
@@ -449,20 +644,33 @@ def channel_z(mid):
 
 
 def bow_turn(x, z, side):
-    """How much the hull turns forward at (x, z): the outward normal's x (0 amidships, about 1 at the stem)."""
+    """How much the hull turns at (x, z): the outward normal's |x| (0 amidships, about 1 at the stem)."""
     return abs(hull_frame(x, z, side)[3].x)
 
 
+def data_openings():
+    """The open spaces' ports through the hull side (the Tally House's hull_ports): (side, x0, x1, z0, z1), absolute z."""
+    out = []
+    floors = {"slip": Z["quay"], "tally": Z["lower"], "keelgate": Z["quay"], "chandlery": Z["main"]}
+    for name, fl in floors.items():
+        for pr in H.space(name)["props"]:
+            wall = pr.get("wall", "")
+            if not wall.startswith("y=") or abs(float(wall[2:])) < 18.9:
+                continue
+            for x0, x1 in pr.get("spans") or []:
+                out.append((1 if float(wall[2:]) > 0 else -1, float(x0), float(x1), fl + pr.get("z0", 0.8), fl + pr.get("z1", 2.0)))
+    return out
+
+
 def fittings():
-    """Every opening and lid on the sides: the open spaces' ports and windows (data), the lidded ports below the main
-    deck, the castles' windows. kind: room (a real room behind it), shut, open, patched (lid gone, boarded), glass, lit,
-    shutter."""
+    """Every opening and lid on the sides: the Tally House's ports (data), lidded ports on every deck below the main deck,
+    windows on the castles' storeys. kind: room (a real room behind it, open), shut, open, lit (lid hauled up, a lantern
+    inside), patched (lid gone, boarded), glass, glow (a lit window), shutter. z0 is the sill's midship height (the sheer
+    lifts it towards the ends)."""
     rng = random.Random(512)
     out = []
-    rooms = data_openings()
-    for side, x0, x1, z0, z1 in rooms:
-        out.append(dict(side=side, x0=x0, x1=x1, z0=z0, z1=z1, kind="room", lid=z1 - z0 < 1.5))
-    tally = HUB["tally"]
+    for side, x0, x1, z0, z1 in data_openings():
+        out.append(dict(side=side, x0=x0, x1=x1, z0=z0, z1=z1, kind="room"))
 
     def clear(side, x, z0, z1, margin):
         for f in out:
@@ -477,39 +685,45 @@ def fittings():
                 return False
         return True
 
+    def seam_clear(x, half, z0, z1):
+        cuts = PARTS_X + (HUB["poopX"], HUB["qdX"], HUB["fcX"]) + (DOOR_X if door_band(z0 - 0.6, z1 + 0.6) or door_band(z0, z1) else ())
+        return all(abs(x - c) > half + 0.45 for c in cuts)
+
     for side in (1, -1):
-        for zs, off in PORT_ROWS:
-            x = 6.0 + off
+        for zs, offset in PORT_ROWS:
+            x = 7.0 if offset else 6.0                          # offset rows 1 m along (the doors' seams fall between)
             while x < 158.0:
-                ok = (x + PORT * 0.5 < end_x(zs) - 3.0 and bow_turn(x, zs + 0.5, side) < 0.3 and chain_clear(x, zs + PORT)
-                      and all(abs(x - c) > 1.4 for c in PARTS_X + (H.HUB["poopX"] + 0.3,)) and clear(side, x, zs, zs + PORT, 2.0)
-                      and zs + PORT < top(x) - 1.0)
+                zl = line_z(zs, x)
+                ok = (x > corner_x(zl) + 4.0 and x + PORT * 0.5 < end_x(zl) - 3.0 and bow_turn(x, zl + 0.5, side) < 0.3
+                      and chain_clear(x, zl + PORT) and seam_clear(x, PORT * 0.5, zs, zs + PORT) and clear(side, x, zs, zs + PORT, 2.0)
+                      and line_z(zs + PORT, x) < top(x) - 1.0)
                 if ok:
-                    in_room = side > 0 and tally["x0"] - 1.0 < x < tally["x1"] + 1.0 and abs(zs - (Z["lower"] + 1.0)) < 0.1
+                    on_door = door_leaf(x, zs, zs + PORT, side) is not None
                     r = rng.random()
-                    kind = "shut" if (r < 0.7 or in_room) else ("open" if r < 0.92 else "patched")
+                    kind = "shut" if (r < 0.68 or on_door) else ("open" if r < 0.86 else ("lit" if r < 0.92 else "patched"))
                     out.append(dict(side=side, x0=x - PORT * 0.5, x1=x + PORT * 0.5, z0=zs, z1=zs + PORT, kind=kind))
                 x += 4.0
         for zs in WIN_ROWS:
-            x = 14.5
+            x = 15.6
             while x < 158.0:
-                fc = zs == Z["fc1"] + 0.8 and x > PARTS_X[1]
-                ok = (zs + WIN_H < top(x) - 0.9 and x + WIN_W * 0.5 < end_x(zs) - 2.0 and bow_turn(x, zs + 1.0, side) < 0.35
-                      and chain_clear(x, zs + WIN_H) and not (GALLERY[0] - 1.0 < x < GALLERY[1] + 1.0)
-                      and all(abs(x - c) > 1.8 for c in PARTS_X + (H.HUB["poopX"] + 0.3,)) and (x < PARTS_X[0] or fc))
+                zl = line_z(zs, x)
+                castle = x < HUB["qdX"] or x > HUB["fcX"]
+                ok = (castle and line_z(zs + WIN_H, x) < top(x) - 0.9 and x + WIN_W * 0.5 < end_x(zl) - 2.5
+                      and bow_turn(x, zl + 1.0, side) < 0.35 and chain_clear(x, zl + WIN_H) and seam_clear(x, WIN_W * 0.5 + 0.4, zs, zs + WIN_H)
+                      and not (QG["x0"] - 1.4 < x < QG["x1"] + 1.4 and zs + WIN_H > QG["z0"] - 0.5))
                 if ok:
                     r = rng.random()
-                    kind = "glass" if r < 0.5 else ("lit" if r < 0.7 else "shutter")
+                    kind = "glass" if r < 0.5 else ("glow" if r < 0.68 else "shutter")
                     out.append(dict(side=side, x0=x - WIN_W * 0.5, x1=x + WIN_W * 0.5, z0=zs, z1=zs + WIN_H, kind=kind))
-                x += 4.0
-    # Cut strake-aligned holes for every opening with nothing in front of it.
-    lines = strake_lines()
+                x += 3.6
+    # Strake-aligned holes for every opening with nothing in front of it (at the opening's middle).
     for f in out:
         xc = 0.5 * (f["x0"] + f["x1"])
-        lz = [line_z(l, xc) for l in lines]
-        f["hz0"] = max([z for z in lz if z <= f["z0"] + 0.02] or [f["z0"]])
-        f["hz1"] = min([z for z in lz if z >= f["z1"] - 0.02] or [f["z1"]])
-        f["hole"] = f["kind"] in ("room", "open", "glass", "lit", "shutter")
+        lz = [line_z(l, xc) for l in LINES]
+        zl0, zl1 = line_z(f["z0"], xc), line_z(f["z1"], xc)
+        f["hz0"] = max([z for z in lz if z <= zl0 + 0.02] or [zl0])
+        f["hz1"] = min([z for z in lz if z >= zl1 - 0.02] or [zl1])
+        f["hole"] = f["kind"] not in ("shut", "patched")
     return out
 
 
@@ -521,18 +735,22 @@ def holes_of(fits):
     return holes
 
 
-def fitting(part, f, F=None):
-    """One opening or lid on the hull's local plane at its centre (or on the plane F given: the transom)."""
-    side, x0, x1, z0, z1 = f["side"], f["x0"], f["x1"], f["z0"], f["z1"]
-    xc, zc = 0.5 * (x0 + x1), 0.5 * (z0 + z1)
-    F = F or hull_frame(xc, zc, side)
-    hw_, hh = 0.5 * (x1 - x0), 0.5 * (z1 - z0)
-    window = f["kind"] in ("glass", "lit", "shutter")
-    frame_mat = "MI_Paint_Cream" if window else ("MI_Hub_HullTarDark" if f["kind"] != "room" else "MI_Paint_CreamAged")
-    if window and random.random() < 0.3:
+def fitting(part, f, F=None, rng=None):
+    """One opening or lid on the hull's local plane at its middle (tilted with the sheer), or on the plane F given."""
+    rng = rng or random.Random(nseed())
+    side, x0, x1 = f["side"], f["x0"], f["x1"]
+    xc = 0.5 * (x0 + x1)
+    zl0, zl1 = line_z(f["z0"], xc), line_z(f["z1"], xc)
+    zc = 0.5 * (zl0 + zl1)
+    F = F or hull_frame(xc, zc, side, slope=line_slope(f["z0"], xc))
+    hw_, hh = 0.5 * (x1 - x0), 0.5 * (zl1 - zl0)
+    kind = f["kind"]
+    window = kind in ("glass", "glow", "shutter")
+    frame_mat = "MI_Paint_Cream" if window else ("MI_Hub_HullTarDark" if kind != "room" else "MI_Paint_CreamAged")
+    if window and rng.random() < 0.3:
         frame_mat = "MI_Paint_CreamAged"
     d0 = PLANK_T - 0.02
-    if f["hole"]:
+    if f.get("hole"):
         # The frame: jambs over the cut board ends, a head and a sill filling to the strake lines.
         hz0, hz1 = f["hz0"] - zc, f["hz1"] - zc
         lbeam(part, F, -hw_ - JAMB * 0.5, hz0 - 0.05, -hw_ - JAMB * 0.5, hz1 + 0.05, JAMB, 0.14, d0, frame_mat)
@@ -541,16 +759,13 @@ def fitting(part, f, F=None):
         lbeam(part, F, -hw_ - JAMB, hh + head * 0.5, hw_ + JAMB, hh + head * 0.5, head, 0.16, d0 + 0.01, frame_mat)
         sill = max(-hh - hz0, 0.16)
         lbeam(part, F, -hw_ - JAMB - 0.08, -hh - sill * 0.5, hw_ + JAMB + 0.08, -hh - sill * 0.5, sill, 0.2, d0 + 0.01, frame_mat)
-        # The reveal: the opening's lining through the hull, dark inside.
-        lining = "MI_Hub_HullTarDark"
-        lbeam(part, F, -hw_ + 0.04, -hh, -hw_ + 0.04, hh, 0.08, 0.6, -0.45, lining, wear=0.3)
-        lbeam(part, F, hw_ - 0.04, -hh, hw_ - 0.04, hh, 0.08, 0.6, -0.45, lining, wear=0.3)
-        lbeam(part, F, -hw_, -hh + 0.04, hw_, -hh + 0.04, 0.08, 0.6, -0.45, lining, wear=0.3)
-        lbeam(part, F, -hw_, hh - 0.04, hw_, hh - 0.04, 0.08, 0.6, -0.45, lining, wear=0.3)
-    kind = f["kind"]
-    if kind in ("open", "room") and f.get("lid", True):
+        # The reveal: the opening's lining through the planking and the frames (it stays inside the hull's 0.35 m).
+        for u0, v0, u1, v1 in ((-hw_ + 0.04, -hh, -hw_ + 0.04, hh), (hw_ - 0.04, -hh, hw_ - 0.04, hh),
+                               (-hw_, -hh + 0.04, hw_, -hh + 0.04), (-hw_, hh - 0.04, hw_, hh - 0.04)):
+            lbeam(part, F, u0, v0, u1, v1, 0.08, 0.42, -0.28, "MI_Hub_HullTarDark", wear=0.3)
+    if kind in ("open", "lit", "room"):
         # A lid hinged at its head, hauled up and out: planked outside, the inside painted oxblood like the boat's hull.
-        ang = math.radians(random.uniform(48.0, 72.0))
+        ang = math.radians(rng.uniform(48.0, 72.0))
         p, t, a, n = F
         hinge = lpt(F, 0.0, hh + 0.04, PLANK_T + 0.02)
         down = -a * math.cos(ang) + n * math.sin(ang)            # hinge -> free edge, swung out
@@ -565,38 +780,26 @@ def fitting(part, f, F=None):
                       "MI_Paint_Hull", nseed(), wear=0.9)
         for u in (-hw_ * 0.55, hw_ * 0.55):
             pa = hinge + t * u + face * 0.115
-            pb = pa + down * (L * 0.85)
-            part.beam(T.straight(pa, pb, t, face), (pb - pa).length, 0.1, 0.03, "MI_Metal_Iron", nseed(), wear=0.5)
-        # Its lanyard up into the hull over the port.
+            part.beam(T.straight(pa, pa + down * (L * 0.85), t, face), L * 0.85, 0.1, 0.03, "MI_Metal_Iron", nseed(), wear=0.5)
         pa = hinge + down * L + face * 0.12
         pb = lpt(F, 0.0, hh + 0.7, PLANK_T)
         part.round(T.straight(pa, pb, t, n), (pb - pa).length, 0.025, "MI_Rope_Hemp", nseed(), sides=5, seg=2.0, wear=0.0)
-    if kind in ("open", "room") or (kind == "glass" or kind == "lit"):
-        if kind == "open":
-            part.polygon([lpt(F, u, v, -0.5) for u, v in ((-hw_, -hh), (-hw_, hh), (hw_, hh), (hw_, -hh))], "MI_Hub_Void", tone=0.1, facing=F[3])
+        if kind in ("open", "lit"):
+            # Inside: the dark of the deck, or a lantern's glow (the back stays within the hull's thickness).
+            mat = "MI_LanternGlass" if kind == "lit" else "MI_Hub_Void"
+            part.polygon([lpt(F, u, v, -0.3) for u, v in ((-hw_, -hh), (-hw_, hh), (hw_, hh), (hw_, -hh))], mat, tone=0.1, facing=F[3])
     if kind == "shut":
-        # The lid shut in its frame (ochre-edged, so the rows read from afar): three boards, two hinge straps, a ring.
-        for sgn in (-1.0, 1.0):
-            lbeam(part, F, sgn * (hw_ + 0.12), -hh - 0.22, sgn * (hw_ + 0.12), hh + 0.22, 0.14, 0.09, PLANK_T - 0.02, "MI_Hub_OchreFaded", wear=1.0)
-        lbeam(part, F, -hw_ - 0.2, hh + 0.14, hw_ + 0.2, hh + 0.14, 0.16, 0.1, PLANK_T - 0.02, "MI_Hub_Ochre")
-        lbeam(part, F, -hw_ - 0.2, -hh - 0.14, hw_ + 0.2, -hh - 0.14, 0.18, 0.12, PLANK_T - 0.02, "MI_Hub_Ochre")
-        for k in range(3):
-            u = -hw_ + (2 * hw_) * (k + 0.5) / 3
-            lbeam(part, F, u, -hh, u, hh, 2 * hw_ / 3 - 0.02, 0.1, PLANK_T - 0.02,
-                  random.choice(("MI_Hub_HullTar", "MI_Hub_HullTar", "MI_Hub_HullTarFaded")))
-        for u in (-hw_ * 0.55, hw_ * 0.55):
-            lbeam(part, F, u, hh + 0.05, u, -hh * 0.6, 0.1, 0.03, PLANK_T + 0.08, "MI_Metal_Iron", wear=0.5)
-        part.lathe([(0.0, 0.0), (0.07, 0.0), (0.07, 0.03), (0.0, 0.03)], lpt(F, 0.0, -hh + 0.15, PLANK_T + 0.08), F[3], "MI_Metal_Iron", sides=8)
+        shut_lid(part, F, hw_, hh, rng)
     if kind == "patched":
         # The lid is gone: boards nailed across the port, unpainted and newer.
         lbeam(part, F, -hw_ - 0.1, hh + 0.14, hw_ + 0.1, hh + 0.14, 0.16, 0.08, PLANK_T - 0.02, "MI_Hub_HullTarDark")
         lbeam(part, F, -hw_ - 0.1, -hh - 0.14, hw_ + 0.1, -hh - 0.14, 0.18, 0.1, PLANK_T - 0.02, "MI_Hub_HullTarDark")
-        for k, v in enumerate((-0.32, 0.02, 0.34)):
-            tilt = random.uniform(-0.12, 0.12)
+        for v in (-0.32, 0.02, 0.34):
+            tilt = rng.uniform(-0.12, 0.12)
             lbeam(part, F, -hw_ - 0.12, v * hh * 2 - tilt, hw_ + 0.12, v * hh * 2 + tilt, 0.26, 0.05, PLANK_T, "MI_Wood_TeakLight", wear=0.3)
     if window:
         # Glass in a cross of mullions (some lit from inside), or shut behind two oxblood shutters.
-        glass = "MI_LanternGlass" if kind == "lit" else "MI_Glass_Dark"
+        glass = "MI_LanternGlass" if kind == "glow" else "MI_Glass_Dark"
         part.polygon([lpt(F, u, v, -0.25) for u, v in ((-hw_, -hh), (hw_, -hh), (hw_, hh), (-hw_, hh))], glass, tone=0.5, facing=F[3])
         lbeam(part, F, 0.0, -hh, 0.0, hh, 0.09, 0.08, -0.25, frame_mat, wear=0.6)
         for v in (-hh * 0.33, hh * 0.33):
@@ -607,21 +810,110 @@ def fitting(part, f, F=None):
                 for k in range(3):
                     u = sgn * (hw_ * (k + 0.5) / 3)
                     lbeam(part, F, u, -hh + 0.02, u, hh - 0.02, hw_ / 3 - 0.015, 0.06, -0.1,
-                          "MI_Paint_Hull" if random.random() < 0.7 else "MI_Paint_HullFaded", wear=1.0)
+                          "MI_Paint_Hull" if rng.random() < 0.7 else "MI_Paint_HullFaded", wear=1.0)
                 lbeam(part, F, sgn * 0.05, hh * 0.6, sgn * (hw_ - 0.05), hh * 0.6, 0.12, 0.04, -0.04, "MI_Metal_Iron")
                 lbeam(part, F, sgn * 0.05, -hh * 0.6, sgn * (hw_ - 0.05), -hh * 0.6, 0.12, 0.04, -0.04, "MI_Metal_Iron")
 
 
-def channels(part_of):
+def shut_lid(part, F, hw_, hh, rng):
+    """A port's lid shut in its frame (ochre-edged, so the rows read from afar): three boards, two hinge straps, a ring."""
+    for sgn in (-1.0, 1.0):
+        lbeam(part, F, sgn * (hw_ + 0.12), -hh - 0.22, sgn * (hw_ + 0.12), hh + 0.22, 0.14, 0.09, PLANK_T - 0.02, "MI_Hub_OchreFaded", wear=1.0)
+    lbeam(part, F, -hw_ - 0.2, hh + 0.14, hw_ + 0.2, hh + 0.14, 0.16, 0.1, PLANK_T - 0.02, "MI_Hub_Ochre")
+    lbeam(part, F, -hw_ - 0.2, -hh - 0.14, hw_ + 0.2, -hh - 0.14, 0.18, 0.12, PLANK_T - 0.02, "MI_Hub_Ochre")
+    for k in range(3):
+        u = -hw_ + (2 * hw_) * (k + 0.5) / 3
+        lbeam(part, F, u, -hh, u, hh, 2 * hw_ / 3 - 0.02, 0.1, PLANK_T - 0.02, rng.choice(("MI_Hub_HullTar", "MI_Hub_HullTar", "MI_Hub_HullTarFaded")))
+    for u in (-hw_ * 0.55, hw_ * 0.55):
+        lbeam(part, F, u, hh + 0.05, u, -hh * 0.6, 0.1, 0.03, PLANK_T + 0.08, "MI_Metal_Iron", wear=0.5)
+    part.lathe([(0.0, 0.0), (0.07, 0.0), (0.07, 0.03), (0.0, 0.03)], lpt(F, 0.0, -hh + 0.15, PLANK_T + 0.08), F[3], "MI_Metal_Iron", sides=8)
+
+
+def build_fittings(route, fits):
+    for k, f in enumerate(fits):
+        xc = 0.5 * (f["x0"] + f["x1"])
+        if not route.wanted(f["x0"], f["x1"]):
+            continue
+        part = route(xc, f["side"], f["z0"], f["z1"])
+        if part is not None:
+            fitting(part, f, rng=random.Random(4040 + k))
+
+
+def pilasters(route, fits):
+    """Oxblood pilasters with ochre capitals between the castles' side windows (as on the stern face), from the storey's band
+    to the next one: the castles read as panelled, not as a flat wall with holes."""
+    rows = {}
+    for f in fits:
+        if f["kind"] in ("glass", "glow", "shutter"):
+            rows.setdefault((f["side"], f["z0"]), []).append(0.5 * (f["x0"] + f["x1"]))
+    for (side, zs), xs in rows.items():
+        xs.sort()
+        spots = []
+        for a, b in zip(xs[:-1], xs[1:]):
+            if b - a < 3.8:
+                spots.append(0.5 * (a + b))
+        if xs:
+            spots += [xs[0] - 1.8, xs[-1] + 1.8]
+        for x in spots:
+            zl, zu = line_z(zs - 0.38, x), line_z(zs + WIN_H + 0.55, x)
+            zu = min(zu, top(x) - 0.45)
+            if zu - zl < 1.0 or x < corner_x(zl) + 1.0 or x > end_x(zu) - 2.0 or bow_turn(x, zl, side) > 0.4:
+                continue
+            if QG["x0"] - 0.8 < x < QG["x1"] + 0.8 and zu > QG["z0"]:
+                continue
+            if any(abs(x - c) < 0.5 for c in (HUB["poopX"], HUB["qdX"], HUB["fcX"])) or (HUB["poopX"] < x < HUB["poopX"] + 0.9):
+                continue
+            part = route(x, side)
+            if part is None or not route.wanted(x - 1, x + 1):
+                continue
+            F = hull_frame(x, 0.5 * (zl + zu), side, slope=line_slope(zs, x))
+            hh = 0.5 * (zu - zl)
+            lbeam(part, F, 0.0, -hh, 0.0, hh, 0.44, 0.12, PLANK_T, "MI_Paint_Hull", wear=1.0)
+            lbeam(part, F, 0.0, hh - 0.3, 0.0, hh, 0.62, 0.19, PLANK_T, "MI_Hub_Ochre", wear=1.0)
+            lbeam(part, F, 0.0, -hh, 0.0, -hh + 0.22, 0.56, 0.16, PLANK_T, "MI_Hub_Ochre", wear=1.0)
+
+
+FENDERS = (76.5, 120.5)              # skids over the wales where boats and cargo come alongside (between the ports' columns)
+
+
+def fenders(route):
+    """Pairs of upright skids over the wales from the waterline belt to the main deck's band, bolted through the wales."""
+    for side in (1, -1):
+        for xc in FENDERS:
+            for dx in (-0.32, 0.32):
+                x = xc + dx
+                part = route(x, side)
+                if part is None or not route.wanted(x - 1, x + 1):
+                    continue
+                z0, z1 = line_z(-0.9, x), line_z(Z["main"] - 0.3, x)
+                n = 10
+                pts = []
+                for k in range(n + 1):
+                    z = z0 + (z1 - z0) * k / n
+                    p, t, a, nn = hull_frame(x, z, side)
+                    pts.append(p + nn * (PLANK_T + 0.42 + 0.14))
+                fr = T.polyline(pts, Vector((1.0, 0.0, 0.0)), lambda q, s=side: hull_frame(x, q.z, s)[3])
+                part.beam(fr, T.length_of(fr), 0.34, 0.28, "MI_Hub_HullTarDark", nseed(), seg=0.9, wear=1.0, grime=grime_hull)
+                for z0_, h, proud, mat, moulded in WALES:
+                    if z0_ > Z["main"] - 0.5:
+                        continue
+                    z = line_z(z0_, x)
+                    F = hull_frame(x, z, side)
+                    lbeam(part, F, -0.17, 0.0, 0.17, 0.0, 0.1, 0.06, PLANK_T + 0.7, "MI_Metal_Iron", wear=0.5)
+
+
+def channels(route):
     """Channels at each mast: a thick plank out from the side on knees, deadeyes on its outer edge, chain plates down the
-    side (outside.sides: channels with deadeyes at each mast). The shrouds come with the rig."""
+    side (outside.sides). The shrouds come with the rig."""
     for side in (1, -1):
         for mid, (ln, n_de) in CHANNELS.items():
             xa, xb = channel_span(mid)
             zc = channel_z(mid)
-            part = part_of(0.5 * (xa + xb), side)
+            part = route(0.5 * (xa + xb), side)
+            if part is None or not route.wanted(xa, xb):
+                continue
 
-            def fr(s, xa=xa, xb=xb, zc=zc, depth=0.0):
+            def fr(s, xa=xa, xb=xb, zc=zc):
                 x = xa + (xb - xa) * s
                 p, t, a, n = hull_frame(x, zc, side)
                 return p + n * (PLANK_T + 0.9) - a * 0.11, n, a, 1.0
@@ -643,69 +935,136 @@ def channels(part_of):
                 lean = (mast_x(mid) - x) * 0.04
                 pa = lpt(F, 0.0, 0.1, PLANK_T + 1.75)
                 pb = lpt(F, -lean, -4.2, PLANK_T + 0.05)
-                part.beam(T.straight(pa, pb, t, (pb - pa).normalized().cross(t) if False else n), (pb - pa).length, 0.12, 0.05,
-                          "MI_Metal_Iron", nseed(), wear=0.6)
+                part.beam(T.straight(pa, pb, t, n), (pb - pa).length, 0.12, 0.05, "MI_Metal_Iron", nseed(), wear=0.6)
+                part.lathe([(0.0, 0.0), (0.09, 0.0), (0.09, 0.05), (0.0, 0.05)], pb + n * 0.03, n, "MI_Metal_Iron", sides=8)
 
 
-def cap_rails(part_of):
-    """The cap rail along the sides' top: the waist's bulwark, the quarterdeck's, the poop's, the forecastle's."""
+RAILS = ((None, HUB["poopX"] - 0.05), (HUB["poopX"] + 0.65, HUB["qdX"] - 0.05), (HUB["qdX"] + 0.65, HUB["fcX"] - 0.05), (HUB["fcX"] + 0.65, None))
+
+
+def cap_rails(route):
+    """The cap rail along the sides' top: the poop's, the quarterdeck's, the waist's bulwark, the forecastle's."""
+    rng = random.Random(81)
     for side in (1, -1):
-        for xa, xb in ((0.3, H.HUB["poopX"] + 0.3), (H.HUB["poopX"] + 0.9, PARTS_X[0]), (PARTS_X[0] + 0.05, PARTS_X[1]),
-                       (PARTS_X[1] + 0.05, end_x(top(150.0)) - 0.6)):
+        for xa, xb in RAILS:
+            xa = corner_x(top(1.0)) + 0.35 if xa is None else xa
+            xb = end_x(top(158.0)) - 0.9 if xb is None else xb
             x = xa
             while x < xb - 1e-6:
-                xe = min(x + random.uniform(6.0, 10.0), xb)
+                xe = min(x + rng.uniform(6.0, 10.0), xb)
                 if xb - xe < 2.0:
                     xe = xb
-
-                def fr(s, x0=x, x1=xe):
-                    xx = x0 + (x1 - x0) * s
-                    zt = top(0.5 * (x0 + x1))
-                    p, t, a, n = hull_frame(xx, zt - 0.05, side)
-                    return p + n * (PLANK_T * 0.5) + Vector((0, 0, 0.08)), n, Vector((0.0, 0.0, 1.0)), 1.0
-                part_of(0.5 * (x + xe), side).beam(fr, xe - x, 0.5, 0.17, "MI_Wood_Varnish", nseed(), seg=0.8, wear=1.0)
+                part = route(0.5 * (x + xe), side)
+                if part is not None and route.wanted(x, xe):
+                    n = max(2, int((xe - x) / 0.8))
+                    pts = []
+                    for i in range(n + 1):
+                        xx = x + (xe - x) * i / n
+                        zt = top(xx)
+                        p, t, a, nn = hull_frame(xx, zt - 0.05, side)
+                        pts.append(p + nn * (PLANK_T * 0.5) + Vector((0, 0, 0.08)))
+                    fr = T.polyline(pts, lambda q, s=side, xx0=x: hull_frame(q.x, q.z - 0.1, s)[3], Vector((0.0, 0.0, 1.0)))
+                    part.beam(fr, T.length_of(fr), 0.5, 0.17, "MI_Wood_Varnish", nseed(), seg=0.8, wear=1.0)
                 x = xe
 
 
+def drifts(route):
+    """Carved drifts where the rail steps up to a castle (x poopX, qdX, fcX): a scrolled board in ochre from the lower rail up
+    to the higher one, with a volute at its foot and a brass boss in it."""
+    for side in (1, -1):
+        for xs, up_aft in ((HUB["poopX"], True), (HUB["qdX"], True), (HUB["fcX"], False)):
+            sgn = 1.0 if up_aft else -1.0                # the low side lies towards x + sgn
+            part = route(xs + sgn * 1.0, side)
+            if part is None or not route.wanted(xs - 3.0, xs + 3.0):
+                continue
+            z_hi, z_lo = top(xs - sgn * 1.0), top(xs + sgn * 3.0)
+            # The castle's corner post: over the strakes' ends where the profile steps, from under the low rail to the high one.
+            xp = xs - sgn * 0.12
+            pts = []
+            for k in range(9):
+                z = (z_lo - 0.9) + (z_hi + 0.12 - z_lo + 0.9) * k / 8
+                F = hull_frame(xp, z, side)
+                pts.append(F[0] + F[3] * (PLANK_T + 0.2))
+            fc = T.polyline(pts, Vector((1.0, 0.0, 0.0)), lambda q, s=side, xp=xp: hull_frame(xp, q.z, s)[3])
+            part.beam(fc, T.length_of(fc), 0.7, 0.4, "MI_Hub_HullTarDark", nseed(), seg=0.8, wear=1.0)
+            # The scroll: from the high rail at the step down in an S to the low rail 2.5 m along, curling into a volute.
+            xz = []
+            for k in range(13):
+                t = k / 12
+                xz.append((xs + sgn * (0.35 + 2.2 * t), z_hi - (z_hi - z_lo) * (0.5 - 0.5 * math.cos(math.pi * t)) - 0.1))
+            cx_, cz_ = xz[-1][0], xz[-1][1] - 0.32
+            for k in range(1, 12):
+                phi = 1.6 * math.pi * k / 11
+                r = 0.32 * (1.0 - 0.55 * k / 11)
+                xz.append((cx_ + sgn * r * math.sin(phi), cz_ + r * math.cos(phi)))
+            q = []
+            for xx, zz in xz:
+                F = hull_frame(xx, zz, side)
+                q.append(F[0] + F[3] * (PLANK_T + 0.11))
+            fr = T.polyline(q, lambda qq, s=side: hull_frame(qq.x, qq.z, s)[3])
+            part.beam(fr, T.length_of(fr, 60), 0.2, 0.55, "MI_Hub_Ochre", nseed(), seg=0.2, wear=1.0)
+            F = hull_frame(cx_, cz_, side)
+            part.lathe([(0.0, 0.0), (0.15, 0.0), (0.17, 0.06), (0.1, 0.14), (0.0, 0.16)], F[0] + F[3] * (PLANK_T + 0.3), F[3],
+                       "MI_Metal_Brass", sides=10, wear=0.9)
+
+
 # --- build ---------------------------------------------------------------------------------------------------------------
-def export(part):
-    objs = part.finish(material, ucx=False)
+def export(part, pivot=None, ucx=False):
+    """Finish a part, save its .blend (with nothing else in it: one session may build several parts) and its FBX."""
+    objs = part.finish(material, ucx=ucx, pivot=pivot) if pivot is not None else part.finish(material, ucx=ucx)
+    for o in list(bpy.data.objects):
+        if o not in objs:
+            bpy.data.objects.remove(o)
     sb.save_blend(part.name)
     sb.export_fbx(objs, os.path.join("Hub", part.name + ".fbx"))
+    return objs
+
+
+def skin(route, fits):
+    """Everything on the sides that the route wants: strakes, the bottom, wales, ports and windows."""
+    holes = holes_of(fits)
+    planking(route, holes)
+    wales(route, holes)
+    build_fittings(route, fits)
+
+
+def write_outside_json(fits):
+    out = os.path.join(H.ROOT, "Art", "Generated", "hub_outside.json")
+    rows = []
+    for f in fits:
+        xc = 0.5 * (f["x0"] + f["x1"])
+        rows.append({"side": f["side"], "x0": round(f["x0"], 3), "x1": round(f["x1"], 3),
+                     "z0": round(line_z(f["z0"], xc), 3), "z1": round(line_z(f["z1"], xc), 3), "kind": f["kind"],
+                     "door": door_leaf(xc, f["z0"], f["z1"], f["side"]) is not None})
+    with open(out, "w", encoding="utf-8") as fh:
+        json.dump({"_comment": "D64 the hull's ports and windows from outside (build_hub_hull.py), ship metres, absolute z. "
+                   "kind: shut / patched (closed), open / lit / room (lid hauled up), glass / glow / shutter (castle windows). "
+                   "Every opening is closed within the hull's 0.35 m (a dark or lit back) except kind room.",
+                   "lines": [round(z, 4) for z in LINES], "door_lines": [LINES[DOOR_J[0]], LINES[DOOR_J[1]]], "fittings": rows}, fh, indent=1)
+    print("SB_OUTSIDE_JSON", out, len(rows))
 
 
 def build_sides():
     parts = {k: T.Part(n) for k, n in (("stern", "SM_Hub_HullStern"), ("waistS", "SM_Hub_HullWaistS"),
                                        ("waistP", "SM_Hub_HullWaistP"), ("bow", "SM_Hub_HullBow"))}
-
-    def part_of(x, side):
-        if x < PARTS_X[0]:
-            return parts["stern"]
-        if x > PARTS_X[1]:
-            return parts["bow"]
-        return parts["waistS"] if side > 0 else parts["waistP"]
-
+    route = Router(parts)
     fits = fittings()
-    holes = holes_of(fits)
-    planking(part_of, holes)
-    bands(part_of, holes)
-    random.seed(4040)
-    for f in fits:
-        fitting(part_of(0.5 * (f["x0"] + f["x1"]), f["side"]), f)
-    channels(part_of)
-    cap_rails(part_of)
-    print("SB_FITTINGS", {k: sum(1 for f in fits if f["kind"] == k) for k in ("room", "shut", "open", "patched", "glass", "lit", "shutter")})
+    skin(route, fits)
+    bottom_planks(route)
+    keel(route)
+    channels(route)
+    cap_rails(route)
+    drifts(route)
+    pilasters(route, fits)
+    fenders(route)
+    write_outside_json(fits)
+    print("SB_FITTINGS", {k: sum(1 for f in fits if f["kind"] == k) for k in ("room", "shut", "open", "lit", "patched", "glass", "glow", "shutter")})
+    print("SB_DOOR_LINES", DOOR_J, LINES[DOOR_J[0]], LINES[DOOR_J[1]], [round(line_z(LINES[j], x), 3) for j in DOOR_J for x in DOOR_X])
     for part in parts.values():
         export(part)
 
 
-def build_ancient():
-    p = T.Part("SM_Hub_Ancient")
-    ancient(p)
-    export(p)
-
-
-BUILDERS = {"sides": build_sides, "ancient": build_ancient}
+BUILDERS = {"sides": build_sides}
 
 if __name__ == "__main__":
     wanted = sb.script_args() or list(BUILDERS)
