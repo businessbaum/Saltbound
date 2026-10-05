@@ -30,6 +30,10 @@
 
 namespace
 {
+	/** D56 A/B: 1 brings back the old behaviour where the sail's drive and the windage on a heeled boat turned it. */
+	TAutoConsoleVariable<int32> CVarRigTurn(TEXT("sb.Boat.RigTurn"), 0,
+		TEXT("1: forces high on the rig turn a heeled boat as before D56 (the waves then steer it); 0: they heel it only (default)."));
+
 	constexpr double RhoWater = 1025.0;   // kg/m3
 	constexpr double RhoAir = 1.225;
 	constexpr double Gravity = 9.80665;
@@ -964,6 +968,7 @@ void ASaltBoat::Tick(float DeltaSeconds)
 
 	const FVector OldX = X;
 	const FQuat OldQ = Q;
+	const double OldVz = V.Z;
 	const int32 Steps = FMath::Clamp(FMath::CeilToInt(Dt / MaxSubstep), 1, 16);
 	const float H = Dt / Steps;
 	for (int32 S = 0; S < Steps; ++S)
@@ -977,6 +982,12 @@ void ASaltBoat::Tick(float DeltaSeconds)
 		Q = OldQ;
 		Recover();
 		return;
+	}
+	// A sudden heave (more than 0.5 m/s in one frame) is not the sea: say where it came from (D56 diagnosis).
+	if (FMath::Abs(V.Z - OldVz) > 0.5)
+	{
+		UE_LOG(LogSaltbound, Warning, TEXT("SB_BOAT_KICK dVz=%.2f m/s in %.4f s: Fz=%.0f N (buoyancy %.0f, heave damping %.0f, weight %.0f), contacts=%d immersion=%.2f"),
+			V.Z - OldVz, Dt, KickTotal, KickBuoyancy, KickDamping, -Mass * 9.80665, Contacts.Num(), Immersion);
 	}
 	PreventTunnelling(OldX, OldQ);
 	ApplyTransform(Dt);
@@ -998,8 +1009,19 @@ void ASaltBoat::SampleWater(float DeltaSeconds)
 	{
 		const FVector Mid = BodyToWorld(C.Bottom + FVector(0.0, 0.0, C.Height * 0.5));
 		const double Z = Sub ? Sub->SampleWater(FVector2D(Mid.X * 100.0, Mid.Y * 100.0)).Location.Z * 0.01 : 0.0;
-		// Along the column's path: includes the slope the hull moves over (encounter velocity).
-		C.WaterVz = (C.bHasWater && DeltaSeconds > 0.f) ? FMath::Clamp((Z - C.WaterZ) / DeltaSeconds, -5.0, 5.0) : 0.0;
+		// Along the column's path: includes the slope the hull moves over (encounter velocity). D56: the sampled surface
+		// can jump from one frame to the next where steep storm crests fold (the search for the water under a point lands
+		// elsewhere); such a jump is not water moving, and through the heave damping it kicked the whole boat (the view
+		// "bugging up and down" in big waves). Bounded to what a sea moves (2.5 m/s) and eased in over ~60 ms.
+		if (C.bHasWater && DeltaSeconds > 0.f)
+		{
+			const double Raw = FMath::Clamp((Z - C.WaterZ) / DeltaSeconds, -2.5, 2.5);
+			C.WaterVz += (Raw - C.WaterVz) * (1.0 - FMath::Exp(-DeltaSeconds / 0.06));
+		}
+		else
+		{
+			C.WaterVz = 0.0;
+		}
 		C.WaterZ = Z;
 		C.bHasWater = true;
 	}
@@ -1065,10 +1087,25 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 	using namespace SaltHull;
 	FVector F(0.0, 0.0, -Mass * Gravity);
 	FVector T = FVector::ZeroVector;
+	KickBuoyancy = KickDamping = 0.0;
 	auto AddForceAt = [&](const FVector& Force, const FVector& At)
 	{
 		F += Force;
 		T += FVector::CrossProduct(At - X, Force);
+	};
+	// D56: forces high on the rig (the sail's drive, the wind on hull and rig) act on the centreline, so on an upright
+	// boat they do not turn it. When the waves heel it, that point swings out to the side and the same forces twisted
+	// the boat round (it broached and circled in big waves). Their twist about the vertical is left out: the waves heel
+	// and pitch the boat but do not steer it (owner).
+	auto AddForceAtNoTurn = [&](const FVector& Force, const FVector& At)
+	{
+		F += Force;
+		FVector Twist = FVector::CrossProduct(At - X, Force);
+		if (CVarRigTurn.GetValueOnGameThread() == 0)
+		{
+			Twist.Z = 0.0;
+		}
+		T += Twist;
 	};
 	const FQuat Inv = Q.Inverse();
 	const FVector Up = Q.GetUpVector();
@@ -1093,6 +1130,8 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 		const double VRel = PointVelocity(At).Z - C.WaterVz;
 		const double Damp = VerticalDamping * C.Area * FMath::Min(Frac * C.Height / 0.3, 1.0);
 		AddForceAt(FVector(0.0, 0.0, RhoWater * Gravity * Vol - Damp * VRel), At);
+		KickBuoyancy += RhoWater * Gravity * Vol;
+		KickDamping += -Damp * VRel;
 	}
 	Immersion = FMath::Clamp((float)(Submerged / DesignVolume), 0.f, 1.f);
 	const double Wet = Immersion;
@@ -1169,7 +1208,7 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 		const double Fy = Fx * SailHeel * FMath::Clamp(Apparent.Y / AppSpeed, -1.0, 1.0);
 		// Applied on the centreline at the sail's height (heel, no twist): with the boom far out, the real centre of
 		// effort would turn the strong drive into a yaw the rudder cannot hold.
-		AddBodyForceAt(FVector(Fx, Fy, 0.0), FVector(MastX - 0.8f, 0.f, SheerZ(MastX) + BoomHeight + SailCEUp));
+		AddForceAtNoTurn(Q.RotateVector(FVector(Fx, Fy, 0.0)), BodyToWorld(FVector(MastX - 0.8f, 0.f, SheerZ(MastX) + BoomHeight + SailCEUp)));
 		SailDrive = (float)Fx;
 	}
 
@@ -1182,7 +1221,7 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 	{
 		const FVector AirB = Inv.RotateVector(AirRel);
 		const double Area = WindageArea.X * FMath::Abs(AirB.X) / AirSpeed + WindageArea.Y * FMath::Abs(AirB.Y) / AirSpeed;
-		AddForceAt(AirRel * (0.5 * RhoAir * Area * AirSpeed), WindagePoint);
+		AddForceAtNoTurn(AirRel * (0.5 * RhoAir * Area * AirSpeed), WindagePoint);
 	}
 
 	// Mooring and anchor lines: horizontal springs with slack.
@@ -1221,6 +1260,7 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 	}
 
 	// Integrate: semi-implicit Euler; added mass in heave and added inertia in roll and pitch.
+	KickTotal = F.Z;
 	FVector A = F / Mass;
 	A.Z = F.Z / (Mass * (1.0 + AddedMass.X * Wet));
 	V += A * H;

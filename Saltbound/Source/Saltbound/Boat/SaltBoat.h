@@ -226,6 +226,8 @@ public:
 
 	/** Vertical damping of the hull columns (N s/m per m2 of column area). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float VerticalDamping = 1400.f;
+	/** The last step's vertical forces (N), for the sudden-heave diagnosis (D56). */
+	double KickBuoyancy = 0.0, KickDamping = 0.0, KickTotal = 0.0;
 	/** Forward resistance at hull speed (N), and hull speed (m/s; about 7.3 kn for 9 m on the waterline). */
 	UPROPERTY(EditAnywhere, Category = "Boat|Hydro") float HullSpeedResistance = 1700.f;
 	UPROPERTY(EditAnywhere, Category = "Boat|Hydro", meta = (Units = "m/s")) float HullSpeed = 3.75f;

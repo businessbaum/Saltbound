@@ -1211,3 +1211,31 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     which is skipped; the wheel keeps the design's painted pictures.
   - `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`; tests `HeldCompassNorth`, `HeldSpyglass`, `HeldLantern`. Inventory 34/34.
   - `build_boat.py` now runs its builds only as the build script, so other scripts can use its parts.
+
+### D56 · Flags that move like cloth, a calmer view on a heaving deck, waves that no longer steer the boat (Adopted)
+- **Owner (2026-10-05):** "the flag physik looks like concrete, there is no movement like a flag in it"; "the camera is
+  bugging up and down a lot when the waves are big"; "the waves should not change the course of the ship, at the moment
+  the boat circles because the waves have to much impact on the direction. Reduce the impact on direction and leave the
+  other impact."
+- **Flags (M_SB_Flag):** D54's wave was a few centimetres with less than one wavelength along the cloth, so the flag
+  moved as one slab. Now ripples run out along the fly (two over its length), growing towards the tail to about 6 % of
+  the length (pennant ~10 cm, ensign ~5 cm), at about 0.6 Hz in light air and 1 Hz in a fresh breeze (the 2 Hz of D44
+  looked frantic), with a slow sway and a small flutter at the tail. Sizes follow the flag's length.
+- **Course in waves (diagnosed):** measured with `Tools/boat_course.py` (sail set, rudder amidships, 60 s in open water):
+  in a storm the boat wandered through 144-218 degrees of heading and broached, against 17-43 degrees in calm water.
+  The cause was not the waves' push but the rig: the sail's drive and the windage act high up on the centreline, and
+  when a wave heels the boat that point swings out to the side and the same forces twist it round. Now those forces
+  heel and pitch the boat but do not turn it (their twist about the vertical is left out). Storm: 32-55 degrees, near
+  the calm drift; rough: as calm. `sb.Boat.RigTurn 1` brings the old behaviour back for comparison.
+- **The view on a heaving deck (diagnosed):** `sb.Dev.CameraTrace [s] [deck]` logs the camera against the boat every
+  frame. The camera does not jitter against the deck; the up and down is the deck itself: at open sea the swell lifts it
+  about 0.5 m (rough) to 1.3 m (storm), with slams. The eyes now ride the deck's average level and the knees take 45 % of
+  the swell about it, softly at most 32 cm (`ASaltPlayerCharacter::CalcCamera`, a linear filter: no lag at a steady
+  rise, no limit that kinks the view). Rough: the eyes move 35 cm instead of 48, the vertical jolts halve (4.3 m/s2 rms
+  instead of 8.3, the worst 25 instead of 144); storm: 103 cm instead of 121. `sb.Camera.DeckKnees 0` turns it off.
+- **The boat's water speed:** the sampled surface can jump where steep crests fold; its vertical speed (heave damping) is
+  now bounded to 2.5 m/s and eased in, so a jump does not kick the hull. A sudden heave (more than 0.5 m/s in a frame) is
+  logged as `SB_BOAT_KICK` with its forces.
+- **Lesson:** `sb.Boat.Place` takes centimetres; the first measurements ran in the cove (the boat touched rocks and the
+  seabed) and were misleading. Measure in open water (`250000 -80000`).
+- Tests: boat 44/44, inventory 34/34, save 5/5, swim 5/5.

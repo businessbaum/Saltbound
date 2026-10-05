@@ -5,7 +5,9 @@
 #include "Boat/SaltBoat.h"
 #include "Boat/SaltHullShape.h"
 #include "CableComponent.h"
+#include "Containers/Ticker.h"
 #include "Camera/CameraComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/PointLightComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Core/SaltContent.h"
@@ -35,6 +37,53 @@ namespace
 			{
 				T->RunBoatSuite();
 			}
+		}));
+
+	/** D56: the camera's height in the boat's frame every frame. Standing still on deck it should stay put however the
+	 *  boat heaves; jitter there is the camera "bugging up and down" in big waves. sb.Dev.CameraTrace [seconds=10] [deck]
+	 *  (deck: stand the player on the middle of the deck first) logs SB_CAM lines. */
+	FAutoConsoleCommandWithWorldAndArgs CmdCameraTrace(
+		TEXT("sb.Dev.CameraTrace"),
+		TEXT("Log the camera's height in the boat's frame every frame: sb.Dev.CameraTrace [seconds=10] [deck]."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+			ASaltPlayerCharacter* P = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr;
+			ASaltBoat* Boat = nullptr;
+			for (TActorIterator<ASaltBoat> It(World); World && It; ++It) { Boat = *It; break; }
+			if (!P || !Boat)
+			{
+				return;
+			}
+			if (Args.Num() > 1 && Args[1] == TEXT("deck"))
+			{
+				const FVector Local(0.f, 0.f, (SaltHull::SheerZ(0.f) + 0.05f) * 100.f);
+				P->TeleportFeetTo(Boat->GetActorTransform().TransformPosition(Local), Boat->GetYawDeg());
+			}
+			const float Seconds = Args.Num() > 0 ? FCString::Atof(*Args[0]) : 10.f;
+			TWeakObjectPtr<ASaltPlayerCharacter> WeakP = P;
+			TWeakObjectPtr<ASaltBoat> WeakBoat = Boat;
+			TSharedRef<float> Clock = MakeShared<float>(0.f);
+			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([WeakP, WeakBoat, Clock, Seconds](float Dt) -> bool
+			{
+				ASaltPlayerCharacter* Pl = WeakP.Get();
+				ASaltBoat* B = WeakBoat.Get();
+				if (!Pl || !B)
+				{
+					return false;
+				}
+				*Clock += Dt;
+				const FTransform Xf = B->GetActorTransform();
+				// The view as rendered (after CalcCamera), else the camera component.
+				const APlayerController* Ctl = Cast<APlayerController>(Pl->GetController());
+				const FVector Cam = Ctl && Ctl->PlayerCameraManager ? Ctl->PlayerCameraManager->GetCameraLocation() : Pl->GetCamera()->GetComponentLocation();
+				const UPrimitiveComponent* Base = Cast<UPrimitiveComponent>(Pl->GetMovementBaseObject());
+				const FVector Wd = B->GetKinematicAngularVelocity();
+				UE_LOG(LogSaltbound, Display, TEXT("SB_CAM t=%.4f dt=%.4f camZ=%.2f camBoatZ=%.3f capBoatZ=%.3f boatZ=%.2f onBoat=%d vz=%.3f w=(%.2f,%.2f,%.2f) heel=%.2f pitch=%.2f contacts=%.1f"),
+					*Clock, Dt, Cam.Z, Xf.InverseTransformPosition(Cam).Z, Xf.InverseTransformPosition(Pl->GetActorLocation()).Z, Xf.GetLocation().Z,
+					Base && Base->GetOwner() == B ? 1 : 0, B->GetVelocity().Z, Wd.X, Wd.Y, Wd.Z, B->GetHeelDeg(), B->GetPitchDeg(), B->GetContactDepth());
+				return *Clock < Seconds;
+			}));
 		}));
 
 	/** Open water south-east of the test cove (about 15 m deep), clear of the pier, rocks and headlands. */

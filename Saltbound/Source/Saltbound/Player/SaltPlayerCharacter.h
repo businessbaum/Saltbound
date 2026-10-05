@@ -173,6 +173,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Interaction", meta = (Units = "s"))
 	float StationBlendTime = 0.45f;
 
+	/** D56: how far the knees take up a heaving deck (cm the eyes are below (+) or above (-) where they would be): 45 %
+	 *  of the swell about its recent level, softly at most 32 cm. */
+	float GetDeckEyeOffset() const { return 32.f * FMath::Tanh(DeckEyeRate * (DeckEyeTarget - DeckEyeZ) / 32.f); }
+
+	virtual void CalcCamera(float DeltaTime, struct FMinimalViewInfo& OutResult) override;
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCameraComponent> Camera;
@@ -184,6 +190,13 @@ protected:
 	TObjectPtr<class USaltHeldToolsComponent> HeldTools;
 
 private:
+	/** The eyes on a moving deck: its level over a few seconds (world Z, cm), the share of the swell taken up, the last
+	 *  eye height before that. */
+	float DeckEyeZ = 0.f;
+	float DeckEyeRate = 0.f;
+	float DeckEyeTarget = 0.f;
+	bool bDeckEyes = false;
+
 	FName HeldTool;
 	TSet<FName> OwnedTools;
 

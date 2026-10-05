@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-04 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55).
+Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55).
 
 ## Milestone status
 
@@ -223,6 +223,8 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D56 (awaiting the owner's check):** flags that ripple like cloth; in big waves the eyes take part of the deck's swell
+  (knees) and the waves no longer turn the boat round (the rig's forces heel it but do not twist it).
 - **D55 (in progress, awaiting the owner's check):** the new UI from the approved design. Done: the fonts, the shared parts,
   the key-scrap prompt with painted lettering, the hold (raising the anchor) with the ink soaking up through the key's
   scrap, the save sign in the corner, the launch intro (startup movie, any key skips), the satchel (leather bag, pressed pockets, the tag on twine), the stores (the satchel beside the open crate or the
@@ -309,7 +311,7 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.Dev.ShowInteractionVolumes 1`, `sb.Dev.RunMenuTests`,
   `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched), `sb.Dev.RunInventoryTests`,
-  `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel 0|1 [chart]|off`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`, `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`
+  `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel 0|1 [chart]|off`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`, `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`, `sb.Dev.CameraTrace [s] [deck]`, `sb.Boat.RigTurn 0|1`, `sb.Camera.DeckKnees 0|1`
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`
   (SB_BOAT state line), `sb.Boat.Place X Y Yaw [Speed m/s]`, `sb.Boat.Hold Free|Moored|Anchored`,

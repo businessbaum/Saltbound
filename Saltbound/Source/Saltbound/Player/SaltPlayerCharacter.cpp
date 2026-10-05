@@ -29,6 +29,10 @@ namespace
 		TEXT("Multiplier applied on top of the character's MouseSensitivity."),
 		ECVF_Default);
 
+	/** D56: the knees take part of a heaving deck's swell (ASaltPlayerCharacter::CalcCamera); 0 turns it off (A/B). */
+	TAutoConsoleVariable<int32> CVarDeckKnees(TEXT("sb.Camera.DeckKnees"), 1,
+		TEXT("1: on a heaving deck the eyes take only part of the swell (default); 0: they ride the deck rigidly."));
+
 	TAutoConsoleVariable<bool> CVarShowInteractionVolumes(
 		TEXT("sb.Dev.ShowInteractionVolumes"), false,
 		TEXT("Draw interaction focus probe hits."),
@@ -226,6 +230,33 @@ void ASaltPlayerCharacter::ApplyMoveInput(const FVector2D& Input)
 bool ASaltPlayerCharacter::IsSwimming() const
 {
 	return GetCharacterMovement() && GetCharacterMovement()->IsSwimming();
+}
+
+void ASaltPlayerCharacter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
+{
+	Super::CalcCamera(DeltaTime, OutResult);
+	// D56: on a deck in big waves (owner: "the camera is bugging up and down a lot") the eyes ride its average level but
+	// not all of each swell, as a sailor's knees take part of it: the level over the last few seconds is followed fully,
+	// of the motion about it the knees take 45 %, softly at most 32 cm (a storm's swell is metres). Smooth everywhere: no
+	// limits that kink the view, no lag at a steady rise. Off the deck it fades out; a teleport starts it afresh.
+	const float Target = (float)OutResult.Location.Z;
+	const UPrimitiveComponent* Base = Cast<UPrimitiveComponent>(GetMovementBaseObject());
+	const bool bDeck = !IsSwimming() && ((Base && Base->Mobility == EComponentMobility::Movable) || ActiveStation != nullptr)
+		&& CVarDeckKnees.GetValueOnGameThread() != 0;
+	if (!bDeckEyes || FMath::Abs(Target - DeckEyeTarget) > 300.f || DeltaTime <= 0.f)
+	{
+		DeckEyeZ = Target;
+		DeckEyeRate = 0.f;
+		bDeckEyes = true;
+	}
+	else
+	{
+		// DeckEyeZ: the deck's level over the last ~2.5 s; DeckEyeRate: how much of the swell the knees take (0..0.45).
+		DeckEyeZ += (Target - DeckEyeZ) * (1.f - FMath::Exp(-DeltaTime / 2.5f));
+		DeckEyeRate = FMath::FInterpConstantTo(DeckEyeRate, bDeck ? 0.45f : 0.f, DeltaTime, 1.f / 0.5f);
+	}
+	DeckEyeTarget = Target;
+	OutResult.Location.Z = Target - GetDeckEyeOffset();
 }
 
 void ASaltPlayerCharacter::SetHeldTool(FName Tool)

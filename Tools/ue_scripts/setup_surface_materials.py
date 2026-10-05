@@ -111,12 +111,18 @@ float U = saturate(L / max(Length, 1.0));
 float W = saturate(Wind);
 float Droop = (1.0 - W) * 1.25 * (0.4 + 0.6 * U);
 float3 P = float3(L * cos(Droop), LocalPos.y, LocalPos.z - L * sin(Droop));
-// A slow wave running along the cloth (D54: the old one ran at about 2 Hz with a 12 cm swing and looked frantic):
-// about 0.3 Hz in light air, 0.6 Hz in a fresh breeze; the hoist stays still, the fly swings a few centimetres.
-float Phase = L * 0.035 - Time * (1.9 + 2.0 * W);
-float Amp = (2.0 + 4.0 * W) * U * U;
-P.y += sin(Phase) * Amp + sin(Phase * 1.7 + 1.7) * Amp * 0.25;
-P.z += sin(Phase * 0.8 + 0.5) * Amp * 0.1;
+// Cloth that moves like cloth (D56; D54's few-centimetre wave looked "like concrete", the 2 Hz one before it frantic):
+// ripples run out along the fly, two over its length, growing towards the tail; about 0.6 Hz in light air, 1 Hz in a
+// fresh breeze. A slow sway and a small flutter at the tail on top. Sizes follow the flag's length (pennant 160 cm,
+// ensign 90 cm); the hoist stays still.
+float K = 6.2832 / (0.5 * max(Length, 1.0));
+float Om = 3.8 + 2.6 * W;
+float Phase = L * K - Time * Om;
+float Amp = Length * (0.035 + 0.045 * W) * pow(U, 1.4);
+float Sway = sin(Time * 1.3 + L * 0.01) * Length * 0.03 * U * U;
+float Flutter = sin(L * K * 2.3 - Time * Om * 2.1 + 0.7) * Length * 0.008 * U * U * U;
+P.y += sin(Phase) * Amp + Sway + Flutter;
+P.z += sin(Phase * 0.5 + 0.9) * Amp * 0.15;
 return P - LocalPos;
 """
 FLAG_PARAMS = {"Wind": 0.6, "Length": 160.0}
