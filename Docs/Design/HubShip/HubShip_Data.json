@@ -441,7 +441,36 @@
     6.5
    ],
    "deep": 8.5,
-   "door": 1
+   "door": 1,
+   "walks": [
+    {
+     "levels": [
+      "lower",
+      "middle",
+      "upper"
+     ],
+     "rects": [
+      {
+       "x0": 26,
+       "x1": 30,
+       "y0": -20,
+       "y1": 20
+      },
+      {
+       "x0": 46,
+       "x1": 50,
+       "y0": -20,
+       "y1": -5
+      },
+      {
+       "x0": 46,
+       "x1": 50,
+       "y0": 5,
+       "y1": 20
+      }
+     ]
+    }
+   ]
   },
   "links": [
    [
@@ -1339,6 +1368,12 @@
      "y1": 20
     },
     {
+     "x0": 46,
+     "x1": 50,
+     "y0": -5,
+     "y1": 5
+    },
+    {
      "x0": 50,
      "x1": 68,
      "y0": -10,
@@ -1362,6 +1397,12 @@
      "x1": 46,
      "y0": -20,
      "y1": 20
+    },
+    {
+     "x0": 46,
+     "x1": 50,
+     "y0": -5,
+     "y1": 5
     },
     {
      "x0": 50,
@@ -1389,6 +1430,12 @@
      "y1": 20
     },
     {
+     "x0": 46,
+     "x1": 50,
+     "y0": -5,
+     "y1": 5
+    },
+    {
      "x0": 50,
      "x1": 68,
      "y0": -10,
@@ -1412,6 +1459,20 @@
      "x1": 46,
      "y0": -20,
      "y1": 20
+    },
+    {
+     "x0": 46,
+     "x1": 50,
+     "y0": -5,
+     "y1": 5
+    }
+   ],
+   "slots": [
+    {
+     "x0": 50,
+     "x1": 60,
+     "y0": -5,
+     "y1": 5
     }
    ]
   },
@@ -1425,8 +1486,15 @@
      "x1": 50,
      "y0": -20,
      "y1": 20
+    },
+    {
+     "x0": 50,
+     "x1": 60,
+     "y0": -5,
+     "y1": 5
     }
-   ]
+   ],
+   "void_edge": "wall"
   },
   {
    "id": "deep",
@@ -1459,6 +1527,12 @@
      "x0": 46,
      "x1": 50,
      "y0": -20,
+     "y1": -5
+    },
+    {
+     "x0": 46,
+     "x1": 50,
+     "y0": 5,
      "y1": 20
     }
    ],
@@ -1526,7 +1600,8 @@
      "y0": 10,
      "y1": 20
     }
-   ]
+   ],
+   "void_edge": "wall"
   },
   {
    "id": "lane",
@@ -2313,6 +2388,45 @@
      "note": "a runway beam under the ceiling from the forward wall out over the fitting berth (above the galleries and a mast), a trolley with a block; its hand chain hangs just off the quay’s edge"
     },
     {
+     "id": "pillars",
+     "at": [
+      [
+       29.8,
+       -10.5
+      ],
+      [
+       29.8,
+       -4.5
+      ],
+      [
+       29.8,
+       4.5
+      ],
+      [
+       29.8,
+       10.5
+      ],
+      [
+       46.2,
+       -15
+      ],
+      [
+       46.2,
+       -10
+      ],
+      [
+       46.2,
+       10
+      ],
+      [
+       46.2,
+       15
+      ]
+     ],
+     "size": 0.36,
+     "note": "posts under the galleries’ edges, from the quays to the gun deck; clear of the bollards, ladders, capstans and the berth board"
+    },
+    {
      "id": "galleries",
      "levels": [
       "lower",
@@ -2359,7 +2473,7 @@
       ],
       [
        46.4,
-       0,
+       12,
        5.6
       ],
       [
@@ -2369,12 +2483,12 @@
       ],
       [
        46.4,
-       0,
+       -12,
        8.6
       ]
      ],
      "hook_z": 3,
-     "note": "on the quays’ posts and on the galleries’ edge posts; none hang over the water (masts)"
+     "note": "under the galleries over the quays, and from the galleries’ edges; none hang over the water or the slipway (masts)"
     }
    ],
    "gates": [
@@ -2408,9 +2522,10 @@
     },
     {
      "id": "display_boat",
-     "x": 63.5,
-     "y": -3.2,
-     "prompt": "Look her over"
+     "x": 61.5,
+     "y": 4.7,
+     "prompt": "Look her over",
+     "note": "beside her, at the head of the slipway"
     },
     {
      "id": "fitting_berth",
@@ -2477,45 +2592,45 @@
     {
      "id": "timber_racks",
      "wall": "x=68",
-     "y0": -9,
-     "y1": 4,
+     "y0": -5.4,
+     "y1": 5.4,
      "z0": 0.6,
      "z1": 3.5,
-     "note": "four rows of planks on iron brackets"
+     "note": "four rows of planks on iron brackets, either side of the mizzen’s foot (the mast comes down through the forward wall to its step), clear of the Keel Walk’s doors"
     },
     {
      "id": "display_boat",
-     "x0": 54,
-     "x1": 68,
-     "y": 0,
+     "x0": 52,
+     "x1": 66,
+     "y": 7.5,
      "beam": 4.4,
      "keel_z": 0.6,
-     "note": "the 14 m cutter (D51), unrigged, bow forward, on cradles at x 57, 61, 65"
+     "note": "the 14 m cutter (D51), unrigged, bow forward, on cradles at x 55, 59, 63 on the starboard side of the hall: the slipway’s way (y -5..5) stays clear"
     },
     {
      "id": "mast_on_trestles",
-     "x0": 52,
-     "x1": 67,
-     "y": -6.5,
+     "x0": 51.5,
+     "x1": 64.5,
+     "y": -7,
      "z": 1.1,
-     "note": "her mast lying on two trestles"
+     "note": "her mast lying on two trestles, port side (the grille to the timber store behind it stays in reach)"
     },
     {
      "id": "lanterns",
      "at": [
       [
-       63,
-       4,
+       62,
+       7.5,
        7
       ],
       [
-       63,
-       -4,
+       62,
+       -5,
        7
       ],
       [
        56,
-       0,
+       -7.5,
        7
       ],
       [
@@ -2524,15 +2639,16 @@
        2.2
       ]
      ],
-     "hook_z": 11.7
+     "hook_z": 11.7,
+     "note": "none over the slipway (masts)"
     },
     {
      "id": "sign",
      "x": 50,
      "y": 0,
-     "z": 6.5,
+     "z": 10.9,
      "text": "SHIPWRIGHT",
-     "note": "over the hall mouth, facing aft over the Water Hall"
+     "note": "over the hall mouth under the gun deck, facing aft over the Water Hall (above a mast on the slipway)"
     }
    ],
    "gates": [
@@ -2607,9 +2723,9 @@
      "wall": "x=68",
      "y0": 12.8,
      "y1": 17.2,
-     "z0": 0.8,
-     "z1": 2.4,
-     "note": "six slips; header board TALLY over it; a chalk slate under it"
+     "z0": 0.6,
+     "z1": 1.9,
+     "note": "six slips; header board TALLY over it (under the beams); a chalk slate under it"
     },
     {
      "id": "pay_booth",
@@ -2844,7 +2960,7 @@
     {
      "id": "shelves",
      "wall": "y=-12",
-     "x0": 79,
+     "x0": 83.8,
      "x1": 94,
      "depth": 0.6,
      "z0": 0,
@@ -3198,8 +3314,8 @@
   "colours": "Hull planking dark tarred brown; ochre bands, muted; window frames cream; carvings and the name brass, muted; decks teak and its light and dark variants; canvas; iron."
  },
  "areas": {
-  "total": 47980,
-  "open": 5642,
+  "total": 47720,
+  "open": 5602,
   "levels": {
    "poop": {
     "total": 950,
@@ -3234,23 +3350,23 @@
     "open": 340
    },
    "upper": {
-    "total": 4771,
+    "total": 4731,
     "open": 340
    },
    "middle": {
-    "total": 4771,
+    "total": 4731,
     "open": 340
    },
    "lower": {
-    "total": 4771,
+    "total": 4731,
     "open": 610
    },
    "quay": {
-    "total": 5275,
-    "open": 1436
+    "total": 5235,
+    "open": 1396
    },
    "hold": {
-    "total": 4955,
+    "total": 4855,
     "open": 0
    },
    "deep": {
@@ -3268,7 +3384,7 @@
    "tally": 180,
    "lane": 30,
    "well_l": 340,
-   "dock": 320,
+   "dock": 280,
    "slip": 540,
    "keelgate": 576
   },
@@ -3277,10 +3393,10 @@
    "L14": 1839,
    "L15": 672,
    "L18": 5431,
-   "L12": 1910,
+   "L12": 1870,
    "L13": 2521,
    "L2": 2379,
-   "L10": 776,
+   "L10": 696,
    "L11": 2521,
    "L8": 961,
    "L7": 125,
@@ -3289,7 +3405,7 @@
    "L3": 1030,
    "L4": 180,
    "L5": 160,
-   "L6": 7424,
+   "L6": 7324,
    "L17": 4955
   }
  }

@@ -257,6 +257,13 @@ def gate_box(gm):
     g, x, y = gm["g"], gm["x"], gm["y"]
     if g == "G5":
         return "seal", None
+    if "axis" in gm:
+        # D64: a gate the room layout placed (hub_plan): it closes a corridor's mouth, the whole opening, door high.
+        t = GATE_WALL / 2 + 0.08
+        h = GATE_SIZE["G1"][1]
+        if gm["axis"] == "x":
+            return "wall", (x - t, x + t, y - gm["w"] / 2, y + gm["w"] / 2, z, z + h)
+        return "wall", (x - gm["w"] / 2, x + gm["w"] / 2, y - t, y + t, z, z + h)
     if g == "G2" and gm["level"] == "main":
         w = half_width(x, z) - 0.1
         return "cargo", (x - 0.05, x + 0.05, -w, w, z, z + 1.0)

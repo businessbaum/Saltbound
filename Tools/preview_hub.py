@@ -5,6 +5,7 @@ preview_blend.py.
   blender -b --factory-startup -P Tools/preview_hub.py -- <out.png> <view> [<view> ...] [--parts A,B] [--blk]
   a view is  x,y,z,dist,az,el  in ship metres (x from the stern face, +y starboard; az 0 = looking from the bow side,
   90 = from starboard; el up from the horizon). --blk adds the blockout parts that have no art yet (grey).
+  --glob PATTERN loads Art/Blender/Source/PATTERN instead of SM_Hub_*.blend (e.g. 'SM_HubBlk_*.blend', D64).
 """
 import glob
 import math
@@ -18,6 +19,7 @@ args = sys.argv[sys.argv.index("--") + 1:]
 out = args[0]
 names = None
 blk = "--blk" in args
+pattern = "SM_Hub_*.blend"
 views = []
 i = 1
 while i < len(args):
@@ -25,11 +27,15 @@ while i < len(args):
         names = args[i + 1].split(",")
         i += 2
         continue
+    if args[i] == "--glob":
+        pattern = args[i + 1]
+        i += 2
+        continue
     if args[i] != "--blk":
         views.append(tuple(float(v) for v in args[i].split(",")))
     i += 1
 src = os.path.join(os.path.dirname(__file__), "..", "Art", "Blender", "Source")
-files = sorted(glob.glob(os.path.join(src, "SM_Hub_*.blend")))
+files = sorted(glob.glob(os.path.join(src, pattern)))
 if names:
     files = [f for f in files if os.path.basename(f)[:-6] in names]
 bpy.ops.wm.read_factory_settings(use_empty=True)

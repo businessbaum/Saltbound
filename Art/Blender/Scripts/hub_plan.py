@@ -58,6 +58,9 @@ class Plan:
         self.z = H.level_z(level_id)
         self.lab = {}
         self.void = set()
+        self.slot = set()           # cells where something else is the floor (the slipway): no floor, no walls round
+        self.walk = set()           # corridor cells that are walkways in view (the Water Hall's galleries)
+        self.hole = {}              # stair holes' cells: the edge the stair arrives over (axis, line), left open
         self.rooms = {}
         self.doors = []             # dicts: x, y, axis ('x': the wall runs along y at that x; 'y': along x), w, kind, a, b
         self.gates = []             # gate marks: level, x, y, g, zone, open (the open space it faces)
@@ -69,7 +72,10 @@ class Plan:
         lv = H.LEVELS[self.level]
         only = [H.R(r) for r in lv.get("only", [])]
         voids = [H.R(r) for r in lv.get("voids", [])]
+        holes = stair_holes(self.level)
+        walks = [H.R(r) for w in RM.get("walks", []) if self.level in w["levels"] for r in w["rects"]]
         water = [H.R(r) for r in lv.get("water", [])]
+        slots = [H.R(r) for r in lv.get("slots", [])]
         opens = [(o["id"], H.R(r)) for o in H.OPEN if o["level"] == self.level and not o.get("inside") for r in o["rects"]]
         locked = [(z["id"], H.R(r)) for z in H.LOCKED for r in z["levels"].get(self.level, [])]
         air = [(z["id"], H.R(r)) for z in H.LOCKED for r in z.get("air", {}).get(self.level, [])]
@@ -90,6 +96,14 @@ class Plan:
                     continue
                 if only and not any(H.inside(r, x, y) for r in only):
                     continue
+                if any(H.inside(r, x, y) for r in slots):
+                    self.slot.add((i, j))
+                    continue
+                hole = next((h for h in holes if H.inside(h[0], x, y)), None)
+                if hole:
+                    self.void.add((i, j))
+                    self.hole[(i, j)] = hole[1]
+                    continue
                 if any(H.inside(r, x, y) for r in voids):
                     self.void.add((i, j))
                     continue
@@ -105,13 +119,17 @@ class Plan:
                     self.lab[(i, j)] = ("air", a)
                     continue
                 zone = next((zid for zid, r in locked if H.inside(r, x, y)), "rest")
-                corr = s0 <= abs(y) < s1 or any(abs(x - xk) < cw for xk in RM["cross"])
+                walk = any(H.inside(r, x, y) for r in walks)
+                corr = s0 <= abs(y) < s1 or any(abs(x - xk) < cw for xk in RM["cross"]) or walk
                 self.lab[(i, j)] = ("corr", zone) if corr else ("todo", zone)
+                if walk:
+                    self.walk.add((i, j))
         self._rooms(half)
         self._prune_corridors()
         self._doors()
         self._gates()
         self._walls()
+        self._hoist_gap()
 
     def _rooms(self, half):
         """The cells between the corridors: blocks by zone, band (outboard starboard, centre either side, outboard port) and
@@ -365,7 +383,22 @@ class Plan:
                 if t is not None:
                     s = prev = t
 
+    def _hoist_gap(self):
+        """The hoist's stops (spaces.well.hoist): its cage's door (aft) opens through the shaft's rail there."""
+        if self.level not in H.prop("well", "hoist")["stops"]:
+            return
+        hs, x0 = H.R(H.HUB["hoist"]), H.HUB["shaft"]["x0"]
+        out = []
+        for w in self.walls:
+            if w["kind"] == "rail" and w["axis"] == "x" and abs(w["line"] - x0) < 1e-6 and w["a0"] < hs[3] and w["a1"] > hs[2]:
+                out += [dict(w, a0=a, a1=b) for a, b in ((w["a0"], hs[2]), (hs[3], w["a1"])) if b - a > 1e-6]
+            else:
+                out.append(w)
+        self.walls = out
+
     def _label_at(self, i, j):
+        if (i, j) in self.slot:
+            return ("slot",)
         if (i, j) in self.void:
             return ("void",)
         return self.lab.get((i, j))
@@ -373,15 +406,29 @@ class Plan:
     def _edge_kind(self, a, b, ca, cb):
         if a == b:
             return None
+        if a == ("slot",) or b == ("slot",):
+            return None
         if a is None and b is None:
             return None
         if a == ("void",) or b == ("void",):
             other = b if a == ("void",) else a
             if other is None or other == ("void",):
                 return None
+            hc = ca if a == ("void",) else cb
+            if hc in self.hole:
+                ax_, ln = self.hole[hc]
+                edge = ("x", X0 + max(ca[0], cb[0]) * CELL) if ca[1] == cb[1] else ("y", Y0 + max(ca[1], cb[1]) * CELL)
+                if edge[0] == ax_ and abs(edge[1] - ln) < 1e-6:
+                    return None                     # where the stair arrives: open
+                return "rail" if other[0] in ("open", "air") else "wall"     # (a locked corridor or room behind it: walled)
             if other[0] == "water":
                 return None
-            return "rail" if other[0] in ("open", "air") else "wall"
+            if other[0] == "open":
+                o = next((z for z in H.OPEN if z["id"] == other[1]), {})
+                return o.get("void_edge", "rail")
+            if other[0] == "corr" and H.LEVELS[self.level].get("void_edge") == "wall":
+                return "wall"                       # (the hold round the slipway: walled, the ramp is walkable)
+            return "rail" if other[0] in ("air", "corr") else "wall"
         if a is None or b is None:
             other = b if a is None else a
             if other[0] == "water":
@@ -392,6 +439,17 @@ class Plan:
     # --- for the drawings and the builds ----------------------------------------------------------------------------------
     def area(self, kind):
         return sum(1 for l in self.lab.values() if l[0] == kind) * CELL * CELL
+
+
+def stair_holes(level_id):
+    """The holes stairs come up through on this floor: the Well's flights arriving here, the dock stair (HUB.stair, up to the
+    lower deck)."""
+    def arrive(r, up):
+        return {"-x": ("x", r[0]), "+x": ("x", r[1]), "-y": ("y", r[2]), "+y": ("y", r[3])}[up]
+    out = [(H.R(f), arrive(H.R(f), f["up"])) for f in H.flights() if f["to"] == level_id]
+    if level_id == "lower":
+        out.append((H.R(H.HUB["stair"]), arrive(H.R(H.HUB["stair"]), "+x")))
+    return out
 
 
 _CACHE = {}
