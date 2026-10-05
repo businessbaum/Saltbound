@@ -1,12 +1,14 @@
 """Import generated/source textures from Art/Textures/<Group>/ into Unreal.
 
-Runs inside the editor:  python Tools/ue_exec.py Tools/ue_scripts/import_textures.py [Group ...]
+Runs inside the editor:  python Tools/ue_exec.py Tools/ue_scripts/import_textures.py [Group ...] [--only=T_UI_Menu*,...]
+(--only imports just the files whose names match one of the patterns, so new parts do not reimport the whole group.)
 Destination: /Game/Saltbound/Water/Textures for the Water group, /Game/Saltbound/UI/Textures for the UI group (D50:
 UI compression and group, no mips, never streamed), otherwise /Game/Saltbound/Materials/Textures/<Group>.
 Settings follow the name suffix:
   _N   normal map (BC5, linear)        _D  albedo (sRGB, BC1/BC7 default)
   _M / _ORM / _H  masks (linear, BC7)
 """
+import fnmatch
 import glob
 import os
 import sys
@@ -50,11 +52,15 @@ def configure(tex, name, group=""):
 
 
 def main():
-    groups = sys.argv[1:] or sorted(d for d in os.listdir(SRC) if os.path.isdir(os.path.join(SRC, d)))
+    only = [p for a in sys.argv[1:] if a.startswith("--only=") for p in a[len("--only="):].split(",") if p]
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    groups = args or sorted(d for d in os.listdir(SRC) if os.path.isdir(os.path.join(SRC, d)))
     tasks = []
     group_of = {}
     for g in groups:
         for path in sorted(glob.glob(os.path.join(SRC, g, "*.png"))):
+            if only and not any(fnmatch.fnmatch(os.path.splitext(os.path.basename(path))[0], p) for p in only):
+                continue
             t = unreal.AssetImportTask()
             t.set_editor_property("filename", path)
             t.set_editor_property("destination_path", dest_for(g))

@@ -1714,3 +1714,55 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - A far view (HLOD or a far mesh) for her silhouette, and her shadow at a distance (phase 2's last item).
   - Opening a gate does not remove its art yet; the zones behind are not built (not now, prompt section 11).
   - The hoist's stop is not saved (it starts at the quay).
+
+### D66 · The menus: start, pause, settings, voyages, loading, first start, keys and buttons (Adopted: built to the owner's choices; in-game review pending)
+- **Owner (2026-10-05), on the menu ideas (`Docs/Design/Menu_Ideas/Menus.html`):**
+  - Start menu: the "Night sea" direction. Its title is the launch intro's own title at the place where the intro leaves it
+    (the intro was changed for this: the big rope grows into the underline and the title glides up, 8.5 s,
+    `Saltbound/Content/Movies/Saltbound_Intro.mp4`). Whether the intro's last frame hands over to the menu is decided later.
+  - One rope everywhere: the intro's big rope is the selection underline, the slider track and the on / off mark; a slider's
+    handle is a knot tied in it; the "‹ value ›" arrows are small anchors.
+  - Pause: Resume, Save now, Voyages, Settings, Return to the title, Quit to desktop, and a "where you are" card (the paper's
+    detail is only a reference). Settings: pages with real settings only. Voyages: three pages with a picture, the place, the
+    time and the play time; hold X to scrap one, an empty page starts a new voyage. Loading: the save sign's knot. A question
+    before something can't be undone: no hold, E answers yes, Esc no. First start: brightness with three knots. Keys and
+    buttons: keys on scraps, "Press a key", a clash explained on a scrap (E swap, Esc keep both). No credits for now.
+- **Built in code like the other screens** (`UI/SaltMenuKit.*` and one widget per screen), placed at the design page's 1080p
+  numbers. The parts come from the design page's own drawing code: `Tools/textures/menu_parts.js` and `gen_menu_parts.py`
+  (the rope as a seamless tile, the knot, the anchor, the card, the voyage page, the question's scrap, the wide key scrap, the
+  X key for the hold, the knot as plain shapes for the brightness test, and `T_UI_MenuTitle` cut from the intro's title at its
+  menu place). `import_textures.py` takes `--only=<patterns>` so new parts do not reimport the whole UI group.
+- **The screens are a stack** on the player controller (`PushScreen` / `PopScreen`): the top one has the keys; a question shows
+  over the screen under it; the game pauses while the pause menu or anything opened from it is up; the HUD hides under any
+  screen. Keys everywhere: W / S (arrows, d-pad) choose, A / D change, E / Enter / Space use, Esc / B / right click go back,
+  Q / E (bumpers) turn the settings' pages; the mouse hovers and clicks (the screens hit-test in design coordinates, D58).
+- **Voyages are save slots:** Voyage I is the old `Main` slot (older saves carry over), then `Voyage2` and `Voyage3`. The voyage
+  last played is kept in the settings (`LastVoyage`). A save remembers its play time (counted while no menu is up) and takes a
+  picture of the world without the UI (`Saved/SaveGames/<slot>.png`). Scrapping deletes both; the voyage in play cannot be
+  scrapped from the pause menu.
+- **A new voyage without reloading the map:** one tick after the map starts, the world as built is saved quietly to the
+  `NewVoyage` slot; a new voyage loads that snapshot (the boat at her mooring, the satchel, stores and pickups as built, no
+  island found, the hub at her default berth) and saves it at once to its page.
+- **The start of the packaged game:** the first start's brightness check once, then the title over the last voyage, loaded
+  behind it (Continue goes straight back to play). Play-in-editor and tool runs (`-SaltNewGame`) start in play as before.
+- **Saving and leaving:** Save now works anywhere (as since D46; the page's idea of saving only when moored or anchored was
+  not taken). Return to the title and sailing another voyage from the pause menu ask first when more than 10 s were played
+  since the last save; the voyage then goes back to that save behind the title. Quit to desktop still saves first (D46).
+- **The loading screen is a veil:** the world is loaded in place, so it fades in, applies the save once covered, stays at least
+  1.4 s (the place in large letters over the voyage's picture, where she lies, a line from an old log, the knot turning as the
+  save sign does), hands over and fades out.
+- **Settings:** Game (the prompt's place, every setting back), Display (window, frame cap, vsync, resolution scale,
+  brightness), Graphics (quality Calm / Fair / Fresh / Gale = the engine's scalability 0-3, shadows, view distance, field of
+  view), Audio (one volume for everything), Controls (mouse sensitivity, invert look, keys and buttons). Brightness is the
+  display gamma (1.6-3.0, the engine's 2.2 by default); Slate applies it too, so the knot test changes with it. The volume is
+  the main audio device's transient primary volume.
+- **Keys and buttons:** the keyboard keys of move, jump, sprint, dive, use, satchel and the tool wheel can be changed; the
+  other keys that always work (arrows, C, I) are shown fainter; the gamepad is shown, not changed. Esc, F10 and 1 to 5 are
+  kept (the pause menu, the tools). A changed key rebuilds the mapping context with the same actions, so bindings stay valid.
+- **Checks:** `sb.Dev.RunMenuTests` (20 checks: the pause menu and its card, the settings applying, the brightness, rebinding
+  with a swap, the voyages, the title) passed in a standalone run. `sb.Dev.MenuShots` and `sb.Dev.MenuFlow` (title, new
+  voyage, play, save, voyages with the picture, back to the title) capture every screen; evidence:
+  `Docs/Evidence/D66/D66_menus_sheet.jpg`.
+- **Not done yet:** the prompts still show E when Use is changed (their letters are pictures); hold-to-toggle, text size,
+  subtitles and the seasickness comfort settings; separate music / sea / effects volumes (there is one bus); the save picture
+  is the full screen as a PNG (about 3 MB); the title shows the world at the time of day it was saved, not always at dusk.

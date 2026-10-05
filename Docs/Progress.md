@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D63).
+Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D63; the menus D66).
 
 ## Milestone status
 
@@ -337,7 +337,8 @@ the sail and cast off.
 | Dive (while swimming) | Left Ctrl / C | B / Circle |
 | Interact / leave station (raising the anchor: hold E) | E | X / Square |
 | At a station | W/S and A/D are routed to the station | Left stick |
-| Pause menu / settings (Prompt position: on the object or the bottom of the screen) | Esc (in the editor: F10) | Start |
+| Pause menu (D66: Resume, Save now, Voyages, Settings, Return to the title, Quit to desktop) | Esc (in the editor: F10) | Start |
+| In the menus (D66) | W / S or the arrows choose, A / D change, E / Enter use, Esc or right click back, Q / E turn the settings' pages; hold X on a voyage to scrap it; the mouse hovers and clicks | D-pad, A use, B back, bumpers turn pages, X (hold) scrap |
 | Satchel | Tab or I (arrows or the mouse choose a pocket, drag an item to another pocket, R turn the item, G drop one; Tab, I or Esc close) | Back |
 | Tool wheel | Hold Q, aim with the mouse, let go to take the tool; Esc cancels; 1 to 5 take a tool directly | Hold LB, aim with the right stick; B cancels |
 | On the boat | Steering oar (starboard quarter, E at its handle): A / D steer, W / S let the sail out or take it in. Pin rails by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Bell rope: E rings the bell; lantern: E lights / douses it. Chart on the mast (aft, to starboard): E looks at it closely (E / Esc put it back). Ladders (both sides, midship): swim or walk into one (or E) to take hold, W / S climb, E lets go; off the bottom into the sea, over the top on board | |
@@ -352,7 +353,10 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.DumpFrames <n>`: the renderer writes the next n frames to `Saved/Screenshots` (with `-UseFixedTimeStep -FPS=<n>`, see `Tools/record_clip.py --dump`)
 - `sb.Dev.RunMovementTests [motion speed turn]`, `sb.Dev.Platform <motion> [speed turn]`
 - `sb.Dev.Benchmark [s]`, `sb.Dev.Perf [s]`, `sb.Dev.Delayed <s> <cmd>`
-- `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.PromptOnObject 1|0`, `sb.Dev.ShowInteractionVolumes 1`, `sb.Dev.RunMenuTests`,
+- Menus (D66): `sb.Dev.RunMenuTests`, `sb.Dev.Menu <title|pause|settings [page]|voyages|keys [listen|clash]|first|ask|loading [s]|close>`,
+  `sb.Dev.MenuShots [quit]` (every screen to `Saved/MenuShots`), `sb.Dev.MenuFlow [quit]` (title, new voyage, save, voyages, back
+  to the title; uses the real voyage slots, so run it in a test install)
+- `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.PromptOnObject 1|0`, `sb.Dev.ShowInteractionVolumes 1`,
   `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched), `sb.Dev.RunInventoryTests`,
   `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel [off]`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`, `sb.Dev.Chart [off]`, `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`, `sb.Dev.CameraTrace [s] [deck]`, `sb.Dev.EdgeTest [s]` (the view beside the deck's low steps in the open sea), `sb.Boat.RigTurn 0|1`, `sb.Camera.DeckKnees 0|1`, `sb.Camera.DeckTilt <share>` (0 = level view), `sb.Camera.StepSmooth 0|1`
 - `sb.Wind <FromDeg> <Speed m/s> [Gustiness]` (no arguments: print the wind)
@@ -369,6 +373,10 @@ Developer console (`~`, non-shipping builds):
   input), `sb.Dev.WaterState` (logs `SB_WATER`: movement mode, immersion, surface, camera height above the water)
 
 ## Known issues and limitations
+- **Menus (D66):** the prompts still show E when Use is changed in Keys and buttons (their letters are pictures); one volume for
+  everything (no music / sea / effects buses yet); no hold-to-toggle, text size, subtitles or seasickness settings yet; a save's
+  picture is the full screen as a PNG (about 3 MB). The packaged game now opens on the first start (once) and the title; it was
+  checked in a standalone run of the editor build, not yet in a packaged build.
 - **Performance:** revision 2 measured in standalone, 2560×1440 native, editor closed:
   - Day 75.7 fps (GPU 12.5 ms), Evening 69.6 fps (GPU 13.6 ms), Dusk 72.1 fps (GPU 13.1 ms).
   - This is within D8 (60 fps), but the headroom shrank from about 2× to 1.2×.

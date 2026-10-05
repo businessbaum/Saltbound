@@ -55,6 +55,26 @@ public:
 	UPROPERTY() TArray<FName> HubUnlocked;
 	UPROPERTY() int32 Salt = 0;
 	UPROPERTY() bool bSeaGateOpen = true;
+
+	// D66: how long this voyage has been played (seconds; the menus show it).
+	UPROPERTY() double PlayTime = 0.0;
+};
+
+/** What the start menu and the voyages screen show of a voyage (a save slot), D66. */
+struct FSaltVoyageInfo
+{
+	bool bExists = false;
+	FDateTime SavedAt;
+	double PlayTime = 0.0;
+	/** The nearest named place ("Ruin Isle"), or "the open sea". */
+	FText Place;
+	/** "moored", "at anchor", "under sail", "adrift". */
+	FText Boat;
+	ESaltBoatHold Hold = ESaltBoatHold::Free;
+	/** Near a named place (else the open sea). */
+	bool bNearPlace = false;
+	/** The picture taken when it was saved (Saved/SaveGames/<slot>.png), empty when there is none. */
+	FString Picture;
 };
 
 /**
@@ -114,7 +134,34 @@ public:
 	/** The hub's state changed (zones unlocked). */
 	FSimpleMulticastDelegate OnHubChanged;
 
+	// Voyages (D66): three save slots; "Main" (the slot of D46) is the first, so older saves are Voyage I -------------
+	static constexpr int32 VoyageCount = 3;
+	static FString VoyageSlot(int32 Index);
+	/** The voyage the slot in use belongs to (0..2), or INDEX_NONE (a test slot). */
+	int32 GetActiveVoyage() const;
+	/** Uses this voyage's slot from now on and remembers it for the start menu's Continue. */
+	void SetActiveVoyage(int32 Index);
+	FSaltVoyageInfo GetVoyageInfo(int32 Index) const;
+	bool DeleteVoyage(int32 Index);
+	/** The map as built, taken once at the start before anything is loaded (a quiet save to the "NewVoyage" slot). */
+	void TakeNewVoyageSnapshot(UWorld* World);
+	bool HasNewVoyageSnapshot() const { return bHasSnapshot; }
+	/** Starts a new voyage in the slot: the world goes back to the snapshot, the satchel and the stores to their start, and
+	 *  it is saved there at once. */
+	bool StartNewVoyage(UWorld* World, int32 Index);
+	/** Puts the world back to the snapshot without saving (returning to the title of a voyage never saved). */
+	bool RestoreNewVoyageSnapshot(UWorld* World);
+	/** Seconds played in the voyage in use (counted by the controller while playing, saved with it). */
+	double PlayTime = 0.0;
+	/** Play time at the last save or load: what Return to the title would lose. */
+	double GetUnsavedTime() const { return FMath::Max(PlayTime - PlayTimeAtSave, 0.0); }
+	/** No save sign, notice or picture (the snapshot, the new voyage's switch). */
+	bool bQuiet = false;
+
 private:
+	bool bHasSnapshot = false;
+	double PlayTimeAtSave = 0.0;
+
 	void Notify(UWorld* World, const FText& Text) const;
 
 	TSet<FName> Collected;

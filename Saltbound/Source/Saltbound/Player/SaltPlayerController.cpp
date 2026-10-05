@@ -4,6 +4,8 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Boat/SaltBoat.h"
+#include "Core/SaltGameUserSettings.h"
+#include "Core/SaltPlaces.h"
 #include "Core/SaltSaveSubsystem.h"
 #include "Core/SaltTools.h"
 #include "EnhancedInputComponent.h"
@@ -12,8 +14,15 @@
 #include "Player/SaltInputConfig.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "UI/SaltChartWidget.h"
+#include "UI/SaltConfirmWidget.h"
+#include "UI/SaltFirstStartWidget.h"
 #include "UI/SaltHUDWidget.h"
+#include "UI/SaltKeysWidget.h"
+#include "UI/SaltLoadingWidget.h"
 #include "UI/SaltMenuWidget.h"
+#include "UI/SaltSettingsWidget.h"
+#include "UI/SaltStartMenuWidget.h"
+#include "UI/SaltVoyagesWidget.h"
 #include "UI/SaltSatchelWidget.h"
 #include "UI/SaltStoreWidget.h"
 #include "UI/SaltToolWheelWidget.h"
@@ -36,10 +45,8 @@ USaltInputConfig* ASaltPlayerController::GetInputConfig()
 
 void ASaltPlayerController::SetHUDVisible(bool bVisible)
 {
-	if (HUDWidget)
-	{
-		HUDWidget->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-	}
+	bHUDWanted = bVisible;
+	UpdateScreens();
 }
 
 void ASaltPlayerController::ShowNotice(const FText& Text)
@@ -57,7 +64,7 @@ FText ASaltPlayerController::GetNoticeText() const
 
 bool ASaltPlayerController::IsMenuOpen() const
 {
-	return MenuWidget && MenuWidget->IsInViewport();
+	return Screens.Num() > 0 || IsLoading();
 }
 
 void ASaltPlayerController::SetMenuOpen(bool bOpen)
@@ -66,32 +73,412 @@ void ASaltPlayerController::SetMenuOpen(bool bOpen)
 	{
 		return;
 	}
-	// Held keys would stay "down" across the switch to the menu and back.
-	FlushPressedKeys();
-	if (ASaltPlayerCharacter* SaltCharacter = Cast<ASaltPlayerCharacter>(GetPawn()))
-	{
-		SaltCharacter->ResetHeldInput();
-	}
 	if (bOpen)
 	{
 		if (!MenuWidget)
 		{
 			MenuWidget = CreateWidget<USaltMenuWidget>(this, USaltMenuWidget::StaticClass(), TEXT("SaltMenu"));
 		}
-		MenuWidget->AddToViewport(10);
-		SetPause(true);
-		bShowMouseCursor = true;
-		FInputModeUIOnly Mode;
-		Mode.SetWidgetToFocus(MenuWidget->TakeWidget());
-		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		SetInputMode(Mode);
+		PushScreen(MenuWidget);
 	}
 	else
 	{
-		MenuWidget->RemoveFromParent();
-		SetPause(false);
-		bShowMouseCursor = false;
-		SetInputMode(FInputModeGameOnly());
+		CloseScreens();
+	}
+}
+
+// --- Menu screens (D66) ------------------------------------------------------------------------------------------------
+
+void ASaltPlayerController::PushScreen(USaltScreen* Screen)
+{
+	if (!Screen || !IsLocalController())
+	{
+		return;
+	}
+	if (Screens.Contains(Screen))
+	{
+		Screens.Remove(Screen);
+		Screen->RemoveFromParent();
+	}
+	Screens.Add(Screen);
+	Screen->AddToViewport(10 + Screens.Num());
+	UpdateScreens();
+}
+
+void ASaltPlayerController::PopScreen(USaltScreen* Screen)
+{
+	if (!Screen)
+	{
+		Screen = GetTopScreen();
+	}
+	if (!Screen || !Screens.Contains(Screen))
+	{
+		return;
+	}
+	const bool bWasTop = Screen == GetTopScreen();
+	Screens.Remove(Screen);
+	Screen->RemoveFromParent();
+	UpdateScreens();
+	if (bWasTop && GetTopScreen())
+	{
+		GetTopScreen()->OnRevealed();
+	}
+}
+
+void ASaltPlayerController::CloseScreens()
+{
+	for (USaltScreen* S : Screens)
+	{
+		if (S)
+		{
+			S->RemoveFromParent();
+		}
+	}
+	Screens.Reset();
+	UpdateScreens();
+}
+
+bool ASaltPlayerController::IsTitleOpen() const
+{
+	return FindScreen<USaltStartMenuWidget>() != nullptr;
+}
+
+bool ASaltPlayerController::IsLoading() const
+{
+	return LoadingWidget && LoadingWidget->IsInViewport() && !LoadingWidget->IsDone();
+}
+
+void ASaltPlayerController::UpdateScreens()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+	// The top screen shows and takes the keys; one under it shows too while the top is a question over it.
+	bool bShow = true;
+	bool bPause = false;
+	for (int32 I = Screens.Num() - 1; I >= 0; --I)
+	{
+		USaltScreen* S = Screens[I];
+		S->SetVisibility(!bShow ? ESlateVisibility::Collapsed : I == Screens.Num() - 1 ? ESlateVisibility::Visible : ESlateVisibility::HitTestInvisible);
+		bShow = bShow && S->bOverlay;
+		bPause = bPause || S->bPausesGame;
+	}
+	const bool bCovered = LoadingWidget && LoadingWidget->IsInViewport() && LoadingWidget->IsCovering();
+	if (HUDWidget)
+	{
+		HUDWidget->SetVisibility(bHUDWanted && Screens.Num() == 0 && !bCovered ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	if (bPause != bPausedByScreens)
+	{
+		bPausedByScreens = bPause;
+		SetPause(bPause);
+	}
+	UUserWidget* KeysTo = GetTopScreen() ? (UUserWidget*)GetTopScreen() : bCovered ? (UUserWidget*)LoadingWidget : nullptr;
+	if (KeysTo != ScreenInput.Get())
+	{
+		const bool bHadScreens = ScreenInput.IsValid();
+		ScreenInput = KeysTo;
+		if (USaltScreen* Top = GetTopScreen())
+		{
+			SetUIInput(true, Top, Top->bWantsCursor);
+		}
+		else if (KeysTo)
+		{
+			SetUIInput(true, KeysTo, false);
+		}
+		else if (bHadScreens && !IsSatchelOpen() && !IsStoreOpen() && !IsChartOpen())
+		{
+			SetUIInput(false, nullptr);
+		}
+	}
+}
+
+void ASaltPlayerController::ShowTitle()
+{
+	CloseScreens();
+	PushScreen(CreateWidget<USaltStartMenuWidget>(this, USaltStartMenuWidget::StaticClass()));
+}
+
+void ASaltPlayerController::OpenBrightness(bool bFromSettings)
+{
+	if (!bFromSettings)
+	{
+		CloseScreens();
+	}
+	USaltFirstStartWidget* W = CreateWidget<USaltFirstStartWidget>(this, USaltFirstStartWidget::StaticClass());
+	W->bFromSettings = bFromSettings;
+	PushScreen(W);
+}
+
+void ASaltPlayerController::OpenSettings()
+{
+	PushScreen(CreateWidget<USaltSettingsWidget>(this, USaltSettingsWidget::StaticClass()));
+}
+
+USaltSettingsWidget* ASaltPlayerController::OpenSettingsAt(uint8 Setting)
+{
+	USaltSettingsWidget* W = CreateWidget<USaltSettingsWidget>(this, USaltSettingsWidget::StaticClass());
+	PushScreen(W);
+	W->ShowSetting((ESaltSetting)Setting);
+	return W;
+}
+
+void ASaltPlayerController::OpenVoyages()
+{
+	USaltVoyagesWidget* W = CreateWidget<USaltVoyagesWidget>(this, USaltVoyagesWidget::StaticClass());
+	W->bInPlay = FindScreen<USaltMenuWidget>() != nullptr;
+	PushScreen(W);
+}
+
+void ASaltPlayerController::OpenKeys()
+{
+	PushScreen(CreateWidget<USaltKeysWidget>(this, USaltKeysWidget::StaticClass()));
+}
+
+void ASaltPlayerController::Ask(const FText& Title, const FText& Body, const FText& Yes, const FText& No, TFunction<void()> OnYes)
+{
+	USaltConfirmWidget* W = CreateWidget<USaltConfirmWidget>(this, USaltConfirmWidget::StaticClass());
+	W->Setup(Title, Body, Yes, No, MoveTemp(OnYes));
+	PushScreen(W);
+}
+
+void ASaltPlayerController::ContinueVoyage()
+{
+	CloseScreens();
+}
+
+void ASaltPlayerController::NewVoyage()
+{
+	const USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this);
+	if (!Saves)
+	{
+		return;
+	}
+	for (int32 I = 0; I < USaltSaveSubsystem::VoyageCount; ++I)
+	{
+		if (!Saves->GetVoyageInfo(I).bExists)
+		{
+			LoadVoyage(I, true, nullptr);
+			return;
+		}
+	}
+	// Every page is taken: the voyages screen, where one can be scrapped.
+	OpenVoyages();
+}
+
+void ASaltPlayerController::SailVoyage(int32 Index)
+{
+	USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this);
+	if (!Saves || Index < 0 || Index >= USaltSaveSubsystem::VoyageCount)
+	{
+		return;
+	}
+	const bool bNew = !Saves->GetVoyageInfo(Index).bExists;
+	const bool bInPlay = FindScreen<USaltMenuWidget>() != nullptr;
+	if (!bInPlay && !bNew && IsTitleOpen() && Saves->GetActiveVoyage() == Index)
+	{
+		// From the title the world behind already is this voyage.
+		ContinueVoyage();
+		return;
+	}
+	if (bInPlay && Saves->GetUnsavedTime() > 10.0)
+	{
+		TWeakObjectPtr<ASaltPlayerController> Self(this);
+		Ask(bNew ? NSLOCTEXT("SaltVoyages", "AskNew", "Start a new voyage?") : NSLOCTEXT("SaltVoyages", "AskLeave", "Leave this voyage?"),
+			Saves->HasSave()
+				? FText::Format(NSLOCTEXT("SaltVoyages", "AskLeaveBody", "You last saved {0}. What happened since then stays at sea."), SaltMenu::Ago(Saves->GetSaveTime()))
+				: NSLOCTEXT("SaltVoyages", "AskLeaveBodyNone", "This voyage has not been saved yet. What happened stays at sea."),
+			NSLOCTEXT("SaltVoyages", "AskLeaveYes", "set sail"), NSLOCTEXT("SaltVoyages", "AskLeaveNo", "stay aboard"),
+			[Self, Index, bNew]()
+			{
+				if (ASaltPlayerController* PC = Self.Get())
+				{
+					PC->LoadVoyage(Index, bNew, nullptr);
+				}
+			});
+		return;
+	}
+	LoadVoyage(Index, bNew, nullptr);
+}
+
+void ASaltPlayerController::LoadVoyage(int32 Index, bool bNew, TFunction<void()> Then)
+{
+	USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this);
+	if (!Saves)
+	{
+		return;
+	}
+	FText Place;
+	FText Line;
+	FString Picture;
+	const FSaltPlace* Home = SaltPlaces::Find(TEXT("SaltboundCove"));
+	if (bNew)
+	{
+		Place = Home ? Home->Name : FText::FromString(TEXT("Saltbound Cove"));
+		Line = NSLOCTEXT("SaltVoyages", "NewLine", "where every voyage begins");
+	}
+	else
+	{
+		const FSaltVoyageInfo Info = Saves->GetVoyageInfo(Index);
+		Place = Info.bNearPlace ? Info.Place : NSLOCTEXT("SaltVoyages", "OpenSeaName", "The open sea");
+		const FSaltPlace* Near = nullptr;
+		for (const FSaltPlace& P : SaltPlaces::All())
+		{
+			if (Info.bNearPlace && P.Name.EqualTo(Info.Place))
+			{
+				Near = &P;
+			}
+		}
+		// "1.7 km north-east of Saltbound Cove · at anchor" (the design's line), or where she lies.
+		Line = Near && Near != Home ? FText::Format(NSLOCTEXT("SaltVoyages", "LoadLine", "{0} · {1}"), SaltPlaces::FromHome(*Near), Info.Boat)
+			: FText::Format(NSLOCTEXT("SaltVoyages", "LoadLineHome", "where you left her · {0}"), Info.Boat);
+		Picture = Info.Picture;
+	}
+	TWeakObjectPtr<ASaltPlayerController> Self(this);
+	ShowLoading(Place, Line, Picture,
+		[Self, Index, bNew]()
+		{
+			ASaltPlayerController* PC = Self.Get();
+			USaltSaveSubsystem* S = PC ? USaltSaveSubsystem::Get(PC) : nullptr;
+			if (!S)
+			{
+				return;
+			}
+			PC->CloseScreens();
+			if (bNew)
+			{
+				S->StartNewVoyage(PC->GetWorld(), Index);
+			}
+			else
+			{
+				S->SetActiveVoyage(Index);
+				S->bQuiet = true;
+				S->LoadGame(PC->GetWorld());
+				S->bQuiet = false;
+			}
+		},
+		[Self, Then]()
+		{
+			if (Then)
+			{
+				Then();
+			}
+			else if (ASaltPlayerController* PC = Self.Get())
+			{
+				PC->UpdateScreens();
+			}
+		});
+}
+
+void ASaltPlayerController::ReturnToTitle()
+{
+	USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this);
+	if (!Saves)
+	{
+		return;
+	}
+	const int32 Active = Saves->GetActiveVoyage();
+	const FSaltVoyageInfo Info = Active != INDEX_NONE ? Saves->GetVoyageInfo(Active) : FSaltVoyageInfo();
+	TWeakObjectPtr<ASaltPlayerController> Self(this);
+	ShowLoading(Info.bExists && Info.bNearPlace ? Info.Place : FText::FromString(TEXT("Saltbound")),
+		Info.bExists ? FText::Format(NSLOCTEXT("SaltVoyages", "LoadLineHome", "where you left her · {0}"), Info.Boat) : FText::GetEmpty(), Info.Picture,
+		[Self]()
+		{
+			ASaltPlayerController* PC = Self.Get();
+			USaltSaveSubsystem* S = PC ? USaltSaveSubsystem::Get(PC) : nullptr;
+			if (!S)
+			{
+				return;
+			}
+			PC->CloseScreens();
+			// The voyage as last saved goes behind the title (or the world as built when it was never saved).
+			if (S->HasSave())
+			{
+				S->bQuiet = true;
+				S->LoadGame(PC->GetWorld());
+				S->bQuiet = false;
+			}
+			else
+			{
+				S->RestoreNewVoyageSnapshot(PC->GetWorld());
+			}
+		},
+		[Self]()
+		{
+			if (ASaltPlayerController* PC = Self.Get())
+			{
+				PC->ShowTitle();
+			}
+		});
+}
+
+void ASaltPlayerController::ShowLoading(const FText& Place, const FText& Line, const FString& Picture, TFunction<void()> Work, TFunction<void()> Then)
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+	if (LoadingWidget)
+	{
+		LoadingWidget->RemoveFromParent();
+	}
+	LoadingWidget = CreateWidget<USaltLoadingWidget>(this, USaltLoadingWidget::StaticClass());
+	LoadingWidget->Begin(Place, Line, Picture, MoveTemp(Work), MoveTemp(Then));
+	LoadingWidget->AddToViewport(100);
+	UpdateScreens();
+}
+
+void ASaltPlayerController::RebuildInputMappings()
+{
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = IsLocalController() ? ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()) : nullptr;
+	USaltInputConfig* Config = GetInputConfig();
+	if (Subsystem && Config->DefaultContext)
+	{
+		Subsystem->RemoveMappingContext(Config->DefaultContext);
+	}
+	Config->BuildMappings();
+	if (Subsystem)
+	{
+		Subsystem->AddMappingContext(Config->DefaultContext, 0);
+	}
+}
+
+void ASaltPlayerController::TickPlayClock()
+{
+	// The timer stops while the game is paused; the title and the loading screen do not count either.
+	if (Screens.Num() == 0 && !IsLoading())
+	{
+		if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
+		{
+			Saves->PlayTime += 1.0;
+		}
+	}
+}
+
+void ASaltPlayerController::StartFromBoot()
+{
+	USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this);
+	USaltGameUserSettings* Settings = USaltGameUserSettings::Get();
+	if (!Saves)
+	{
+		return;
+	}
+	// The voyage last played goes behind the title (D46's continue, now per voyage).
+	Saves->SetActiveVoyage(Settings ? Settings->LastVoyage : 0);
+	if (Saves->HasSave())
+	{
+		Saves->bQuiet = true;
+		Saves->LoadGame(GetWorld());
+		Saves->bQuiet = false;
+	}
+	if (Settings && !Settings->bFirstStartDone)
+	{
+		OpenBrightness(false);
+	}
+	else
+	{
+		ShowTitle();
 	}
 }
 
@@ -247,7 +634,16 @@ void ASaltPlayerController::HandleMenuKey()
 		CloseToolWheel(false);
 		return;
 	}
-	ToggleMenu();
+	if (IsLoading())
+	{
+		return;
+	}
+	if (USaltScreen* Top = GetTopScreen())
+	{
+		Top->Back();
+		return;
+	}
+	SetMenuOpen(true);
 }
 
 void ASaltPlayerController::OpenToolWheel()
@@ -382,17 +778,26 @@ void ASaltPlayerController::BeginPlay()
 		HUDWidget->AddToViewport(0);
 	}
 	SetInputMode(FInputModeGameOnly());
-
-	// The game continues from the last save (D46). Play-in-editor and tool runs (-SaltNewGame: captures, benchmarks)
-	// start from the map as built. Next tick: the boat has set itself up by then.
-	if (!GIsEditor && !FParse::Param(FCommandLine::Get(), TEXT("SaltNewGame")))
+	// D66: the brightness and the volume the player chose.
+	if (USaltGameUserSettings* Settings = USaltGameUserSettings::Get())
 	{
-		GetWorldTimerManager().SetTimerForNextTick([this]()
-		{
-			if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
-			{
-				Saves->LoadGame(GetWorld());
-			}
-		});
+		Settings->ApplyExtras();
 	}
+	GetWorldTimerManager().SetTimer(PlayClock, this, &ASaltPlayerController::TickPlayClock, 1.f, true);
+
+	// Next tick (the boat has set itself up by then): the world as built is kept for new voyages (D66). The packaged game then
+	// loads the last voyage and opens the title (the first start before it once). Play-in-editor and tool runs
+	// (-SaltNewGame: captures, benchmarks) start from the map as built, in play.
+	const bool bBoot = !GIsEditor && !FParse::Param(FCommandLine::Get(), TEXT("SaltNewGame"));
+	GetWorldTimerManager().SetTimerForNextTick([this, bBoot]()
+	{
+		if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
+		{
+			Saves->TakeNewVoyageSnapshot(GetWorld());
+		}
+		if (bBoot)
+		{
+			StartFromBoot();
+		}
+	});
 }

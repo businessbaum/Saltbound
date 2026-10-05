@@ -1,502 +1,309 @@
-// Saltbound - pause menu with the settings (display and look), built in code like the HUD.
+// Saltbound - the pause menu (D66).
 
 #include "UI/SaltMenuWidget.h"
 
 #include "Blueprint/WidgetTree.h"
-#include "Components/Border.h"
-#include "Components/Button.h"
+#include "Boat/SaltBoat.h"
+#include "Boat/SaltHullShape.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
-#include "Components/Overlay.h"
-#include "Components/OverlaySlot.h"
-#include "Components/SizeBox.h"
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
-#include "Core/SaltGameUserSettings.h"
+#include "Core/SaltPlaces.h"
 #include "Core/SaltSaveSubsystem.h"
+#include "EngineUtils.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Player/SaltPlayerController.h"
-#include "Styling/CoreStyle.h"
+#include "UI/SaltPaintedText.h"
+#include "World/SaltLightingRig.h"
+#include "World/SaltWindSubsystem.h"
 
 namespace
 {
-	const FLinearColor TextBright(0.96f, 0.92f, 0.84f, 1.f);   // the HUD's warm off-white
-	const FLinearColor TextDim(0.78f, 0.74f, 0.66f, 1.f);
-	const FLinearColor RowHighlight(0.85f, 0.62f, 0.30f, 0.22f);
-	const FLinearColor PanelColor(0.055f, 0.045f, 0.035f, 0.88f);
+	// Menus.html "Pause": "Paused" at (6cqw, 7cqw), the lines from 11.5cqw; the card 29 x 40cqw, 6cqw from the right, 7cqw
+	// down, turned 1.2 degrees, its text 2.4 / 2.6cqw in.
+	const FVector2D PauseMenuAt(115.f, 221.f);
+	const FVector2D PauseCardAt(1248.f, 134.f);
+	const FVector2D PauseCardSize(557.f, 768.f);
+	constexpr float PauseCardPadX = 50.f;
+	constexpr float PauseCardPadY = 46.f;
+	/** Return to the title asks first when this much was played since the last save (s). */
+	constexpr double PauseAskAfter = 10.0;
 
-	UTextBlock* MakeText(UWidgetTree* Tree, FName Name, int32 Size, const FLinearColor& Color)
+	UTextBlock* SpacedInk(UWidgetTree* Tree, const FText& Text, ESaltFace Face, float Size, float Spacing, float Alpha = 0.94f)
 	{
-		UTextBlock* Text = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), Name);
-		Text->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", Size));
-		Text->SetColorAndOpacity(FSlateColor(Color));
-		Text->SetShadowOffset(FVector2D(1.f, 1.f));
-		Text->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.5f));
-		return Text;
+		UTextBlock* T = SaltUI::InkText(Tree, Text, Face, Size, ETextJustify::Left, Alpha);
+		FSlateFontInfo F = T->GetFont();
+		F.LetterSpacing = FMath::RoundToInt(Spacing * 1000.f);
+		T->SetFont(F);
+		return T;
 	}
 
-	FSlateBrush RoundedBrush(float Radius)
+	FText WindWords(float SpeedMs)
 	{
-		FSlateBrush Brush;
-		Brush.DrawAs = ESlateBrushDrawType::RoundedBox;
-		Brush.OutlineSettings.RoundingType = ESlateBrushRoundingType::FixedRadius;
-		Brush.OutlineSettings.CornerRadii = FVector4(Radius, Radius, Radius, Radius);
-		Brush.TintColor = FSlateColor(FLinearColor::White);
-		return Brush;
+		// The Beaufort names a sailor would use.
+		if (SpeedMs < 1.5f) { return NSLOCTEXT("SaltPause", "Calm", "calm"); }
+		if (SpeedMs < 3.3f) { return NSLOCTEXT("SaltPause", "LightAir", "a light breeze"); }
+		if (SpeedMs < 5.5f) { return NSLOCTEXT("SaltPause", "Gentle", "a gentle breeze"); }
+		if (SpeedMs < 8.f) { return NSLOCTEXT("SaltPause", "Moderate", "a moderate breeze"); }
+		if (SpeedMs < 10.8f) { return NSLOCTEXT("SaltPause", "Fresh", "a fresh breeze"); }
+		if (SpeedMs < 13.9f) { return NSLOCTEXT("SaltPause", "Strong", "a strong breeze"); }
+		return NSLOCTEXT("SaltPause", "Gale", "a gale");
 	}
 
-	/** Option lists. The frame caps include the display's refresh rate; 0 = unlimited. */
-	TArray<float> FrameCaps()
+	FText TimeWords(FName Preset)
 	{
-		TArray<float> Caps = { 30.f, 60.f, 90.f, 120.f, 144.f, 165.f, 240.f };
-		Caps.AddUnique(USaltGameUserSettings::DefaultFrameRateLimit());
-		Caps.Sort();
-		Caps.Add(0.f);
-		return Caps;
+		if (Preset == TEXT("Day")) { return NSLOCTEXT("SaltPause", "Day", "day, the sun high"); }
+		if (Preset == TEXT("Evening")) { return NSLOCTEXT("SaltPause", "Evening", "evening, the sun low in the west"); }
+		if (Preset == TEXT("Dusk")) { return NSLOCTEXT("SaltPause", "Dusk", "dusk, the light going"); }
+		if (Preset == TEXT("Night")) { return NSLOCTEXT("SaltPause", "Night", "night"); }
+		if (Preset == TEXT("Dawn")) { return NSLOCTEXT("SaltPause", "Dawn", "dawn"); }
+		return Preset.IsNone() ? FText::FromString(TEXT("-")) : FText::FromString(Preset.ToString().ToLower());
 	}
-	TArray<float> Steps(float From, float To, float Step)
+
+	FText HoldWords(const ASaltBoat* Boat)
 	{
-		TArray<float> Out;
-		for (float V = From; V <= To + Step * 0.01f; V += Step)
+		switch (Boat->GetHold())
 		{
-			Out.Add(V);
+		case ESaltBoatHold::Moored: return NSLOCTEXT("SaltPause", "Moored", "moored");
+		case ESaltBoatHold::Anchored: return NSLOCTEXT("SaltPause", "Anchored", "at anchor");
+		default: return Boat->IsSailSet() ? NSLOCTEXT("SaltPause", "UnderSail", "under sail") : NSLOCTEXT("SaltPause", "Adrift", "adrift");
 		}
-		return Out;
-	}
-	int32 Nearest(const TArray<float>& Options, float Value)
-	{
-		int32 Best = 0;
-		for (int32 I = 1; I < Options.Num(); ++I)
-		{
-			if (FMath::Abs(Options[I] - Value) < FMath::Abs(Options[Best] - Value))
-			{
-				Best = I;
-			}
-		}
-		return Best;
-	}
-	float StepOption(const TArray<float>& Options, float Value, int32 Delta)
-	{
-		const int32 N = Options.Num();
-		return Options[((Nearest(Options, Value) + Delta) % N + N) % N];
-	}
-	const EWindowMode::Type WindowModes[] = { EWindowMode::Fullscreen, EWindowMode::WindowedFullscreen, EWindowMode::Windowed };
-
-	float ResolutionScale(const USaltGameUserSettings* S)
-	{
-		// 0 = never set (the engine's default): native resolution (r.ScreenPercentage 100, DefaultEngine.ini).
-		float Normalized, Value, Min, Max;
-		S->GetResolutionScaleInformationEx(Normalized, Value, Min, Max);
-		return Value > 1.f ? Value : 100.f;
 	}
 }
 
-// --- Row -------------------------------------------------------------------------
-
-void USaltMenuRow::Setup(USaltMenuWidget* InMenu, int32 InIndex, const FText& InLabel)
+USaltMenuWidget::USaltMenuWidget(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	Menu = InMenu;
-	Index = InIndex;
-	Label = InLabel;
+	bPausesGame = true;
+	BackdropKind = EBackdrop::Blurred;
+	bShadeLeft = true;
 }
 
-TSharedRef<SWidget> USaltMenuRow::RebuildWidget()
+void USaltMenuWidget::Build()
 {
-	if (WidgetTree && !WidgetTree->RootWidget)
+	SaltUI::At(Contents, SaltMenu::Paint(WidgetTree, NSLOCTEXT("SaltPause", "Paused", "Paused"), ESaltFace::FellSC, 25.f, ETextJustify::Left, 8.f),
+		FVector2D(115.f, 134.f + 12.5f), FVector2D::ZeroVector, FVector2D(0.f, 0.5f));
+
+	AddItem(NSLOCTEXT("SaltPause", "Resume", "Resume"), PauseMenuAt);
+	AddItem(NSLOCTEXT("SaltPause", "SaveNow", "Save now"), PauseMenuAt);
+	AddItem(NSLOCTEXT("SaltPause", "Voyages", "Voyages"), PauseMenuAt);
+	AddItem(NSLOCTEXT("SaltPause", "Settings", "Settings"), PauseMenuAt);
+	AddItem(NSLOCTEXT("SaltPause", "Title", "Return to the title"), PauseMenuAt);
+	AddItem(NSLOCTEXT("SaltPause", "Quit", "Quit to desktop"), PauseMenuAt);
+
+	// The card: torn parchment, turned a little, its lines inked.
+	UCanvasPanel* Card = WidgetTree->ConstructWidget<UCanvasPanel>();
+	SaltUI::At(Contents, Card, PauseCardAt, PauseCardSize);
+	Card->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+	Card->SetRenderTransformAngle(1.2f);
+	UImage* Paper = WidgetTree->ConstructWidget<UImage>();
+	Paper->SetBrush(SaltUI::ImageBrush(SaltUI::Tex(TEXT("T_UI_MenuCard")), FVector2D(620.f, 830.f)));
+	if (UCanvasPanelSlot* S = Card->AddChildToCanvas(Paper))
 	{
-		Button = WidgetTree->ConstructWidget<USaltMenuButton>(USaltMenuButton::StaticClass(), TEXT("Button"));
-		FButtonStyle Style;
-		FSlateBrush None;
-		None.DrawAs = ESlateBrushDrawType::NoDrawType;
-		Style.SetNormal(None).SetHovered(None).SetPressed(None).SetDisabled(None);
-		Style.SetNormalPadding(FMargin(0.f)).SetPressedPadding(FMargin(0.f));
-		Button->SetStyle(Style);
-		Button->OnClicked.AddDynamic(this, &USaltMenuRow::HandleClicked);
-		Button->OnHovered.AddDynamic(this, &USaltMenuRow::HandleHovered);
-		WidgetTree->RootWidget = Button;
-
-		Background = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("Background"));
-		Background->SetBrush(RoundedBrush(6.f));
-		Background->SetBrushColor(FLinearColor::Transparent);
-		Background->SetPadding(FMargin(16.f, 7.f));
-		Button->AddChild(Background);
-
-		UHorizontalBox* Line = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("Line"));
-		Background->SetContent(Line);
-		LabelText = MakeText(WidgetTree, TEXT("Label"), 17, TextDim);
-		LabelText->SetText(Label);
-		if (UHorizontalBoxSlot* S = Line->AddChildToHorizontalBox(LabelText))
-		{
-			S->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-			S->SetVerticalAlignment(VAlign_Center);
-		}
-		ValueText = MakeText(WidgetTree, TEXT("Value"), 17, TextDim);
-		if (UHorizontalBoxSlot* S = Line->AddChildToHorizontalBox(ValueText))
-		{
-			S->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
-			S->SetVerticalAlignment(VAlign_Center);
-		}
+		S->SetPosition(FVector2D(-30.f, -30.f));
+		S->SetSize(FVector2D(PauseCardSize.X + 60.f, PauseCardSize.Y + 60.f));
 	}
-	return Super::RebuildWidget();
+	UVerticalBox* Box = WidgetTree->ConstructWidget<UVerticalBox>();
+	if (UCanvasPanelSlot* S = Card->AddChildToCanvas(Box))
+	{
+		S->SetPosition(FVector2D(PauseCardPadX, PauseCardPadY));
+		S->SetSize(FVector2D(PauseCardSize.X - 2.f * PauseCardPadX, PauseCardSize.Y - 2.f * PauseCardPadY));
+	}
+	Box->AddChildToVerticalBox(SpacedInk(WidgetTree, NSLOCTEXT("SaltPause", "WhereYouAre", "Where you are"), ESaltFace::FellSC, 19.f, 0.25f, 0.66f));
+	PlaceText = SaltUI::InkText(WidgetTree, FText::GetEmpty(), ESaltFace::FellSC, 50.f);
+	Box->AddChildToVerticalBox(PlaceText)->SetPadding(FMargin(0.f, 12.f, 0.f, 0.f));
+	WhereText = SaltUI::InkText(WidgetTree, FText::GetEmpty(), ESaltFace::FellItalic, 23.f);
+	Box->AddChildToVerticalBox(WhereText)->SetPadding(FMargin(0.f, 0.f, 0.f, 0.f));
+	UImage* Rule = WidgetTree->ConstructWidget<UImage>();
+	FSlateBrush Line;
+	Line.DrawAs = ESlateBrushDrawType::Image;
+	Line.ImageSize = FVector2D(2.f, 2.f);
+	Rule->SetBrush(Line);
+	Rule->SetColorAndOpacity(SaltUI::SRGB(58, 38, 22, 0.45f));
+	Box->AddChildToVerticalBox(Rule)->SetPadding(FMargin(0.f, 18.f, 0.f, 8.f));
+	CardLine(Box, NSLOCTEXT("SaltPause", "Time", "Time"), TimeText, 14.f);
+	CardLine(Box, NSLOCTEXT("SaltPause", "Wind", "Wind"), WindText, 14.f);
+	CardLine(Box, NSLOCTEXT("SaltPause", "YourBoat", "Your boat"), BoatText, 14.f);
+	CardLine(Box, NSLOCTEXT("SaltPause", "Satchel", "Satchel"), SatchelText, 14.f);
+	CardLine(Box, NSLOCTEXT("SaltPause", "LastSaved", "Last saved"), SavedText, 14.f);
+
+	PlaceHints({ { { TEXT("Esc") }, NSLOCTEXT("SaltPause", "HintResume", "resume") }, { { TEXT("E") }, NSLOCTEXT("SaltPause", "HintChoose", "choose") } },
+		115.f, false);
 }
 
-void USaltMenuRow::SetValue(const FText& Value)
+UTextBlock* USaltMenuWidget::CardLine(UVerticalBox* Box, const FText& Label, TObjectPtr<UTextBlock>& OutValue, float Top)
 {
-	if (ValueText)
-	{
-		ValueText->SetText(Value);
-	}
-}
-
-void USaltMenuRow::SetSelected(bool bSelected)
-{
-	if (Background)
-	{
-		Background->SetBrushColor(bSelected ? RowHighlight : FLinearColor::Transparent);
-		LabelText->SetColorAndOpacity(FSlateColor(bSelected ? TextBright : TextDim));
-		ValueText->SetColorAndOpacity(FSlateColor(bSelected ? TextBright : TextDim));
-	}
-}
-
-void USaltMenuRow::HandleClicked()
-{
-	if (USaltMenuWidget* M = Menu.Get())
-	{
-		M->SelectRow(Index);
-		M->ActivateRow(Index);
-	}
-}
-
-void USaltMenuRow::HandleHovered()
-{
-	if (USaltMenuWidget* M = Menu.Get())
-	{
-		M->SelectRow(Index);
-	}
-}
-
-// --- Menu ------------------------------------------------------------------------
-
-TSharedRef<SWidget> USaltMenuWidget::RebuildWidget()
-{
-	SetIsFocusable(true);
-	if (WidgetTree && !WidgetTree->RootWidget)
-	{
-		Rows = { ERow::Resume, ERow::Save, ERow::Load, ERow::VSync, ERow::FrameCap, ERow::ResolutionScale, ERow::WindowMode, ERow::FieldOfView,
-			ERow::MouseSensitivity, ERow::InvertLook, ERow::PromptPlace, ERow::Defaults, ERow::Quit };
-
-		// Dimmed game behind a small dark panel in the middle.
-		UBorder* Backdrop = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("Backdrop"));
-		Backdrop->SetBrushColor(FLinearColor(0.f, 0.f, 0.f, 0.45f));
-		Backdrop->SetHorizontalAlignment(HAlign_Center);
-		Backdrop->SetVerticalAlignment(VAlign_Center);
-		WidgetTree->RootWidget = Backdrop;
-
-		USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("Size"));
-		Size->SetWidthOverride(560.f);
-		Backdrop->SetContent(Size);
-		UBorder* Panel = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("Panel"));
-		Panel->SetBrush(RoundedBrush(12.f));
-		Panel->SetBrushColor(PanelColor);
-		Panel->SetPadding(FMargin(26.f, 22.f));
-		Size->SetContent(Panel);
-
-		UVerticalBox* Box = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("Box"));
-		Panel->SetContent(Box);
-		UTextBlock* Title = MakeText(WidgetTree, TEXT("Title"), 28, TextBright);
-		Title->SetText(NSLOCTEXT("Saltbound", "MenuTitle", "Paused"));
-		if (UVerticalBoxSlot* S = Box->AddChildToVerticalBox(Title))
-		{
-			S->SetPadding(FMargin(16.f, 0.f, 0.f, 14.f));
-		}
-
-		static const TCHAR* Labels[] = { TEXT("Resume"), TEXT("Save game"), TEXT("Load last save"), TEXT("V-Sync"), TEXT("Frame rate limit"), TEXT("Resolution scale"),
-			TEXT("Window mode"), TEXT("Field of view"), TEXT("Mouse sensitivity"), TEXT("Invert look"), TEXT("Prompt position"),
-			TEXT("Restore defaults"), TEXT("Quit to desktop") };
-		RowWidgets.Reset();
-		for (int32 I = 0; I < Rows.Num(); ++I)
-		{
-			USaltMenuRow* Row = CreateWidget<USaltMenuRow>(this, USaltMenuRow::StaticClass());
-			Row->Setup(this, I, FText::FromString(Labels[(int32)Rows[I]]));
-			RowWidgets.Add(Row);
-			if (UVerticalBoxSlot* S = Box->AddChildToVerticalBox(Row))
-			{
-				// A little air between the actions and the settings.
-				const bool bGap = Rows[I] == ERow::VSync || Rows[I] == ERow::Defaults;
-				S->SetPadding(FMargin(0.f, bGap ? 10.f : 1.f, 0.f, 1.f));
-			}
-		}
-
-		Footer = MakeText(WidgetTree, TEXT("Footer"), 13, TextDim);
-		Footer->SetText(NSLOCTEXT("Saltbound", "MenuFooter", "W / S  select     A / D  change     Enter  use     Esc / F10  close"));
-		Footer->SetRenderOpacity(0.7f);
-		if (UVerticalBoxSlot* S = Box->AddChildToVerticalBox(Footer))
-		{
-			S->SetPadding(FMargin(16.f, 16.f, 0.f, 0.f));
-		}
-	}
-	return Super::RebuildWidget();
+	UHorizontalBox* Line = WidgetTree->ConstructWidget<UHorizontalBox>();
+	Box->AddChildToVerticalBox(Line)->SetPadding(FMargin(0.f, Top, 0.f, 0.f));
+	UTextBlock* L = SaltUI::InkText(WidgetTree, FText::Format(NSLOCTEXT("SaltPause", "CardLabel", "{0} · "), Label), ESaltFace::FellSC, 23.f);
+	Line->AddChildToHorizontalBox(L)->SetVerticalAlignment(VAlign_Top);
+	OutValue = SaltUI::InkText(WidgetTree, FText::GetEmpty(), ESaltFace::Alegreya, 23.f);
+	OutValue->SetAutoWrapText(true);
+	UHorizontalBoxSlot* S = Line->AddChildToHorizontalBox(OutValue);
+	S->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	S->SetVerticalAlignment(VAlign_Top);
+	return OutValue;
 }
 
 void USaltMenuWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-	Selected = 0;
+	ChooseItem(0, true);
 	Refresh();
 }
 
 void USaltMenuWidget::Refresh()
 {
-	for (int32 I = 0; I < RowWidgets.Num(); ++I)
-	{
-		const FText Value = ValueOf(Rows[I]);
-		const bool bOption = IsOption(Rows[I]) && !Value.IsEmpty();
-		RowWidgets[I]->SetValue(bOption && I == Selected ? FText::Format(NSLOCTEXT("Saltbound", "MenuValueSelected", "<   {0}   >"), Value) : Value);
-		RowWidgets[I]->SetSelected(I == Selected);
-	}
-}
-
-FText USaltMenuWidget::ValueOf(ERow Row) const
-{
-	if (Row == ERow::Save || Row == ERow::Load)
-	{
-		// When the game was last saved; loading needs a save.
-		const USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this);
-		if (!Saves || !Saves->HasSave())
-		{
-			return Row == ERow::Load ? NSLOCTEXT("Saltbound", "NoSave", "no save yet") : FText::GetEmpty();
-		}
-		return FText::FromString(Saves->GetSaveTime().ToString(TEXT("%d.%m. %H:%M")));
-	}
-	const USaltGameUserSettings* S = USaltGameUserSettings::Get();
-	if (!S)
-	{
-		return Row == ERow::Resume || Row == ERow::Defaults || Row == ERow::Quit ? FText::GetEmpty() : FText::FromString(TEXT("-"));
-	}
-	auto OnOff = [](bool b) { return b ? NSLOCTEXT("Saltbound", "On", "On") : NSLOCTEXT("Saltbound", "Off", "Off"); };
-	switch (Row)
-	{
-	case ERow::VSync:
-		// The editor keeps its own vsync off ([SystemSettingsEditor] r.VSync=0 in BaseEngine.ini).
-		return GIsEditor ? FText::Format(NSLOCTEXT("Saltbound", "GameOnly", "{0} (game only)"), OnOff(S->IsVSyncEnabled()))
-			: OnOff(S->IsVSyncEnabled());
-	case ERow::FrameCap:
-		return S->GetFrameRateLimit() <= 0.f ? NSLOCTEXT("Saltbound", "Unlimited", "Unlimited")
-			: FText::FromString(FString::Printf(TEXT("%.0f fps"), S->GetFrameRateLimit()));
-	case ERow::ResolutionScale:
-		return FText::FromString(FString::Printf(TEXT("%.0f %%"), ResolutionScale(S)));
-	case ERow::WindowMode:
-	{
-		const EWindowMode::Type Mode = S->GetFullscreenMode();
-		FString Name = Mode == EWindowMode::Fullscreen ? TEXT("Fullscreen") : Mode == EWindowMode::WindowedFullscreen ? TEXT("Borderless") : TEXT("Windowed");
-		if (GIsEditor)
-		{
-			Name += TEXT(" (game only)");
-		}
-		return FText::FromString(Name);
-	}
-	case ERow::FieldOfView:
-		return FText::FromString(FString::Printf(TEXT("%.0f deg"), S->FieldOfView));
-	case ERow::MouseSensitivity:
-		return FText::FromString(FString::Printf(TEXT("%.2f"), S->MouseSensitivity));
-	case ERow::InvertLook:
-		return OnOff(S->bInvertLookY);
-	case ERow::PromptPlace:
-		return S->bPromptOnObject ? NSLOCTEXT("Saltbound", "PromptOnObject", "On the object")
-			: NSLOCTEXT("Saltbound", "PromptLow", "Bottom of the screen");
-	default:
-		return FText::GetEmpty();
-	}
-}
-
-void USaltMenuWidget::SelectRow(int32 Row)
-{
-	if (Rows.IsValidIndex(Row) && Row != Selected)
-	{
-		Selected = Row;
-		Refresh();
-	}
-}
-
-void USaltMenuWidget::ChangeRow(int32 Row, int32 Delta)
-{
-	USaltGameUserSettings* S = USaltGameUserSettings::Get();
-	if (!S || !Rows.IsValidIndex(Row) || Delta == 0)
+	if (!PlaceText)
 	{
 		return;
 	}
-	bool bDisplay = true;
-	switch (Rows[Row])
+	UWorld* World = GetWorld();
+	const USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this);
+	ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn());
+	ASaltBoat* Boat = nullptr;
+	for (TActorIterator<ASaltBoat> It(World); It; ++It)
 	{
-	case ERow::VSync:
-		S->SetVSyncEnabled(!S->IsVSyncEnabled());
-		break;
-	case ERow::FrameCap:
-	{
-		// Unlimited (0) is the last entry; the others are matched to the nearest cap.
-		const TArray<float> Caps = FrameCaps();
-		const int32 N = Caps.Num();
-		const int32 Current = S->GetFrameRateLimit() <= 0.f ? N - 1 : Nearest(TArray<float>(Caps.GetData(), N - 1), S->GetFrameRateLimit());
-		S->SetFrameRateLimit(Caps[((Current + Delta) % N + N) % N]);
+		Boat = *It;
 		break;
 	}
-	case ERow::ResolutionScale:
-		S->SetResolutionScaleValueEx(StepOption(Steps(50.f, 100.f, 5.f), ResolutionScale(S), Delta));
-		break;
-	case ERow::WindowMode:
+
+	// Where: the nearest named place, and whether aboard, ashore or in the water.
+	const FVector Feet = Player ? Player->GetActorLocation() : FVector::ZeroVector;
+	const FSaltPlace* Place = SaltMenu::PlaceNear(Feet);
+	PlaceText->SetText(Place ? Place->Name : NSLOCTEXT("SaltPause", "OpenSea", "The open sea"));
+	bool bAboard = false;
+	if (Boat && Player)
 	{
-		int32 I = 0;
-		while (I < 2 && WindowModes[I] != S->GetFullscreenMode())
-		{
-			++I;
-		}
-		S->SetFullscreenMode(WindowModes[((I + Delta) % 3 + 3) % 3]);
+		const FVector Local = Boat->GetActorTransform().InverseTransformPosition(Feet) * 0.01;
+		bAboard = FMath::Abs(Local.X) < SaltHull::HalfLength && FMath::Abs(Local.Y) < SaltHull::HalfBeamAtSheer(Local.X) && Local.Z > -0.5 && Local.Z < 3.5;
+	}
+	WhereText->SetText(Player && Player->IsSwimming() ? NSLOCTEXT("SaltPause", "InWater", "in the water")
+		: bAboard ? NSLOCTEXT("SaltPause", "Aboard", "aboard your boat") : NSLOCTEXT("SaltPause", "Ashore", "ashore"));
+
+	const ASaltLightingRig* Rig = nullptr;
+	for (TActorIterator<ASaltLightingRig> It(World); It; ++It)
+	{
+		Rig = *It;
 		break;
 	}
-	case ERow::FieldOfView:
-		S->FieldOfView = StepOption(Steps(70.f, 110.f, 5.f), S->FieldOfView, Delta);
-		bDisplay = false;
-		break;
-	case ERow::MouseSensitivity:
-		S->MouseSensitivity = StepOption(Steps(0.25f, 3.f, 0.25f), S->MouseSensitivity, Delta);
-		bDisplay = false;
-		break;
-	case ERow::InvertLook:
-		S->bInvertLookY = !S->bInvertLookY;
-		bDisplay = false;
-		break;
-	case ERow::PromptPlace:
-		// The HUD reads it every frame.
-		S->bPromptOnObject = !S->bPromptOnObject;
-		bDisplay = false;
-		break;
-	default:
-		return;
-	}
-	if (bDisplay)
+	TimeText->SetText(TimeWords(Rig ? Rig->CurrentPreset : NAME_None));
+
+	if (const USaltWindSubsystem* Wind = World ? World->GetSubsystem<USaltWindSubsystem>() : nullptr)
 	{
-		S->ApplyDisplay();
+		const float Ms = Wind->GetSpeed() * 0.01f;
+		WindText->SetText(Ms < 1.5f ? WindWords(Ms) : FText::Format(NSLOCTEXT("SaltPause", "WindFrom", "{0} from the {1}"), WindWords(Ms),
+			FText::FromString(SaltMenu::CompassPoint(Wind->GetFromDirectionDeg()))));
+	}
+
+	if (!Boat)
+	{
+		BoatText->SetText(NSLOCTEXT("SaltPause", "NoBoat", "nowhere to be seen"));
+	}
+	else if (bAboard)
+	{
+		BoatText->SetText(FText::Format(NSLOCTEXT("SaltPause", "BoatAboard", "under your feet, {0}"), HoldWords(Boat)));
 	}
 	else
 	{
-		S->SaveSettings();
-		if (ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn()))
-		{
-			Player->ApplyUserSettings();
-		}
+		// North is +X, east +Y: the bearing from the player to the boat, clockwise from north.
+		const FVector D = Boat->GetActorLocation() - Feet;
+		const float Metres = D.Size2D() * 0.01f;
+		const FString Distance = Metres < 1000.f ? FString::Printf(TEXT("%d m"), FMath::Max(FMath::RoundToInt(Metres), 1))
+			: FString::Printf(TEXT("%.1f km"), Metres / 1000.f);
+		BoatText->SetText(FText::Format(NSLOCTEXT("SaltPause", "BoatAway", "{0}, {1} {2}"), HoldWords(Boat), FText::FromString(Distance),
+			FText::FromString(SaltMenu::CompassPoint(FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X))))));
 	}
-	Refresh();
-}
 
-void USaltMenuWidget::ActivateRow(int32 Row)
-{
-	if (!Rows.IsValidIndex(Row))
+	if (const USaltInventoryComponent* Satchel = Player ? Player->GetInventory() : nullptr)
 	{
-		return;
+		int32 Used = 0;
+		for (const FSaltItemStack& S : Satchel->GetSlots())
+		{
+			Used += S.IsEmpty() ? 0 : 1;
+		}
+		SatchelText->SetText(FText::Format(NSLOCTEXT("SaltPause", "Pockets", "{0} of {1} pockets"), FText::AsNumber(Used), FText::AsNumber(Satchel->GetCapacity())));
 	}
-	switch (Rows[Row])
+
+	const bool bSaved = Saves && Saves->HasSave();
+	SavedText->SetText(bSaved ? SaltMenu::Ago(Saves->GetSaveTime()) : NSLOCTEXT("SaltPause", "NotSaved", "not yet on this voyage"));
+	if (Items.IsValidIndex(FindItem(EItem::Save)))
 	{
-	case ERow::Resume:
-		RequestClose();
-		break;
-	case ERow::Save:
-		if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
-		{
-			Saves->SaveGame(GetWorld(), TEXT("menu"));
-			Refresh();
-		}
-		break;
-	case ERow::Load:
-		if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
-		{
-			if (Saves->HasSave())
-			{
-				RequestClose();
-				Saves->LoadGame(GetWorld());
-			}
-		}
-		break;
-	case ERow::Defaults:
-		if (USaltGameUserSettings* S = USaltGameUserSettings::Get())
-		{
-			S->SetToDefaults();
-			S->ApplyDisplay();
-			if (ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetOwningPlayerPawn()))
-			{
-				Player->ApplyUserSettings();
-			}
-			Refresh();
-		}
-		break;
-	case ERow::Quit:
-		if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this))
-		{
-			Saves->Autosave(GetWorld(), TEXT("quit"));
-		}
-		UKismetSystemLibrary::QuitGame(this, GetOwningPlayer(), EQuitPreference::Quit, false);
-		break;
-	default:
-		ChangeRow(Row, 1);
-		break;
+		Items[FindItem(EItem::Save)]->SetSub(bSaved
+			? FText::Format(NSLOCTEXT("SaltPause", "SaveSub", "Last saved {0}"), SaltMenu::Ago(Saves->GetSaveTime()))
+			: NSLOCTEXT("SaltPause", "SaveSubNone", "Not saved on this voyage yet"));
 	}
+	StackItems(PauseMenuAt);
 }
 
-FString USaltMenuWidget::DescribeRow(int32 Row) const
+FString USaltMenuWidget::DescribeCard() const
 {
-	return Rows.IsValidIndex(Row) ? ValueOf(Rows[Row]).ToString() : FString();
+	auto T = [](const UTextBlock* B) { return B ? B->GetText().ToString() : FString(); };
+	return FString::Printf(TEXT("place='%s' where='%s' time='%s' wind='%s' boat='%s' satchel='%s' saved='%s'"), *T(PlaceText), *T(WhereText), *T(TimeText),
+		*T(WindText), *T(BoatText), *T(SatchelText), *T(SavedText));
 }
 
-void USaltMenuWidget::RequestClose()
+void USaltMenuWidget::Back()
 {
-	if (ASaltPlayerController* PC = Cast<ASaltPlayerController>(GetOwningPlayer()))
+	if (ASaltPlayerController* PC = GetSaltController())
 	{
 		PC->SetMenuOpen(false);
 	}
 }
 
-FReply USaltMenuWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+void USaltMenuWidget::ItemUsed(int32 Index)
 {
-	const FKey Key = InKeyEvent.GetKey();
-	auto Is = [&Key](std::initializer_list<FKey> Keys)
+	ASaltPlayerController* PC = GetSaltController();
+	USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(this);
+	if (!PC)
 	{
-		for (const FKey& K : Keys)
+		return;
+	}
+	switch ((EItem)Index)
+	{
+	case EItem::Resume:
+		PC->SetMenuOpen(false);
+		break;
+	case EItem::Save:
+		if (Saves)
 		{
-			if (Key == K)
-			{
-				return true;
-			}
+			Saves->SaveGame(GetWorld(), TEXT("menu"));
+			Refresh();
 		}
-		return false;
-	};
-	if (Is({ EKeys::Up, EKeys::W, EKeys::Gamepad_DPad_Up, EKeys::Gamepad_LeftStick_Up }))
-	{
-		SelectRow((Selected + Rows.Num() - 1) % Rows.Num());
+		break;
+	case EItem::Voyages:
+		PC->OpenVoyages();
+		break;
+	case EItem::Settings:
+		PC->OpenSettings();
+		break;
+	case EItem::Title:
+		if (Saves && Saves->GetUnsavedTime() > PauseAskAfter)
+		{
+			PC->Ask(NSLOCTEXT("SaltPause", "AskTitle", "Return to the title?"),
+				Saves->HasSave()
+					? FText::Format(NSLOCTEXT("SaltPause", "AskTitleBody", "You last saved {0}. What happened since then stays at sea."), SaltMenu::Ago(Saves->GetSaveTime()))
+					: NSLOCTEXT("SaltPause", "AskTitleBodyNone", "This voyage has not been saved yet. What happened stays at sea."),
+				NSLOCTEXT("SaltPause", "AskTitleYes", "return"), NSLOCTEXT("SaltPause", "AskTitleNo", "stay aboard"),
+				[PC]() { PC->ReturnToTitle(); });
+		}
+		else
+		{
+			PC->ReturnToTitle();
+		}
+		break;
+	case EItem::Quit:
+		if (Saves)
+		{
+			Saves->Autosave(GetWorld(), TEXT("quit"));
+		}
+		UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false);
+		break;
 	}
-	else if (Is({ EKeys::Down, EKeys::S, EKeys::Gamepad_DPad_Down, EKeys::Gamepad_LeftStick_Down }))
-	{
-		SelectRow((Selected + 1) % Rows.Num());
-	}
-	else if (Is({ EKeys::Left, EKeys::A, EKeys::Gamepad_DPad_Left, EKeys::Gamepad_LeftStick_Left }))
-	{
-		ChangeRow(Selected, -1);
-	}
-	else if (Is({ EKeys::Right, EKeys::D, EKeys::Gamepad_DPad_Right, EKeys::Gamepad_LeftStick_Right }))
-	{
-		ChangeRow(Selected, 1);
-	}
-	else if (Is({ EKeys::Enter, EKeys::SpaceBar, EKeys::E, EKeys::Gamepad_FaceButton_Bottom }))
-	{
-		ActivateRow(Selected);
-	}
-	else if (Is({ EKeys::Escape, EKeys::F10, EKeys::Gamepad_Special_Right, EKeys::Gamepad_FaceButton_Right }))
-	{
-		RequestClose();
-	}
-	else
-	{
-		return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
-	}
-	return FReply::Handled();
 }

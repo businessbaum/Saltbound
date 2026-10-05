@@ -1,7 +1,9 @@
-// Saltbound - user settings: display (vsync, frame cap, resolution scale, window mode) and look (FOV, mouse).
+// Saltbound - user settings: display (vsync, frame cap, resolution scale, window mode), look (FOV, mouse), and (D66)
+// brightness, sound, the player's keys, the first start and the voyage to continue.
 
 #include "Core/SaltGameUserSettings.h"
 
+#include "AudioDevice.h"
 #include "Engine/Engine.h"
 #include "HAL/PlatformMisc.h"
 
@@ -30,6 +32,10 @@ void USaltGameUserSettings::SetToDefaults()
 	MouseSensitivity = 1.f;
 	bInvertLookY = false;
 	bPromptOnObject = true;
+	// D66: the first start and the voyage are kept; the keys go back to their defaults.
+	Brightness = 2.2f;
+	MasterVolume = 1.f;
+	KeyBindings.Reset();
 }
 
 void USaltGameUserSettings::ApplyDisplay()
@@ -44,6 +50,36 @@ void USaltGameUserSettings::ApplyDisplay()
 		ApplySettings(false);
 	}
 	SaveSettings();
+}
+
+void USaltGameUserSettings::ApplyExtras()
+{
+	if (!GEngine)
+	{
+		return;
+	}
+	Brightness = FMath::Clamp(Brightness, BrightnessMin, BrightnessMax);
+	MasterVolume = FMath::Clamp(MasterVolume, 0.f, 1.f);
+	GEngine->DisplayGamma = Brightness;
+	if (FAudioDeviceHandle Device = GEngine->GetMainAudioDevice())
+	{
+		Device->SetTransientPrimaryVolume(MasterVolume);
+	}
+}
+
+FKey USaltGameUserSettings::GetKey(FName Id, const FKey& Default) const
+{
+	const FSaltKeyBinding* B = KeyBindings.FindByPredicate([Id](const FSaltKeyBinding& K) { return K.Id == Id; });
+	return B && B->Key.IsValid() ? B->Key : Default;
+}
+
+void USaltGameUserSettings::SetKey(FName Id, const FKey& Key, const FKey& Default)
+{
+	KeyBindings.RemoveAll([Id](const FSaltKeyBinding& K) { return K.Id == Id; });
+	if (Key.IsValid() && Key != Default)
+	{
+		KeyBindings.Add({ Id, Key });
+	}
 }
 
 bool USaltGameUserSettings::IsVersionValid()

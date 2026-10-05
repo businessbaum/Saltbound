@@ -1,18 +1,17 @@
-// Saltbound - pause menu with the settings (display and look), built in code like the HUD.
+// Saltbound - the pause menu (D66, Docs/Design/Menu_Ideas/Menus.html "Pause"): painted lines over the blurred world and a
+// "where you are" card.
 
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
+#include "UI/SaltMenuKit.h"
 #include "SaltMenuWidget.generated.h"
 
-class UBorder;
 class UTextBlock;
 class UVerticalBox;
-class USaltMenuWidget;
 
-/** A button that never takes the keyboard focus: the menu keeps it and handles the keys. */
+/** A button that never takes the keyboard focus: the screen keeps it and handles the keys. */
 UCLASS()
 class SALTBOUND_API USaltMenuButton : public UButton
 {
@@ -22,71 +21,42 @@ public:
 	USaltMenuButton(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) { InitIsFocusable(false); }
 };
 
-/** One line of the menu: a label and (for options) its value; hover selects it, a click uses it. */
-UCLASS()
-class SALTBOUND_API USaltMenuRow : public UUserWidget
-{
-	GENERATED_BODY()
-
-public:
-	/** Call before the row is added to a panel. */
-	void Setup(USaltMenuWidget* InMenu, int32 InIndex, const FText& InLabel);
-	void SetValue(const FText& Value);
-	void SetSelected(bool bSelected);
-
-protected:
-	virtual TSharedRef<SWidget> RebuildWidget() override;
-
-private:
-	UFUNCTION() void HandleClicked();
-	UFUNCTION() void HandleHovered();
-
-	UPROPERTY(Transient) TObjectPtr<USaltMenuButton> Button;
-	UPROPERTY(Transient) TObjectPtr<UBorder> Background;
-	UPROPERTY(Transient) TObjectPtr<UTextBlock> LabelText;
-	UPROPERTY(Transient) TObjectPtr<UTextBlock> ValueText;
-	TWeakObjectPtr<USaltMenuWidget> Menu;
-	int32 Index = 0;
-	FText Label;
-};
-
 /**
- * Pause menu: Resume, save, load the last save, V-Sync, frame rate limit, resolution scale, window mode, field of view, mouse sensitivity,
- * invert look, prompt position, restore defaults, quit. Keyboard (arrows / WASD, Enter, Esc / F10), mouse and gamepad (d-pad,
- * A, B / Start). Every change applies at once and is saved.
+ * Resume, Save now, Voyages, Settings, Return to the title, Quit to desktop. The world stops and blurs; the card on the right
+ * answers what a player asks after a break: where am I, the time of day, the wind, where the boat is, the satchel, the last
+ * save. Returning to the title asks first when something happened since the last save (quitting saves, as before, D46).
  */
 UCLASS()
-class SALTBOUND_API USaltMenuWidget : public UUserWidget
+class SALTBOUND_API USaltMenuWidget : public USaltScreen
 {
 	GENERATED_BODY()
 
 public:
-	enum class ERow : uint8 { Resume, Save, Load, VSync, FrameCap, ResolutionScale, WindowMode, FieldOfView, MouseSensitivity, InvertLook, PromptPlace, Defaults, Quit };
-	static bool IsOption(ERow Row) { return Row >= ERow::VSync && Row <= ERow::PromptPlace; }
+	USaltMenuWidget(const FObjectInitializer& ObjectInitializer);
 
-	/** Re-reads every value from the settings. */
+	enum class EItem : uint8 { Resume, Save, Voyages, Settings, Title, Quit };
+	static int32 FindItem(EItem Item) { return (int32)Item; }
+	/** Re-reads the card and the save line. */
 	void Refresh();
-	int32 GetRowCount() const { return Rows.Num(); }
-	int32 FindRow(ERow Row) const { return Rows.IndexOfByKey(Row); }
-	int32 GetSelectedRow() const { return Selected; }
-	void SelectRow(int32 Row);
-	/** Steps an option by Delta (wraps around); actions ignore it. */
-	void ChangeRow(int32 Row, int32 Delta);
-	/** Enter / click: options step forward, actions run. */
-	void ActivateRow(int32 Row);
-	FString DescribeRow(int32 Row) const;
+	/** The card's lines as shown (tests). */
+	FString DescribeCard() const;
+
+	virtual void Back() override;
+	virtual void OnRevealed() override { Refresh(); }
 
 protected:
-	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void Build() override;
 	virtual void NativeConstruct() override;
-	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual void ItemUsed(int32 Index) override;
 
 private:
-	FText ValueOf(ERow Row) const;
-	void RequestClose();
+	UTextBlock* CardLine(UVerticalBox* Box, const FText& Label, TObjectPtr<UTextBlock>& OutValue, float Top);
 
-	TArray<ERow> Rows;
-	UPROPERTY(Transient) TArray<TObjectPtr<USaltMenuRow>> RowWidgets;
-	UPROPERTY(Transient) TObjectPtr<UTextBlock> Footer;
-	int32 Selected = 0;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> PlaceText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> WhereText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> TimeText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> WindText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> BoatText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> SatchelText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> SavedText;
 };

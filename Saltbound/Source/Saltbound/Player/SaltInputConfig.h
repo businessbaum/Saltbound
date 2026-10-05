@@ -3,11 +3,23 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InputCoreTypes.h"
 #include "UObject/Object.h"
 #include "SaltInputConfig.generated.h"
 
 class UInputAction;
 class UInputMappingContext;
+
+/** An action whose keyboard key the player can change (Keys and buttons, D66). The gamepad button is shown, not changed. */
+struct FSaltRebindable
+{
+	FName Id;
+	FText Label;
+	FKey Default;
+	/** Other keys that always work too (the arrow keys, C for diving, I for the satchel); shown, not changed. */
+	TArray<FKey> Fixed;
+	FText Pad;
+};
 
 /**
  * Owns all player input actions and their default key mappings.
@@ -20,8 +32,20 @@ class SALTBOUND_API USaltInputConfig : public UObject
 	GENERATED_BODY()
 
 public:
-	/** Creates actions and the default mapping context. */
+	/** Creates actions and the mapping context (with the player's keys). */
 	void Build();
+	/** Makes a new mapping context with the player's current keys (D66); the actions stay, so bindings stay valid. */
+	void BuildMappings();
+
+	/** The actions the player can rebind, in the order of the Keys and buttons screen. */
+	static const TArray<FSaltRebindable>& Rebindables();
+	static const FSaltRebindable* FindRebindable(FName Id);
+	/** The key the player uses for it now (their choice or the default). */
+	static FKey KeyOf(FName Id);
+	/** The rebindable action (other than Except) that already uses Key as its key or a fixed one; None when free. */
+	static FName UsedBy(const FKey& Key, FName Except);
+	/** Keys that cannot be taken (they open the pause menu, or are the tools' digits). */
+	static bool IsReserved(const FKey& Key);
 
 	/** WASD / left stick. Axis2D: X = right, Y = forward. */
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Move;

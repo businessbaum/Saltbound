@@ -4,6 +4,11 @@
 
 #include "Boat/SaltHullShape.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/SaltGameUserSettings.h"
+#include "Core/SaltPlaces.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
+#include "UnrealClient.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -77,10 +82,14 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 	{
 		return false;
 	}
-	OnSaveStarted.Broadcast();
+	if (!bQuiet)
+	{
+		OnSaveStarted.Broadcast();
+	}
 	USaltSaveGame* Save = Cast<USaltSaveGame>(UGameplayStatics::CreateSaveGameObject(USaltSaveGame::StaticClass()));
 	Save->SavedAt = FDateTime::Now();
 	Save->Map = MapOf(World);
+	Save->PlayTime = PlayTime;
 
 	ASaltBoat* Boat = FindFirst<ASaltBoat>(World);
 	if (Boat)
@@ -154,8 +163,17 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 	UE_LOG(LogSaltbound, Display, TEXT("SB_SAVE saved=%d slot=%s reason=%s boat=(%.0f, %.0f) hold=%d sail=%d aboard=%d sea=%s"),
 		bOk ? 1 : 0, *Slot, Reason, Save->BoatLocation.X, Save->BoatLocation.Y, (int32)Save->BoatHold, Save->bBoatSail ? 1 : 0,
 		Save->bPlayerAboard ? 1 : 0, *Save->SeaState.ToString());
+	if (bOk && !bQuiet)
+	{
+		// D66: the voyage remembers when it was saved, and a picture of the world for the voyages screen (no UI on it).
+		PlayTimeAtSave = PlayTime;
+		FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("SaveGames") / (Slot + TEXT(".png")), false, false);
+	}
 	// The save sign in the corner shows it (D55); no notice.
-	OnSaveFinished.Broadcast();
+	if (!bQuiet)
+	{
+		OnSaveFinished.Broadcast();
+	}
 	return bOk;
 }
 
@@ -252,7 +270,12 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 	}
 	UE_LOG(LogSaltbound, Display, TEXT("SB_SAVE loaded slot=%s from=%s boat=(%.0f, %.0f) hold=%d aboard=%d"),
 		*Slot, *Save->SavedAt.ToString(), Save->BoatLocation.X, Save->BoatLocation.Y, (int32)Save->BoatHold, Save->bPlayerAboard ? 1 : 0);
-	Notify(World, NSLOCTEXT("Saltbound", "GameLoaded", "Game loaded"));
+	PlayTime = Save->PlayTime;
+	PlayTimeAtSave = PlayTime;
+	if (!bQuiet)
+	{
+		Notify(World, NSLOCTEXT("Saltbound", "GameLoaded", "Game loaded"));
+	}
 	OnGameLoaded.Broadcast();
 	OnHubChanged.Broadcast();
 	return true;
@@ -264,4 +287,132 @@ void USaltSaveSubsystem::Notify(UWorld* World, const FText& Text) const
 	{
 		PC->ShowNotice(Text);
 	}
+}
+
+// --- Voyages (D66) -----------------------------------------------------------------------------------------------------
+
+FString USaltSaveSubsystem::VoyageSlot(int32 Index)
+{
+	return Index <= 0 ? FString(TEXT("Main")) : FString::Printf(TEXT("Voyage%d"), Index + 1);
+}
+
+int32 USaltSaveSubsystem::GetActiveVoyage() const
+{
+	for (int32 I = 0; I < VoyageCount; ++I)
+	{
+		if (Slot == VoyageSlot(I))
+		{
+			return I;
+		}
+	}
+	return INDEX_NONE;
+}
+
+void USaltSaveSubsystem::SetActiveVoyage(int32 Index)
+{
+	Index = FMath::Clamp(Index, 0, VoyageCount - 1);
+	Slot = VoyageSlot(Index);
+	if (USaltGameUserSettings* S = USaltGameUserSettings::Get())
+	{
+		S->LastVoyage = Index;
+		S->SaveSettings();
+	}
+}
+
+FSaltVoyageInfo USaltSaveSubsystem::GetVoyageInfo(int32 Index) const
+{
+	FSaltVoyageInfo Info;
+	const FString Name = VoyageSlot(Index);
+	const USaltSaveGame* Save = UGameplayStatics::DoesSaveGameExist(Name, 0) ? Cast<USaltSaveGame>(UGameplayStatics::LoadGameFromSlot(Name, 0)) : nullptr;
+	if (!Save)
+	{
+		return Info;
+	}
+	Info.bExists = true;
+	Info.SavedAt = Save->SavedAt;
+	Info.PlayTime = Save->PlayTime;
+	// Where the player is: aboard, where the boat lies.
+	const FVector Where = Save->bPlayerAboard && Save->bHasBoat ? Save->BoatLocation : Save->PlayerFeet;
+	const FVector2D WorldM(Where.X * 0.01, Where.Y * 0.01);
+	const FSaltPlace* Nearest = nullptr;
+	float Best = 1500.f;
+	for (const FSaltPlace& P : SaltPlaces::All())
+	{
+		const float D = SaltPlaces::DistanceToShoreM(P, WorldM);
+		if (D < Best)
+		{
+			Best = D;
+			Nearest = &P;
+		}
+	}
+	Info.Place = Nearest ? Nearest->Name : NSLOCTEXT("SaltVoyages", "OpenSea", "the open sea");
+	Info.bNearPlace = Nearest != nullptr;
+	Info.Hold = Save->BoatHold;
+	switch (Save->BoatHold)
+	{
+	case ESaltBoatHold::Moored: Info.Boat = NSLOCTEXT("SaltVoyages", "Moored", "moored"); break;
+	case ESaltBoatHold::Anchored: Info.Boat = NSLOCTEXT("SaltVoyages", "Anchored", "at anchor"); break;
+	default: Info.Boat = Save->bBoatSail ? NSLOCTEXT("SaltVoyages", "UnderSail", "under sail") : NSLOCTEXT("SaltVoyages", "Adrift", "adrift"); break;
+	}
+	const FString Picture = FPaths::ProjectSavedDir() / TEXT("SaveGames") / (Name + TEXT(".png"));
+	if (IFileManager::Get().FileExists(*Picture))
+	{
+		Info.Picture = Picture;
+	}
+	return Info;
+}
+
+bool USaltSaveSubsystem::DeleteVoyage(int32 Index)
+{
+	const FString Name = VoyageSlot(Index);
+	IFileManager::Get().Delete(*(FPaths::ProjectSavedDir() / TEXT("SaveGames") / (Name + TEXT(".png"))), false, true, true);
+	const bool bOk = UGameplayStatics::DeleteGameInSlot(Name, 0);
+	UE_LOG(LogSaltbound, Display, TEXT("SB_SAVE deleted=%d slot=%s"), bOk ? 1 : 0, *Name);
+	return bOk;
+}
+
+void USaltSaveSubsystem::TakeNewVoyageSnapshot(UWorld* World)
+{
+	if (!World || bHasSnapshot)
+	{
+		return;
+	}
+	const FString Keep = Slot;
+	Slot = TEXT("NewVoyage");
+	bQuiet = true;
+	bHasSnapshot = SaveGame(World, TEXT("snapshot"));
+	bQuiet = false;
+	Slot = Keep;
+}
+
+bool USaltSaveSubsystem::RestoreNewVoyageSnapshot(UWorld* World)
+{
+	if (!World || !bHasSnapshot)
+	{
+		return false;
+	}
+	// The world as it was at the start: the boat at her mooring, the player on the pier, the satchel and stores as given,
+	// every pickup back, no island found, the hub as built.
+	const FString Keep = Slot;
+	Slot = TEXT("NewVoyage");
+	bQuiet = true;
+	const bool bLoaded = LoadGame(World);
+	bQuiet = false;
+	Slot = Keep;
+	PlayTime = 0.0;
+	PlayTimeAtSave = 0.0;
+	return bLoaded;
+}
+
+bool USaltSaveSubsystem::StartNewVoyage(UWorld* World, int32 Index)
+{
+	if (!World || !bHasSnapshot)
+	{
+		return false;
+	}
+	const bool bLoaded = RestoreNewVoyageSnapshot(World);
+	SetActiveVoyage(Index);
+	const bool bSaved = bLoaded && SaveGame(World, TEXT("new voyage"));
+	UE_LOG(LogSaltbound, Display, TEXT("SB_SAVE new_voyage=%d slot=%s loaded=%d"), bSaved ? 1 : 0, *Slot, bLoaded ? 1 : 0);
+	return bSaved;
 }
