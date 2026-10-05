@@ -68,27 +68,31 @@ def _flight(frm, to, down=False):
 
 
 def routes():
-    q, lw, m = Z["quay"], Z["lower"], Z["main"]
+    """The walks from the fitting berth's board to each service (D64): along the forward quay into the shop; up the dock stair
+    to the Tally House; through the lane and down the Well's first flight to the Keelgate; round the Well's galleries and up its
+    four flights to the main deck and the Chandlery. Corners in the open floor, clear of the props and the stairs' rails."""
+    q, lw, md, up, gn, m = Z["quay"], Z["lower"], Z["middle"], Z["upper"], Z["gun"], Z["main"]
     berth = _e("slip", "fitting_berth") + (q,)
-    land = next(r for zid, r in H.open_rects("lower") if zid == "tally" and r[1] - r[0] < 5.0)
     st = H.R(H.HUB["stair"])
     sy = 0.5 * (st[2] + st[3])
-    foot = land[0] - 22 * 0.30
-    to_tally = [berth, (foot - 2.4, H.HUB["quayY"] - 1.5, q), (foot - 1.6, sy, q), (foot - 0.4, sy, q), (land[0] + 0.6, sy, lw),
-                (land[1] + 1.5, sy, lw)]
-    tally = to_tally + [_e("tally", "pay_hatch") + (lw,)]
     lane = H.R(H.HUB["lane"])
-    to_well = to_tally + [(lane[0] - 5.0, sy, lw), (lane[0] - 3.0, 0.5 * (lane[2] + lane[3]) + 1.5, lw),       # round the table (lane[0] + 0.8, 0.5 * (lane[2] + lane[3]) + 1.0, lw),
-                          (lane[1] - 0.5, 0.5 * (lane[2] + lane[3]) + 0.5, lw)]
-    down = _flight("quay", "lower", down=True)
-    keel = to_well + [(down[0][0] - 0.2, down[0][1], lw)] + down + [(down[1][0] + 1.0, 6.8, q), (82.0, 6.6, q), (81.6, 2.4, q), (77.0, -1.0, q), _e("keelgate", "talk") + (q,)]
     sh = H.R(H.HUB["shaft"])
-    f_lm, f_mu, f_um = _flight("lower", "middle"), _flight("middle", "upper"), _flight("upper", "main")
-    chand = to_well + [(sh[0] - 4.0, sh[3] + 1.0, lw), (f_lm[0][0], sh[3] + 1.0, lw)] + f_lm + \
-        [(f_mu[0][0] + 1.5, f_mu[0][1], Z["middle"])] + f_mu + [(f_um[0][0] + 1.5, f_mu[1][1], Z["upper"]), (f_um[0][0] + 1.5, f_um[0][1] - 1.0, Z["upper"])] + \
-        [f_um[0], f_um[1]] + [(sh[0] - 1.0, sh[3] + 2.5, m), (sh[1] + 2.0, sh[3] + 1.5, m), (sh[1] + 6.0, -5.0, m), (sh[1] + 10.5, -5.0, m), _e("chandlery", "counter") + (m,)]
-    slip = [berth, (H.HUB["basin"]["x1"] + 0.5, H.HUB["quayY"] - 2.0, q), _e("slip", "counter") + (q,)]
-    return {"slip": slip, "tally": tally, "keelgate": keel, "chandlery": chand}
+    tally = H.R(H.HUB["tally"])
+    door_y = 0.5 * (max(tally[2], lane[2]) + min(tally[3], lane[3]))   # the Tally House's door to the lane: the middle of their wall
+    slip = [berth, (st[0] - 1.2, st[2] - 2.2, q), (st[0] + 2.2, st[2] - 2.2, q), _e("slip", "counter") + (q,)]
+    to_tally = [berth, (st[0] - 1.4, sy, q), (st[0] - 0.6, sy, q), (st[1] + 0.6, sy, lw), (st[1] + 1.2, st[2] - 0.8, lw)]
+    to_pay = to_tally + [_e("tally", "pay_hatch") + (lw,)]
+    to_well = to_tally + [(lane[0] - 3.0, st[2] - 1.3, lw), (lane[0] - 1.0, door_y, lw), (lane[0] + 1.0, door_y, lw),
+                          (lane[1] + 0.8, sh[3] + 1.0, lw)]
+    down = _flight("quay", "lower", down=True)
+    keel = to_well + [(down[0][0], sh[3] + 1.0, lw)] + down + [(down[1][0] + 0.5, sh[3] + 1.0, q), (sh[0] - 1.0, sh[3] + 1.0, q),
+                                                               (sh[0] - 2.0, 0.0, q), _e("keelgate", "talk") + (q,)]
+    f_lm, f_mu, f_ug, f_gm = _flight("lower", "middle"), _flight("middle", "upper"), _flight("upper", "gun"), _flight("gun", "main")
+    chand = to_well + [(f_lm[0][0] - 2.5, sh[3] + 1.0, lw), (f_lm[0][0], f_lm[0][1] + 3.0, lw)] + f_lm + \
+        [(f_mu[0][0] + 3.0, f_mu[0][1] + 1.5, md)] + f_mu + [(f_ug[0][0] + 1.0, f_mu[1][1] + 2.5, up)] + f_ug + \
+        [(f_gm[0][0] - 3.0, f_gm[0][1] - 1.5, gn)] + f_gm + \
+        [(f_gm[1][0] + 5.4, sh[3] - 2.0, m), (f_gm[1][0] + 12.9, sh[3] - 3.0, m), (f_gm[1][0] + 13.4, -4.0, m), _e("chandlery", "counter") + (m,)]
+    return {"slip": slip, "tally": to_pay, "keelgate": keel, "chandlery": chand}
 
 
 def _safe(state, fn):

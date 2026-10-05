@@ -43,7 +43,7 @@ public:
 	/** Open floor allowed below MinFloorZ: the slipway runs down into the water. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") TArray<FSaltHubArea> LowFloorExempt;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") TArray<FSaltHubRoute> Routes;
-	/** The sea under her hull and in the basin (x, y; z unused). */
+	/** The sea under her hull and in the water hall (x, y; z unused). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") TArray<FVector> HullWater;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") TArray<FVector> BasinWater;
 	/** Under the keel (x, y), the keel's depth (cm, negative). */
@@ -55,11 +55,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub", meta = (Units = "cm")) float BasinWaterMax = 40.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub", meta = (Units = "cm")) float MinFloorZ = 150.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub", meta = (Units = "cm")) float MinHeadroom = 220.f;
-	/** The dock: the arch's span along x, the basin's half width, where a boat starts to sail in and where it lies in the basin's middle. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FVector2D ArchX = FVector2D::ZeroVector;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub", meta = (Units = "cm")) float BasinHalfWidth = 1000.f;
+	/** The water hall's side doors (D64): the clear way between the open leaves along x, the hull's half-breadth at them, where a
+	 *  boat starts to sail in (out from the starboard pair) and the hall's middle. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FVector2D DoorsX = FVector2D::ZeroVector;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub", meta = (Units = "cm")) float DoorsHullHalf = 1950.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FVector BoatInStart = FVector::ZeroVector;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FVector BasinMiddle = FVector::ZeroVector;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FVector HallMiddle = FVector::ZeroVector;
 	/** The slipway (dock.slipway): its rectangle, and where a boat starts to run up it. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FSaltHubArea Slipway;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FVector SlipStart = FVector::ZeroVector;

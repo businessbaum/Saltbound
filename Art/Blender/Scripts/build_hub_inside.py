@@ -29,6 +29,7 @@ Meshes (/Game/Saltbound/Hub/Art, ship pivot; Nanite; no collision of their own):
   SM_Hub_Gates      every gate
 Run: Tools/Build-BlenderAsset.ps1 build_hub_inside [dock slip tally well hoist keelgate main chandlery gates]
 """
+import json
 import math
 import os
 import random
@@ -63,8 +64,31 @@ HH.COLOURS.update({"MI_Hub_AncientGlowLow": (0.3, 0.7, 0.65), "MI_Hub_CanvasRed"
                    "MI_Wood_Piling": (0.2, 0.17, 0.14), "MI_Canvas": (0.8, 0.76, 0.66)})
 
 
+LAMPS = []                          # the lit lanterns' glass of the part being built (ship metres)
+LAMPS_JSON = os.path.join(os.path.dirname(__file__), "..", "..", "Generated", "hub_lamps.json")
+
+
 def export(p):
     HH.export(p)
+    write_lamps(p.name)
+
+
+def write_lamps(name):
+    """The lit lanterns by part (Art/Generated/hub_lamps.json): hub_place.py hangs a light in each, where the art hangs it."""
+    data = {}
+    if os.path.exists(LAMPS_JSON):
+        with open(LAMPS_JSON, encoding="utf-8") as fh:
+            data = json.load(fh)
+    if LAMPS or name in data:
+        data[name] = [[round(v, 3) for v in q] for q in LAMPS]
+        with open(LAMPS_JSON, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=1, sort_keys=True)
+    del LAMPS[:]
+
+
+def lamp(q):
+    """A light without a lantern of its own (the ring lantern's: one for its six)."""
+    LAMPS.append(tuple(q))
 
 
 def grime_floor(z0):
@@ -219,11 +243,13 @@ def rail(p, axis, line, a0, a1, z, height=B.RAIL_H):
         HE.balustrade(p, (a0, line), (a1, line), z, height=height, posts=1.6, mat="MI_Wood_Varnish", baluster="MI_Wood_TeakLight")
 
 
-def lantern(p, c, chain_to=None, r=0.2, s=1.0):
+def lantern(p, c, chain_to=None, r=0.2, s=1.0, lit=True):
     """A hanging lantern: brass cage, glass, a ring on top, its chain or hook up to `chain_to`. c: its bottom; s: its height's
-    scale (0.7 under the 3 m decks' beams, D64); its ring's top at c + LANTERN_H(s)."""
+    scale (0.7 under the 3 m decks' beams, D64); its ring's top at c + LANTERN_H(s). lit: it gets a light (hub_lamps.json)."""
     def h(v):
         return v * s
+    if lit:
+        lamp(Vector(c) + UP * h(0.33))
     p.lathe([(0.0, 0.0), (r * 0.8, 0.0), (r, h(0.08)), (r * 0.95, h(0.12)), (0.0, h(0.12))], c, UP, "MI_Metal_Brass", sides=8)
     p.lathe([(r * 0.82, h(0.12)), (r * 0.88, h(0.4)), (r * 0.82, h(0.55)), (0.0, h(0.55))], c, UP, "MI_LanternGlass", sides=8, caps=False)
     for k in range(4):
@@ -250,7 +276,7 @@ def LANTERN_H(s=1.0):
     return 0.84 * s + 0.12
 
 
-def bracket_lantern(p, post_face, out, z_hook, drop=0.55, arm=0.75, s=1.0):
+def bracket_lantern(p, post_face, out, z_hook, drop=0.55, arm=0.75, s=1.0, lit=True):
     """An iron bracket out from a post's face with a lantern hanging from its end (lanterns' hook_z); its ring `drop` under the
     bracket on a short chain."""
     out = Vector(out).normalized()
@@ -259,7 +285,7 @@ def bracket_lantern(p, post_face, out, z_hook, drop=0.55, arm=0.75, s=1.0):
     p.beam(T.straight(a, b, UP, out.cross(UP)), arm, 0.06, 0.04, "MI_Metal_Iron", nseed(), seg=1.0)
     s0, s1 = a - UP * 0.45, a + out * (arm * 0.67)
     p.beam(T.straight(s0, s1, out.cross(UP), (s1 - s0).normalized().cross(out.cross(UP))), (s1 - s0).length, 0.04, 0.04, "MI_Metal_Iron", nseed())
-    lantern(p, b - UP * (drop + LANTERN_H(s)), chain_to=b, s=s)
+    lantern(p, b - UP * (drop + LANTERN_H(s)), chain_to=b, s=s, lit=lit)
 
 
 def deck_lantern(p, x, y, z_above, r=0.17):
@@ -344,21 +370,12 @@ def build_dock():
         a = Vector((ramp["x0"] + 0.3, yw, z0s)) + nrm * 0.25
         b = Vector((ramp["x1"] - 0.1, yw, z1s)) + nrm * 0.25
         p.beam(T.straight(a, b, Y, nrm), (b - a).length, 0.4, 0.2, "MI_Wood_TeakDark", nseed(), seg=1.0, wear=1.0, grime=wet)
-    # The hull's inside over the water, up to the gun deck, round the hidden doors; the doors' jambs and lintel.
+    # The hull's inside over the water, up to the gun deck, round the hidden doors (their jambs, head, sill, hinge posts and
+    # leaves are the doors' own: build_hub_doors.py).
     zc = Z["gun"] - SLAB
     door = (dr["x0"], dr["x1"], dr["z0"], dr["z1"])
     for side in (1.0, -1.0):
         hull_lining(p, side, wx0, wx1, -0.6, zc, holes=[door])
-        for xj in (dr["x0"], dr["x1"]):
-            pts = [Vector((xj + (-0.25 if xj == dr["x0"] else 0.25), side * (H.half_width(xj, z) - 0.25), z)) for z in [dr["z0"] + (dr["z1"] + 0.3 - dr["z0"]) * k / 8 for k in range(9)]]
-            f = T.polyline(pts, lambda q: X, lambda q, s=side: Vector((0.0, -s, 0.0)))
-            p.beam(f, T.length_of(f), 0.5, 0.5, DARK, nseed(), seg=0.8, wear=1.0, grime=wet)
-            for zz in (dr["z0"] + 2.5, 0.5 * (dr["z0"] + dr["z1"]), dr["z1"] - 1.5):        # the pintles the leaves hang on
-                c = Vector((xj, side * (H.half_width(xj, zz) - 0.5), zz))
-                p.block(c.x - 0.12, c.x + 0.12, c.y - 0.12, c.y + 0.12, zz - 0.2, zz + 0.2, "MI_Metal_Iron", nseed(), axis="z")
-        a = Vector((dr["x0"] - 0.5, side * (H.half_width(dr["x0"], dr["z1"]) - 0.3), dr["z1"] + 0.15))    # (under the gun deck's boards)
-        b = Vector((dr["x1"] + 0.5, side * (H.half_width(dr["x1"], dr["z1"]) - 0.3), dr["z1"] + 0.15))
-        p.beam(T.straight(a, b, UP, Vector((0.0, -side, 0.0))), (b - a).length, 0.5, 0.45, DARK, nseed(), seg=1.0, wear=1.0)
     # Bollards along the quays' edges; the rung ladders up from the water.
     bo = pr["bollards"]
     for ex, ya, yb in bo["along"]:
@@ -448,7 +465,7 @@ def build_slip():
     p.lathe([(0.0, 0.0), (0.05, 0.0), (0.05, 0.06), (0.02, 0.08), (0.0, 0.08)], Vector((c["x0"] + 0.4, ym + 0.6, zq + hgt)), UP, "MI_Glass_Dark", sides=8)
     # The plans on an easel by the way in from the quay (the shop is open to the quay: no wall there to pin them on).
     pb = sl["plans_board"]
-    xe = float(pb["wall"].split("=")[1]) + 0.6
+    xe = float(pb["wall"].split("=")[1]) + B.EASEL_OUT
     y0, y1 = pb["y0"], pb["y1"]
     for yy in (y0 + 0.2, y1 - 0.2):
         a, b = Vector((xe + 0.35, yy, zq)), Vector((xe, yy, zq + pb["z1"] + 0.2))
@@ -864,7 +881,7 @@ def build_tally():
     dy0, dy1 = pb["door"]
     booth_h = pb["h"]
     door_h = min(B.DOOR_H, booth_h - 0.1)
-    hatch = (pb["x0"] + 0.9, pb["x1"] - 1.1, zl + 1.0, zl + 1.8)                     # (its note: hatch x 57.5..60.5, z 1.0..1.8)
+    hatch = (pb["x0"] + 0.9, pb["x1"] - 1.1, zl + 1.0, zl + 1.8)                     # (its note: the hatch x and z 1.0..1.8)
     Fb = (Vector((0.0, pb["y0"] + 0.08, 0.0)), X, UP, -Y)
     HE.wall_boards(p, Fb, pb["x0"], pb["x1"], zl, zl + booth_h, lambda u, v: not (hatch[0] < u < hatch[1] and hatch[2] < v < hatch[3]),
                    mats=("MI_Wood_Varnish", "MI_Wood_TeakDark"))
@@ -983,9 +1000,10 @@ def build_well():
     for k in range(6):
         a = 2 * math.pi * k / 6
         d = Vector((math.cos(a), math.sin(a), 0.0))
-        lantern(p, c + d * hoop - UP * (0.05 + LANTERN_H(0.8)), chain_to=c + d * hoop, r=0.18, s=0.8)
+        lantern(p, c + d * hoop - UP * (0.05 + LANTERN_H(0.8)), chain_to=c + d * hoop, r=0.18, s=0.8, lit=False)
         if k % 2 == 0:
             lantern_chain(p, c + d * hoop, c + UP * 2.2)
+    lamp(c - UP * 0.4)
     top = Z["main"] + 7.5 - 1.0                                                  # under the brake drum at the apex (gantry note)
     lantern_chain(p, c + UP * 2.2, Vector((84.0, 0.0, top)))
     export(p)
@@ -1548,13 +1566,14 @@ def build_chandlery():
     p.polygon([(103.88, -13.62, tz + 0.105), (104.12, -13.62, tz + 0.105), (104.12, -13.38, tz + 0.105), (103.88, -13.38, tz + 0.105)], "MI_Paint_CreamAged",
               facing=UP)
     p.round(T.straight((105.3, -13.2, tz + 0.06), (106.4, -13.6, tz + 0.06), Y, UP), 1.17, lambda s: 0.05 + 0.02 * s, "MI_Metal_Brass", nseed(), sides=10)  # spyglass
-    lantern(p, Vector((107.4, -13.4, tz)), r=0.13)
+    lantern(p, Vector((107.4, -13.4, tz)), r=0.13, lit=False)
     for bx in cd["beams"]["at_x"]:
         zb = zm + cd["beams"]["z"]
         p.beam(T.straight((bx, dh["y0"] + 0.3, zb), (bx, dh["y1"] - 0.3, zb), X, UP), dh["y1"] - dh["y0"] - 0.6, 0.24, 0.26, "MI_Wood_TeakDark", nseed())
         for k, yy in enumerate([dh["y0"] + 1.5 + 2.2 * j for j in range(4)]):
             if k % 3 == 0:
-                lantern(p, Vector((bx, yy, zb - 1.2)), chain_to=(bx, yy, zb - 0.12), r=0.15)
+                lantern(p, Vector((bx, yy, zb - 1.2)), chain_to=(bx, yy, zb - 0.12), r=0.15,
+                        lit=k == 3 and bx in cd["beams"]["at_x"][::2])           # stock: two burn, by the counter
             elif k % 3 == 1:
                 for j in range(4):
                     p.beam(T.arc(Vector((bx, yy, zb - 0.55 - 0.04 * j)), X, UP, 0.28 - 0.01 * j, -math.pi * 0.4, math.pi * 1.4), 1.4, 0.04, 0.04, "MI_Rope_Hemp",
@@ -1674,6 +1693,7 @@ def build_gates():
             for k in range(6):
                 u = -hw + wdt * (k + 0.5) / 6
                 HH.lbeam(p, F, u, 0.02, u, hgt - 0.02, wdt / 6 - 0.015, 0.1, -0.05, rng.choice(("MI_Wood_TeakDark", "MI_Hub_HullTar")), wear=1.0)
+            HH.lbeam(p, F, -hw, hgt + 0.25, hw, hgt + 0.25, 0.48, 0.1, -0.05, "MI_Wood_TeakDark", wear=0.9)   # a transom up to a taller frame's head
             for v in (0.45, hgt - 0.45):                                          # the leaves' ledges
                 for sg in (-1.0, 1.0):
                     HH.lbeam(p, F, sg * 0.05, v, sg * (hw - 0.08), v, 0.14, 0.04, 0.05, "MI_Wood_TeakDark", wear=0.9)

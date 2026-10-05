@@ -1715,6 +1715,82 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - Opening a gate does not remove its art yet; the zones behind are not built (not now, prompt section 11).
   - The hoist's stop is not saved (it starts at the quay).
 
+### D64 · The hub ship redesigned after the owner's review: side doors into a water hall, a galleon's stern, 3 m decks with every room built (Provisional: waiting for the owner's review)
+- **Owner's review (2026-10-05):**
+  - "Cover the white bottom part of the ship with the same muster you use higher up with the normal planks and windows."
+  - "The hull shape is too boring and static, a bit more shape detail overall would be nice."
+  - "The boat will have a cavity in the bottom deck filled with water so other ships can enter from THE SIDE. But its a bit hidden
+    its not a big obvious gate its the hull that opens inside like a double door ... The ship will get more rounder, wider and
+    bigger at the back top like a real galleon. Build all the decks and rooms you dont need to design every room. Make the decks
+    cozy and not too big. Look in the details an check if what you build makes sense."
+  - Answers to my questions: doors in both sides; decks 3 m apart; boats keep their masts up (first "the boat lowers its mast",
+    then "make a concept where the ship can dock with full mast").
+- **The layout** (`hub_data.js`, review drawings `Docs/Design/HubShip/HubShip_D64_*.png` from `Tools/design/hub_review.py`):
+  - **Floors 3 m apart** (2.7 m under the slab, 2.4 m under the beams): the Deep −4.5, the hold −1.5, the dock deck +1.5, lower,
+    middle, upper and gun decks, the main deck +16.5; the sterncastle three storeys over it (the quarterdeck at 22.5 over x 24..48,
+    the poop at 28.5 over x 0..24), the forecastle one (22.5).
+  - **The Water Hall** (x 26..50, the bottom deck): sea water from side to side between two quays (aft x 26..30, forward x
+    46..50), open up to the gun deck (13.2 m clear over the water: a mast up to 12 m passes), galleries over both quays on the
+    lower, middle and upper decks, the forward starboard one open (the door into the Tally House), the others the rooms' behind
+    them. The slipway runs up from the water through the forward quay into the Slip's hall (x 46..60); over it the galleries
+    stop (masts) and the hold is walled off round it.
+  - **The hidden doors:** a pair in each side at x 32..40, from under the keel of a boat (z −2.5) to under the gun deck (13.0);
+    each leaf 4 m, the hull's own planking (wales and port lids run on across them). Shut, a seam and the hinge straps show.
+  - **The stern** is a galleon's again (no dock mouth): round in plan, leaning aft, wider at the top (17.4 m half-breadth at the
+    taffrail), two open stern galleries, quarter galleries, one rudder.
+  - **Every deck and room built** (`hub_plan.py`): outside the open spaces each floor becomes two corridors fore and aft, corridors
+    across at fixed stations and rooms of about 5.5 m between them (893 rooms), every room with a door.
+    Where a locked zone's corridor meets an open space a gate stands (32 such gates, 39 with the data's own marks); two corridor
+    mouths with a stair in front of them stay walled (no room to stand at a gate there).
+- **The doors in the game** (`ASaltHubDoors`, replacing the sea gate):
+  - The leaves cannot turn about the hull's skin (a leaf curved like this hull would swing through the fixed planking), so each
+    turns on iron arms about a hinge post standing in the hall, 1.4 m beyond its jamb (`build_hub_doors.py`). The seam is
+    bevelled and the aft leaf leads by 10 degrees. Open, they stand along x 30.3..33.2 and 38.8..41.8 to |y| 12.3; the clear way
+    between them is 7.1 m at the waterline, 5.65 m at its narrowest (z 6).
+  - **The dock watch:** they open by themselves for a boat outside the hull within 45 m, or one inside heading for them, and shut
+    again 20 s after it is in and clear of their swing; E at a capstan on the aft quay opens or shuts them by hand. They never
+    swing into a boat (a leaf holds while one is in the rest of its swing). Not saved: they start shut.
+  - **Berths moved clear of the swing:** the fitting berth along the forward quay's starboard side (unchanged), the 10 m fleet
+    berth mirrored to its port side (the fore leaves never pass x 41.4), the 14 m fleet berth in the middle of the aft quay (the
+    aft leaves sweep the quay's ends beyond |y| 12).
+- **Looked at in the details** (eye-level previews of every designed space, then fixed):
+  - The 14 m cutter stood on the slipway: she and her mast moved to the hall's sides, so the way up the middle stays clear for a
+    boat with her mast; no lanterns over the slipway or the water.
+  - The mizzen comes down through the Slip's forward wall to its step (a mast stands on the keel): the timber racks either side.
+  - The slipway's sides were open under the Slip's floor into the hold: walled (art and collision).
+  - The plans stand on an easel (the shop is open to the quay: no wall there); the berth board stood on a bollard; the pay booth
+    stood 0.8 m in front of where the dock stair arrives (moved forward 1 m, the salt cakes out of the stair's way); racks and
+    shelves stood in front of gates and grilles.
+  - Stair holes had rails where a locked room was behind them (walls now); the Well's rail and coaming were closed at the
+    hoist's stops; every ceiling was drawn up to four times over voids (once now); the hoist's guide posts ended in the air.
+  - Lanterns under 3 m decks hang from cleats as deep as the beams, their bottoms 1.7 m over the floor (over a 1.5 m head);
+    hub_lamps.json gives the lights exactly where the art hangs them.
+  - Pillars under the galleries' edges, from the quays to the gun deck.
+- **The build:** `build_hub_rooms.py` (every floor, one mesh each: the hand-made kit where the player goes, plank faces in the
+  locked rooms), `build_hub_inside.py` (the designed spaces), `build_hub_blockout.py` (collision per floor), `build_hub_hull.py`,
+  `build_hub_ends.py`, `build_hub_doors.py`, `build_hub_rig.py` (the outside). Run times: blockout 12 s, floors 50 s, inside 10 s,
+  outside about 1 min.
+- **Tests** (`sb.Dev.RunHubTests [part]`, run in `L_HubReview`: `L_VisualTest`'s saved boat crashes in PIE after the D65 sail rename,
+  the boat's own fix to follow):
+  - boatdock (rewritten for the side): from 40 m off the starboard side the watch has the doors fully open before she reaches the
+    hull; she takes in her sail 6 m short of it and glides through in 14.5 s with no contact (0.95 m between her beam and the
+    leaves at their narrowest height); out again with no contact; moored at a fleet berth and kept through a save and a load.
+    The fitting berth's mooring fails in `L_HubReview` only: there the boat's own start mooring lies on the same spot.
+  - gates: all 37 stop the player and show their line; unlocking all zones opens all 38 blockers.
+  - route: the Slip 3.0 s, the Tally House 6.4 s, the Keelgate 27.5 s each way; the Chandlery 55 s (target 40 s, D61 proposal 3).
+  - hoist 5/5, ladder 2.3 s, slipway (0.7 cm deep, lies still), headroom 17 586 spots (the least 2.7 m), no low floor (4 903).
+- **Still open:**
+  - **The water hall's water glows** pale cyan in play: the sky light lights it as if open to the sky (with the sky lighting off
+    it goes dark), and the eye is opened for the interior. Next: a reflection capture or the sea cut out in the hall with its
+    own dark water.
+  - Pale light slits along some ceilings' seams (the Water Hall's, the Slip's).
+  - The starter boat's square sail (D65) is about as wide as the doors' narrowest clear way (5.2 m against 5.54 m at z 6): she
+    should take it in to pass the doors (the test does).
+  - The Chandlery is 55 s away on foot (D61 proposal 3: a shortcut, or the hoist as the way up).
+  - The open spaces are 11.7 % of the floor area now (5 602 of 47 720 m2; 3 m decks give more floors), against about 20 % before.
+  - The outside's planking stands up to 0.5 m outside the collision between the section's points; the stern's top still reads boxy.
+  - `ASaltSeaGate` is no longer placed but stays in the code: the save (`bSeaGateOpen`) still names it (the menus' file).
+
 ### D66 · The menus: start, pause, settings, voyages, loading, first start, keys and buttons (Adopted: built to the owner's choices; in-game review pending)
 - **Owner (2026-10-05), on the menu ideas (`Docs/Design/Menu_Ideas/Menus.html`):**
   - Start menu: the "Night sea" direction. Its title is the launch intro's own title at the place where the intro leaves it

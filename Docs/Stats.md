@@ -42,34 +42,35 @@ Size of the things on deck (D59, `Art/Blender/Scripts/build_boat.py`): barrel 0.
 
 Not built yet: a 14 m gaff cutter with a top deck and a lower deck (`Docs/Design/Boat2.md`). Its row is added when it is.
 
-## The hub ship (Hollowkeel, D61 blockout)
+## The hub ship (Hollowkeel, D61 blockout, D64 layout)
 
-Every number from `Docs/Design/HubShip/HubShip_Data.json` (generated from `hub_data.js`); measured on the blockout in `L_HubBlockout`.
+Every number from `Docs/Design/HubShip/HubShip_Data.json` (generated from `hub_data.js`); D64 measured in `L_HubReview`.
 
 | Stat | Value | Notes |
 |---|---|---|
 | Size | 160 m on deck (188 m with the bowsprit), 40 m beam, keel at -12 m | 37.8 m wide at the main deck (the hull's tumblehome) |
-| Decks | quay +1.5, lower +5.5, middle +9.5, upper +13.5, main +17.5 m | 4 m floor to floor, 3.7 m clear under the slabs |
-| Open at the start | 6 466 of 31 234 m2 (20.7 %) | |
+| Decks (D64) | the Deep -4.5, hold -1.5, dock deck +1.5, lower +4.5, middle +7.5, upper +10.5, gun +13.5, main +16.5 m; sterncastle 19.5 / 22.5 / 25.5, poop 28.5; forecastle 19.5, its deck 22.5 | 3 m floor to floor, 2.7 m under the slabs, 2.4 m under the beams |
+| Rooms (D64) | 893 rooms on 14 floors, corridors fore and aft and across every 24 m | `hub_plan.py`; every room has a door |
+| Open at the start | 5 602 of 47 720 m2 (11.7 %, D64; D61: 20.7 % of 31 234 m2) | more floors at 3 m |
 | Bulwarks | 0.9 m with a cap rail | the 1.4 m player's eyes see over them |
-| Stern Dock | basin 44 x 20 m, 5 m deep; the arch 21.5-25.5 m clear | quays 4 m wide at +1.5 |
-| Stairs | 22 steps of 18 cm on 30 cm treads per storey, 3 m wide | ramps in the collision |
-| Fitting berth | x 32..42, y 7.9 (0.4 m off the wall) | the boat moors there (`MooringPierHeight` 150 cm) |
-| Walking from the fitting berth | Slip 4.6 s, Tally House 10.2 s, Keelgate 33.4 s, Chandlery 63.1 s | 2.5 m/s; sprinting about 0.6 x |
+| Water Hall (D64) | water 16 x 40 m (x 30..46), its floor -4; quays 4 m wide at +1.5; 13.2 m clear over the water | galleries over both quays on three decks; the slipway x 46..60 |
+| Side doors (D64) | a pair in each side at x 32..40, 4 m leaves, -2.5 to 13.0 m; open in 10 s (the aft leaf 10 degrees ahead); clear way 5.54 m at its narrowest (z 6), 7.1 m at the waterline | the watch opens for a boat within 45 m, shuts 20 s after; `sb.Hub.Doors` |
+| Stairs | 17 steps of 17.6 cm on 30 cm treads per storey (D64), 3 m wide in the Well, 2.5 m the dock stair | ramps in the collision |
+| Berths (D64) | fitting x 43.9, y 6..16 and a 10 m fleet berth x 43.9, y -16..-6 (the forward quay 2.1 m to starboard); 14 m fleet berth x 32.3, y -7..7 (the aft quay 2.3 m to port) | all bow to port; clear of the leaves' swing |
+| Walking from the fitting berth | Slip 3.0 s, Tally House 6.4 s, Keelgate 27.5 s, Chandlery 55 s (D64) | 2.5 m/s; sprinting about 0.6 x |
 | Her berth | (81, 415) m, bow to 92 degrees | off the lagoon's channel, held by two bow cables and two stern moorings |
-| Calm zones | 20 % within 120 m of her (full by 300 m), 10 % → 7 % in the basin | Storm: +1.06 m under the hull, +0.34 m in the basin |
+| Calm zones | 20 % within 120 m of her (full by 300 m), 7 % in the water hall (D64; was the basin) | Storm (D63): +1.20 m under the hull, +0.36 m in the basin |
 | Lanterns below decks | 60 cd, 2100 K, lit by day, reach 10 m (D63; was 16 m) | exposure down to EV 3 inside, up to EV 7.5 |
-| Sea gate (D62) | portcullis 20 x 9 m, raised 26.5 m in 24 s (eased), capstans 8 turns | starts open; `sb.Hub.SeaGate`; points at 21.5 m when up |
 | Rig (D62) | masts 54 / 76 / 64 m over the main deck; round tops 14 m (main); shrouds 5 / 8 / 6 a side | ratlines every 0.5 m; lateen yard 34 m on the mizzen |
-| Art (D62) | about 26 000 hand-made boards and timbers in 26 meshes (Nanite) | built in about 2 min (`build_hub_*.py`); the blockout collides |
+| Art (D64) | outside about 13 700 pieces, inside every floor one mesh (`SM_Hub_Lvl_*`, about 4 M vertices) plus the designed spaces | about 3 min to build all (`build_hub_*.py`); the blockout collides, one part per floor |
 | Her level (D63) | `L_Hub`: her pivot (x 80, the waterline) at the origin, bow to +X | `ASaltHubShip` streams it in at a berth (`HubLevel`) |
 | Follow rule (D63) | she moves only while the player is more than 2 500 m from both berths, checked every 2 s | `FollowDistanceM`, `CheckInterval`; a berth's harbour is 1 200 m round it (`HarbourRadiusM`) |
 | First sight (D63) | hidden until the first island is found; then she appears only beyond 2 500 m or outside 75 degrees of the view | `bHiddenUntilLandfall`, `ViewHalfAngle`; `sb.Hub.Show 1` |
 | Moorings (D63) | fitting berth (the quay 2.1 m to starboard), fleet berths (2.1 m and 2.5 m to port); the quays 1.5 m over the water | the windlass moors to the nearest within 8 m (`MooringRadius`); 11-29 cm off the pose moored |
-| Hoist (D63) | stops quay / lower / main deck at 0 / 4 / 16 m; 1.6 m/s, 0.6 m/s2 to start and stop | measured: 4 m in 4.8 s, 12 m in 9.7 s; `HoistSpeed`, `HoistAccel` |
+| Hoist (D63) | stops quay / lower / main deck at 0 / 3 / 15 m (D64); 1.6 m/s, 0.6 m/s2 to start and stop | D63 measured: 4 m in 4.8 s, 12 m in 9.7 s; `HoistSpeed`, `HoistAccel` |
 | Counterweight (D63) | 0.8 x 1.2 x 1.5 m of stone, runs the other way, in its railed bay when the cage is at the main deck | its sheave 0.9 m aft and 2.3 m to port of the cage's |
-| Gates (D63) | 33 blockers (the Keelgate, G5, blocks nothing): doors 1.2 x 2.2 m, rope 2.4 x 1.0, ladders 0.9 x 3.0, shutters 1.6 x 1.4, grilles 3.0 x 2.5 | block while their zone (L1-L17) is locked; `sb.Hub.Unlock` |
-| Quay ladders (D63) | 4 (x 3.5 and 20, both quays), rungs every 30 cm down to 3.3 m under the quay deck | from the water onto the quay in 2.2 s |
+| Gates (D64) | 38 blockers (the Keelgate, G5, blocks nothing): 32 at the locked corridors' mouths (2 m wide, door high), the cargo rope, a hatch, two shroud plates, the forecastle's two ladders | block while their zone (L1-L18) is locked; `sb.Hub.Unlock` |
+| Quay ladders (D64) | 4 (the aft quay's edge at y 14 and -15, the forward quay's at -8 and 17), rungs every 30 cm | from the water onto the quay in 2.3 s |
 | Salt purse (D63) | a saved number, 0 at the start; nothing spends it yet | `sb.Dev.Salt <n>` |
 | Storm sea at her (D63, `HubSeaLow`) | under the hull up to +1.20 m, in the basin up to +0.36 m (60 s) | right at the 1.2 m limit; D61 measured +1.06 m in another minute of the same sea |
 

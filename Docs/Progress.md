@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D63; the menus D66).
+Last updated: 2026-10-05 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66).
 
 ## Milestone status
 
@@ -224,6 +224,14 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D64 (the owner's review of the hub, waiting for the next look):** boats come in from the side through hidden doors in the hull
+  (both sides, x 32..40) that open inwards like a double door into the Water Hall, a cavity of sea water across the bottom deck
+  with quays, galleries and the slipway; masts stay up (13.2 m clear). The stern is a galleon's again; the hull is planked to the
+  keel with more shape; the decks are 3 m apart and every deck and room is built (893 rooms behind 38 gates). The doors open for a
+  boat by themselves (the dock watch, `sb.Hub.Doors`) or with E at a capstan. In `L_HubReview`: the side entry, the gates, the
+  walks (Slip 3 s, Tally House 6 s, Keelgate 28 s, Chandlery 55 s), the hoist, ladders, slipway and headroom pass. Open: the
+  hall's water glows (sky light), seams of light in some ceilings, the square sail is about as wide as the doors' narrowest
+  clear way, the Chandlery walk.
 - **D63 (phases 3 and 4, waiting for the owner's review):** the hub is in the game. Her level `L_Hub` streams in at her berth in
   `L_VisualTest` (`ASaltHubShip`; hidden until the first island is found, `sb.Hub.Show 1` shows her now) and follows the player
   between harbours (moves only beyond 2.5 km from both berths). The boat moors at the fitting and fleet berths (the windlass; it
@@ -364,7 +372,8 @@ Developer console (`~`, non-shipping builds):
 - `sb.Dev.RunBoatTests [part]` (a part alone: `ladder`, `WindAbeam`, ...), `sb.Dev.Helm [off]`
 - Hub blockout (D61, on `L_HubBlockout`): `python Tools/hub_blockout_checks.py [headroom] [walk | walk:<space>] [boat] [water]`
 - Hub (D63): `sb.Hub.Show 1|0|-1`, `sb.Hub.Berth <id>`, `sb.Hub.Unlock <L#>|all|none`, `sb.Hub.Info`, `sb.Hub.Hoist <stop> [now]`,
-  `sb.Hub.SeaGate open|close|toggle`, `sb.Dev.Salt <n>`, `sb.Dev.HubGoto dock|slip|tally|well|keelgate|main|chandlery`,
+  `sb.Hub.Doors open|close|toggle|snapopen|snapclosed|watchon|watchoff` (D64; the sea gate is gone), `sb.Dev.Salt <n>`,
+  `sb.Dev.HubGoto dock|slip|tally|well|keelgate|main|chandlery`,
   `sb.Dev.RunHubTests [placed|sealow|nolowfloor|headroom|route|gates|boatdock|slipway|hoist|follow|save|ladder]`
   (`python Tools/run_pie_test.py "sb.Dev.RunHubTests hoist" --done "SB_TEST HubSuite DONE"`)
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`

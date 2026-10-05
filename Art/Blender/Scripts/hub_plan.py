@@ -17,6 +17,7 @@ import math
 import hub_layout as H
 
 CELL = 0.5
+GATE_ROOM = 1.2             # the open floor a gate needs in front of it (m): where a player stands to try it
 X0, X1, Y0, Y1 = -3.0, 163.0, -21.0, 21.0
 NX = int(round((X1 - X0) / CELL))
 NY = int(round((Y1 - Y0) / CELL))
@@ -64,6 +65,7 @@ class Plan:
         self.rooms = {}
         self.doors = []             # dicts: x, y, axis ('x': the wall runs along y at that x; 'y': along x), w, kind, a, b
         self.gates = []             # gate marks: level, x, y, g, zone, open (the open space it faces)
+        self.gates_dropped = []     # corridors' mouths left walled: a stair in front of them
         self.walls = []             # segments: axis, line, a0, a1, kind ('wall' | 'rail' | 'hull'), left, right labels
         self._build()
 
@@ -317,6 +319,11 @@ class Plan:
             for e in self._shared_edges({c}, lambda m: m[0] == "open"):
                 key = (l[1], e[3][1], e[2], round(e[0], 3) if e[2] == "x" else round(e[1], 3))
                 edges.setdefault(key, []).append(e)
+        # A flight up from this floor (or the dock stair) in front of a corridor's mouth leaves no room to stand at a gate there:
+        # the corridor ends in a wall instead (D64: the grille behind the Keelgate's stair, the rope behind the middle flight).
+        stairs = [H.R(f) for f in H.flights() if f["from"] == self.level]
+        if self.level == "quay":
+            stairs.append(H.R(H.HUB["stair"]))
         for (zone, open_id, axis, _), es in edges.items():
             es.sort(key=lambda e: e[1] if axis == "x" else e[0])
             runs, run = [], [es[0]]
@@ -330,6 +337,10 @@ class Plan:
             runs.append(run)
             for run in runs:
                 mid = run[len(run) // 2]
+                fronts = [(mid[0] + s * GATE_ROOM, mid[1]) if axis == "x" else (mid[0], mid[1] + s * GATE_ROOM) for s in (-1.0, 1.0)]
+                if any(H.inside(r, fx, fy) for r in stairs for fx, fy in fronts):
+                    self.gates_dropped.append((self.level, zone, mid[0], mid[1]))
+                    continue
                 g = zones.get(zone, {}).get("gate", "G1")
                 if g in ("G3", "G5"):
                     g = "G1"
@@ -418,8 +429,8 @@ class Plan:
             if hc in self.hole:
                 ax_, ln = self.hole[hc]
                 edge = ("x", X0 + max(ca[0], cb[0]) * CELL) if ca[1] == cb[1] else ("y", Y0 + max(ca[1], cb[1]) * CELL)
-                if edge[0] == ax_ and abs(edge[1] - ln) < 1e-6:
-                    return None                     # where the stair arrives: open
+                if edge[0] == ax_ and abs(edge[1] - ln) < CELL * 0.5 + 1e-6:
+                    return None                     # where the stair arrives: open (the hole's cell edge at the stair's end)
                 return "rail" if other[0] in ("open", "air") else "wall"     # (a locked corridor or room behind it: walled)
             if other[0] == "water":
                 return None
@@ -459,6 +470,46 @@ def plan(level_id):
     if level_id not in _CACHE:
         _CACHE[level_id] = Plan(level_id)
     return _CACHE[level_id]
+
+
+def rects_of(cells):
+    """Cells (i, j) merged into rectangles (runs along y, then equal runs stacked along x): [(x0, x1, y0, y1)]."""
+    rows = {}
+    for i, j in cells:
+        rows.setdefault(i, []).append(j)
+    runs = {}
+    for i, js in rows.items():
+        js.sort()
+        s = p = js[0]
+        for j in js[1:] + [None]:
+            if j is not None and j == p + 1:
+                p = j
+                continue
+            runs.setdefault((s, p), []).append(i)
+            if j is not None:
+                s = p = j
+    out = []
+    for (j0, j1), iis in runs.items():
+        iis.sort()
+        s = p = iis[0]
+        for i in iis[1:] + [None]:
+            if i is not None and i == p + 1:
+                p = i
+                continue
+            out.append((X0 + s * CELL, X0 + (p + 1) * CELL, Y0 + j0 * CELL, Y0 + (j1 + 1) * CELL))
+            if i is not None:
+                s = p = i
+    return out
+
+
+def open_floor_rects(level_id):
+    """[(zone id, (x0, x1, y0, y1))] of the open floors as the layout has them (inside the hull, round holes and voids)."""
+    pl = plan(level_id)
+    zones = {}
+    for c, lab in pl.lab.items():
+        if lab[0] == "open":
+            zones.setdefault(lab[1], []).append(c)
+    return [(z, r) for z, cells in sorted(zones.items()) for r in rects_of(cells)]
 
 
 def all_gate_marks():

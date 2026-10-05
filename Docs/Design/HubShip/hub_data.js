@@ -46,7 +46,7 @@ const HUB = {
   ramp: { x0: 46, x1: 60, y0: -5, y1: 5, z0: -3, z1: 1.5 },     // the slipway, out of the water into the Slip's boat hall
   hall: { x0: 50, x1: 68, y0: -10, y1: 10 },        // the Slip's boat hall: the quay deck up to the gun deck (11.7 m clear)
   shop: { x0: 50, x1: 68, y0: 10, y1: 20 },         // the shipwright's shop, starboard of the hall
-  stair: { x0: 50.4, x1: 55.8, y0: 16.8, y1: 19.2 }, // the dock stair: in the shop, up to the Tally House (+x)
+  stair: { x0: 50.5, x1: 56.0, y0: 16.5, y1: 19.0 }, // the dock stair: in the shop, up to the Tally House (+x); on the 0.5 m grid
   tally: { x0: 50, x1: 68, y0: 10, y1: 20 },        // the Tally House, lower deck, over the shop
   lane: { x0: 68, x1: 73, y0: 6, y1: 12 },          // lower deck, from the Tally House to the Well
   shaft: { x0: 78, x1: 90, y0: -6, y1: 6 },         // the Well: open from the Keelgate floor to the sky
@@ -214,7 +214,7 @@ const SPACES = {
       { id: 'bollards', every: 5, along: [[30, -17, 17], [46, -17, -6], [46, 6, 17]], r: 0.3, h: 0.6, note: 'on the quays’ edges (x, y from, y to)' },
       { id: 'rung_ladders', at: [[30, 14], [30, -15], [46, -8], [46, 17]], note: 'from the water onto the quays (the D54 ladder); [x of the edge, y]' },
       { id: 'fitting_berth', x: 43.9, y0: 6, y1: 16, heading: -90, note: 'along the forward quay (its edge x 46), bow to port: a boat that came in by the starboard doors slides alongside; the quay to her starboard (reach 2.1 m)' },
-      { id: 'fleet_berths', berths: [{ x: 32.1, y0: -14, y1: -4, boat: '10 m', reach: -2.1 }, { x: 32.3, y0: -2, y1: 12, boat: '14 m', reach: -2.3 }], heading: -90, note: 'along the aft quay (its edge x 30), bow to port, the quay to their port side' },
+      { id: 'fleet_berths', berths: [{ x: 43.9, y0: -16, y1: -6, boat: '10 m', reach: 2.1 }, { x: 32.3, y0: -7, y1: 7, boat: '14 m', reach: -2.3 }], heading: -90, note: 'bow to port: the 10 m along the forward quay’s port side (the quay to her starboard; the fore leaves never swing past x 41.4), the 14 m along the middle of the aft quay (the quay to her port side): the aft leaves stand open at y 12.3..16.3 and sweep x 30.6..36.5 beyond |y| 12' },
       { id: 'crane', beam: [50, 44.2, 11, 12.6], hook_rope_x: 44.6, hand_chain: [45.8, 11], note: 'a runway beam under the ceiling from the forward wall out over the fitting berth (above the galleries and a mast), a trolley with a block; its hand chain hangs just off the quay’s edge' },
       { id: 'pillars', at: [[29.8, -10.5], [29.8, -4.5], [29.8, 4.5], [29.8, 10.5], [46.2, -15], [46.2, -10], [46.2, 10], [46.2, 15]], size: 0.36, note: 'posts under the galleries’ edges, from the quays to the gun deck; clear of the bollards, ladders, capstans and the berth board' },
       { id: 'galleries', levels: ['lower', 'middle', 'upper'], aft: [26, 30], fore: [46, 50], note: 'balconies over both quays on three decks, balustraded on the water side; the lower forward-starboard one (y 5..20) is open, with a door into the Tally House; the others belong to the rooms behind them' },
@@ -229,7 +229,7 @@ const SPACES = {
       { id: 'counter', x: 54.6, y: 13.2, prompt: 'Talk' },
       { id: 'plans', x: 50.6, y: 12, prompt: 'Look at the plans' },
       { id: 'display_boat', x: 61.5, y: 4.7, prompt: 'Look her over', note: 'beside her, at the head of the slipway' },
-      { id: 'fitting_berth', x: 47, y: 11, prompt: 'Read the berth board', note: 'a board at the quay’s edge by the fitting berth' },
+      { id: 'fitting_berth', x: 47, y: 13.5, prompt: 'Read the berth board', note: 'a board at the quay’s edge by the fitting berth, between two bollards' },
     ],
     props: [
       { id: 'hall', x0: 50, x1: 68, y0: -10, y1: 10, h: 11.7, note: 'open to the Water Hall’s forward quay along x 50; its ceiling is the gun deck (a boat on the slipway keeps her mast)' },
@@ -248,21 +248,21 @@ const SPACES = {
   },
   tally: {
     svc: 'J', level: 'lower', floor: 4.5, name: 'Tally House (side jobs)',
-    npc: { x: 59, y: 18.8, face: 270, note: 'inside the pay booth, behind the hatch, facing into the room' },
+    npc: { x: 60, y: 18.8, face: 270, note: 'inside the pay booth, behind the hatch, facing into the room' },
     e: [
-      { id: 'pay_hatch', x: 59, y: 16.6, prompt: 'Talk' },
+      { id: 'pay_hatch', x: 60, y: 16.6, prompt: 'Talk' },
       { id: 'job_board', x: 66.4, y: 14.6, prompt: 'Read the board' },
       { id: 'weighing_bench', x: 64.5, y: 17.6, prompt: 'Deliver goods' },
     ],
     props: [
       { id: 'room', x0: 50, x1: 68, y0: 10, y1: 20, h: 3 },
-      { id: 'stair_hole', x0: 50.4, x1: 55.8, y0: 16.8, y1: 19.2, note: 'the dock stair arrives here, a rail round it' },
+      { id: 'stair_hole', x0: 50.5, x1: 56.0, y0: 16.5, y1: 19.0, note: 'the dock stair arrives here, a rail round it' },
       { id: 'gallery_door', wall: 'x=50', y0: 11, y1: 12.2, note: 'out onto the Water Hall gallery' },
       { id: 'lane_door', wall: 'x=68', y0: 10.2, y1: 12, note: 'to the lane and the Well' },
       { id: 'job_board', wall: 'x=68', y0: 12.8, y1: 17.2, z0: 0.6, z1: 1.9, note: 'six slips; header board TALLY over it (under the beams); a chalk slate under it' },
-      { id: 'pay_booth', x0: 56.6, x1: 61.6, y0: 17.4, y1: 20, h: 2.4, door: [18.0, 19.0], note: 'timber booth on the hull wall; grilled hatch x 57.5..60.5, z 1.0..1.8; ledge at z 1.0; sign PAY; its door in the forward side' },
-      { id: 'weighing_bench', x0: 62.4, x1: 67, y0: 18.6, y1: 20, h: 0.9, note: 'a big balance on it; sacks and crates beside' },
-      { id: 'salt_cakes', x0: 55.6, x1: 56.4, y0: 15.6, y1: 16.4, h: 0.9 },
+      { id: 'pay_booth', x0: 57.6, x1: 62.6, y0: 17.4, y1: 20, h: 2.4, door: [18.0, 19.0], note: 'timber booth on the hull wall, 1.8 m forward of where the dock stair arrives; grilled hatch x 58.5..61.5, z 1.0..1.8; ledge at z 1.0; sign PAY; its door in the forward side' },
+      { id: 'weighing_bench', x0: 63.4, x1: 67, y0: 18.6, y1: 20, h: 0.9, note: 'a big balance on it; sacks and crates beside' },
+      { id: 'salt_cakes', x0: 51.2, x1: 52, y0: 10.6, y1: 11.4, h: 0.9, note: 'stacked by the windows over the Slip, out of the stair’s way' },
       { id: 'table', x0: 56, x1: 64, y0: 12.6, y1: 13.8, h: 0.8, note: 'benches either side at y 14.2..14.6 and y 11.8..12.2, h 0.45' },
       { id: 'hull_ports', wall: 'y=20', spans: [[62.4, 64], [65.2, 66.8]], z0: 0.8, z1: 1.8 },
       { id: 'hall_windows', wall: 'y=10', spans: [[54, 57], [58, 61], [62, 65]], z0: 0.8, z1: 2.2, note: 'look down into the Slip' },

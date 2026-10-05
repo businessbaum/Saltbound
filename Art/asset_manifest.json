@@ -471,47 +471,110 @@
     "collision": "complex",
     "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout: complex collision (the boat's hull capsules hit it)"
   },
-  "SM_HubBlk_Basin": {
-    "fbx": "Hub/SM_HubBlk_Basin.fbx",
+  "SM_HubBlk_Dock": {
+    "fbx": "Hub/SM_HubBlk_Dock.fbx",
     "dest": "/Game/Saltbound/Hub/Blockout",
     "nanite": false,
     "collision": "complex",
-    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout: complex collision (the boat's hull capsules hit it)"
+    "_note": "D64 the Water Hall's water bed, quay faces and slipway (build_hub_blockout.py); collision only under the art"
   },
-  "SM_HubBlk_Quay": {
-    "fbx": "Hub/SM_HubBlk_Quay.fbx",
+  "SM_HubBlk_Deck_deep": {
+    "fbx": "Hub/SM_HubBlk_Deck_deep.fbx",
     "dest": "/Game/Saltbound/Hub/Blockout",
     "nanite": false,
     "collision": "ucx",
-    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
   },
-  "SM_HubBlk_Lower": {
-    "fbx": "Hub/SM_HubBlk_Lower.fbx",
+  "SM_HubBlk_Deck_hold": {
+    "fbx": "Hub/SM_HubBlk_Deck_hold.fbx",
     "dest": "/Game/Saltbound/Hub/Blockout",
     "nanite": false,
     "collision": "ucx",
-    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
   },
-  "SM_HubBlk_Middle": {
-    "fbx": "Hub/SM_HubBlk_Middle.fbx",
+  "SM_HubBlk_Deck_quay": {
+    "fbx": "Hub/SM_HubBlk_Deck_quay.fbx",
     "dest": "/Game/Saltbound/Hub/Blockout",
     "nanite": false,
     "collision": "ucx",
-    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
   },
-  "SM_HubBlk_Upper": {
-    "fbx": "Hub/SM_HubBlk_Upper.fbx",
+  "SM_HubBlk_Deck_lower": {
+    "fbx": "Hub/SM_HubBlk_Deck_lower.fbx",
     "dest": "/Game/Saltbound/Hub/Blockout",
     "nanite": false,
     "collision": "ucx",
-    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
   },
-  "SM_HubBlk_Main": {
-    "fbx": "Hub/SM_HubBlk_Main.fbx",
+  "SM_HubBlk_Deck_middle": {
+    "fbx": "Hub/SM_HubBlk_Deck_middle.fbx",
     "dest": "/Game/Saltbound/Hub/Blockout",
     "nanite": false,
     "collision": "ucx",
-    "_note": "D61 hub blockout (build_hub_blockout.py), only for L_HubBlockout"
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
+  },
+  "SM_HubBlk_Deck_upper": {
+    "fbx": "Hub/SM_HubBlk_Deck_upper.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
+  },
+  "SM_HubBlk_Deck_gun": {
+    "fbx": "Hub/SM_HubBlk_Deck_gun.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
+  },
+  "SM_HubBlk_Deck_main": {
+    "fbx": "Hub/SM_HubBlk_Deck_main.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
+  },
+  "SM_HubBlk_Deck_sc1": {
+    "fbx": "Hub/SM_HubBlk_Deck_sc1.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
+  },
+  "SM_HubBlk_Deck_sc2": {
+    "fbx": "Hub/SM_HubBlk_Deck_sc2.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
+  },
+  "SM_HubBlk_Deck_sc3": {
+    "fbx": "Hub/SM_HubBlk_Deck_sc3.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
+  },
+  "SM_HubBlk_Deck_poop": {
+    "fbx": "Hub/SM_HubBlk_Deck_poop.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
+  },
+  "SM_HubBlk_Deck_fc1": {
+    "fbx": "Hub/SM_HubBlk_Deck_fc1.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
+  },
+  "SM_HubBlk_Deck_fcTop": {
+    "fbx": "Hub/SM_HubBlk_Deck_fcTop.fbx",
+    "dest": "/Game/Saltbound/Hub/Blockout",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D64 one floor of the room layout (hub_plan.py): slabs, walls with their doorways, rails, the hull's lining; collision only under the art"
   },
   "SM_HubBlk_Stairs": {
     "fbx": "Hub/SM_HubBlk_Stairs.fbx",
@@ -687,6 +750,90 @@
     "nanite": false,
     "collision": "none",
     "_note": "D62 the rig (build_hub_rig.py): visual only (the blockout's masts collide); the pennant streams on M_SB_Flag (no Nanite: WPO)"
+  },
+  "SM_Hub_Lvl_deep": {
+    "fbx": "Hub/SM_Hub_Lvl_deep.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_hold": {
+    "fbx": "Hub/SM_Hub_Lvl_hold.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_quay": {
+    "fbx": "Hub/SM_Hub_Lvl_quay.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_lower": {
+    "fbx": "Hub/SM_Hub_Lvl_lower.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_middle": {
+    "fbx": "Hub/SM_Hub_Lvl_middle.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_upper": {
+    "fbx": "Hub/SM_Hub_Lvl_upper.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_gun": {
+    "fbx": "Hub/SM_Hub_Lvl_gun.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_main": {
+    "fbx": "Hub/SM_Hub_Lvl_main.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_sc1": {
+    "fbx": "Hub/SM_Hub_Lvl_sc1.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_sc2": {
+    "fbx": "Hub/SM_Hub_Lvl_sc2.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_sc3": {
+    "fbx": "Hub/SM_Hub_Lvl_sc3.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
+  },
+  "SM_Hub_Lvl_fc1": {
+    "fbx": "Hub/SM_Hub_Lvl_fc1.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D64 one floor's art (build_hub_rooms.py): floors, walls, doors, rails, ceilings, the hull's lining; visual only, the blockout collides"
   },
   "SM_Hub_Dock": {
     "fbx": "Hub/SM_Hub_Dock.fbx",

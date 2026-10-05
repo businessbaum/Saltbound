@@ -74,7 +74,7 @@ rig = spawn(unreal.SaltLightingRig, (0, 0, 300), label="LightingRig")
 
 ocean = spawn(unreal.SaltOcean, (0, 0, 0), label="Ocean")
 ocean.set_editor_property("calm_zones", hub_place.calm_zones(local=False, berth=((BX, BY, BZ), YAW, BERTH_ID)))
-print("SB_HUB_ZONES ship", [round(c) for c in world(H.PIVOT_X, 0, 0)[:2]], "basin", [round(c) for c in world(22.0, 0, 0)[:2]])
+print("SB_HUB_ZONES ship", [round(c) for c in world(H.PIVOT_X, 0, 0)[:2]], "hall", [round(c) for c in world(0.5 * sum(hub_place.water_x()), 0, 0)[:2]])
 # The far floor, 60 m down under her (the visual test map's floor; it is not under her whole hull there).
 floor = spawn(unreal.StaticMeshActor, (BX, BY, -6000), label="Seabed")
 floor.static_mesh_component.set_static_mesh(unreal.load_asset("/Engine/BasicShapes/Cube"))
@@ -123,17 +123,16 @@ def open_side(gm):
     return best
 
 
-for gm in ([] if ART else H.GATE_MARKS):
+for gm in ([] if ART else hub_place.PL.all_gate_marks()):
     zl = H.level_z(gm["level"])
     label("%s %s" % (gm["g"], gm["zone"]), gm["x"], gm["y"], zl + 2.6, open_side(gm), unreal.Color(r=255, g=70, b=50, a=255), size=28.0)
 
-# --- the player's boat at the fitting berth, the player on the starboard quay --------------------------------------------
-fb = H.prop("dock", "fitting_berth")
-bx, by = 0.5 * (fb["x0"] + fb["x1"]), fb["y"]
-boat = spawn(unreal.SaltBoat, world(bx, by, 0.0), (0, YAW, 0), "Boat")
-boat.set_editor_property("mooring_reach", (H.HUB["basin"]["y1"] - by) * 100.0)     # to the starboard quay's edge
+# --- the player's boat at the fitting berth, the player on the forward quay beside her ------------------------------------
+_bid, bx, by, bh, breach = hub_place.berth_spots()[0]
+boat = spawn(unreal.SaltBoat, world(bx, by, 0.0), (0, YAW + bh, 0), "Boat")
+boat.set_editor_property("mooring_reach", breach * 100.0)                           # to the forward quay's edge, on her starboard
 boat.set_editor_property("mooring_pier_height", H.Z["quay"] * 100.0)
-spawn(unreal.PlayerStart, world(bx - 1.0, H.HUB["basin"]["y1"] + 2.0, H.Z["quay"] + 0.95), (0, YAW, 0), "PlayerStart")
+spawn(unreal.PlayerStart, world(bx + breach + 1.5, by, H.Z["quay"] + 0.95), (0, YAW + 180.0, 0), "PlayerStart")
 rig.set_editor_property("start_region", "ShoresOfPlenty")
 rig.set_editor_property("start_weather", "Clear")
 rig.set_editor_property("start_sea_state", "Rough")

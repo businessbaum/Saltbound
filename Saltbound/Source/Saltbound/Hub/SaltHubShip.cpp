@@ -319,15 +319,17 @@ namespace SaltHubCommands
 		FVector ShipM;
 		float Face;
 	};
-	// Where each space is entered (ship metres, the data's frame; face: 0 bow, 90 starboard).
+	// Where each space is entered (ship metres, the data's frame; face: 0 bow, 90 starboard). D64: the Water Hall from its aft quay,
+	// the Slip from the forward quay, the Tally House where the dock stair arrives, the Well's lower gallery, the Keelgate chamber,
+	// the main deck's waist, the Chandlery's counter.
 	const FGoto Places[] = {
-		{ TEXT("dock"), FVector(37.0, 12.2, 1.5), 180.f },
-		{ TEXT("slip"), FVector(45.5, 12.0, 1.5), 0.f },
-		{ TEXT("tally"), FVector(43.0, 15.5, 5.5), 0.f },
-		{ TEXT("well"), FVector(75.5, 9.5, 5.5), 0.f },
-		{ TEXT("keelgate"), FVector(75.0, 4.0, 1.5), -20.f },
-		{ TEXT("main"), FVector(60.0, 0.0, 17.5), 0.f },
-		{ TEXT("chandlery"), FVector(105.0, -4.0, 17.5), -90.f },
+		{ TEXT("dock"), FVector(27.5, 0.0, 1.5), 0.f },
+		{ TEXT("slip"), FVector(49.0, 9.5, 1.5), 30.f },
+		{ TEXT("tally"), FVector(57.2, 15.5, 4.5), 0.f },
+		{ TEXT("well"), FVector(74.5, 7.0, 4.5), 0.f },
+		{ TEXT("keelgate"), FVector(76.0, 2.0, 1.5), -20.f },
+		{ TEXT("main"), FVector(60.0, 0.0, 16.5), 0.f },
+		{ TEXT("chandlery"), FVector(105.0, -4.0, 16.5), -90.f },
 	};
 
 	FAutoConsoleCommandWithWorldAndArgs CmdShow(

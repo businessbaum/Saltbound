@@ -177,33 +177,8 @@ def slab(part, rect, z, mat, holes=(), thick=SLAB):
 
 
 def rects_of(cells):
-    """Cells (i, j) merged into rectangles (runs along y, then equal runs stacked along x): [(x0, x1, y0, y1)]."""
-    rows = {}
-    for i, j in cells:
-        rows.setdefault(i, []).append(j)
-    runs = {}
-    for i, js in rows.items():
-        js.sort()
-        s = p = js[0]
-        for j in js[1:] + [None]:
-            if j is not None and j == p + 1:
-                p = j
-                continue
-            runs.setdefault((s, p), []).append(i)
-            if j is not None:
-                s = p = j
-    out = []
-    for (j0, j1), iis in runs.items():
-        iis.sort()
-        s = p = iis[0]
-        for i in iis[1:] + [None]:
-            if i is not None and i == p + 1:
-                p = i
-                continue
-            out.append((PL.X0 + s * PL.CELL, PL.X0 + (p + 1) * PL.CELL, PL.Y0 + j0 * PL.CELL, PL.Y0 + (j1 + 1) * PL.CELL))
-            if i is not None:
-                s = p = i
-    return out
+    """Cells merged into rectangles (hub_plan.rects_of)."""
+    return PL.rects_of(cells)
 
 
 # --- the shell --------------------------------------------------------------------------------------------------------
@@ -529,6 +504,7 @@ def cradle_xs(db):
     return [db["x0"] + (db["x1"] - db["x0"]) * f for f in (0.21, 0.5, 0.79)]
 
 
+EASEL_OUT = 0.6                                   # the Slip's plans stand on an easel this far in from the quay's edge
 GANTRY_GUYS = ((84.0, 10.5), (84.0, -10.5))      # the Well's gantry's guys' feet on the main deck, aft of the companion's hatch
 GUIDE_OVER_MAIN = 3.2                             # the hoist's guide posts end this far over the main deck (the cage is 2.4 m tall)
 
@@ -567,7 +543,9 @@ def build_props():
     sl = {pr["id"]: pr for pr in H.space("slip")["props"]}
     c = sl["counter"]
     p.box(c["x0"], c["x1"], c["y0"], c["y1"], zq, zq + c["h"], "MI_HubBlk_Prop")
-    wall_prop(p, "slip", sl["plans_board"], zq)
+    pb_ = sl["plans_board"]                                                             # on an easel (no wall there: the shop is open)
+    xe = float(pb_["wall"].split("=")[1]) + EASEL_OUT
+    p.box(xe - 0.1, xe + 0.95, pb_["y0"] - 0.05, pb_["y1"] + 0.05, zq, zq + pb_["z1"] + 0.2, "MI_HubBlk_Prop")
     wall_prop(p, "slip", sl["half_models"], zq, depth=0.4)
     wb = sl["workbench"]
     p.box(wb["x0"], wb["x1"], wb["y0"], wb["y1"], zq, zq + wb["h"], "MI_HubBlk_Prop")
@@ -589,7 +567,7 @@ def build_props():
     # The Tally House.
     tl = {pr["id"]: pr for pr in H.space("tally")["props"]}
     pb = tl["pay_booth"]
-    hatch = (57.5, 60.5)                                                                   # (its note: hatch x 57.5..60.5, z 1.0..1.8)
+    hatch = (pb["x0"] + 0.9, pb["x1"] - 1.1)                                              # (its note: the hatch x and z 1.0..1.8)
     p.box(pb["x0"], pb["x1"], pb["y0"], pb["y0"] + 0.1, zl, zl + 1.0, "MI_HubBlk_Prop")
     p.box(pb["x0"], pb["x1"], pb["y0"], pb["y0"] + 0.1, zl + 1.8, zl + pb["h"], "MI_HubBlk_Prop")
     p.box(pb["x0"], hatch[0], pb["y0"], pb["y0"] + 0.1, zl + 1.0, zl + 1.8, "MI_HubBlk_Prop")

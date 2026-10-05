@@ -6,6 +6,7 @@
 
 #include "Algo/Reverse.h"
 #include "Boat/SaltBoat.h"
+#include "Boat/SaltHullShape.h"
 #include "Boat/SaltMooringPoint.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -17,6 +18,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "Hub/SaltHubBerth.h"
+#include "Hub/SaltHubDoors.h"
 #include "Hub/SaltHubGate.h"
 #include "Hub/SaltHubHoist.h"
 #include "Hub/SaltHubLadder.h"
@@ -76,6 +78,7 @@ namespace
 		TWeakObjectPtr<ASaltBoat> Boat;
 		TWeakObjectPtr<ASaltHubBerth> DevBerth;
 		TWeakObjectPtr<ASaltHubHoist> Hoist;
+		TWeakObjectPtr<ASaltHubDoors> Doors;
 		TWeakObjectPtr<ASaltHubLadder> Ladder;
 		TArray<TWeakObjectPtr<ASaltHubGate>> Gates;
 		FName HomeBerth;
@@ -322,13 +325,19 @@ void USaltDevTestSubsystem::RunHubSuite(const FString& Only)
 			S->Hoist = *It;
 			break;
 		}
+		for (TActorIterator<ASaltHubDoors> It(W); It; ++It)
+		{
+			S->Doors = *It;
+			break;
+		}
 		for (TActorIterator<ASaltHubGate> It(W); It; ++It)
 		{
 			S->Gates.Add(*It);
 		}
 		S->Gates.Sort([](const TWeakObjectPtr<ASaltHubGate>& A, const TWeakObjectPtr<ASaltHubGate>& B) { return A->GetName() < B->GetName(); });
-		UE_LOG(LogSaltbound, Display, TEXT("SB_TEST HubSetup ship=%d berth=%s data=%d gates=%d hoist=%d boat=%d"), S->Ship.IsValid() ? 1 : 0,
-			*S->HomeBerth.ToString(), S->Data.IsValid() ? 1 : 0, S->Gates.Num(), S->Hoist.IsValid() ? 1 : 0, S->Boat.IsValid() ? 1 : 0);
+		UE_LOG(LogSaltbound, Display, TEXT("SB_TEST HubSetup ship=%d berth=%s data=%d gates=%d hoist=%d doors=%d boat=%d"), S->Ship.IsValid() ? 1 : 0,
+			*S->HomeBerth.ToString(), S->Data.IsValid() ? 1 : 0, S->Gates.Num(), S->Hoist.IsValid() ? 1 : 0, S->Doors.IsValid() ? 1 : 0,
+			S->Boat.IsValid() ? 1 : 0);
 		if (!S->Data.IsValid())
 		{
 			Report(TEXT("HubSetup"), false, TEXT("no ASaltHubTestData: her level is not in this world (sb.Hub.Show 1, or L_HubReview)"));
@@ -688,9 +697,12 @@ void USaltDevTestSubsystem::RunHubSuite(const FString& Only)
 			return N;
 		};
 		const int32 Before = Open();
-		for (int32 I = 1; I <= 17; ++I)
+		for (const TWeakObjectPtr<ASaltHubGate>& G : S->Gates)                // every zone a gate closes (D64: L1-L18)
 		{
-			Saves->SetUnlocked(FName(*FString::Printf(TEXT("L%d"), I)), true);
+			if (G.IsValid())
+			{
+				Saves->SetUnlocked(G->ZoneId, true);
+			}
 		}
 		const int32 Unlocked = Open();
 		Saves->ClearUnlocked();
@@ -699,64 +711,105 @@ void USaltDevTestSubsystem::RunHubSuite(const FString& Only)
 			TEXT("gates=%d openLocked=%d openUnlocked=%d openRelocked=%d"), S->Gates.Num(), Before, Unlocked, After));
 	}, nullptr, nullptr});
 
-	// HubBoatDock: in under the arch without touching it, moored at the fitting berth and a fleet berth (the save keeps it), out again
+	// HubBoatDock: in from the side through the hidden doors with her mast up (the dock watch opens them in time), without
+	// touching a leaf or the doorway; moored at the fitting berth and a fleet berth (the save keeps it); out again (D64)
 	auto DockRun = [this, S, BoatLocal, BoatLocalYaw, EndStep](bool bIn)
 	{
 		return [this, S, bIn, BoatLocal, BoatLocalYaw, EndStep](float Dt)
 		{
 			ASaltBoat* B = S->Boat.Get();
 			const ASaltHubTestData* D = S->Data.Get();
-			if (!B || !D)
+			ASaltHubDoors* Doors = S->Doors.Get();
+			if (!B || !D || !Doors)
 			{
+				Report(bIn ? TEXT("HubBoatDockIn") : TEXT("HubBoatDockOut"), false, TEXT("no boat, data or doors"));
 				EndStep();
 				return;
 			}
 			S->T += Dt;
 			const FVector L = BoatLocal();
 			const float Yaw = BoatLocalYaw();
-			// Steer along the centreline (D61's run): the heading wanted leans 12 deg per metre off it; + oar = to starboard.
-			const float Want = (bIn ? 0.f : 180.f) + (bIn ? -12.f : 12.f) * (float)L.Y / 100.f;
-			const float Err = (float)FRotator::NormalizeAxis(Want - Yaw);
-			if (bIn && L.X > D->BasinMiddle.X - 400.0)
+			const float Mid = 0.5f * (float)(D->DoorsX.X + D->DoorsX.Y);
+			const float Half = D->DoorsHullHalf;
+			// Going out, she waits (held, sail down) until the doors stand open (E at a capstan), then sails.
+			if (!bIn && !S->bFlag)
+			{
+				B->SetSailSet(false);
+				B->SetControlOverride(true, 0.f);
+				if (Doors->IsOpen())
+				{
+					S->bFlag = true;
+					B->SetSailSet(true);
+				}
+				if (S->T > 15.f)
+				{
+					Report(TEXT("HubBoatDockOut"), false, TEXT("the doors did not open"));
+					EndStep();
+				}
+				return;
+			}
+			// Steer along the doors' middle: the heading wanted leans 20 deg per metre off it (30 at most); + oar = to starboard.
+			const float Base = bIn ? -90.f : 90.f;
+			const float Lean = FMath::Clamp((bIn ? -20.f : 20.f) * ((float)L.X - Mid) / 100.f, -30.f, 30.f);
+			const float Err = (float)FRotator::NormalizeAxis(Base + Lean - Yaw);
+			B->SetControlOverride(true, FMath::Clamp(Err / 25.f, -1.f, 1.f));
+			const float Out = FMath::Abs((float)L.Y);
+			// Coming in she takes in her sail 6 m short of the hull and glides through (her sail set is about as wide as the doors'
+			// narrowest clear way, D65); going out she sets it once past the leaves.
+			if (bIn && Out < Half + 600.f)
 			{
 				B->SetSailSet(false);
 			}
-			B->SetControlOverride(true, FMath::Clamp(Err / 25.f, -1.f, 1.f));
-			if (L.X > D->ArchX.X - 500.0 && L.X < D->ArchX.Y + 300.0)
+			// Through the doorway (from 3 m outside the hull to past the open leaves): no contact, clear of the leaves.
+			if (Out > Half - 900.f && Out < Half + 300.f)
 			{
 				S->Max1 = FMath::Max(S->Max1, B->GetContactDepth());
 				S->Count += B->GetContactCount() > 0 ? 1 : 0;
+				const float Side = FMath::Min((float)L.X - (float)D->DoorsX.X, (float)D->DoorsX.Y - (float)L.X);
+				S->Min1 = FMath::Min(S->Min1, Side - 170.f);                                  // the boat's half-beam (D36)
+				S->Best = FMath::Min(S->Best, Side - SaltHull::SailHalfFoot * 100.f);         // her sail's foot (D65), at the narrowest
 			}
-			if (L.X > D->ArchX.X && L.X < D->BasinMiddle.X + 1500.0)
+			if (bIn && S->Max2 < 0.f && Out < Half + 600.f)
 			{
-				S->Min1 = FMath::Min(S->Min1, (float)(D->BasinHalfWidth - FMath::Abs(L.Y)) - 170.f);   // the boat's half-beam (D36)
+				S->Max2 = Doors->GetOpenAmount();                    // how far open when her bow reaches the hull
 			}
-			S->Max2 = FMath::Max(S->Max2, FMath::Abs((float)L.Y));
-			const float Speed = (float)B->GetVelocity().Size2D();
-			const bool bArrived = bIn ? (L.X > D->BasinMiddle.X - 600.0 && Speed < 40.f) : L.X < D->BoatInStart.X + 1000.0;
-			if (bArrived || S->T > 50.f)
+			const bool bArrived = bIn ? Out < Half - 900.f : Out > Half + 1500.f;      // past the open leaves, or 15 m out
+			if (bArrived || S->T > 60.f)
 			{
-				const bool bThrough = bIn ? L.X > D->ArchX.Y : L.X < D->ArchX.X - 1000.0;
-				Report(bIn ? TEXT("HubBoatDockIn") : TEXT("HubBoatDockOut"), bThrough && S->Max1 < 1.f && S->Count == 0 && S->Min1 > 0.f, FString::Printf(
-					TEXT("t=%.1fs end=(%.1f, %.1f) archContactFrames=%d archDepth=%.1fcm minQuayGap=%.2fm maxOffCentre=%.2fm"), S->T, L.X / 100.0 + 80.0,
-					L.Y / 100.0, S->Count, S->Max1, S->Min1 / 100.f, S->Max2 / 100.f));
+				const bool bThrough = bArrived;
+				const bool bOpenInTime = !bIn || S->Max2 >= 0.99f;
+				if (bIn)
+				{
+					B->SetControlOverride(true, 0.f);
+				}
+				// The hull's contact decides (the leaves stand furthest in at 6 m up, over her hull); the gaps at that narrowest
+				// height are reported for her rig.
+				Report(bIn ? TEXT("HubBoatDockIn") : TEXT("HubBoatDockOut"), bThrough && bOpenInTime && S->Max1 < 1.f && S->Count == 0,
+					FString::Printf(TEXT("t=%.1fs end=(%.1f, %.1f) doorsAtHull=%.2f contactFrames=%d depth=%.1fcm beamGapAtNarrowest=%.2fm sailGapAtNarrowest=%.2fm"), S->T,
+					L.X / 100.0 + 80.0, L.Y / 100.0, S->Max2, S->Count, S->Max1, S->Min1 / 100.f, S->Best / 100.f));
 				EndStep();
 			}
 		};
 	};
-	Steps.Add({TEXT("HubBoatDockIn"), 60.f, [this, S, PlaceBoat]()
+	Steps.Add({TEXT("HubBoatDockIn"), 70.f, [this, S, PlaceBoat]()
 	{
 		S->T = 0.f;
-		S->Max1 = S->Max2 = 0.f;
-		S->Min1 = 1.0e9f;
+		S->Max1 = 0.f;
+		S->Max2 = -1.f;
+		S->Min1 = S->Best = 1.0e9f;
 		S->Count = 0;
 		if (USaltWindSubsystem* W = GetWorld()->GetSubsystem<USaltWindSubsystem>())
 		{
 			W->SetBaseWind(200.f, 700.f, 0.f);
 		}
+		if (ASaltHubDoors* Doors = S->Doors.Get())
+		{
+			Doors->SetOpenAmountNow(0.f);                             // shut: the watch must open them for her
+			Doors->bWatch = true;
+		}
 		if (const ASaltHubTestData* D = S->Data.Get())
 		{
-			PlaceBoat(D->BoatInStart, 0.f, 2.5f, true);
+			PlaceBoat(D->BoatInStart, -90.f, 2.5f, true);
 		}
 	}, DockRun(true), nullptr});
 	auto Moor = [this, S, FindMooring](FName Id)
@@ -820,15 +873,20 @@ void USaltDevTestSubsystem::RunHubSuite(const FString& Only)
 	Steps.Add({TEXT("HubBoatDockKeepFitting"), 0.f, Keep(TEXT("HubFitting"), TEXT("HubBoatDockKeepFitting")), nullptr, nullptr});
 	Steps.Add({TEXT("HubBoatDockMoorFleet"), 10.f, Moor(TEXT("HubFleet1")), nullptr, Moored(TEXT("HubFleet1"), TEXT("HubBoatDockMoorFleet"))});
 	Steps.Add({TEXT("HubBoatDockKeepFleet"), 0.f, Keep(TEXT("HubFleet1"), TEXT("HubBoatDockKeepFleet")), nullptr, nullptr});
-	Steps.Add({TEXT("HubBoatDockOut"), 60.f, [S, PlaceBoat]()
+	Steps.Add({TEXT("HubBoatDockOut"), 80.f, [S, PlaceBoat]()
 	{
 		S->T = 0.f;
 		S->Max1 = S->Max2 = 0.f;
-		S->Min1 = 1.0e9f;
+		S->Min1 = S->Best = 1.0e9f;
 		S->Count = 0;
+		S->bFlag = false;
 		if (const ASaltHubTestData* D = S->Data.Get())
 		{
-			PlaceBoat(D->BasinMiddle, 180.f, 0.5f, true);
+			PlaceBoat(D->HallMiddle, 90.f, 0.f, false);
+		}
+		if (ASaltHubDoors* Doors = S->Doors.Get())
+		{
+			Doors->Open();                                            // as E at a capstan
 		}
 	}, DockRun(false), nullptr});
 
