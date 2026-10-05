@@ -224,6 +224,8 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D65:** the starter boat is calmer in the waves (`sb.Dev.BoatMotion`) and carries a square sail that always pulls. Known
+  issue: the furled sail renders dark; `sb.Dev.RunBoatTests Float,RollKick` to re-run in a fresh PIE.
 - **D64 (the owner's review of the hub, waiting for the next look):** boats come in from the side through hidden doors in the hull
   (both sides, x 32..40) that open inwards like a double door into the Water Hall, a cavity of sea water across the bottom deck
   with quays, galleries and the slipway; masts stay up (13.2 m clear). The stern is a galleon's again; the hull is planked to the

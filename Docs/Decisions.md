@@ -1791,6 +1791,19 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - The outside's planking stands up to 0.5 m outside the collision between the section's points; the stern's top still reads boxy.
   - `ASaltSeaGate` is no longer placed but stays in the code: the save (`bSeaGateOpen`) still names it (the menus' file).
 
+### D65 · The starter boat calmer in the waves, with a square sail that always pulls (Adopted: waiting for the owner's look)
+- **Owner's review (2026-10-05):** "make the starter ship calmer in the waves"; "make the sail of the starter ship a normal sail, so
+  both sides with the same amount of sail not rotatable"; it always pulls (strongest with the wind astern, weaker into it, never
+  stuck); W / S still set how much. The boat docks in the hub with her full mast up (D64).
+- **Calmer:** the hull feels the sea's slope over 1.6 x its size and its height right under it, with more damping (a new heave
+  damping) and added mass. In Rough at anchor: roll -30..36 %, pitch -51..57 %, deck acceleration -31..39 %, the rail no longer
+  under water; she still rides the swell (heave ratio 1.01-1.04), roll period 3.56 s. A plane-only wave filter did nothing.
+- **Square sail:** a fixed yard (5.2 m, 9.0 m over the deck) on the mast's front, the sail (32.6 m2) laced under it, rolled up
+  from the foot by brails, sheets to the pin rails (`M_SB_SquareSail`, `setup_boat_sail.py`); boom and gaff gone, shrouds aft of
+  the mast. Drive = thrust x amount x (1.0 astern, 0.6 abeam, 0.28 head to wind): 8.4 / 7.2 / 5.4 / 3.2 kn in 7 m/s.
+- **Open:** the furled sail renders almost black (the roll keeps the flat cloth's normals; fix in the material's normals);
+  `BoatFloats` and `BoatRollPeriod` to re-run in a fresh PIE; the unused boom and gaff assets.
+
 ### D66 · The menus: start, pause, settings, voyages, loading, first start, keys and buttons (Adopted: built to the owner's choices; in-game review pending)
 - **Owner (2026-10-05), on the menu ideas (`Docs/Design/Menu_Ideas/Menus.html`):**
   - Start menu: the "Night sea" direction. Its title is the launch intro's own title at the place where the intro leaves it
