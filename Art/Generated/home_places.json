@@ -1,0 +1,322 @@
+{
+ "meshes": [
+  {
+   "label": "KeeperHut",
+   "mesh": "SM_Home_KeeperHut",
+   "loc": [
+    -2350.0,
+    1300.0,
+    61.89283657224761
+   ],
+   "rot": [
+    0,
+    -31.0,
+    0
+   ]
+  },
+  {
+   "label": "KeeperSmoke",
+   "mesh": "SM_Home_Smoke",
+   "loc": [
+    -2604.663523174738,
+    1318.8544414987493,
+    511.8928365722476
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "collide": false,
+   "shadow": false
+  },
+  {
+   "label": "WreckHull",
+   "mesh": "SM_Home_WreckHull",
+   "loc": [
+    -6830.0,
+    -10800.0,
+    35.1
+   ],
+   "rot": [
+    14.99,
+    55.0,
+    6.34
+   ],
+   "collide": true
+  },
+  {
+   "label": "WreckMast",
+   "mesh": "SM_Home_WreckMast",
+   "loc": [
+    -7021.0,
+    -10357.8,
+    36.3
+   ],
+   "rot": [
+    8.28,
+    89.0,
+    13.42
+   ],
+   "collide": true
+  },
+  {
+   "label": "WreckPlank1",
+   "mesh": "SM_Home_PlankA",
+   "loc": [
+    -7136.8,
+    -11032.1,
+    -4.7
+   ],
+   "rot": [
+    -3.53,
+    140.0,
+    7.34
+   ],
+   "collide": false
+  },
+  {
+   "label": "WreckPlank2",
+   "mesh": "SM_Home_PlankB",
+   "loc": [
+    -6454.8,
+    -10776.3,
+    60.6
+   ],
+   "rot": [
+    9.91,
+    45.0,
+    1.99
+   ],
+   "collide": false
+  },
+  {
+   "label": "WreckPlank3",
+   "mesh": "SM_Home_PlankA",
+   "loc": [
+    -6674.3,
+    -10276.8,
+    67.2
+   ],
+   "rot": [
+    -2.91,
+    205.0,
+    0.7
+   ],
+   "collide": false
+  },
+  {
+   "label": "WreckBarrel",
+   "mesh": "SM_Home_WreckBarrel",
+   "loc": [
+    -6589.5,
+    -11088.7,
+    48.1
+   ],
+   "rot": [
+    6.52,
+    65.0,
+    30.91
+   ],
+   "collide": true
+  },
+  {
+   "label": "WreckCrate",
+   "mesh": "SM_Crate_Small",
+   "loc": [
+    -6907.2,
+    -11249.5,
+    -1.3
+   ],
+   "rot": [
+    9.98,
+    100.0,
+    10.77
+   ],
+   "collide": true,
+   "path": "/Game/Saltbound/Props/"
+  },
+  {
+   "label": "TidePools",
+   "mesh": "SM_Home_TidePools",
+   "loc": [
+    5050.0,
+    -18880.0,
+    -1.9
+   ],
+   "rot": [
+    -0.58,
+    -10.0,
+    -5.61
+   ],
+   "collide": true
+  },
+  {
+   "label": "Cairn",
+   "mesh": "SM_Home_Cairn",
+   "loc": [
+    9550.0,
+    -14350.0,
+    1602.5
+   ],
+   "rot": [
+    0.0,
+    41.0,
+    0.0
+   ],
+   "collide": true
+  },
+  {
+   "label": "Spring",
+   "mesh": "SM_Home_Spring",
+   "loc": [
+    7300.0,
+    -16700.0,
+    198.7
+   ],
+   "rot": [
+    0.0,
+    -135.6,
+    0.0
+   ],
+   "collide": true
+  },
+  {
+   "label": "FirePit",
+   "mesh": "SM_Home_FirePit",
+   "loc": [
+    -3400.0,
+    -4100.0,
+    199.0
+   ],
+   "rot": [
+    0.0,
+    20.0,
+    0.0
+   ],
+   "collide": true
+  },
+  {
+   "label": "LogSeat1",
+   "mesh": "SM_Home_LogSeatA",
+   "loc": [
+    -3280.4,
+    -3960.7,
+    198.7
+   ],
+   "rot": [
+    0.03,
+    90.0,
+    -1.66
+   ],
+   "collide": true
+  },
+  {
+   "label": "LogSeat2",
+   "mesh": "SM_Home_LogSeatB",
+   "loc": [
+    -3572.6,
+    -4035.1,
+    203.1
+   ],
+   "rot": [
+    -2.6,
+    -5.0,
+    -3.3
+   ],
+   "collide": true
+  },
+  {
+   "label": "DigStake",
+   "mesh": "SM_Home_Stake",
+   "loc": [
+    -2280.0,
+    530.0,
+    65.5
+   ],
+   "rot": [
+    0.0,
+    30.0,
+    0.0
+   ],
+   "collide": false
+  },
+  {
+   "label": "FallenPalm",
+   "mesh": "SM_Home_FallenPalm",
+   "loc": [
+    -5820.0,
+    6070.0,
+    47.9
+   ],
+   "rot": [
+    0.0,
+    162.0,
+    0.0
+   ],
+   "collide": true,
+   "path": "/Game/Saltbound/Environment/Vegetation/"
+  }
+ ],
+ "lanterns": [
+  {
+   "loc": [
+    -2048.1332597275427,
+    1346.1136760330492,
+    261.89283657224763
+   ],
+   "rot": [
+    0,
+    -31.0,
+    0
+   ]
+  },
+  {
+   "loc": [
+    -2296.105425756641,
+    1098.4550301616857,
+    176.8928365722476
+   ],
+   "rot": [
+    0,
+    -11.0,
+    0
+   ]
+  }
+ ],
+ "keeper": {
+  "spot": [
+   -2251.425760419257,
+   1240.7706213853437,
+   83.8928365722476
+  ],
+  "point": [
+   -2144.279847831493,
+   1176.390862021587,
+   161.89283657224763
+  ],
+  "yaw": -31.0,
+  "extent": [
+   45.0,
+   95.0,
+   60.0
+  ]
+ },
+ "lights": [
+  {
+   "label": "FirePit",
+   "loc": [
+    -3400.0,
+    -4100.0,
+    237.0119053941756
+   ],
+   "intensity": 6.0,
+   "color": [
+    1.0,
+    0.45,
+    0.18
+   ],
+   "radius": 600.0
+  }
+ ]
+}

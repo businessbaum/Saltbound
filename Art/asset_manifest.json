@@ -150,6 +150,12 @@
     "nanite": false,
     "collision": "none"
   },
+  "SK_Gull": {
+    "fbx": "Birds/SK_Gull.fbx",
+    "dest": "/Game/Saltbound/Environment/Birds",
+    "type": "skeletal",
+    "_note": "D76 the seagull (build_birds.py): skinned on 10 bones (spine, neck, head, tail, upper/fore/hand for each wing); ASaltBirds poses them every frame"
+  },
   "SM_Gull_Body": {
     "fbx": "Birds/SM_Gull_Body.fbx",
     "dest": "/Game/Saltbound/Environment/Birds",
@@ -351,6 +357,208 @@
     "collision": "complex",
     "_note": "The home island's collision (D60): 1 m cells within 3 m of the water, 2 m deeper; hidden in the map."
   },
+  "SM_Home_Ground": {
+    "fbx": "Islands/SM_Home_Ground.fbx",
+    "dest": "/Game/Saltbound/Environment/Islands",
+    "nanite": true,
+    "collision": "none",
+    "_note": "D71 build_home_island.py ground: the whole visible ground (sand, earth, grass, litter) in one mesh, 0.25 m cells on the land; MI_HomeGround. Replaces SM_Home_Sand and SM_Home_Turf in the map; SM_Home_Col still collides."
+  },
+  "SM_Home_KeeperHut": {
+    "fbx": "HomeIsland/SM_Home_KeeperHut.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D71 build_home_props.py hut: the Harbour Keeper's hut on the pier's beach (counter, thatch, chimney, nets, gear); UCX boxes for the floor, walls, counter, chimney, barrels, trap and bench."
+  },
+  "SM_Home_Smoke": {
+    "fbx": "HomeIsland/SM_Home_Smoke.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": false,
+    "collision": "none",
+    "bounds_extension": [350, 350, 700],
+    "_note": "D71 build_home_props.py smoke: the chimney's puffs, moved by M_SB_IslSmoke (translucent, so not Nanite); bounds cover their rise."
+  },
+  "SM_Home_Shell_A": {
+    "fbx": "HomeIsland/SM_Home_Shell_A.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area",
+    "_note": "D71 build_home_props.py: small things on the ground (instanced by place_home_island.py), no collision."
+  },
+  "SM_Home_Shell_B": {
+    "fbx": "HomeIsland/SM_Home_Shell_B.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Home_Shell_C": {
+    "fbx": "HomeIsland/SM_Home_Shell_C.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Home_Pebble_A": {
+    "fbx": "HomeIsland/SM_Home_Pebble_A.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Home_Pebble_B": {
+    "fbx": "HomeIsland/SM_Home_Pebble_B.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Home_DebrisHusk": {
+    "fbx": "HomeIsland/SM_Home_DebrisHusk.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Home_DebrisFrond": {
+    "fbx": "HomeIsland/SM_Home_DebrisFrond.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Home_DebrisTwigs": {
+    "fbx": "HomeIsland/SM_Home_DebrisTwigs.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Home_DebrisStick": {
+    "fbx": "HomeIsland/SM_Home_DebrisStick.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none"
+  },
+  "SM_Home_ClumpSeaweed": {
+    "fbx": "HomeIsland/SM_Home_ClumpSeaweed.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Home_Burrow": {
+    "fbx": "HomeIsland/SM_Home_Burrow.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D71: a crab burrow in the ground's own material (MI_HomeGround)."
+  },
+  "SM_Home_WreckHull": {
+    "fbx": "HomeIsland/SM_Home_WreckHull.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D71 build_home_props.py: the places to explore (wreck, tide pools, lookout, spring, fire pit, the dig spot's stake)."
+  },
+  "SM_Home_WreckMast": {
+    "fbx": "HomeIsland/SM_Home_WreckMast.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "ucx"
+  },
+  "SM_Home_PlankA": {
+    "fbx": "HomeIsland/SM_Home_PlankA.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none"
+  },
+  "SM_Home_PlankB": {
+    "fbx": "HomeIsland/SM_Home_PlankB.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none"
+  },
+  "SM_Home_WreckBarrel": {
+    "fbx": "HomeIsland/SM_Home_WreckBarrel.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "ucx"
+  },
+  "SM_Home_TidePools": {
+    "fbx": "HomeIsland/SM_Home_TidePools.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "ucx"
+  },
+  "SM_Home_Cairn": {
+    "fbx": "HomeIsland/SM_Home_Cairn.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "ucx"
+  },
+  "SM_Home_Spring": {
+    "fbx": "HomeIsland/SM_Home_Spring.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": false,
+    "collision": "ucx"
+  },
+  "SM_Home_FirePit": {
+    "fbx": "HomeIsland/SM_Home_FirePit.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": false,
+    "collision": "ucx"
+  },
+  "SM_Home_LogSeatA": {
+    "fbx": "HomeIsland/SM_Home_LogSeatA.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "ucx"
+  },
+  "SM_Home_LogSeatB": {
+    "fbx": "HomeIsland/SM_Home_LogSeatB.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "ucx"
+  },
+  "SM_Home_Stake": {
+    "fbx": "HomeIsland/SM_Home_Stake.fbx",
+    "dest": "/Game/Saltbound/Environment/HomeIsland",
+    "nanite": true,
+    "collision": "none"
+  },
+  "SM_Home_FallenPalm": {
+    "fbx": "Vegetation/SM_Home_FallenPalm.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "ucx",
+    "nanite_shape": "preserve_area",
+    "_note": "D71 build_vegetation.py fallen: a palm thrown over on the north-west outer beach; its trunk collides in four hulls (walkable out over the shallows)."
+  },
+  "SM_Grass_PatchA": {
+    "fbx": "Vegetation/SM_Grass_PatchA.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area",
+    "_note": "D71 build_vegetation.py lawn: a square metre of short lawn grass (a reusable kit), instanced densely over the grass; MI_IslGrass_Lawn takes the ground's colour."
+  },
+  "SM_Grass_PatchB": {
+    "fbx": "Vegetation/SM_Grass_PatchB.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Grass_PatchEdge": {
+    "fbx": "Vegetation/SM_Grass_PatchEdge.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
   "SM_Palm_A": {
     "fbx": "Vegetation/SM_Palm_A.fbx",
     "dest": "/Game/Saltbound/Environment/Vegetation",
@@ -435,6 +643,29 @@
   },
   "SM_GrassTuft_B": {
     "fbx": "Vegetation/SM_GrassTuft_B.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Tree_C": {
+    "fbx": "Vegetation/SM_Tree_C.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "ucx",
+    "nanite_shape": "preserve_area",
+    "_note": "D71 build_vegetation.py: the third broadleaf tree (leaning, four limbs); the trunk collides (UCX hull), the leaves do not."
+  },
+  "SM_Runner_A": {
+    "fbx": "Vegetation/SM_Runner_A.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area",
+    "_note": "D71 build_vegetation.py: beach creeper (morning glory) at the grass's edge, over the sand."
+  },
+  "SM_Runner_B": {
+    "fbx": "Vegetation/SM_Runner_B.fbx",
     "dest": "/Game/Saltbound/Environment/Vegetation",
     "nanite": true,
     "collision": "none",

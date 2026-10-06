@@ -273,3 +273,184 @@ def forest(F, x, y):
     deep = smooth((F["e"] - 16.0) / 12.0) * smooth((F["f"] - 18.0) / 12.0)
     open_ = smooth((np.hypot(x + 20.0, y) - 25.0) / 15.0)
     return clumps * deep * open_
+
+
+# --- D71: the ground's surface (one mesh: sand, earth, grass, litter) -----------------------------------------------
+# Owner (2026-10-06): "the floor ... lacks EVERYTHING ELSE ... everything is perfectly flat, there is no good transition
+# between grass and sand." The functions above stay as they were (the plants keep their places); these add what the visible
+# ground (SM_Home_Ground) needs: where each cover lies and the small relief on top of the broad shape (the collision).
+
+# Hand-placed places (m, yaw deg; Unreal axes). Plants inside `clear` are left out; the ground knows about them too.
+PLACES = {
+    # The Harbour Keeper's hut on the pier's beach, its counter facing the pier (D71; the M6 helper NPC stands here).
+    "keeper_hut": {"x": -23.5, "y": 13.0, "yaw": -31.0, "clear": (-3.5, 4.5, -3.8, 3.8)},
+    # "Spare canvas under the leaning palm, three paces seaward" (GameConcept 8.1): the palm (SM_Palm_B, leaning north)
+    # at (-25.7, 4.8), the loose sand three paces (2.3 m) seaward of it.
+    "dig_spot": {"x": -23.3, "y": 4.9, "yaw": 0.0},
+    # A castaway's wreck thrown up on the windward (south-west) outer beach.
+    "wreck": {"x": -68.3, "y": -108.0, "yaw": 65.0, "clear": (-6.0, 6.0, -5.0, 5.0)},
+    # Tide pools in a shelf of rock at the west coast's surf (by the surf rock at (59.7, -195.2)), along the shore.
+    "tide_pools": {"x": 50.5, "y": -188.8, "yaw": -10.0, "clear": (-3.2, 3.2, -2.2, 2.2)},
+    # The old lookout on the west hill's crown: a cairn and a sighting post on the Spire (yaw 41: (560, 260) seen from here).
+    "lookout": {"x": 95.5, "y": -143.5, "yaw": 41.0, "clear": (-2.0, 2.0, -1.8, 1.8)},
+    # The spring at the hill's foot, running out of a broken Old World pipe (local -X up the slope, to the hill).
+    "spring": {"x": 73.0, "y": -167.0, "yaw": -135.6, "clear": (-4.4, 2.6, -2.0, 2.0)},
+    # A fire pit by the footpath with log seats.
+    "fire_pit": {"x": -34.0, "y": -41.0, "yaw": 20.0, "clear": (-2.6, 2.6, -2.6, 2.6)},
+    # A palm the storms threw over on the north-west outer beach, its crown out in the shallows by the surf rock (walkable).
+    "fallen_palm": {"x": -58.2, "y": 60.7, "yaw": 162.0, "clear": (-1.0, 12.0, -1.2, 1.2)},
+}
+
+
+def _hash2(ix, iy, seed):
+    h = (ix * 374761393 + iy * 668265263 + seed * 2147483647) & 0xFFFFFFFF
+    h = ((h ^ (h >> 13)) * 1274126177) & 0xFFFFFFFF
+    return ((h ^ (h >> 16)) & 0xFFFF) / 32767.5 - 1.0
+
+
+def vnoise(x, y, cell, seed):
+    """Gradient (Perlin) noise in about [-1, 1] on a lattice of `cell` metres (no visible directions or blocks, unlike the
+    sum of sines in noise(); for the small relief and the cover's edges)."""
+    x = np.asarray(x, dtype=float) / cell
+    y = np.asarray(y, dtype=float) / cell
+    ix, iy = np.floor(x).astype(np.int64), np.floor(y).astype(np.int64)
+    fx, fy = x - ix, y - iy
+
+    def corner(cx, cy, dx, dy):
+        a = _hash2(cx, cy, seed) * np.pi
+        return np.cos(a) * dx + np.sin(a) * dy
+
+    ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10)
+    uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10)
+    n00 = corner(ix, iy, fx, fy)
+    n10 = corner(ix + 1, iy, fx - 1, fy)
+    n01 = corner(ix, iy + 1, fx, fy - 1)
+    n11 = corner(ix + 1, iy + 1, fx - 1, fy - 1)
+    a = n00 + (n10 - n00) * ux
+    b = n01 + (n11 - n01) * ux
+    return np.clip((a + (b - a) * uy) * 1.6, -1.0, 1.0)
+
+
+def fbm(x, y, cell, seed, octaves=3):
+    s, amp, tot = 0.0, 1.0, 0.0
+    for o in range(octaves):
+        s = s + amp * vnoise(x, y, cell / (2.0 ** o), seed + 17 * o)
+        tot += amp
+        amp *= 0.5
+    return s / tot
+
+
+def place_local(x, y, name):
+    """Coordinates in a place's frame: (along its facing, to its right) in metres."""
+    p = PLACES[name]
+    a = math.radians(p["yaw"])
+    dx, dy = x - p["x"], y - p["y"]
+    return dx * math.cos(a) + dy * math.sin(a), -dx * math.sin(a) + dy * math.cos(a)
+
+
+def cover(F, x, y):
+    """The ground's cover, 0..1 each: grass, litter (fallen leaves, twigs; replaces the grass under the trees) and earth (the
+    footpath, trodden places). The sand is what is left. The grass's edge is the turf's ragged line (turf()), widened into a
+    zone where it breaks into tufts, crossed by fingers of sand blown in from the beach and tongues of grass running out on
+    to it; the material's height blend draws the clumps."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    z, e, f = F["z"], F["e"], F["f"]
+    line = 0.9 + 0.22 * noise(x, y, 5.5, 41) + 0.1 * noise(x, y, 1.9, 42) + 0.07 * fbm(x, y, 1.2, 43)
+    # Fingers across the edge (sand into the grass, grass out on to the sand): noise stretched across the shore, about 1.5
+    # by 4 m (the along-shore coordinate is the position's component along the ring's tangent: no seam where the bearing
+    # wraps, behind the pier).
+    r, th = polar(x, y)
+    along = -np.sin(th) * x + np.cos(th) * y
+    fingers = (0.7 * vnoise(along / 1.5, r / 4.0, 1.0, 44) + 0.3 * vnoise(x, y, 0.8, 144)) * 0.13
+    g = smooth((z - line + fingers + 0.12) / 0.32) * smooth((e - 6.0 + 1.5 * fingers / 0.16) / 3.5) * smooth((f - 8.0) / 3.5)
+    # Tufts thinning out over the sand: grass also where the clumpy noise peaks, a little beyond the edge.
+    tufts = smooth((fbm(x, y, 0.7, 45) - 0.25) / 0.2) * smooth((z - line + 0.3) / 0.22)
+    g = np.maximum(g, 0.5 * tufts)
+    pd = F["path"]
+    path_edge = S_PATH_EDGE(x, y)
+    g = g * smooth((pd - path_edge) / 0.45)
+    g = g * (1.0 - F["gap"])
+    # The footpath's earth: where it runs inland (on the beach it stays sand), ragged at its sides.
+    earth = smooth((path_edge + 0.15 - pd) / 0.5) * smooth((F["inland"] - 0.05) / 0.3)
+    # Litter: the forest's clumps, and under the trees' crowns (litter_trees adds those from the placements).
+    lit = smooth((forest(F, x, y) - 0.2) / 0.45) * 0.85
+    lit = lit * smooth((pd - path_edge - 0.4) / 0.8)
+    return g, np.clip(lit, 0.0, 1.0), earth
+
+
+def S_PATH_EDGE(x, y):
+    """The footpath's half width with a ragged edge (m)."""
+    return PATH_HALF + 0.12 * vnoise(x, y, 0.7, 46) + 0.08 * vnoise(x, y, 2.3, 47)
+
+
+def relief(F, x, y, g, lit, earth):
+    """Small relief over the broad shape (m), within about +-10 cm where people walk (the collision is the broad shape):
+    the beach's ripples and swash ridges (sand_detail), a storm berm at the top of the beach, tussocks of grass breaking
+    into single clumps at the edge, humps on the forest floor, ruts along the footpath. Returns (dz, crest, trough)."""
+    z = F["z"]
+    dz, crest, trough, tone = sand_detail(x, y, z)
+    bare = 1.0 - np.maximum(g, earth)
+    dz = dz * bare
+    crest = crest * bare
+    trough = trough * bare
+    # The berm: a low ridge where the waves' run-up ends (higher on the outer beaches), a shallow runnel behind it.
+    outer = smooth((F["e"] - F["f"]) / 30.0)
+    zb = 0.42 + 0.05 * outer + 0.04 * vnoise(x, y, 3.0, 48)
+    berm = (0.045 + 0.04 * outer) * np.exp(-((z - zb) / 0.07) ** 2) - 0.02 * np.exp(-((z - zb - 0.16) / 0.06) ** 2)
+    dz = dz + berm * bare
+    # Grass: a thatch a few centimetres thick, hummocks all over (0.5-1.5 m), tussocks standing out where it thins.
+    hum = np.maximum(fbm(x, y, 1.1, 49), -0.3)
+    tus = smooth((fbm(x, y, 0.6, 50) + 0.1) / 0.4) * smooth((0.9 - g) / 0.4)
+    dz = dz + g * (0.03 + 0.045 * hum + 0.05 * tus)
+    # The forest floor: soft humps and hollows (roots below, leaves heaped).
+    dz = dz + lit * (0.05 * fbm(x, y, 1.4, 51) + 0.02 * vnoise(x, y, 0.45, 52))
+    # The footpath: two ruts worn by feet and carts, a slightly raised middle, crumbled edges.
+    pd = F["path"]
+    rut = np.exp(-((pd - 0.42) / 0.14) ** 2)
+    dz = dz + earth * (-0.035 * rut * (0.7 + 0.3 * vnoise(x, y, 1.5, 53)) + 0.012 * vnoise(x, y, 0.35, 54))
+    return dz, crest, trough
+
+
+# The broadleaf trees' roots (build_vegetation.py builds them at these bearings, so the ground's ridges continue them):
+# (bearing deg in the plant's own frame, length m).
+TREE_ROOTS = {
+    "SM_Tree_A": [(12.0, 1.6), (85.0, 1.35), (150.0, 1.7), (222.0, 1.4), (290.0, 1.55)],
+    "SM_Tree_B": [(40.0, 1.3), (118.0, 1.1), (190.0, 1.35), (262.0, 1.2), (330.0, 1.15)],
+    "SM_Tree_C": [(0.0, 1.2), (100.0, 1.0), (205.0, 1.25), (290.0, 1.05)],
+}
+
+
+def plant_relief(x, y, plants):
+    """Mounds round the trunks and ridges along the trees' roots (m), and the litter under the crowns (0..1).
+    plants: rows of (mesh, x, y, yaw deg, scale) in metres."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    dz = np.zeros(x.shape)
+    lit = np.zeros(x.shape)
+    for mesh, px, py, yaw, sc in plants:
+        reach = 5.0 * sc if "Tree" in mesh else 1.2 * sc
+        m = (np.abs(x - px) < reach) & (np.abs(y - py) < reach)
+        if not m.any():
+            continue
+        dx, dy = x[m] - px, y[m] - py
+        d = np.hypot(dx, dy)
+        if "Tree" in mesh:
+            mound = 0.11 * sc * np.exp(-(d / (0.9 * sc)) ** 2)
+            ridge = np.zeros(d.shape)
+            for bearing, length in TREE_ROOTS.get(mesh, TREE_ROOTS["SM_Tree_A"]):
+                a = math.radians(yaw + bearing)
+                ux, uy = math.cos(a), math.sin(a)
+                along = dx * ux + dy * uy
+                across = -dx * uy + dy * ux
+                L = length * sc * 1.25
+                t = np.clip(along / L, 0.0, 1.0)
+                w = 0.22 * sc * (1.0 - 0.6 * t)
+                ridge = np.maximum(ridge, 0.09 * sc * (1.0 - t) ** 1.5 * np.exp(-(across / w) ** 2) * (along > -0.2))
+            dz[m] += mound + ridge
+            ragged = 1.0 + 0.3 * vnoise(x[m], y[m], 1.3, 55) + 0.15 * vnoise(x[m], y[m], 0.5, 56)
+            lit[m] = np.maximum(lit[m], 0.75 * smooth((3.4 * sc * ragged - d) / (1.2 * sc)))
+        else:
+            dz[m] += 0.05 * sc * np.exp(-(d / (0.55 * sc)) ** 2)
+            lit[m] = np.maximum(lit[m], 0.35 * smooth((1.0 * sc - d) / (0.6 * sc)))
+    return dz, lit

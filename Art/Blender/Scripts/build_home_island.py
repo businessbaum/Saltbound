@@ -16,7 +16,15 @@ rocks stand. Shape: island_shape.py.
                  seagrass {A|B|C: [...]} in Unreal cm and degrees; rocks [[mesh, x, y, z, yaw, scale], ...].
 
 Origin = the world origin at the water level (placed at 0, 0, 0). Unreal metres in the shape (Blender Y = -Unreal Y).
-Run: Tools/Build-BlenderAsset.ps1 build_home_island [sand] [turf] [col] [scatter]
+  SM_Home_Ground (D71) the whole visible ground in one Nanite mesh (replaces SM_Home_Sand and SM_Home_Turf in the map):
+                 0.25 m cells on the land and the beaches, the relief of island_shape.relief() on the broad shape (berm,
+                 tussocks, the forest's humps, ruts, mounds and root ridges round the trees), material M_SB_IslandGround
+                 (MI_HomeGround). Vertex colours: R grass, G litter, B earth, A tone; UV1 (the sand's ripples 0.5 flat,
+                 1 crest, 0 trough; the curvature 0.5 flat). The plants' heights in home_island.json follow it (rez_plants), and the
+                 places (island_shape.PLACES) are kept clear.
+
+Run: Tools/Build-BlenderAsset.ps1 build_home_island [scatter] [ground] [col] [sand] [turf]
+(the scatter also runs in the host Python: python Art/Blender/Scripts/build_home_island.py scatter)
 """
 import json
 import math
@@ -204,6 +212,330 @@ def collision():
     sb.export_fbx([obj], os.path.join("Islands", "SM_Home_Col.fbx"))
 
 
+# --- D71: one visible ground (sand, earth, grass, litter) ------------------------------------------------------------
+GROUND_FINE = 0.25            # cell (m) on the land, the beaches and the first 0.6 m of water
+GROUND_SINK = {"SM_Tree": 0.15, "SM_Palm": 0.1, "SM_BigLeaf": 0.05, "SM_Bush": 0.1, "SM_Fern": 0.04, "SM_GrassTuft": 0.03,
+               "SM_Runner": 0.0}
+
+
+def scatter_plants(kinds=("Tree", "Palm")):
+    """The placed plants of some kinds from home_island.json as rows (mesh, x, y, yaw, scale) in metres."""
+    with open(SCATTER_JSON, encoding="utf-8") as fh:
+        H = json.load(fh)
+    rows = []
+    for mesh, items in H["plants"].items():
+        if any(k in mesh for k in kinds):
+            rows += [(mesh, r[0] / 100.0, r[1] / 100.0, r[3], r[6]) for r in items]
+    return rows
+
+
+def surface(x, y, plants, F=None):
+    """The visible ground at the points (m): z with its relief, the cover (grass, litter, earth), the sand's crests and
+    troughs and a broad tone."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    F = F if F is not None else S.fields(x, y)
+    g, lit, earth = S.cover(F, x, y)
+    pdz, plit = S.plant_relief(x, y, plants)
+    lit = np.maximum(lit, plit * np.clip(1.4 * g - 0.05, 0.0, 1.0)) * (1.0 - earth)
+    # The Keeper's hut: the sand trodden hard in front of the counter and round the door, no grass under the floor.
+    hl, hr = S.place_local(x, y, "keeper_hut")
+    yard = S.smooth((1.0 - np.maximum(np.abs(hl - 2.6) / 3.6, np.abs(hr) / 4.6)) / 0.35)
+    yard = yard * (0.55 + 0.45 * S.smooth((S.vnoise(x, y, 0.6, 81) + 0.2) / 0.5))
+    earth = np.maximum(earth, 0.8 * yard)
+    g = g * (1.0 - S.smooth((1.0 - np.maximum(np.abs(hl + 0.2) / 3.4, np.abs(hr) / 3.4)) / 0.3))
+    # The dig spot: a low mound of loose, darker sand.
+    dl, dr = S.place_local(x, y, "dig_spot")
+    dd = np.hypot(dl, dr * 1.2)
+    dig = np.exp(-(dd / 0.55) ** 2)
+    earth = np.maximum(earth, 0.45 * S.smooth((0.75 - dd) / 0.25) * (0.6 + 0.4 * S.vnoise(x, y, 0.2, 82)))
+    # The spring (D71): its pool's rim levelled into the slope and a shallow bowl under the water, wet earth round it.
+    sl, sr = S.place_local(x, y, "spring")
+    sd = np.hypot(sl / 1.25, sr / 1.05)
+    rim = S.smooth((1.45 - sd) / 0.35)
+    g = g * (1.0 - S.smooth((1.2 - sd) / 0.3))
+    lit = np.maximum(lit, 0.75 * S.smooth((1.9 - sd) / 0.6))
+    dz, crest, trough = S.relief(F, x, y, g, lit, earth)
+    dz = dz + pdz + 0.06 * dig * (1.0 + 0.3 * S.vnoise(x, y, 0.18, 83))
+    sp = S.PLACES["spring"]
+    zs = float(S.base(np.array([sp["x"]]), np.array([sp["y"]]))[0])
+    target = zs + 0.02 - 0.18 * S.smooth((0.95 - sd) / 0.4)
+    z_all = F["z"] + dz
+    dz = dz + (np.minimum(z_all, target) - z_all) * rim
+    tone = 0.5 + 0.35 * S.noise(x, y, 6.0, 63) + 0.15 * S.fbm(x, y, 2.5, 64)
+    return {"z": F["z"] + dz, "g": g, "lit": lit, "earth": earth, "crest": crest, "trough": trough, "tone": tone, "F": F}
+
+
+def curvature(z, step, gain):
+    """0.5 on flat ground, more on rises, less in hollows (at about 0.5 and 1.5 m), from a lattice of heights."""
+    k1, k2 = max(1, int(round(0.5 / step))), max(1, int(round(1.5 / step)))
+    lap = 0.0
+    for k, w in ((k1, 0.6), (k2, 0.4)):
+        lap = lap + w * (np.roll(z, k, 0) + np.roll(z, -k, 0) + np.roll(z, k, 1) + np.roll(z, -k, 1) - 4 * z) / (4.0 * (k * step) ** 2)
+    return np.clip(0.5 - lap * gain, 0.0, 1.0)
+
+
+def ground_part(X, Y, keep, plants, offset=0.0, curv_gain=1.2):
+    """A grid part of the ground: (verts, faces, cols, uv1) for the kept cells."""
+    t = time.time()
+    ni, nj = keep.shape
+    used = np.zeros((ni + 1, nj + 1), dtype=bool)
+    ci, cj = np.nonzero(keep)
+    for a in (0, 1):
+        for b in (0, 1):
+            used[ci + a, cj + b] = True
+    # Evaluate only the rows and columns in use (a box), so the curvature has neighbours.
+    ii, jj = np.nonzero(used)
+    i0, i1, j0, j1 = max(ii.min() - 8, 0), min(ii.max() + 9, ni + 1), max(jj.min() - 8, 0), min(jj.max() + 9, nj + 1)
+    Xb, Yb = X[i0:i1, j0:j1], Y[i0:i1, j0:j1]
+    G = surface(Xb, Yb, plants)
+    step = float(X[1, 0] - X[0, 0])
+    curv = curvature(G["z"], step, curv_gain)
+    Z = np.full(X.shape, np.nan)
+    Z[i0:i1, j0:j1] = G["z"] + offset
+
+    def full(a):
+        out = np.zeros(X.shape)
+        out[i0:i1, j0:j1] = a
+        return out
+
+    index = -np.ones(used.shape, dtype=np.int64)
+    index[used] = np.arange(used.sum())
+    verts = np.stack([X[used], -Y[used], Z[used]], -1)
+    faces = np.stack([index[ci, cj], index[ci, cj + 1], index[ci + 1, cj + 1], index[ci + 1, cj]], -1)
+    cols = np.stack([full(G["g"])[used], full(G["lit"])[used], full(G["earth"])[used], np.clip(full(G["tone"])[used], 0, 1)], -1)
+    ripple = 0.5 + 0.5 * (full(G["crest"])[used] - full(G["trough"])[used])
+    uv1 = np.stack([np.clip(ripple, 0, 1), full(curv)[used]], -1)
+    print("SB_HOME ground part", step, "m: verts", len(verts), "faces", len(faces), round(time.time() - t, 1), "s")
+    return verts, faces, cols, uv1
+
+
+def ground_object(name, parts, material):
+    verts = np.concatenate([p[0] for p in parts])
+    faces, off = [], 0
+    for p in parts:
+        faces.append(p[1] + off)
+        off += len(p[0])
+    faces = np.concatenate(faces)
+    me = bpy.data.meshes.new(name)
+    me.vertices.add(len(verts))
+    me.vertices.foreach_set("co", verts.astype(np.float32).ravel())
+    me.loops.add(len(faces) * 4)
+    me.loops.foreach_set("vertex_index", faces.astype(np.int32).ravel())
+    me.polygons.add(len(faces))
+    me.polygons.foreach_set("loop_start", (np.arange(len(faces)) * 4).astype(np.int32))
+    me.update(calc_edges=True)
+    me.validate()
+    me.shade_smooth()
+    obj = sb.new_object(name, me)
+    obj.data.materials.append(sb.get_material(material, (0.76, 0.68, 0.52, 1)))
+    vi = np.empty(len(me.loops), dtype=np.int32)
+    me.loops.foreach_get("vertex_index", vi)
+    # UV0: top projection (tangents); UV1: (the sand's ripples: 0.5 flat, 1 a lit crest, 0 a trough; the curvature: 0.5
+    # flat, more on rises) as data for M_SB_IslandGround.
+    for layer, data in (("UVMap", verts[:, :2]), ("Data", np.concatenate([p[3] for p in parts]))):
+        uv = me.uv_layers.new(name=layer)
+        uv.data.foreach_set("uv", data[vi].astype(np.float32).ravel())
+    attr = me.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+    cols = np.concatenate([p[2] for p in parts])
+    attr.data.foreach_set("color", cols.astype(np.float32).ravel())
+    me.color_attributes.active_color = attr
+    print("SB_HOME", name, "verts", len(verts), "faces", len(faces))
+    return obj
+
+
+def ground():
+    """SM_Home_Ground (D71): the whole visible ground, sand to forest, in one Nanite mesh (replaces SM_Home_Sand and
+    SM_Home_Turf in the map). 0.25 m cells where it comes within 0.6 m of the water, 0.5 m down to 4.5 m (3 cm lower,
+    overlapping one block under the fine part), 2 m deeper (6 cm lower)."""
+    t0 = time.time()
+    plants = scatter_plants()
+    X5, Y5, n5 = lattice(FINE)
+    z5 = S.base(X5, Y5)
+    r1 = block_mask(z5, -0.6, dilate=1)
+    r2 = block_mask(z5, -4.5, dilate=1)
+    r2 = (r2 & ~r1) | (grow(r2 & ~r1, 1) & r1)
+    k1 = int(round(BLOCK / GROUND_FINE))
+    k2 = int(round(BLOCK / FINE))
+    X1, Y1, n1 = lattice(GROUND_FINE)
+    parts = [ground_part(X1, Y1, np.repeat(np.repeat(r1, k1, 0), k1, 1), plants)]
+    parts.append(ground_part(X5, Y5, np.repeat(np.repeat(r2, k2, 0), k2, 1), plants, offset=-0.03))
+    Xc, Yc, nc = lattice(COARSE)
+    zc = S.base(Xc, Yc) - 0.06
+    coarse_cells = grow(~(r1 | r2), 1)
+    vc_, fc_, _ = cells_to_mesh("coarse", Xc, Yc, zc, coarse_cells)
+    n = len(vc_)
+    colc = np.zeros((n, 4))
+    colc[:, 3] = 0.5
+    parts.append((vc_, fc_, colc, np.full((n, 2), 0.5)))
+    sb.reset_scene()
+    obj = ground_object("SM_Home_Ground", parts, "MI_HomeGround")
+    sb.save_blend("SM_Home_Ground")
+    sb.export_fbx([obj], os.path.join("Islands", "SM_Home_Ground.fbx"))
+    print("SB_HOME ground", round(time.time() - t0, 1), "s")
+
+
+def details(out):
+    """D71: small things that make the ground's edges (owner: "no good transition between grass and sand"): the beach creeper
+    running from the grass out over the sand. Its own placer and seed, so the plants above keep their places."""
+    trunks = [(m, r[0] / 100.0, r[1] / 100.0, r[3], r[6]) for m, rows in out["plants"].items() if ("Tree" in m or "Palm" in m)
+              for r in rows]
+    P = Placer(71)
+    for m, x, y, yaw, sc in trunks:
+        P.add(x, y, 0.8)
+    xs, ys = P.candidates(1.1)
+    G = surface(xs, ys, trunks)
+    F = G["F"]
+    edge = (G["g"] > 0.02) & (G["g"] < 0.55) & (F["z"] > 0.42) & (F["path"] > S.PATH_HALF + 0.9) & (F["gap"] < 0.3)
+    outer = S.smooth((F["e"] - F["f"]) / 30.0)
+    p = edge * (0.3 + 0.35 * outer) * S.smooth((S.noise(xs, ys, 6.0, 91) + 0.3) / 0.5)
+    roll = P.rng.uniform(0, 1, xs.shape)
+    rows = {"SM_Runner_A": [], "SM_Runner_B": []}
+    for k in np.nonzero(roll < p)[0]:
+        x, y = float(xs[k]), float(ys[k])
+        if not P.free(x, y, 1.0):
+            continue
+        P.add(x, y, 1.0)
+        # They run away from the grass, out over the sand: face down the slope of the grass's weight (roughly seaward).
+        r, th = S.polar(x, y)
+        seaward = math.degrees(th) if F["f"][k] < F["e"][k] else math.degrees(th) + 180.0
+        mesh = "SM_Runner_A" if P.rng.random() < 0.6 else "SM_Runner_B"
+        rows[mesh].append([round(x * 100, 1), round(y * 100, 1), 0.0, round(seaward + float(P.rng.uniform(-60, 60)), 1), 0.0, 0.0,
+                           round(float(P.rng.uniform(0.8, 1.3)), 3)])
+    out["plants"].update(rows)
+    print("SB_HOME details: runners", {k: len(v) for k, v in rows.items()})
+    # Things the sea and the trees leave on the ground (build_home_props.py), instanced: shells and seaweed along the
+    # wrack line (the waves' reach, about 0.3-0.5 m up), pebbles on the outer beaches and at the path's sides, husks and
+    # dead fronds under the palms, twigs under the trees, driftwood sticks, crab burrows on the upper beach; more of
+    # them where the grass meets the sand.
+    xs, ys = P.candidates(0.7)
+    G = surface(xs, ys, trunks)
+    F = G["F"]
+    outer = S.smooth((F["e"] - F["f"]) / 30.0)
+    sand = (G["g"] < 0.15) & (G["earth"] < 0.3) & (F["gap"] < 0.3)
+    wrack = np.exp(-((F["z"] - 0.4) / 0.12) ** 2)
+    edge = np.exp(-((G["g"] - 0.35) / 0.25) ** 2) * (F["z"] > 0.4)
+    grove = S.smooth((S.noise(xs, ys, 9.0, 92) + 0.2) / 0.5)
+    near_palm = np.zeros(xs.shape)
+    near_tree = np.zeros(xs.shape)
+    for m, px, py, yaw, sc in trunks:
+        box = (np.abs(xs - px) < 4.0) & (np.abs(ys - py) < 4.0)
+        if not box.any():
+            continue
+        d = np.hypot(xs[box] - px, ys[box] - py)
+        if "Palm" in m:
+            near_palm[box] = np.maximum(near_palm[box], S.smooth((3.0 - d) / 1.5) * (d > 0.5))
+        else:
+            near_tree[box] = np.maximum(near_tree[box], S.smooth((3.5 - d) / 1.5) * (d > 0.7))
+    pathside = np.exp(-((F["path"] - S.PATH_HALF - 0.25) / 0.3) ** 2) * (F["inland"] > 0.2)
+    kinds = {
+        # mesh: (density, radius, sink, scale range, lay on the slope)
+        "SM_Home_Shell_A": (sand * (0.012 + 0.32 * wrack * (0.4 + 0.6 * outer)) * (F["z"] > 0.05), 0.15, 0.005, (0.8, 1.3)),
+        "SM_Home_Shell_B": (sand * (0.006 + 0.15 * wrack) * (F["z"] > 0.05), 0.15, 0.005, (0.8, 1.3)),
+        "SM_Home_Shell_C": (sand * (0.005 + 0.12 * wrack) * (F["z"] > 0.05), 0.15, 0.01, (0.8, 1.4)),
+        "SM_Home_ClumpSeaweed": (sand * 0.45 * wrack * (0.3 + 0.7 * outer) * grove, 0.5, 0.0, (0.8, 1.5)),
+        "SM_Home_Pebble_A": ((sand * (0.25 * outer * (F["z"] < 0.9) * (F["z"] > -0.2) * grove) + 0.25 * pathside + 0.06 * edge), 0.3, 0.01, (0.8, 1.4)),
+        "SM_Home_Pebble_B": ((sand * 0.1 * outer * (F["z"] < 0.9) * (F["z"] > 0.0) * grove) + 0.12 * pathside, 0.4, 0.02, (0.8, 1.5)),
+        "SM_Home_DebrisHusk": (0.12 * near_palm + 0.03 * edge, 0.6, 0.03, (0.85, 1.2)),
+        "SM_Home_DebrisFrond": (0.06 * near_palm + 0.04 * edge * (F["z"] > 0.5), 1.4, 0.0, (0.8, 1.25)),
+        "SM_Home_DebrisTwigs": (0.08 * near_tree + 0.04 * edge + 0.03 * G["lit"], 0.6, 0.0, (0.8, 1.3)),
+        "SM_Home_DebrisStick": (sand * 0.14 * wrack * (0.3 + 0.7 * outer) + 0.02 * edge, 1.2, 0.01, (0.8, 1.3)),
+        "SM_Home_Burrow": (sand * 0.035 * (F["z"] > 0.55) * (F["z"] < 1.6) * (1.0 - wrack), 0.5, 0.01, (0.8, 1.2)),
+    }
+    roll = P.rng.uniform(0, 1, xs.shape)
+    det = {}
+    for mesh, (dens, radius, sink, sc_range) in kinds.items():
+        pick = P.rng.uniform(0, 1, xs.shape) < np.clip(dens, 0.0, 0.9)
+        rows_ = []
+        for k in np.nonzero(pick & (roll > 0.0))[0]:
+            x, y = float(xs[k]), float(ys[k])
+            if not P.free(x, y, radius):
+                continue
+            P.add(x, y, radius)
+            rows_.append([round(x * 100, 1), round(y * 100, 1), 0.0, round(float(P.rng.uniform(0, 360)), 1), 0.0, 0.0,
+                          round(float(P.rng.uniform(*sc_range)), 3), sink])
+        det[mesh] = rows_
+    # The lawn (owner: "just create real visual grass small and a lot so it blends in"): square-metre patches of short blades
+    # wherever the grass covers (overlapping, each turned and scaled its own way), thinner patches at the grass's edge, none on
+    # the footpath, in the places or where the litter takes over under the trees. Its own placer and seed.
+    PL = Placer(72)
+    xs, ys = PL.candidates(0.82)
+    G = surface(xs, ys, trunks)
+    F = G["F"]
+    g = G["g"]
+    ok = (g > 0.38) & (F["path"] > S.PATH_HALF + 0.45) & (G["earth"] < 0.35)
+    ok &= PL.rng.uniform(0, 1, xs.shape) > np.clip((G["lit"] - 0.3) / 0.4, 0, 1)
+    for name, p in S.PLACES.items():
+        if "clear" in p:
+            hl, hr = S.place_local(xs, ys, name)
+            l0, l1, r0, r1_ = p["clear"]
+            ok &= ~((hl > l0 - 0.5) & (hl < l1 + 0.5) & (hr > r0 - 0.5) & (hr < r1_ + 0.5))
+    lawn = {"SM_Grass_PatchA": [], "SM_Grass_PatchB": [], "SM_Grass_PatchEdge": []}
+    pick = PL.rng.uniform(0, 1, xs.shape)
+    for k in np.nonzero(ok)[0]:
+        mesh = "SM_Grass_PatchEdge" if g[k] < 0.7 else ("SM_Grass_PatchA" if pick[k] < 0.6 else "SM_Grass_PatchB")
+        lawn[mesh].append([round(float(xs[k]) * 100, 1), round(float(ys[k]) * 100, 1), 0.0, round(float(PL.rng.uniform(0, 360)), 1), 0.0, 0.0,
+                           round(float(PL.rng.uniform(0.85, 1.15)), 3), 0.0])
+    det.update(lawn)
+    out["details"] = det
+    print("SB_HOME details:", {k: len(v) for k, v in det.items()})
+
+
+def lay_details(out, trunks):
+    """The details' heights and tilts on the visible ground (each lies on its slope)."""
+    for mesh, rows in out.get("details", {}).items():
+        if not rows:
+            continue
+        a = np.array(rows, dtype=float)
+        x, y = a[:, 0] / 100.0, a[:, 1] / 100.0
+        e = 0.15
+        z = surface(x, y, trunks)["z"]
+        gx = (surface(x + e, y, trunks)["z"] - surface(x - e, y, trunks)["z"]) / (2 * e)
+        gy = (surface(x, y + e, trunks)["z"] - surface(x, y - e, trunks)["z"]) / (2 * e)
+        yaw = np.radians(a[:, 3])
+        sx = gx * np.cos(yaw) + gy * np.sin(yaw)
+        sy = -gx * np.sin(yaw) + gy * np.cos(yaw)
+        pitch, roll = np.degrees(np.arctan(sx)), -np.degrees(np.arctan(sy))
+        out["details"][mesh] = [[r[0], r[1], round(float(zz - r[7]) * 100.0, 1), r[3], round(float(p), 1), round(float(q), 1), r[6]]
+                                for r, zz, p, q in zip(rows, z, pitch, roll)]
+
+
+def rez_plants(out):
+    """D71: the plants stand on the new ground (its relief, the trees' mounds); the places keep clear of them."""
+    trees = [(m, r[0] / 100.0, r[1] / 100.0, r[3], r[6]) for m, rows in out["plants"].items() if ("Tree" in m or "Palm" in m)
+             for r in rows]
+    removed = {}
+    for mesh, rows in out["plants"].items():
+        a = np.array(rows, dtype=float)
+        x, y = a[:, 0] / 100.0, a[:, 1] / 100.0
+        G = surface(x, y, trees)
+        sink = next(v for k, v in GROUND_SINK.items() if mesh.startswith(k))
+        z = G["z"] - sink
+        keep = np.ones(len(rows), dtype=bool)
+        for name, p in S.PLACES.items():
+            if "clear" not in p:
+                continue
+            l0, l1, r0, r1_ = p["clear"]
+            hl, hr = S.place_local(x, y, name)
+            keep &= ~((hl > l0) & (hl < l1) & (hr > r0) & (hr < r1_))
+        removed[mesh] = int((~keep).sum())
+        out["plants"][mesh] = [[r[0], r[1], round(float(zz) * 100.0, 1)] + list(r[3:]) for r, zz, k in zip(rows, z, keep) if k]
+    for mesh, rows in out.get("details", {}).items():
+        keep = []
+        for r in rows:
+            inside = False
+            for name, p in S.PLACES.items():
+                if "clear" in p:
+                    hl, hr = S.place_local(r[0] / 100.0, r[1] / 100.0, name)
+                    l0, l1, r0, r1_ = p["clear"]
+                    inside = inside or (l0 < hl < l1 and r0 < hr < r1_)
+            if not inside:
+                keep.append(r)
+        out["details"][mesh] = keep
+    lay_details(out, trees)
+    print("SB_HOME rez plants: removed for the places", {k: v for k, v in removed.items() if v})
+
+
 def block_mask_cell(z, threshold, k):
     n = (z.shape[0] - 1) // k
     zmax = np.full((n, n), -1e9)
@@ -380,6 +712,16 @@ def scatter():
             sc = rng.uniform(0.8, 1.25) * (1.0 + min(-z / 14.0, 1.0) * 0.4)
             out["seagrass"][k].append([round(x * 100, 1), round(y * 100, 1), round(z * 100 - 3.0, 1),
                                        round(rng.uniform(0, 360), 1), round(rng.uniform(-6, 6), 1), round(rng.uniform(-6, 6), 1), round(sc, 3)])
+    # D71: three in ten broadleaf trees become the third kind (leaning, four limbs); every tree keeps its place.
+    c_rows = []
+    for mesh in ("SM_Tree_A", "SM_Tree_B"):
+        kept = []
+        for r in out["plants"][mesh]:
+            (c_rows if int(abs(r[0]) * 7.0 + abs(r[1]) * 13.0) % 10 < 3 else kept).append(r)
+        out["plants"][mesh] = kept
+    out["plants"]["SM_Tree_C"] = c_rows
+    details(out)
+    rez_plants(out)
     os.makedirs(os.path.dirname(SCATTER_JSON), exist_ok=True)
     with open(SCATTER_JSON, "w", encoding="utf-8") as fh:
         json.dump(out, fh, separators=(",", ":"))
@@ -390,9 +732,11 @@ def scatter():
 
 
 if __name__ == "__main__":
-    args = (sb.script_args() if sb else sys.argv[1:]) or ["sand", "turf", "col", "scatter"]
+    args = (sb.script_args() if sb else sys.argv[1:]) or ["scatter", "ground", "col"]
     if "scatter" in args:
         scatter()
+    if sb and "ground" in args:
+        ground()
     if sb and ("sand" in args or "turf" in args):
         X, Y, F = fine_fields()
         if "sand" in args:

@@ -110,10 +110,8 @@ I = "/Game/Saltbound/Environment/Islands/"
 home_col = mesh("Home_Collision", I + "SM_Home_Col", (0, 0, 0))
 home_col.static_mesh_component.set_editor_property("visible", False)
 home_col.set_actor_hidden_in_game(True)
-sand = mesh("Home_Sand", I + "SM_Home_Sand", (0, 0, 0))
-sand.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
-turf = mesh("Home_Turf", I + "SM_Home_Turf", (0, 0, 0))
-turf.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+# The visible ground (D71: SM_Home_Ground, sand to forest in one mesh), the island's rocks, plants, sea grass, the small
+# things on the ground, the places to explore and the Harbour Keeper's hut are place_home_island.py's (called below).
 # Steep wave faces reflect rays downward; hardware-traced Lumen reflections would show the sand as beige
 # streaks on the open sea. The seabed is only seen through the water, never in reflections (the island's land is: it
 # stands above the water and shows in the sea's reflections).
@@ -160,10 +158,6 @@ rocks = [
 ]
 for label, m, loc, yaw, s in rocks:
     mesh(label, R + m, loc, (0, yaw, 0), s)
-# The island's rocks (D60): the hilltop's crown, both headlands at the channel, the surf on the west coast, coral heads in
-# the lagoon (build_home_island.py).
-for k, (m, x, y, z, yaw, s) in enumerate(HOME["rocks"]):
-    mesh("Island_Rock_%02d" % k, R + m, (x, y, z), (0, yaw, 0), s)
 
 # No small scatter rocks around the big ones (owner: "we dont need those", D30).
 import random  # noqa: E402
@@ -273,31 +267,11 @@ gulls_sea.set_editor_property("area_radius", 9000.0)
 mesh("Crate_Dock", "/Game/Saltbound/Props/SM_Crate_Small", (1180, -60, 110), (0, 25, 0))
 mesh("Crate_Dock2", "/Game/Saltbound/Props/SM_Crate_Small", (1185, -62, 150.5), (0, 12, 0), 0.85)
 
-# --- the island's plants (D60) and the lagoon's sea grass (D28): instanced from build_home_island.py's placements ---
-VEG = "/Game/Saltbound/Environment/Vegetation/"
-# (cull start, cull end in cm (0 = never), casts shadows, collides): palms and trees seen from far out at sea, the trunks
-# collide; bushes and big leaves to 300 m, ferns and beach grass close by.
-KINDS = {"Palm": (0.0, 0.0, True, True), "Tree": (0.0, 0.0, True, True), "Bush": (25000.0, 30000.0, True, False),
-         "BigLeaf": (25000.0, 30000.0, True, False), "Fern": (12000.0, 15000.0, True, False),
-         "GrassTuft": (6000.0, 8000.0, False, False)}
-
-
-def instances(rows, sink=0.0):
-    return [unreal.Transform(unreal.Vector(x, y, z - sink), unreal.Rotator(roll=roll, pitch=pitch, yaw=yaw), unreal.Vector(sc, sc, sc))
-            for x, y, z, yaw, pitch, roll, sc in rows]
-
-
-for name, rows in sorted(HOME["plants"].items()):
-    kind = next(k for k in KINDS if k in name)
-    c0, c1, shadow, collide = KINDS[kind]
-    scatter = spawn(unreal.SaltInstanceScatter, (0, 0, 0), label="Plants_" + name[3:])
-    scatter.set_instances(unreal.load_asset(VEG + name), None, instances(rows), c0, c1, shadow, collide)
-    print("SB_PLANTS", name, len(rows))
-for kind, rows in HOME["seagrass"].items():
-    scatter = spawn(unreal.SaltInstanceScatter, (0, 0, 0), label="SeaGrass_" + kind)
-    scatter.set_instances(unreal.load_asset(UW + "SM_SeaGrass_" + kind),
-                          unreal.load_asset("/Game/Saltbound/Materials/Instances/MI_SeaGrass"), instances(rows), 5000.0, 7000.0, False)
-print("SB_SEAGRASS clumps=%s" % {k: len(v) for k, v in HOME["seagrass"].items()})
+# --- the home island (D60, D71): its ground, rocks, plants, sea grass, the small things on the ground, the places to explore
+# and the Harbour Keeper's hut (place_home_island.py; from build_home_island.py's and build_home_props.py's placements) ---
+import place_home_island  # noqa: E402
+importlib.reload(place_home_island)
+place_home_island.place(eas)
 
 spawn(unreal.PlayerStart, (380, -10, 110 + 92), (0, 0, 0), "PlayerStart")
 rig.set_editor_property("start_region", "ShoresOfPlenty")
