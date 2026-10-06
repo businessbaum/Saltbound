@@ -2062,6 +2062,98 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Open:** the Chandlery walk; the gates, placed and save parts of the hub suite not re-run; a packaged performance check with the
   inside streamed (the outside alone is lighter than D69's whole ship).
 
+### D71 · The home island's detail pass: real ground with a natural edge between grass and sand, detailed trees and plants, places to explore, the Harbour Keeper's hut (Adopted: waiting for the owner's look)
+- **Owner (2026-10-06):** "The colors are fine and the position of everything too BUT: 1. the trees have 0 detail 2. the floor is good
+  colored but lacks EVERYTHING ELSE. Only color, there is no real texture everything is perfectly flat, there is no good transition
+  between grass and sand. the unique touch of the island is non existent. nothing to explore. Keypoints are a lack of surface texture
+  and material realism, Microtexture, Surface roughness 3. Make a place for an NPC."
+- **Kept:** the island's shape, the palette (each new set calibrated to D60's mean albedo), the places of D60's plants and rocks (the
+  re-run scatter gives every one the same x / y; only their heights follow the new ground; 26 grass tufts and five small plants
+  gave way to the places), the collision (`SM_Home_Col` unchanged), the pier, the lagoon and the channel.
+- **The ground is one surface** (`SM_Home_Ground`, `build_home_island.py ground`) in place of D60's sand under a separate turf with a
+  rolled lip: sand, footpath earth, grass and forest litter in one Nanite mesh of 1.57 M quads (0.25 m cells on the land, the beaches
+  and the first 0.6 m of water; 0.5 m to 4.5 m deep; 2 m beyond).
+  - *Cover* (`island_shape.cover`): the turf's ragged line widened into a zone where the grass breaks into tufts, crossed by fingers
+    of sand blown in and tongues of grass running out; litter under the forest's clumps and each tree's crown (ragged, not on bare
+    sand); earth along the footpath inland, trodden round the Keeper's hut and round the spring.
+  - *Relief* within about +-10 cm of the broad shape where people walk (`relief`, `plant_relief`): the beach's ripples and swash
+    ridges (now resolved), a storm berm with its runnel, hummocks and tussocks in the grass, humps on the forest floor, two ruts along
+    the footpath, a mound at each palm, mounds and root ridges at each tree (continuing its buttress roots, `TREE_ROOTS`), the dig
+    spot's loose sand, the spring's level rim and bowl.
+- **Its material** (`M_SB_IslandGround`, `MI_HomeGround`, `setup_island_materials.py`): five sets projected from the top, each laid
+  over the last by height (the vertex weight sets where the edge runs, each set's height decides what shows along it, a 0.3-1 m
+  breakup bends it into clumps): sea floor (D29's painted sand) -> sand -> earth -> grass -> litter. The sets are new
+  (`gen_island_textures.py`, 2048 px, painted by stamping the things that lie there one by one, crisp; normal, roughness and AO from
+  their heights): sand (2 m: micro wind ripples in patches with dark heavy grains in their troughs, grains, shell bits, small cockles,
+  pebbles, coral crumbs); grass (1.6 m: clumps of blades combed one way, dark bases and light tips, straw, clover, rare flowers);
+  litter (2 m: heaped leaves in five colours with veins, curl and rot, twigs, roots, moss, pebbles, husks); earth (2 m: packed sandy
+  earth, stones pressed flush, loose pebbles, fine cracks, a few leaves). Sand wet and glossy within about 22 cm of the water (a wavy
+  line; roughness 0.3, its relief softened), damp and darker to 1.5 m (as D60), dry and matte above (0.9); grass 0.45-0.7, litter
+  0.55-0.9, the path 0.7. The sculpted ripples' crests are lit and their troughs shaded, curvature lights rises and darkens hollows,
+  a larger turned second sample hides the sand's and the grass's tiling, and the painted detail is averaged a little sooner beyond
+  6 m (a mip bias, so mid-distance grass does not shimmer).
+- **Plants** (`build_vegetation.py`), still geometry and Nanite with "preserve area", on the island's own masters (`M_SB_IslFoliage`,
+  `M_SB_IslBark`: D60's vertex-mask colours and wind plus detail textures through the UVs; D60's `M_SB_Foliage` is untouched):
+  - palms: trunks ringed every 20 cm (a scar and a swelling, matching the bark texture's rings and fibres), a bulb and a ball of 44
+    roots at the foot, the crown shaft wrapped in old leaf bases, bunches of nuts on stalks (green to brown), fronds of folded leaflets
+    alternating in a V (older fronds torn and gappy, their tips dried), a skirt of two to four dead fronds;
+  - broadleaf trees, three kinds now (59 of D60's 206 places became the leaning, four-limbed `SM_Tree_C`): buttress roots taller than
+    wide at the trunk, a trunk with knots tapering into limbs, branches and twigs, broken stubs with pale wood, chunky crowns of clumps
+    made of leaf groups on twigs (folded leaves with stalks and veins, tilted up and out), a dark core in each clump; furrowed bark
+    with plates, cross cracks, knot eyes and lichen;
+  - bushes on branching stems with twice D60's leaves, hibiscus with stamen columns, dracaena with ringed stems and drooping folded
+    straps, ferns with lobed pinnae and a fiddlehead, big leaves with veins (some torn), beach grass with folded blades and seed heads.
+- **The lawn** (owner, mid-pass: "the grass looks shit. just create real visual grass small and a lot so it blends in. The grass
+  design is important because you will copy it a lot"): a reusable kit of square-metre patches of short blades
+  (`SM_Grass_PatchA/B/Edge`, `build_vegetation.py lawn`: 200-220 clumps of 4-7 thin tapered blades, 7-16 cm, leaning and curving
+  over, a few straw blades and seed stalks; 2 400-4 900 triangles a patch), instanced 37 600 times wherever the grass covers
+  (thinner patches along its edge, none on the path, in the places or under the trees' litter), culled from 45-60 m. Their
+  material (`MI_IslGrass_Lawn`, `GroundMatch`) takes the ground's own grass colour, anti-tiling and macro variation where they
+  stand, so they melt into it; under them the painted grass is a shade darker and matte (`GrassUnder`, `GrassRough`).
+- **The edge between grass and sand:** besides the ground's blend, 917 beach creepers (morning glory, `SM_Runner_A/B`) run from the
+  grass out over the sand, D60's beach grass stays, and husks, frond pieces, twigs and pebbles lie thicker along the line.
+- **Small things on the ground** (`build_home_props.py`, instanced by `build_home_island.details`, each laid on its slope): about
+  4 800 shells (cockles, pink cockles, whelks) mostly along the wrack line, 590 seaweed clumps, 3 800 pebble groups on the outer
+  beaches and at the footpath's sides, 1 100 husks and 160 dead frond pieces under the palms, 1 600 twig groups under the trees, 70
+  driftwood sticks, 450 ghost crab burrows on the upper beach (in the ground's own material).
+- **Places to explore** (`island_shape.PLACES`, `build_home_props.py`, `Art/Generated/home_places.json`):
+  - *a wreck* on the windward south-west outer beach (-68, -108): a small boat's bones half swallowed by the sand (the keel, curved
+    ribs arching out, some snapped, planks with old cream paint across the low side), the snapped mast with a torn strip of sail and
+    rope, planks, a stove-in barrel, a crate;
+  - *tide pools* in a shelf of dark rock at the west coast's surf (50, -189): three pools of still water (`M_SB_IslPool`) with
+    starfish, urchins, anemones and shells;
+  - *the old lookout* on the west hill's crown (95, -144): a cairn, a post with a sighting board notched on the Spire, a faded red rag,
+    a log to sit on;
+  - *the spring* at the hill's foot (73, -167): water running out of a broken pipe of pale Old World composite (a faint turquoise
+    band round it, `MI_IslAncientFaint`, the island's one touch of the Old World) into a pool held by stones;
+  - *a fire pit* by the footpath (-34, -41): a stone ring, ash, charred logs with glowing embers (a small warm light), a tripod and pot,
+    two log seats;
+  - *a fallen palm* on the north-west outer beach (-58, 61): thrown over with its root plate, its crown out in the shallows by the surf
+    rock; the trunk collides (four hulls), so it can be walked out over the water;
+  - *the dig spot* (GameConcept 8.1, "spare canvas under the leaning palm, three paces seaward"): the leaning `SM_Palm_B` at
+    (-25.7, 4.8), a low mound of loose, darker sand at (-23.3, 4.9) and a driftwood stake beside it (for M6's digging).
+- **The Harbour Keeper's place** (`SM_Home_KeeperHut` on the pier's beach, its middle at (-23.5, 13.0) m, facing yaw -31, the pier):
+  a low hut on stilts of weathered boards, a thatched gable roof (rows of palm thatch with ragged fringes over a dark underlay, a bound
+  ridge), a stone chimney at the back with smoke rising, drifting downwind and fading (`SM_Home_Smoke`, `M_SB_IslSmoke`); a counter
+  1.15 m above the sand in the front wall under a propped shutter, shelves of stores behind it, a ledger and a call bell on it; a side
+  door ajar with a step; a net drying on two poles with cork floats and a second net heaped; glass floats, oars, two barrels, a fish
+  trap, a rope coil and a bench; two lanterns (on the counter and on a bracket). **The Keeper stands behind the counter at
+  (-22.51, 12.41, 0.84) m** (`Keeper_Spot`, a target point tagged `KeeperSpot`), facing yaw -31; the interaction point `Keeper_Point`
+  (`ASaltHubPoint`, space `home`, point `keeper`, "Talk to the Harbour Keeper", extent 45 x 95 x 60 cm) stands in front of the
+  counter at (-21.44, 11.76, 1.62) m. No NPC or dialogue (M6's helper NPC will stand on the spot).
+- **Tools:** `place_home_island.py` replaces only the island's actors in the open map (ground, rocks, plants, sea grass, details,
+  places, hut, lights, the Keeper's point and spot); `create_visual_test_map.py` calls it. `island_shots.py`: named views and a sheet.
+- **Tests (short runs, the hut's collision near the pier):** the boat suite's Pier, Ground and Moor parts 3/3 (stops at the pier, runs
+  aground, holds at the mooring), swim 5/5. Performance, a quick look in PIE in the editor (2038 x 1222 at 75 %): 98-102 fps, GPU
+  8.6-9.0 ms at the pier, on the west beach, in the forest and over the island from the hill; with the lawn 97-98 fps, GPU 8.9 ms
+  (over the lawn and from the pier). Everything new is Nanite except the
+  smoke (720 triangles, translucent), the burrows (764), the spring (5 100) and the fire pit (5 000).
+- **Evidence:** `Docs/Evidence/D71/D71_island_sheet.jpg` (D60 / D71 pairs, then the lawn and the places); the D60 views as a sheet in
+  `Docs/Evidence/D71/before/`.
+- **Open:** the Keeper's hut is dark inside by day (no interior light; for the NPC's pass); the broadleaf crowns still read dark
+  against a bright sky; the lawn stops at 45-60 m (beyond it the painted grass carries on); `SM_Home_Sand` and `SM_Home_Turf` stay as
+  assets but are no longer placed.
+
 ### D72 · M6 step 1: the day's clock, the moon and a sky with stars (Adopted: waiting for the owner's look)
 - **Why:** the concept (D67, D68) needs a running day: night is where the measured horror lives, the lanterns' warm pools are the
   harbour's welcome, and voyages are planned around daylight. The rig had three fixed presets (Day, Evening, Dusk) and no night.

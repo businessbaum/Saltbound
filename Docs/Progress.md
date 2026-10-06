@@ -240,6 +240,16 @@ for a higher screen percentage (for example 75 %) and more content.
   and ends at their eyes, the first time long, never skippable); casting off at a hub berth asks "Sail out?". Her inside is a level
   of its own (`L_HubInside`), streamed in near her. The command hall has a glass bridge on top, the ancient helm in it (locked).
   Try: `sb.Hub.Show 1`, sail at a door, or `sb.Hub.Passage arrive 0 1 long`; `sb.Dev.HubGoto dock|foredock|wellfoot`.
+- **D71 (the home island's detail pass, waiting for the owner's look):** the colours and every place kept; the ground is one
+  surface (`SM_Home_Ground`) with painted sand, grass, litter and footpath sets blended by height, relief where it reads (berm,
+  tussocks, ruts, root ridges), wet glossy sand at the water, an edge where the grass breaks into tufts and creepers over the sand,
+  and a lawn of real blades (37 600 instanced square-metre patches that take the ground's colour);
+  palms and trees rebuilt with ringed and furrowed bark, roots, branches, folded veined leaves (a third tree kind); shells, seaweed,
+  pebbles, husks, fronds, twigs and crab burrows on the ground; places to find (a wreck, tide pools, a lookout cairn aimed at the Spire,
+  a spring from an Old World pipe, a fire pit, a walkable fallen palm, the dig spot under the leaning palm); the Harbour Keeper's hut on
+  the pier's beach with its counter, smoking chimney, nets and lanterns, the Keeper's spot and `Keeper_Point` ("Talk to the Harbour
+  Keeper"). Scripts: `place_home_island.py` (the island's actors), `setup_island_materials.py`, `build_home_props.py`,
+  `gen_island_textures.py`; views: `Tools/island_shots.py`.
 - **D74 (M6 step 3, waiting for the owner's look):** the ship repair system: hard knocks spring planks (holes on the bulwark's inner
   face, the sea spurting in), the water aboard weighs her down and shows over the deck, at 4 t she founders (towed home for now);
   patch with driftwood and nails (hold E), bail with the bucket by the starboard gap (hold E), a sail torn by too much wind mended
