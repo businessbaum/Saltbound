@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; M6 step 1, the day's clock D72).
+Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; the hub's harbour D70; M6 step 1, the day's clock D72).
 
 ## Milestone status
 
@@ -234,6 +234,12 @@ for a higher screen percentage (for example 75 %) and more content.
   every rope end attached, 36 hanging ropes as real cables in the wind. The hull's sides: gunports, lids, round portholes, skids,
   rosettes, entry ports, scuppers. Wood, paint and metal got relief (plane marks, grain grooves, brush ridges, cracks, dents).
   `sb.Dev.HubGoto quarterdeck|poop`; `Tools/hub_pie_shot.py` for captures in play.
+- **D70 (the hub's harbour, waiting for the owner's look):** a canal the whole length of the dock deck with two basins and four
+  hidden doors (two each side), quays, galleries, lifting bridges and footbridges, two docking stations; the Keelgate out of the hub
+  for now; the Slip a shop on the quay. Sailing in and out are cinematics (`ASaltHubPassage`: the camera starts at the player's view
+  and ends at their eyes, the first time long, never skippable); casting off at a hub berth asks "Sail out?". Her inside is a level
+  of its own (`L_HubInside`), streamed in near her. The command hall has a glass bridge on top, the ancient helm in it (locked).
+  Try: `sb.Hub.Show 1`, sail at a door, or `sb.Hub.Passage arrive 0 1 long`; `sb.Dev.HubGoto dock|foredock|wellfoot`.
 - **D72 (M6 step 1, waiting for the owner's look):** a running day and night (40 minutes, the night faster): the sun moves through
   Morning, Day, Evening, Dusk and Twilight into the Night, a moon lights the night sky, the sea and the clouds, stars come out
   (a sky dome that draws the atmosphere itself), lanterns light at dusk and go out in the morning (a lantern you doused stays out until

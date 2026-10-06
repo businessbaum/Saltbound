@@ -1997,6 +1997,71 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Tools:** `Tools/hub_shot.py` (editor captures) and `Tools/hub_pie_shot.py` (in play: the doors shut, the renderer's frames)
   take poses in the ship's frame; `sb.Dev.HubGoto quarterdeck|poop`.
 
+### D70 · The hub's harbour: a water street the whole length, four doors, docking stations, the passages in and out as cinematics, her inside streamed apart, the control room on the command hall (Adopted: waiting for the owner's look)
+- **Owner (2026-10-06):** "The doors automatically open when the player ship comes near, if the ship tries to enter, the animation
+  takes over. The animation shows how the ship is sailing into the Hub and docking on the docking station. Behind the ship the Doors
+  are closing. We use this animation to load a new level with the inner hub. When the player wants to leave, he will be asked again
+  when cast off, if confirmed the same animation mechanic comes. The Doors are opening and the ship is sailing out. Both animations
+  with a cool smooth and epic camera pan. The animation start needs to perfectly align with the last camera angle of the player,
+  same when the animation ends"; "The whole bottom area of the ship will be a small harbor, with 4 doors in total 2 on each side.
+  The water street will go through the whole length of the ship"; "still no control room for controlling the ship (the player will
+  unlock it later, the whole ship is not powered by wind (as it seems) its driven by old ancient technology) ... control room needs
+  panorama view".
+- **Answers before building:** the control room is the glass hall on the poop, made two storeys ("you can use the glass hall if you
+  upgrade it and make two levels"); the Keelgate leaves the hub for now ("remove the ancient midship from the hub for now"); she
+  leaves by the door she came in (the nearest); "always play an animation, but the first one is longer. no animation is
+  skippable".
+- **The harbour (hub.dock):** a canal down the middle of the dock deck from x 12 to 148, 10 m wide (6 m under the Well, where its
+  galleries span it), and two basins across the ship (x 30..42 and 102..114) with a pair of hidden doors in each side (x 32..40 and
+  104..112; the fore pair where the hull's side is straight, so the same seams bound its leaves). Quays along the canal to |y| 10 and
+  across the basins' ends: timber faces on piles with fenders, kerbs and mooring rings along every edge of the water
+  (`hub_plan.water_edges`), bollards, rung ladders, pillars under the galleries' edges. The decks above stand back to |y| 6.5 (a
+  moored boat's yard clears them); over the canal and the basins the ship is open up to the gun deck (13.2 m over the water),
+  galleries along both sides on three decks. The quays cross the basins on lifting bridges (two 6 m leaves hinged at the basin's
+  edges, raised 80 degrees for a boat: `ASaltHubBridge`); footbridges cross the canal under the Well and forward of the fore station.
+- **Docking stations (hub.docking):** forward of each basin on the canal's starboard quay, bow forward: the aft one (x 44..54) is the
+  Slip's fitting berth (mooring `HubFitting`, the berth board at its bow), the fore one x 117..127 (`HubDockFore`); a lantern post at
+  each gangway. The fleet's berths: a 10 m across the canal from the aft station (`HubFleet1`), the 14 m cutter at the Slip's quay
+  (moored there, the Slip's boat for sale).
+- **The Slip** is the shipwright's shop on the starboard quay (no slipway, no hall): its open front onto the quay under the SHIPWRIGHT
+  board, the dock stair up along its aft wall to the Tally House, the shipwright's work on the quay in front. **The Keelgate** is out
+  of the hub: its chamber is the Well's foot, quays round the narrow canal (the hoist's counterweight on the quay beside the cage); L5
+  is the warehouses along the quays; L17 has no way down yet.
+- **The passages (`ASaltHubPassage`, one per world):** the doors open as the player's boat comes near (once her inside is there); when
+  the boat carrying the player heads into the open doorway the arrival takes over: she lines up, glides through under her way (the
+  sail taken in), turns in the basin (the lifting bridge on her side up) and comes alongside the docking station; the doors shut
+  behind her once she is clear of their swing; moored, the game saves. Casting off at a hub berth (the windlass) asks "Sail out?";
+  yes: astern off the berth, round in the basin, out by the doors she came in by (starboard after a load), the sail falls in the
+  doorway, the doors shut behind her; at sea under way and under sail she is the player's again. The boat is scripted meanwhile
+  (`ASaltBoat::SetScripted`: her simulation rests, her looks, ropes, wake and lantern go on). The camera flies through keyed shots
+  timed to her path (off the doorway, through it, in the turn, alongside): it starts exactly at the player's view (the camera's
+  last frame) and ends exactly at the player's eyes (asked live each frame; the eyes are pointed along the canal or out to sea before
+  the last stretch), then hands back with a 0.2 s blend. Long (first time, `HubArrivalSeen` / `HubDepartureSeen` in the save's hub
+  set): high and wide off her quarter showing the hull and the open doorway, behind her through it, high in the basin, over the canal
+  as she comes alongside; about 25 s. Short: behind her through the doorway, high in the basin; about 15 s. Input and the HUD are off;
+  nothing skips it. `sb.Hub.Passage arrive <station> <side> [long|short] | depart | info`; `Tools/hub_passage_shot.py` records one.
+- **Two levels:** her outside (`L_Hub`: hull, castles, rig and ropes, the doors, the shell's collision) and her inside (`L_HubInside`:
+  every floor and room, the harbour and bridges, gates, E points, hoist, ladders, moorings, test data, the lanterns below decks and
+  their flicker, exposure and the interiors' fog). `ASaltHubShip` streams the inside at her berth: loaded within 300 m of her hull,
+  shown within 140 m (before her doors open), unloaded beyond 450 m; kept while the player or a boat is in her, a passage runs, or a
+  loaded game, a test or a goto requires it (until the player has come near and left again). The harbour's water is sheltered only
+  while her inside is shown (`ASaltOcean::Shelters`: three boxes, the canal and the two basins). The calm zone over her harbour
+  reaches 75 m round her middle (7 %). The review map `L_HubReview` keeps both in one level.
+- **The control room (hub.command.bridge):** the command hall on the poop has a second storey, the bridge, set in 1.2 m (a railed walk
+  on the hall's copper roof round it), 3.4 m high, clear glass all round from a low sill between slim iron mullions (`MI_Hub_GlassClear`:
+  translucent, forward-shaded) for the panorama, the copper roof and its lantern on it. In its middle the ancient helm: a pedestal of
+  pale seamless stone with turquoise lines on its top and a curved desk before it facing the bow, dark until the player wakes it;
+  locked behind the hall's barred doors. The quarterdeck's great wheel stays lashed.
+- **Tests (short runs, each part alone):** passage 3/3 (the aft doors from starboard, short: in 14.8 s, moored at HubFitting; out
+  14.9 s, 14 m off the hull at 3.8 m/s under sail; the fore doors from port, long: 28.4 s, moored at HubDockFore; view and hands back
+  each time); boatdock 6/6 (through the doors under sail without contact, moored at the fitting and the fleet berth, both kept over a
+  save and load); routes: the Slip 2.6 s, the Tally House 7.4 s, the Chandlery 68 s (over the 40 s target, as in D69: the open
+  question of a shortcut or the hoist, which now stands on the way at the Well's foot); headroom 26 785 samples, least 2.70 m.
+  Evidence: `Docs/Evidence/D70/D70_harbour_sheet.jpg` (in play; the passage frames are from the run before the last timing change:
+  the long departure is now about 25 s and the high basin shot sits inside the raised bridge's leaves).
+- **Open:** the Chandlery walk; the gates, placed and save parts of the hub suite not re-run; a packaged performance check with the
+  inside streamed (the outside alone is lighter than D69's whole ship).
+
 ### D72 · M6 step 1: the day's clock, the moon and a sky with stars (Adopted: waiting for the owner's look)
 - **Why:** the concept (D67, D68) needs a running day: night is where the measured horror lives, the lanterns' warm pools are the
   harbour's welcome, and voyages are planned around daylight. The rig had three fixed presets (Day, Evening, Dusk) and no night.
