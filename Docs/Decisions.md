@@ -1870,3 +1870,28 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   satchel on M, and the drawn E beside the painted one (they match).
 - **Not done yet:** hold-to-toggle, text size, subtitles and the seasickness comfort settings; the save picture is the full
   screen as a PNG (about 3 MB); the title shows the world at the time of day it was saved, not always at dusk.
+
+### D67 · The game concept: what the player does, how they progress, why they keep playing (Provisional: the owner's four answers adopted, the rest waits for the owner)
+- **Owner (2026-10-06):** develop a concept for what the game is about and what the player can do: a good story, but above all an
+  exciting experience that does not get boring; combat, story and progress systems may be part of it; inspiration from other games
+  is allowed. Mid-task: everything in English from now on (docs, ideas, notes and the conversation).
+- **The owner's answers before writing:** combat **light and tool-based** (the sea and its creatures are the danger; no human
+  enemies); **a hand-made open sea with a story** that opens step by step through the boat and has an ending; pressure from **the
+  boat and the sea only** (no hunger or thirst: hull damage, weather, night, cargo lost in a wreck and salvageable); **about 10-15
+  hours**.
+- **The concept** (`Docs/Design/GameConcept.md`, a proposal):
+  - Story: a castaway in a sea ringed by the Gale follows the vanished Cartographer's log (their old boat is the starter boat) to six
+    Tidestones at the Tidewrights' sites; the shard from Ruin Isle is the seventh. The Keelgate opens to the Deep and the
+    Hollowkeel's heart; an ending choice (sail out through the Gale or stay). Three acts: the Inner Waters, the Outer Isles, the
+    Storm Waters and the Deep.
+  - Progress through boats (the double-ender, the cutter of D51, ancient fittings), tools, knowledge (the log, about 30 ancient
+    words), the chart (only charted water shows), the Hollowkeel's 18 zones waking with the people the player rescues, and salt.
+    No levels or experience points.
+  - Danger by one grammar (a tell, an answer, a cost, a reward): squalls, reefs, night, reef sharks, fog, rams, the Grey (the one
+    night horror, never fought), guardians, the storm. Answered with the bell, the lantern, the boat hook, flares, a bow harpoon,
+    the ancient lens. Failure is a faint or a wreck (towed home, the stores salvageable), never permanent.
+  - Hooks: the Hollowkeel in the haze after the first landfall (within 40 minutes), always three open questions in view, the
+    tension and warm-harbour rhythm, something new every hour, every voyage ending at a mooring.
+- **The README's scope changes:** light combat, an economy, diving to wrecks and ruins and the boat's damage are now planned;
+  multiplayer, human enemies, survival meters, a procedural world and freeform shipbuilding stay out.
+- **Next:** the owner's answers to the concept's questions (its section 12), then M6, the first playable hour (its section 10.2).

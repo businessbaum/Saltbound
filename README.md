@@ -10,8 +10,13 @@ Hobby project · Unreal Engine 5 + Blender · Windows PC · single-player · no 
 
 Initial scope (Milestones 1–5): project foundation, first-person player, visual test scene, starting boat
 with navigable water, starting harbor with a complete short gameplay loop (depart → sail → return → moor →
-save/load). Larger systems (multiplayer, combat, survival, procedural world, economy, underwater
-exploration, freeform shipbuilding) are out of scope for now. See [Docs/Ideas.md](Docs/Ideas.md).
+save/load).
+
+The game beyond M5 is planned in the game concept ([Docs/Design/GameConcept.md](Docs/Design/GameConcept.md), D67,
+a proposal waiting for the owner's answers): a hand-made sea that opens through the boat, a story with an ending
+(about 10-15 hours), light tool-based danger from the sea and its creatures, boat damage, salt as the economy and
+diving to wrecks and ruins. Multiplayer, human enemies, survival meters, a procedural world and freeform
+shipbuilding stay out of scope. Future ideas: [Docs/Ideas.md](Docs/Ideas.md).
 
 Status and next steps: [Docs/Progress.md](Docs/Progress.md).
 
@@ -74,6 +79,7 @@ Controls are listed in [Docs/Progress.md](Docs/Progress.md#controls); settings (
 - [Docs/Decisions.md](Docs/Decisions.md) – significant technical and visual decisions with rationale
 - [Docs/Progress.md](Docs/Progress.md) – milestone status, verification results, known issues, next steps
 - [Docs/Stats.md](Docs/Stats.md) – every object's numbers (boats, the player, items, tools) and where to change them
+- [Docs/Design/GameConcept.md](Docs/Design/GameConcept.md) – the game concept: story, what the player does, danger, progression, hooks (D67)
 - [Docs/Ideas.md](Docs/Ideas.md) – future ideas with benefits and prerequisites
 - [Docs/ArtDirection.md](Docs/ArtDirection.md) – visual principles, palette, lighting presets, boat proportions
 - [Docs/ThirdParty.md](Docs/ThirdParty.md) – external content, sources and licenses
