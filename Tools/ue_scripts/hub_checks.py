@@ -3,9 +3,8 @@
   headroom()         editor world: on every open floor (0.5 m grid) the clear height up to the next solid; logs SB_HEADROOM
   walk(route)        PIE: steers the player along a route (simulated input, the control yaw towards each waypoint), logs
                      SB_WALK lines (time, length, stuck) and SB_WALK DONE
-  boat(run)          PIE: the boat sails into the dock under the arch, turns on the spot in the basin, sails out (a simple
-                     autopilot on the rudder; the sail set or not); logs SB_HUBBOAT lines and SB_HUBBOAT DONE
-  water(seconds)     PIE: the sea's height (the CPU's long waves) under the hull and in the basin; logs SB_HUBWATER
+  water(seconds)     PIE: the sea's height (the CPU's long waves) under the hull and in the harbour; logs SB_HUBWATER
+  (D70: the D61 stern dock's boat run is gone; the boat's runs through the side doors are sb.Dev.RunHubTests boatdock)
 Every place comes from HubShip_Data.json (hub_layout.py); the routes' corners are chosen in the open floor between props.
 """
 import math
@@ -79,31 +78,31 @@ def _to_chandlery(m):
 
 
 def routes():
-    """The walks from the fitting berth's board to each service (D64): along the forward quay into the shop; up the dock stair
-    to the Tally House; through the lane and down the Well's first flight to the Keelgate; round the Well's galleries and up its
-    four flights to the main deck and the Chandlery. Corners in the open floor, clear of the props and the stairs' rails."""
+    """The walks from the fitting berth's board (D70: on the starboard quay at the aft docking station) to each service: in at
+    the Slip's open front to its counter; up the dock stair along the shop's aft wall to the Tally House's pay hatch; along the
+    covered quay (between the pillars and the shipwright's work) to the Well's foot, up its five flights to the main deck and
+    forward to the Chandlery. Corners in the open floor, clear of the props and the stairs' rails."""
     q, lw, md, up, gn, m = Z["quay"], Z["lower"], Z["middle"], Z["upper"], Z["gun"], Z["main"]
     berth = _e("slip", "fitting_berth") + (q,)
     st = H.R(H.HUB["stair"])
-    sy = 0.5 * (st[2] + st[3])
-    lane = H.R(H.HUB["lane"])
+    sx = 0.5 * (st[0] + st[1])
     sh = H.R(H.HUB["shaft"])
-    tally = H.R(H.HUB["tally"])
-    door_y = 0.5 * (max(tally[2], lane[2]) + min(tally[3], lane[3]))   # the Tally House's door to the lane: the middle of their wall
-    slip = [berth, (st[0] - 1.2, st[2] - 2.2, q), (st[0] + 2.2, st[2] - 2.2, q), _e("slip", "counter") + (q,)]
-    to_tally = [berth, (st[0] - 1.4, sy, q), (st[0] - 0.6, sy, q), (st[1] + 0.6, sy, lw), (st[1] + 1.2, st[2] - 0.8, lw)]
-    to_pay = to_tally + [_e("tally", "pay_hatch") + (lw,)]
-    to_well = to_tally + [(lane[0] - 3.0, st[2] - 1.3, lw), (lane[0] - 1.0, door_y, lw), (lane[0] + 1.0, door_y, lw),
-                          (lane[1] + 0.8, sh[3] + 1.0, lw)]
-    down = _flight("quay", "lower", down=True)
-    keel = to_well + [(down[0][0], sh[3] + 1.0, lw)] + down + [(down[1][0] + 0.5, sh[3] + 1.0, q), (sh[0] - 1.0, sh[3] + 1.0, q),
-                                                               (sh[0] - 2.0, 0.0, q), _e("keelgate", "talk") + (q,)]
+    pb = H.prop("tally", "pay_booth")
+    slip = [berth, (st[1] + 0.9, st[2] - 1.2, q), (st[1] + 0.9, st[2] + 1.0, q), _e("slip", "counter") + (q,)]
+    to_pay = [berth, (sx, st[2] - 1.2, q), (sx, st[2] - 0.6, q), (sx, st[3] + 0.7, lw), (st[1] + 1.0, st[3] + 1.1, lw),
+              (pb["x0"] - 0.6, pb["y0"] - 1.1, lw), _e("tally", "pay_hatch") + (lw,)]
+    pil = H.prop("harbour", "pillars")
+    qw = H.prop("slip", "quay_work")
+    walk_y = 0.5 * (pil["at"][0][1] + pil["size"] * 0.5 + qw["y0"])               # the covered quay's free strip
+    f_ql = _flight("quay", "lower")
+    foot = f_ql[0]
+    quay = [berth, (st[1] + 2.5, walk_y, q), (sh[0] - 7.0, walk_y, q), (foot[0] + 1.2, walk_y - 0.2, q), (foot[0] + 1.2, foot[1], q)] + f_ql
     f_lm, f_mu, f_ug, f_gm = _flight("lower", "middle"), _flight("middle", "upper"), _flight("upper", "gun"), _flight("gun", "main")
-    chand = to_well + [(f_lm[0][0] - 2.5, sh[3] + 1.0, lw), (f_lm[0][0], f_lm[0][1] + 3.0, lw)] + f_lm + \
+    chand = quay + [(f_ql[1][0] - 0.8, sh[3] + 1.0, lw), (f_lm[0][0] - 2.5, sh[3] + 1.0, lw), (f_lm[0][0], f_lm[0][1] + 3.0, lw)] + f_lm + \
         [(f_mu[0][0] + 3.0, f_mu[0][1] + 1.5, md)] + f_mu + [(f_ug[0][0] + 1.0, f_mu[1][1] + 2.5, up)] + f_ug + \
         [(f_gm[0][0] - 3.0, f_gm[0][1] - 1.5, gn)] + f_gm + \
         [(f_gm[1][0] + 5.4, sh[3] - 2.0, m)] + _to_chandlery(m)
-    return {"slip": slip, "tally": to_pay, "keelgate": keel, "chandlery": chand}
+    return {"slip": slip, "tally": to_pay, "chandlery": chand}
 
 
 def _safe(state, fn):
@@ -233,82 +232,6 @@ def headroom(step=0.5):
     _log("HEADROOM DONE samples=%d under_2.2m=%d" % (n, len(low)))
 
 
-# --- the boat -------------------------------------------------------------------------------------------------------------
-BOAT = {}
-
-
-def _boat():
-    return unreal.GameplayStatics.get_all_actors_of_class(_game(), unreal.SaltBoat)[0]
-
-
-def boat(run="in"):
-    """in: from 40 m astern, heading in under the arch, sail set; cut at the dock's middle, steered along the centreline.
-    turn: at the basin's middle, at rest, the oar hard over (sculling) for 40 s.  out: from the basin's middle heading out."""
-    b = H.HUB["basin"]
-    mid_x = 0.5 * (b["x0"] + b["x1"])
-    if run == "in":
-        x, head, speed = -40.0, 0.0, 2.5
-    elif run == "turn":
-        x, head, speed = mid_x, 0.0, 0.0
-    else:
-        x, head, speed = mid_x, 180.0, 0.5
-    wx, wy, _ = H.ship_to_world(x, 0.0, 0.0)
-    _cmd("sb.Wind 200 7")
-    _cmd("sb.Boat.Place %.0f %.0f %.1f %.1f" % (wx, wy, yaw_world(head), speed))
-    _cmd("sb.Boat.Control 0 %d" % (0 if run == "turn" else 1))
-    BOAT.clear()
-    BOAT.update(run=run, t=0.0, head=head, last=-1.0, max_off=0.0, min_gap=99.0, contacts=0, yaw0=None, turned=0.0, prev_yaw=None,
-                sail=run != "turn", cut_x=mid_x - 4.0)
-    BOAT["handle"] = unreal.register_slate_post_tick_callback(_safe(BOAT, _boat_tick))
-    _log("HUBBOAT START %s" % run)
-
-
-def _boat_tick(dt):
-    s = BOAT
-    s["t"] += dt
-    bt = _boat()
-    loc = bt.get_actor_location()
-    x, y, z = to_ship(loc)
-    yaw = bt.get_actor_rotation().yaw - H.berth_world()[1]
-    yaw = (yaw + 180.0) % 360.0 - 180.0
-    info_contacts = 0
-    half = H.HUB["basin"]["y1"]
-    beam = 1.7                                                         # the first boat's half-beam at the sheer (D36)
-    inside = H.HUB["basin"]["x0"] - 2.0 < x < H.HUB["basin"]["x1"]
-    if inside:
-        s["min_gap"] = min(s["min_gap"], half - abs(y) - beam)
-    if s["run"] == "turn":
-        _cmd("sb.Boat.Control 1 0")
-        if s["prev_yaw"] is not None:
-            s["turned"] += ((yaw - s["prev_yaw"] + 180.0) % 360.0) - 180.0
-        s["prev_yaw"] = yaw
-        s["max_off"] = max(s["max_off"], math.hypot(x - 22.0, y))
-        if abs(s["turned"]) >= 180.0 and "t180" not in s:
-            s["t180"] = s["t"]
-        done = s["t"] > 40.0 or abs(s["turned"]) >= 360.0
-    else:
-        # Steer along the centreline: heading error and the offset from it, the oar's sign + = to starboard.
-        want = s["head"] + (-12.0 * y if s["head"] == 0.0 else 12.0 * y)
-        err = ((want - yaw + 180.0) % 360.0) - 180.0
-        rudder = max(-1.0, min(1.0, err / 25.0))
-        sail = 1 if s["sail"] else 0
-        if s["run"] == "in" and x > s["cut_x"]:
-            s["sail"] = False
-            sail = 0
-        _cmd("sb.Boat.Control %.2f %d" % (rudder, sail))
-        s["max_off"] = max(s["max_off"], abs(y)) if inside else s["max_off"]
-        done = s["t"] > 45.0 or (s["run"] == "out" and x < -30.0)
-    if s["t"] - s["last"] >= 1.0:
-        s["last"] = s["t"]
-        _cmd("sb.Boat.Info")
-        _log("HUBBOAT %s t=%.1f ship=(%.1f, %.1f) heading=%.1f" % (s["run"], s["t"], x, y, yaw))
-    if done:
-        _cmd("sb.Boat.Control off")
-        unreal.unregister_slate_post_tick_callback(s["handle"])
-        _log("HUBBOAT DONE %s t=%.1f end=(%.1f, %.1f) heading=%.1f max_offset=%.2fm min_gap_to_quay=%.2fm turned=%.0fdeg t180=%s" % (
-            s["run"], s["t"], x, y, yaw, s["max_off"], s["min_gap"], s["turned"], ("%.1f" % s["t180"]) if "t180" in s else "-"))
-
-
 # --- the sea --------------------------------------------------------------------------------------------------------------
 WATER = {}
 
@@ -318,10 +241,12 @@ def water(seconds=60.0):
     for x in range(12, 152, 14):
         for fy in (-0.6, 0.0, 0.6):
             pts.append(("hull", x, fy * H.half_width(x, 0.0)))
-    b = H.HUB["basin"]
-    for x in (4.0, 12.0, 20.0, 28.0, 36.0):
-        for y in (-6.0, 0.0, 6.0):
-            pts.append(("basin", x, y))
+    for x0, x1, _, _ in H.basins():                                    # D70: the harbour's basins and canal
+        for x in (x0 + 1.5, 0.5 * (x0 + x1), x1 - 1.5):
+            for y in (-12.0, 0.0, 12.0):
+                pts.append(("basin", x, y))
+    for x in range(16, 148, 12):
+        pts.append(("basin", float(x), 0.0))
     WATER.clear()
     WATER.update(t=0.0, seconds=seconds, pts=pts, max={"hull": -99.0, "basin": -99.0}, at={})
     WATER["handle"] = unreal.register_slate_post_tick_callback(_safe(WATER, _water_tick))

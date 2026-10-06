@@ -1,6 +1,6 @@
 """The hub ship's designed spaces, inside (D62, D64): what the owner sees in the open spaces besides their floors, walls and
-ceilings (those are every floor's own, build_hub_rooms.py, built with the kit below): the Water Hall's quays and slipway, the
-Slip, the dock stair and the Tally House, the Well's flights and hoist, the Keelgate, the main deck, the Chandlery, the gates.
+ceilings (those are every floor's own, build_hub_rooms.py, built with the kit below): the harbour's quays and bridges (D70), the
+Slip, the dock stair and the Tally House, the Well's flights and hoist, the main deck, the Chandlery, the gates.
 Hand-made like the boat (owner: "you need to Look at Everything, every Wall every Corner floor"; D64: "Look in the details and
 check if what you build makes sense").
 
@@ -14,21 +14,21 @@ top plate; the decks overhead on heavy beams (2.4 m clear under them, D64: lante
 turned balusters on the rails; the quays' timber faces on piles; warm teak and dark tarred timber, iron fittings, rope.
 
 Meshes (/Game/Saltbound/Hub/Art, ship pivot; Nanite; no collision of their own):
-  SM_Hub_Dock       the Water Hall: the water's bed, the quays' faces, piles, fenders, kerbs, rings, the slipway, the hull's inside
-                    over the water with the hidden doors' jambs, pintles and lintel, the galleries' pillars, bollards, rung ladders,
-                    the berth board, the crane's runway, lanterns
-  SM_Hub_Slip       the Slip's things: counter, plans easel, half-models, workbench, timber racks, the cutter on her cradles, her
-                    mast on trestles, the mizzen's foot, lanterns, the sign
+  SM_Hub_Dock       the harbour (D70): the water's bed, the quays' faces, piles, fenders, kerbs, rings along the canal and the
+                    basins, the hull's inside over the basins round the hidden doors, the lifting bridges' hinge frames, the
+                    footbridges, the galleries' pillars, bollards, rung ladders, the docking stations' boards and lanterns, lanterns
+  SM_Hub_BridgeLeaf one leaf of a lifting bridge (pivot at its hinge; its own collision: it moves)
+  SM_Hub_Slip       the Slip's things: counter, plans, half-models, workbench, timber racks, the work on the quay, the cutter
+                    moored at her berth, lanterns, the sign
   SM_Hub_Tally      the dock stair, the Tally House's job board, pay booth, weighing bench, table, lanterns
   SM_Hub_Well       the Well's flights, the gantry and the hoist's guides, the counterweight's bay, lanterns, the ring lantern
   SM_Hub_HoistCage, SM_Hub_HoistWeight   the hoist's moving parts (their own pivots)
-  SM_Hub_Keelgate   the Keelgate's ring, disc and lines, its apron, the reader's desk, shelves, rubbings, lanterns
   SM_Hub_MainDeck   the bulwarks' inner side, the Well's coaming and rails, the companion's hood, fife rails, hatches, boats,
                     capstan, chimney, lanterns
   SM_Hub_Chandlery  the shop in the forecastle's front (D69): its front's shop windows, sign, awning, door and goods outside;
                     the counter, shelves, ladder, beams with stock, the display table and the spyglass inside
   SM_Hub_Gates      every gate
-Run: Tools/Build-BlenderAsset.ps1 build_hub_inside [dock slip tally well hoist keelgate main chandlery gates]
+Run: Tools/Build-BlenderAsset.ps1 build_hub_inside [dock bridge slip tally well hoist main chandlery gates]
 """
 import json
 import math
@@ -298,135 +298,98 @@ def deck_lantern(p, x, y, z_above, r=0.17):
     lantern(p, Vector((x, y, top - LANTERN_H(0.7))), chain_to=(x, y, top), r=r, s=0.7)
 
 
-# --- the Water Hall --------------------------------------------------------------------------------------------------------
-def build_dock():
-    """The Water Hall (D64, spaces.dock): the water's bed, the quays' timber faces on piles with fenders, kerbs and rings, the
-    slipway's ways and sleepers, the hull's inside over the water with the hidden doors' jambs and lintel, bollards, rung
-    ladders, the berth board, the crane's runway beam with its trolley, lanterns. (The quays' decking, the galleries and the
-    walls are the floors' (build_hub_rooms); the door leaves and their capstans the outside's (build_hub_doors).)"""
-    p = T.Part("SM_Hub_Dock")
-    dk = HUB["dock"]
-    wx0, wx1 = dk["water"]["x0"], dk["water"]["x1"]
-    fl, zq = dk["floor"], Z["quay"]
-    ramp, dr = HUB["ramp"], HUB["doors"]
-    pr = {q["id"]: q for q in H.space("dock")["props"]}
-    wet = lambda q: min(max((0.7 - q.z) / 1.5, 0.0), 1.0)                                  # noqa: E731
+# --- the harbour (D70) -----------------------------------------------------------------------------------------------------
+LEAF_L = 6.0                        # a lifting bridge's leaf: half the basin's width
+LEAF_T = 0.42                       # its depth from the deck's top to its girders' undersides
 
-    def inner(x, z, d=0.4):
-        return H.half_width(x, z) - d
-    # The bed: the ship's own bottom inside, dark planks under the water.
-    y = -inner(0.5 * (wx0 + wx1), fl)
-    while y < inner(0.5 * (wx0 + wx1), fl) - 0.05:
-        yb = min(y + 0.4, inner(0.5 * (wx0 + wx1), fl))
-        p.polygon([(wx0, y, fl), (wx1, y, fl), (wx1, yb, fl), (wx0, yb, fl)], "MI_Wood_Piling", tone=random.random(), facing=UP)
-        y = yb
-    # The quays' faces: vertical planking from the bed up under the deck, piles standing proud every 1.5 m, two fenders, an
-    # iron-shod kerb, mooring rings. The aft quay faces forward (+x), the forward quay aft (-x), cut where the slipway runs.
-    for face, s in ((wx0, 1.0), (wx1, -1.0)):
-        w = inner(face, zq, 0.6)
-        spans = [(-w, w)] if s > 0 else [(-w, ramp["y0"]), (ramp["y1"], w)]
-        for a0, a1 in spans:
-            F = (Vector((face, 0.0, 0.0)), Y, UP, X * s)
-            HE.board_runs(p, (Vector((face, 0.0, 0.5 * (fl + zq - 0.25))), Y, UP, X * s), [(a0, a1)], -(zq - 0.25 - fl) * 0.5, (zq - 0.25 - fl) * 0.5,
-                          0.0, ("MI_Wood_Piling", "MI_Wood_DockWeathered"), lmin=3.0, lmax=6.0)
-            u = a0 + 0.4
-            while u < a1 - 0.3:
-                p.beam(T.straight((face + s * 0.14, u, fl), (face + s * 0.14, u, zq - 0.3), Y, X * s), zq - 0.3 - fl, 0.3, 0.26, "MI_Wood_Piling", nseed(),
-                       seg=0.8, wear=1.0, grime=wet)
-                u += 1.5
-            for zw in (-0.4, 0.9):
-                p.beam(T.straight((face + s * 0.32, a0 + 0.2, zw), (face + s * 0.32, a1 - 0.2, zw), UP, X * s), a1 - a0 - 0.4, 0.26, 0.14, "MI_Wood_Piling",
-                       nseed(), seg=1.0, wear=1.0, grime=wet)
-            p.beam(T.straight((face + s * 0.12, a0, zq - 0.1), (face + s * 0.12, a1, zq - 0.1), X * s, UP), a1 - a0, 0.3, 0.22, DARK, nseed(), seg=1.0, wear=1.0)
-            p.beam(T.straight((face, a0, zq - 0.06), (face, a1, zq - 0.06), UP, X * s), a1 - a0, 0.12, 0.02, "MI_Metal_Iron", nseed(), seg=2.0)
-            u = a0 + 2.5
-            while u < a1 - 1.0:
-                c = Vector((face + s * 0.05, u, zq - 0.7))
-                p.beam(T.arc(c + X * s * 0.12, Y, UP, 0.16, 0.0, 2 * math.pi), 1.0, 0.04, 0.04, "MI_Metal_Iron", nseed(), seg=0.1)
-                u += 5.0
-    # The slipway's cut sides, through the forward quay and up under the Slip's floor (flush with the hold's walls there), a post
-    # at the hall's mouth; the slipway: its face, oak ways the keels run on, cross sleepers.
-    for yy, s in ((ramp["y0"], -1.0), (ramp["y1"], 1.0)):
-        for xa, xb, inset, z0 in ((wx1, dk["x1"], 0.0, fl), (dk["x1"], ramp["x1"], WALL * 0.5, Z["hold"])):
-            yf = yy - s * inset
-            HE.board_runs(p, (Vector((0.5 * (xa + xb), yf, 0.5 * (z0 + zq - 0.06))), X, UP, Y * -s), [(-(xb - xa) * 0.5, (xb - xa) * 0.5)],
-                          -(zq - 0.06 - z0) * 0.5, (zq - 0.06 - z0) * 0.5, 0.0, ("MI_Wood_Piling", "MI_Wood_DockWeathered"))
-        p.beam(T.straight((dk["x1"], yy + s * 0.02, fl), (dk["x1"], yy + s * 0.02, zq - 0.02), X, Y), zq - 0.02 - fl, 0.34, 0.34, "MI_Wood_Piling", nseed(),
-               wear=1.0, grime=wet)
-    wr = ramp["y1"]
-    z0s, z1s = ramp["z0"], ramp["z1"]
-    p.polygon([(ramp["x0"], -wr, z0s), (ramp["x1"], -wr, z1s), (ramp["x1"], wr, z1s), (ramp["x0"], wr, z0s)], "MI_Wood_Piling", facing=UP)
-    p.polygon([(ramp["x0"], -wr, fl), (ramp["x0"], wr, fl), (ramp["x0"], wr, z0s), (ramp["x0"], -wr, z0s)], "MI_Wood_Piling", facing=-X)
-    for yy, s in ((-wr, -1.0), (wr, 1.0)):
-        p.polygon([(ramp["x0"], yy, fl), (ramp["x1"], yy, z1s - 0.3), (ramp["x1"], yy, z1s), (ramp["x0"], yy, z0s)], "MI_Wood_Piling", facing=(0.0, s, 0.0))
-    slope = Vector((ramp["x1"] - ramp["x0"], 0.0, z1s - z0s)).normalized()
-    nrm = Y.cross(slope) if Y.cross(slope).z > 0 else slope.cross(Y)
-    L = (Vector((ramp["x1"], 0, z1s)) - Vector((ramp["x0"], 0, z0s))).length
-    k = 0.6
-    while k < L - 0.3:
-        c = Vector((ramp["x0"], 0.0, z0s)) + slope * k + nrm * 0.08
-        p.beam(T.straight(c - Y * (wr - 0.3), c + Y * (wr - 0.3), slope, nrm), 2 * wr - 0.6, 0.24, 0.16, "MI_Wood_Piling", nseed(), seg=1.0, grime=wet)
-        k += 1.1
-    for yw in (-1.6, 1.6):
-        a = Vector((ramp["x0"] + 0.3, yw, z0s)) + nrm * 0.25
-        b = Vector((ramp["x1"] - 0.1, yw, z1s)) + nrm * 0.25
-        p.beam(T.straight(a, b, Y, nrm), (b - a).length, 0.4, 0.2, "MI_Wood_TeakDark", nseed(), seg=1.0, wear=1.0, grime=wet)
-    # The hull's inside over the water, up to the gun deck, round the hidden doors (their jambs, head, sill, hinge posts and
+
+def face_frame(axis, line, side):
+    """A quay's face (PL.water_edges): a point on it from (u along it, off out over the water, z), and its normal (out over
+    the water)."""
+    n = (X if axis == "x" else Y) * -side
+
+    def P(u, off, z):
+        return Vector((line, u, z)) + n * off if axis == "x" else Vector((u, line, z)) + n * off
+    return P, n
+
+
+def build_dock():
+    """The harbour (D70, spaces.harbour): the water's bed under the canal and the basins, the quays' timber faces on piles with
+    fenders, kerbs and rings along every edge of the water, the hull's inside over the basins round the hidden doors, the
+    lifting bridges' hinge frames, the footbridges over the canal, the galleries' pillars, bollards, rung ladders, the docking
+    stations' boards and lantern posts, lanterns. (The quays' decking, the galleries and the walls are the floors' (build_hub_rooms);
+    the door leaves and their capstans the outside's (build_hub_doors); the bridges' leaves move (SM_Hub_BridgeLeaf).)"""
+    p = T.Part("SM_Hub_Dock")
+    fl, zq = HUB["dock"]["floor"], Z["quay"]
+    pr = {q["id"]: q for q in H.space("harbour")["props"]}
+    wet = lambda q: min(max((0.7 - q.z) / 1.5, 0.0), 1.0)                                  # noqa: E731
+    # The bed: the ship's own bottom inside, dark planks under the water, across the canal and the basins.
+    for x0, x1, y0, y1 in H.water_rects():
+        x = x0
+        while x < x1 - 1e-6:
+            xb = min(x + 6.0, x1)
+            hw = min(H.half_width(x, fl), H.half_width(xb, fl)) - 0.4
+            y = max(y0, -hw)
+            while y < min(y1, hw) - 0.05:
+                yb = min(y + 0.4, y1, hw)
+                p.polygon([(x, y, fl), (xb, y, fl), (xb, yb, fl), (x, yb, fl)], "MI_Wood_Piling", tone=random.random(), facing=UP)
+                y = yb
+            x = xb
+    # The quays' faces along every edge of the water: vertical planking from the bed up under the deck, piles standing proud
+    # every 1.5 m (and at the corners), two fenders, an iron-shod kerb, mooring rings every 5 m.
+    for axis, line, a0, a1, side in PL.water_edges():
+        P, n = face_frame(axis, line, side)
+        along = Y if axis == "x" else X
+        origin = Vector((line, 0.0, 0.5 * (fl + zq - 0.25))) if axis == "x" else Vector((0.0, line, 0.5 * (fl + zq - 0.25)))
+        HE.board_runs(p, (origin, along, UP, n), [(a0, a1)], -(zq - 0.25 - fl) * 0.5, (zq - 0.25 - fl) * 0.5, 0.0,
+                      ("MI_Wood_Piling", "MI_Wood_DockWeathered"), lmin=3.0, lmax=6.0)
+        L = a1 - a0
+        k = max(int(round(L / 1.5)), 1)
+        for i in range(k + 1):
+            u = a0 + 0.15 + (L - 0.3) * i / k
+            p.beam(T.straight(P(u, 0.14, fl), P(u, 0.14, zq - 0.3), along, n), zq - 0.3 - fl, 0.3, 0.26, "MI_Wood_Piling", nseed(),
+                   seg=0.8, wear=1.0, grime=wet)
+        for zw in (-0.4, 0.9):
+            p.beam(T.straight(P(a0 + 0.2, 0.32, zw), P(a1 - 0.2, 0.32, zw), UP, n), L - 0.4, 0.26, 0.14, "MI_Wood_Piling",
+                   nseed(), seg=1.0, wear=1.0, grime=wet)
+        p.beam(T.straight(P(a0, 0.12, zq - 0.1), P(a1, 0.12, zq - 0.1), n, UP), L, 0.3, 0.22, DARK, nseed(), seg=1.0, wear=1.0)
+        p.beam(T.straight(P(a0, 0.0, zq - 0.06), P(a1, 0.0, zq - 0.06), UP, n), L, 0.12, 0.02, "MI_Metal_Iron", nseed(), seg=2.0)
+        u = a0 + 2.5
+        while u < a1 - 1.0:
+            c = P(u, 0.05, zq - 0.7)
+            p.beam(T.arc(c + n * 0.12, along, UP, 0.16, 0.0, 2 * math.pi), 1.0, 0.04, 0.04, "MI_Metal_Iron", nseed(), seg=0.1)
+            u += 5.0
+    # The hull's inside over the basins, up to the gun deck, round the hidden doors (their jambs, head, sill, hinge posts and
     # leaves are the doors' own: build_hub_doors.py).
     zc = Z["gun"] - SLAB
-    door = (dr["x0"], dr["x1"], dr["z0"], dr["z1"])
-    for side in (1.0, -1.0):
-        hull_lining(p, side, wx0, wx1, -0.6, zc, holes=[door])
-    # Bollards along the quays' edges; the rung ladders up from the water.
-    bo = pr["bollards"]
-    for ex, ya, yb in bo["along"]:
-        s = 1.0 if ex < 40 else -1.0                                             # inboard of the edge, on the quay
-        yy = ya
-        while yy <= yb + 1e-6:
-            c = Vector((ex - s * 0.6, yy, zq))
-            p.lathe([(0.0, 0.0), (bo["r"] + 0.05, 0.0), (bo["r"], 0.08), (bo["r"] * 0.82, 0.3), (bo["r"] * 0.85, bo["h"] - 0.14),
-                     (bo["r"] * 1.15, bo["h"] - 0.08), (bo["r"] * 1.12, bo["h"]), (0.0, bo["h"] + 0.04)], c, UP, "MI_Metal_Iron", sides=12, wear=1.0)
-            yy += bo["every"]
-    for ex, ly in pr["rung_ladders"]["at"]:
-        s = 1.0 if ex < 40 else -1.0                                             # the water is on +x of the aft quay's edge
-        zr = -1.8
-        while zr < zq - 0.1:
-            for dy in (-0.25, 0.25):
-                p.beam(T.straight((ex, ly + dy, zr), (ex + s * 0.16, ly + dy, zr), UP, Y), 0.16, 0.04, 0.04, "MI_Metal_Iron", nseed(), seg=1.0)
-            p.beam(T.straight((ex + s * 0.16, ly - 0.27, zr), (ex + s * 0.16, ly + 0.27, zr), UP, X), 0.54, 0.045, 0.045, "MI_Metal_Iron", nseed(), seg=1.0)
-            zr += 0.3
-        for dy in (-0.3, 0.3):                                                   # grab handles over the kerb
-            p.beam(T.arc(Vector((ex - s * 0.15, ly + dy, zq + 0.02)), -X * s, UP, 0.28, 0.0, math.pi), 0.9, 0.05, 0.05, "MI_Metal_Iron", nseed(), seg=0.1)
-    # The berth board at the fitting berth: a painted board on a post at the quay's edge.
-    fb = next(e for e in H.space("slip")["e"] if e["id"] == "fitting_berth")
-    c = Vector((fb["x"] - 0.4, fb["y"], zq))
-    p.beam(T.straight(c, c + UP * 1.5, X, Y), 1.5, 0.16, 0.16, DARK, nseed())
-    p.block(c.x - 0.12, c.x - 0.04, c.y - 0.5, c.y + 0.5, zq + 1.0, zq + 1.6, "MI_Paint_Cream", nseed(), axis="y")
-    for zz in (zq + 1.18, zq + 1.3, zq + 1.42):
-        p.block(c.x - 0.13, c.x - 0.11, c.y - 0.38, c.y + 0.3 - random.random() * 0.2, zz - 0.025, zz + 0.025, "MI_Paint_HullDark", nseed(), axis="y")
-    # The crane: a runway beam bracketed to the forward wall under the ceiling, out over the fitting berth (above the galleries
-    # and a mast), a trolley with a block, the hook's rope, the hand chain just off the quay's edge.
-    cr = pr["crane"]
-    bx0, bx1, by, bz = cr["beam"]
-    a, b = Vector((bx0, by, bz - 0.25)), Vector((bx1, by, bz - 0.25))
-    p.beam(T.straight(a, b, Y, UP), (b - a).length, 0.36, 0.5, DARK, nseed(), seg=1.0, wear=1.0)
-    p.beam(T.straight(Vector((bx0 - 0.2, by, bz - 2.2)), Vector((bx0 - 2.2, by, bz - 0.5)), Y, Vector((-0.6, 0.0, -0.8)).normalized()), 2.6, 0.3, 0.3, DARK,
-           nseed(), wear=1.0)                                                    # its strut to the wall
-    tx = cr["hook_rope_x"]
-    p.block(tx - 0.35, tx + 0.35, by - 0.3, by + 0.3, bz - 0.95, bz - 0.5, "MI_Metal_Iron", nseed(), axis="x")
-    hook = Vector((tx, by, zq + 4.0))
-    p.round(T.straight(Vector((tx, by, bz - 0.95)), hook + UP * 0.25, X, Y), bz - 0.95 - hook.z - 0.25, 0.035, "MI_Rope_Hemp", nseed(), sides=6, seg=10.0, wear=0.0)
-    p.block(hook.x - 0.14, hook.x + 0.14, hook.y - 0.1, hook.y + 0.1, hook.z - 0.15, hook.z + 0.25, "MI_Wood_Varnish", nseed(), axis="z")
-    p.beam(T.arc(hook - UP * 0.4, Y, UP, 0.14, math.pi * 0.95, math.pi * 2.2), 0.6, 0.05, 0.05, "MI_Metal_Iron", nseed(), seg=0.08)
-    hx, hy = cr["hand_chain"]
-    k = 0
-    zt = bz - 0.9
-    while zt - k * 0.12 > zq + 1.0:
-        q = Vector((hx, hy, zt - k * 0.12))
-        p.beam(T.arc(q, X if k % 2 else Y, UP, 0.045, 0.0, 2 * math.pi), 0.3, 0.014, 0.014, "MI_Metal_Iron", nseed(), seg=0.08)
-        k += 1
-    # The pillars under the galleries' edges, from the quays up to the gun deck (the galleries' beams span the ship; these carry
-    # their edges), iron-banded where they pass a gallery.
+    dr = HUB["doors"]
+    for (bx0, bx1, _, _), (dx0, dx1) in zip(H.basins(), H.door_stations()):
+        for side in (1.0, -1.0):
+            hull_lining(p, side, bx0, bx1, -0.6, zc, holes=[(dx0, dx1, dr["z0"], dr["z1"])])
+    # The lifting bridges' hinge frames at the basins' edges: two oak posts either side of each leaf's hinge, an iron axle
+    # housing across, a stop the raised leaf leans back on.
+    for bx0, bx1, by0, by1 in H.lift_bridges():
+        for xh, s in ((bx0, 1.0), (bx1, -1.0)):
+            for yy in (by0 - 0.25, by1 + 0.25):
+                p.beam(T.straight((xh - s * 0.25, yy, zq), (xh - s * 0.25, yy, zq + 1.5), X, Y), 1.5, 0.34, 0.3, DARK, nseed(), wear=1.0)
+                p.lathe([(0.0, -0.12), (0.2, -0.12), (0.2, 0.12), (0.0, 0.12)], Vector((xh, yy, zq - 0.2)), Y, "MI_Metal_Iron", sides=12)
+            p.round(T.straight((xh, by0 - 0.3, zq - 0.2), (xh, by1 + 0.3, zq - 0.2), X, UP), by1 - by0 + 0.6, 0.09, "MI_Metal_Iron", nseed(), sides=10)
+            p.block(xh - s * 0.6, xh - s * 0.1, by0 - 0.1, by1 + 0.1, zq + 1.2, zq + 1.4, DARK, nseed(), axis="y")
+    # The footbridges over the canal (where no boat sails): planked across on two stringers, railed both sides.
+    for x0, x1, y0, y1 in H.fixed_bridges():
+        ya, yb = y0 - 0.3, y1 + 0.3
+        for xs in (x0 + 0.2, x1 - 0.2):
+            p.beam(T.straight((xs, ya, zq - 0.25), (xs, yb, zq - 0.25), X, UP), yb - ya, 0.24, 0.32, DARK, nseed(), seg=1.0, wear=1.0)
+        xx = x0
+        rng = random.Random(nseed())
+        while xx < x1 - 1e-6:
+            xb = min(xx + 0.3, x1)
+            p.board(T.straight((0.5 * (xx + xb), ya, zq - 0.04), (0.5 * (xx + xb), yb, zq - 0.04), X, UP), yb - ya, xb - xx - 0.01, 0.08,
+                    rng.choice(DOCK), nseed(), seg=1.0, wear=1.0)
+            xx = xb
+        for xr in (x0 + 0.06, x1 - 0.06):
+            rail(p, "x", xr, y0, y1, zq)
+    # The pillars under the galleries' edges, from the quays up to the gun deck, iron-banded where they pass a gallery.
     pl = pr["pillars"]
     hs_ = pl["size"] * 0.5
     for px, py in pl["at"]:
@@ -436,20 +399,98 @@ def build_dock():
             for zz in (Z[lv] - SLAB - 0.25, Z[lv] + 0.25):
                 p.block(px - hs_ - 0.02, px + hs_ + 0.02, py - hs_ - 0.02, py + hs_ + 0.02, zz - 0.05, zz + 0.05, "MI_Metal_Iron", nseed(), axis="x")
         p.block(px - hs_ - 0.06, px + hs_ + 0.06, py - hs_ - 0.06, py + hs_ + 0.06, zq, zq + 0.12, "MI_Wood_TeakDark", nseed(), axis="x")
-    # Lanterns: under the galleries over the quays, and under the next gallery at the galleries' edges (none over the water or the
-    # ramp: masts).
+    # Bollards along the quays' edges (shared with the blockout's); the rung ladders up from the water.
+    bo = pr["bollards"]
+    for bx, by in B.bollard_spots():
+        p.lathe([(0.0, 0.0), (bo["r"] + 0.05, 0.0), (bo["r"], 0.08), (bo["r"] * 0.82, 0.3), (bo["r"] * 0.85, bo["h"] - 0.14),
+                 (bo["r"] * 1.15, bo["h"] - 0.08), (bo["r"] * 1.12, bo["h"]), (0.0, bo["h"] + 0.04)], Vector((bx, by, zq)), UP, "MI_Metal_Iron", sides=12,
+                wear=1.0)
+    for lx, ly, yaw in pr["rung_ladders"]["at"]:
+        d = Vector((math.cos(math.radians(yaw)), math.sin(math.radians(yaw)), 0.0))        # from the water to the quay
+        t = Vector((-d.y, d.x, 0.0))
+        e = Vector((lx, ly, 0.0))
+        zr = -1.8
+        while zr < zq - 0.1:
+            for dt in (-0.25, 0.25):
+                a = e + t * dt + UP * zr
+                p.beam(T.straight(a, a - d * 0.16, UP, t), 0.16, 0.04, 0.04, "MI_Metal_Iron", nseed(), seg=1.0)
+            a = e - d * 0.16 + UP * zr
+            p.beam(T.straight(a - t * 0.27, a + t * 0.27, UP, -d), 0.54, 0.045, 0.045, "MI_Metal_Iron", nseed(), seg=1.0)
+            zr += 0.3
+        for dt in (-0.3, 0.3):                                                   # grab handles over the kerb
+            p.beam(T.arc(e + d * 0.15 + t * dt + UP * (zq + 0.02), -d, UP, 0.28, 0.0, math.pi), 0.9, 0.05, 0.05, "MI_Metal_Iron", nseed(), seg=0.1)
+    # The docking stations (hub.docking): a board on a post at the berth's bow (the aft one is the Slip's berth board) and a
+    # lantern post where the gangway lands.
+    for d in HUB["docking"]:
+        x, y, _ = H.docking_pose(d)
+        face = math.copysign(H.canal_half(x), y)
+        s = math.copysign(1.0, y)
+        berth_board(p, d["x1"] - 1.0, face + s * 0.35, s)                     # (the aft one is the Slip's: spaces.slip.e)
+        post_lantern(p, d["x0"] + 2.5, face + s * 0.8)
+    # Lanterns: under the decks over the quays, and under the next gallery at the galleries' edges (none over the water: masts).
     for x, y, zz in pr["lanterns"]["at"]:
         over = min((Z[lv] for lv in ("lower", "middle", "upper", "gun") if Z[lv] > zq + zz), default=Z["gun"])
         deck_lantern(p, x, y, over)
     export(p)
 
 
+def berth_board(p, x, y, s):
+    """A painted board on a post at a quay's edge (s: the quay's side of the canal, +1 starboard), read from the quay."""
+    zq = Z["quay"]
+    c = Vector((x, y, zq))
+    p.beam(T.straight(c, c + UP * 1.6, X, Y), 1.6, 0.16, 0.16, DARK, nseed())
+    yb = y + s * 0.12
+    p.block(x - 0.5, x + 0.5, yb - 0.04, yb + 0.04, zq + 1.0, zq + 1.6, "MI_Paint_Cream", nseed(), axis="x")
+    for zz in (zq + 1.18, zq + 1.3, zq + 1.42):
+        p.block(x - 0.38, x + 0.3 - random.random() * 0.2, yb + s * 0.05 - 0.01, yb + s * 0.05 + 0.01, zz - 0.025, zz + 0.025, "MI_Paint_HullDark",
+                nseed(), axis="x")
+
+
+def post_lantern(p, x, y):
+    """A lantern on a post with an arm, at a gangway's landing."""
+    zq = Z["quay"]
+    p.beam(T.straight((x, y, zq), (x, y, zq + 2.3), X, Y), 2.3, 0.18, 0.18, DARK, nseed(), wear=1.0)
+    p.block(x - 0.22, x + 0.22, y - 0.22, y + 0.22, zq, zq + 0.12, "MI_Wood_TeakDark", nseed(), axis="x")
+    s = -math.copysign(1.0, y)                                                   # the arm out over the water's side
+    p.beam(T.straight((x, y, zq + 2.2), (x, y + s * 0.6, zq + 2.2), X, UP), 0.6, 0.1, 0.1, DARK, nseed())
+    lantern(p, Vector((x, y + s * 0.55, zq + 2.2 - LANTERN_H(0.8))), chain_to=(x, y + s * 0.55, zq + 2.15), r=0.18, s=0.8)
+
+
+def build_bridge():
+    """One leaf of a lifting bridge (hub.bridges.lift), built from its hinge (the pivot, on the quay's deck at the basin's
+    edge) out along +X: oak deck planks across two girders, a railed balustrade both sides, the iron hinge straps, a counter
+    bracket. Its own collision (it moves: ASaltHubBridge raises it to hub.bridges.lift.open degrees)."""
+    p = T.Part("SM_Hub_BridgeLeaf")
+    w = HUB["bridges"]["lift"]["w"] * 0.5
+    L = LEAF_L - 0.03                                                            # the leaves meet with a seam in the middle
+    rng = random.Random(70)
+    for yg in (-w + 0.3, w - 0.3):                                               # the girders
+        p.beam(T.straight((0.0, yg, -LEAF_T * 0.5 - 0.04), (L, yg, -LEAF_T * 0.5 - 0.04), Y, UP), L, 0.28, LEAF_T - 0.08, DARK, nseed(), seg=1.0,
+               wear=1.0)
+    x = 0.0
+    while x < L - 1e-6:                                                          # the deck: planks across
+        xb = min(x + 0.32, L)
+        p.board(T.straight((0.5 * (x + xb), -w, -0.04), (0.5 * (x + xb), w, -0.04), X, UP), 2 * w, xb - x - 0.012, 0.08, rng.choice(DOCK), nseed(),
+                seg=1.0, wear=1.0)
+        x = xb
+    for yr in (-w + 0.06, w - 0.06):                                             # balustrades
+        rail(p, "y", yr, 0.15, L - 0.05, 0.0)
+    for yg in (-w + 0.3, w - 0.3):                                               # the hinge straps round the axle
+        p.block(-0.05, 0.9, yg - 0.17, yg - 0.15, -LEAF_T, 0.0, "MI_Metal_Iron", nseed(), axis="x")
+        p.block(-0.05, 0.9, yg + 0.15, yg + 0.17, -LEAF_T, 0.0, "MI_Metal_Iron", nseed(), axis="x")
+        p.lathe([(0.0, -0.18), (0.16, -0.18), (0.16, 0.18), (0.0, 0.18)], Vector((0.0, yg, -0.2)), Y, "MI_Metal_Iron", sides=12)
+    p.collide_box(0.0, L, -w, w, -LEAF_T, 0.0)
+    for yr in (-w, w - 0.12):
+        p.collide_box(0.15, L - 0.05, yr, yr + 0.12, 0.0, B.RAIL_H)
+    export_pivoted(p, (0.0, 0.0, 0.0))
+
+
 # --- the Slip -------------------------------------------------------------------------------------------------------------
 def build_slip():
-    """The Slip (spaces.slip): the counter across the shop, the plans on an easel by the way in from the quay, the half-models,
-    the workbench, the timber racks, the 14 m cutter on her cradles on the hall's starboard side and her mast on trestles on its
-    port side (the slipway's way up the middle stays clear), the mizzen's foot coming down through the forward wall, lanterns,
-    the SHIPWRIGHT sign over the hall's mouth. (Floors, walls and ceilings are the floors'.)"""
+    """The Slip (spaces.slip, D70: the shipwright's shop on the harbour's starboard quay, no slipway): the counter across the
+    shop, the plans pinned on its aft wall, the half-models, the workbench, the timber racks, the work on the quay in front (a
+    spar on trestles, the steam box, coils, a grindstone), the 14 m cutter moored at her berth along the quay, lanterns, the
+    SHIPWRIGHT sign over the shop's open front. (Floors, walls and ceilings are the floors'.)"""
     p = T.Part("SM_Hub_Slip")
     zq = Z["quay"]
     sl = {pr["id"]: pr for pr in H.space("slip")["props"]}
@@ -464,22 +505,17 @@ def build_slip():
     ym = 0.5 * (c["y0"] + c["y1"])
     p.block(c["x0"] + 0.15, c["x0"] + 0.6, ym - 0.4, ym + 0.2, zq + hgt, zq + hgt + 0.06, "MI_Paint_HullDark", nseed(), axis="y")        # the ledger
     p.lathe([(0.0, 0.0), (0.05, 0.0), (0.05, 0.06), (0.02, 0.08), (0.0, 0.08)], Vector((c["x0"] + 0.4, ym + 0.6, zq + hgt)), UP, "MI_Glass_Dark", sides=8)
-    # The plans on an easel by the way in from the quay (the shop is open to the quay: no wall there to pin them on).
+    # The plans pinned on the shop's aft wall, past the dock stair (D70: the quay's side is the shop's open front).
     pb = sl["plans_board"]
-    xe = float(pb["wall"].split("=")[1]) + B.EASEL_OUT
+    xe = float(pb["wall"].split("=")[1]) + WALL * 0.5
     y0, y1 = pb["y0"], pb["y1"]
-    for yy in (y0 + 0.2, y1 - 0.2):
-        a, b = Vector((xe + 0.35, yy, zq)), Vector((xe, yy, zq + pb["z1"] + 0.2))
-        p.beam(T.straight(a, b, Y, (b - a).normalized().cross(Y)), (b - a).length, 0.08, 0.08, "MI_Wood_TeakDark", nseed())
-    a, b = Vector((xe + 0.9, 0.5 * (y0 + y1), zq)), Vector((xe + 0.1, 0.5 * (y0 + y1), zq + pb["z1"]))
-    p.beam(T.straight(a, b, Y, (b - a).normalized().cross(Y)), (b - a).length, 0.07, 0.07, "MI_Wood_TeakDark", nseed())
-    p.block(xe - 0.04, xe + 0.02, y0, y1, zq + pb["z0"], zq + pb["z1"], "MI_Wood_Teak", nseed(), axis="y")
-    p.block(xe - 0.1, xe + 0.12, y0 - 0.05, y1 + 0.05, zq + pb["z0"] - 0.06, zq + pb["z0"], "MI_Wood_TeakDark", nseed(), axis="y")     # its ledge
+    p.block(xe, xe + 0.05, y0, y1, zq + pb["z0"], zq + pb["z1"], "MI_Wood_Teak", nseed(), axis="y")
+    p.block(xe, xe + 0.12, y0 - 0.05, y1 + 0.05, zq + pb["z0"] - 0.06, zq + pb["z0"], "MI_Wood_TeakDark", nseed(), axis="y")     # its ledge
     for k in range(4):
         ya = y0 + 0.2 + k * 0.7
         za = zq + pb["z0"] + 0.15 + rng.uniform(0.0, 0.4)
-        p.polygon([(xe - 0.05, ya, za), (xe - 0.05, ya + 0.6, za - 0.02), (xe - 0.05, ya + 0.62, za + 0.7), (xe - 0.05, ya + 0.02, za + 0.68)],
-                  "MI_Paint_CreamAged", tone=rng.random(), facing=-X)
+        p.polygon([(xe + 0.06, ya, za), (xe + 0.06, ya + 0.6, za - 0.02), (xe + 0.06, ya + 0.62, za + 0.7), (xe + 0.06, ya + 0.02, za + 0.68)],
+                  "MI_Paint_CreamAged", tone=rng.random(), facing=X)
     # The half-models over the shop's forward wall; the workbench.
     hm = sl["half_models"]
     xw = float(hm["wall"].split("=")[1]) - WALL * 0.5
@@ -499,53 +535,58 @@ def build_slip():
             p.block(xx - 0.08, xx + 0.08, yy - 0.08, yy + 0.08, zq, zq + wb["h"] - 0.12, "MI_Wood_TeakDark", nseed(), axis="z")
     p.block(wb["x0"] + 0.1, wb["x1"] - 0.1, wb["y0"] + 0.1, wb["y1"] - 0.1, zq + 0.18, zq + 0.24, "MI_Wood_Teak", nseed(), axis="x")
     p.block(wb["x0"] + 0.6, wb["x0"] + 1.0, wb["y0"] + 0.3, wb["y0"] + 0.8, zq + wb["h"], zq + wb["h"] + 0.14, "MI_Metal_Iron", nseed(), axis="y")    # a vice
-    # The mizzen's foot: the mast comes down through the main deck and the decks under it to its step, half out of the forward
-    # wall here (a ship's masts stand on her keel).
-    mz, mr = mast_foot("mizzen")
-    p.round(T.straight((mz["x"], 0.0, zq), (mz["x"], 0.0, Z["gun"] - SLAB), X, Y), Z["gun"] - SLAB - zq, mr, "MI_Wood_Varnish", nseed(), sides=20, seg=1.0,
-            wear=0.8)
-    for zz in [zq + 0.6 + 2.2 * k for k in range(6)]:
-        p.lathe([(mr + 0.01, -0.07), (mr + 0.04, -0.05), (mr + 0.04, 0.05), (mr + 0.01, 0.07)], Vector((mz["x"], 0.0, zz)), UP, "MI_Metal_Iron", sides=20,
-                caps=False)
-    # The timber racks on the hall's forward wall, either side of the mast.
+    # The timber racks on the shop's forward wall.
     tr = sl["timber_racks"]
     xw = float(tr["wall"].split("=")[1]) - WALL * 0.5
-    for ra, rb in ((tr["y0"], -mr - 0.3), (mr + 0.3, tr["y1"])):
-        for k in range(4):
-            z = zq + tr["z0"] + (tr["z1"] - tr["z0"]) * k / 3
-            for yb in (ra + 0.3, rb - 0.3):
-                p.block(xw - 0.6, xw, yb - 0.04, yb + 0.04, z - 0.06, z, "MI_Metal_Iron", nseed(), axis="x")
-            for j in range(3):
-                ya = ra + rng.uniform(-0.1, 0.4)
-                yb_ = rb - rng.uniform(0.0, 0.8)
-                p.board(T.straight((xw - 0.15 - 0.15 * j, ya, z + 0.05 + 0.08 * j), (xw - 0.15 - 0.15 * j, yb_, z + 0.05 + 0.08 * j), X, UP),
-                        yb_ - ya, 0.14, 0.07, rng.choice(("MI_Wood_TeakLight", "MI_Wood_Teak", "MI_Wood_Planks")), nseed(), seg=1.0)
-    # The 14 m cutter on her cradles, her mast on trestles.
-    cutter(p, sl["display_boat"])
-    mt = sl["mast_on_trestles"]
-    for tx in (mt["x0"] + 2.0, mt["x1"] - 2.0):
+    ra, rb = tr["y0"], tr["y1"]
+    for k in range(4):
+        z = zq + tr["z0"] + (tr["z1"] - tr["z0"]) * k / 3
+        for yb in (ra + 0.3, rb - 0.3):
+            p.block(xw - 0.6, xw, yb - 0.04, yb + 0.04, z - 0.06, z, "MI_Metal_Iron", nseed(), axis="x")
+        for j in range(3):
+            ya = ra + rng.uniform(-0.1, 0.4)
+            yb_ = rb - rng.uniform(0.0, 0.8)
+            p.board(T.straight((xw - 0.15 - 0.15 * j, ya, z + 0.05 + 0.08 * j), (xw - 0.15 - 0.15 * j, yb_, z + 0.05 + 0.08 * j), X, UP),
+                    yb_ - ya, 0.14, 0.07, rng.choice(("MI_Wood_TeakLight", "MI_Wood_Teak", "MI_Wood_Planks")), nseed(), seg=1.0)
+    # The work on the quay in front of the shop: a spar on two trestles, the steam box on its stove, coils, a grindstone.
+    qw = sl["quay_work"]
+    sy = 0.5 * (qw["y0"] + qw["y1"])
+    for tx in (qw["x0"] + 0.5, qw["x0"] + 3.5):
         for dy in (-0.45, 0.45):
-            a, b = Vector((tx - 0.3, mt["y"] + dy * 1.4, zq)), Vector((tx, mt["y"] + dy * 0.2, zq + mt["z"]))
+            a, b = Vector((tx - 0.3, sy + dy * 1.4, zq)), Vector((tx, sy + dy * 0.2, zq + 0.8))
             p.beam(T.straight(a, b, X, (b - a).normalized().cross(X)), (b - a).length, 0.12, 0.12, DARK, nseed())
-        p.block(tx - 0.12, tx + 0.12, mt["y"] - 0.5, mt["y"] + 0.5, zq + mt["z"] - 0.18, zq + mt["z"], "MI_Wood_TeakDark", nseed(), axis="y")
-    a, b = Vector((mt["x0"], mt["y"], zq + mt["z"] + 0.24)), Vector((mt["x1"], mt["y"], zq + mt["z"] + 0.2))
-    p.round(T.straight(a, b, Y, UP), mt["x1"] - mt["x0"], lambda s: 0.24 - 0.1 * s, "MI_Wood_Varnish", nseed(), sides=10, seg=1.0, wear=0.6)
-    # Lanterns: on chains from the gun deck in the hall (none over the slipway: masts), under the Tally House in the shop; the sign.
-    hall = H.R(HUB["hall"])
+        p.block(tx - 0.12, tx + 0.12, sy - 0.5, sy + 0.5, zq + 0.62, zq + 0.8, "MI_Wood_TeakDark", nseed(), axis="y")
+    a, b = Vector((qw["x0"] - 0.6, sy, zq + 0.98)), Vector((qw["x0"] + 4.8, sy, zq + 0.96))
+    p.round(T.straight(a, b, Y, UP), (b - a).length, lambda t: 0.18 - 0.06 * t, "MI_Wood_Varnish", nseed(), sides=10, seg=1.0, wear=0.6)
+    bx0, bx1, by0, by1 = qw["x1"] - 2.6, qw["x1"] - 0.4, qw["y1"] - 1.2, qw["y1"] - 0.2
+    p.block(bx0, bx1, by0, by1, zq + 0.45, zq + 1.1, "MI_Wood_TeakDark", nseed(), axis="x")                  # the steam box
+    p.block(bx0 + 0.3, bx0 + 0.9, by0 + 0.1, by1 - 0.1, zq, zq + 0.45, "MI_Metal_Iron", nseed(), axis="z")     # its stove
+    p.round(T.straight((bx0 + 0.6, 0.5 * (by0 + by1), zq + 1.1), (bx0 + 0.6, 0.5 * (by0 + by1), Z["lower"] - SLAB - 0.05), X, Y),
+            Z["lower"] - SLAB - 1.15 - zq, 0.09, "MI_Metal_Iron", nseed(), sides=8)                         # its flue
+    for k, (cx_, cy_) in enumerate(((qw["x0"] + 5.4, sy), (qw["x0"] + 6.2, sy + 0.1))):                  # coils
+        for j in range(4):
+            p.beam(T.arc(Vector((cx_, cy_, zq + 0.05 + 0.07 * j)), X, Y, 0.38 - 0.03 * (j % 2), 0.0, 2 * math.pi), 2.3, 0.07, 0.07, "MI_Rope_Hemp",
+                   nseed(), seg=0.2, wear=0.0)
+    gx, gy = qw["x0"] + 6.9 + 0.3, sy                                                                       # the grindstone
+    for dx in (-0.35, 0.35):
+        p.block(gx + dx - 0.05, gx + dx + 0.05, gy - 0.05, gy + 0.05, zq, zq + 0.75, DARK, nseed(), axis="z")
+    p.lathe([(0.0, -0.1), (0.42, -0.1), (0.45, -0.06), (0.45, 0.06), (0.42, 0.1), (0.0, 0.1)], Vector((gx, gy, zq + 0.75)), X, "MI_Hub_AncientStone", sides=18)
+    # The 14 m cutter (D51) moored at her berth along the quay (harbour.fleet_berths), riding at her waterline.
+    fb = next(b for b in H.prop("harbour", "fleet_berths")["berths"] if b["boat"] == "14 m")
+    _, cy, _ = H.docking_pose(dict(fb, heading=0))
+    cutter(p, {"x0": fb["x0"], "x1": fb["x1"], "y": cy, "beam": 4.4, "keel_z": -2.9}, cradles=False)
+    # Lanterns under the Tally House in the shop; the sign under the lower deck's edge over the shop's open front.
     for x, y, zz in sl["lanterns"]["at"]:
-        if H.inside(hall, x, y):
-            lantern(p, Vector((x, y, zq + zz)), chain_to=(x, y, Z["gun"] - SLAB + 0.05), r=0.28)
-        else:
-            deck_lantern(p, x, y, Z["lower"])
+        deck_lantern(p, x, y, Z["lower"])
     sg = sl["sign"]
     zc = zq + sg["z"]
-    xs = sg["x"] + 0.35
-    p.block(xs - 0.3, xs, sg["y"] - 3.3, sg["y"] + 3.3, zc - 0.55, zc + 0.55, "MI_Paint_HullDark", nseed(), axis="y")
-    p.block(xs - 0.35, xs, sg["y"] - 3.4, sg["y"] + 3.4, zc - 0.62, zc - 0.5, "MI_Hub_Ochre", nseed(), axis="y")
-    p.block(xs - 0.35, xs, sg["y"] - 3.4, sg["y"] + 3.4, zc + 0.5, zc + 0.62, "MI_Hub_Ochre", nseed(), axis="y")
-    for yy in (sg["y"] - 2.8, sg["y"] + 2.8):                                    # hung from the gun deck's beams on iron straps
-        p.block(xs - 0.2, xs - 0.1, yy - 0.04, yy + 0.04, zc + 0.6, Z["gun"] - SLAB + 0.05, "MI_Metal_Iron", nseed(), axis="z")
-    sign_text(p, sg["text"], xs - 0.31, sg["y"], zc, 0.6)
+    ys = sg["y"] - 0.05
+    p.block(sg["x"] - 3.3, sg["x"] + 3.3, ys - 0.3, ys, zc - 0.4, zc + 0.4, "MI_Paint_HullDark", nseed(), axis="x")
+    p.block(sg["x"] - 3.4, sg["x"] + 3.4, ys - 0.35, ys, zc - 0.47, zc - 0.37, "MI_Hub_Ochre", nseed(), axis="x")
+    p.block(sg["x"] - 3.4, sg["x"] + 3.4, ys - 0.35, ys, zc + 0.37, zc + 0.47, "MI_Hub_Ochre", nseed(), axis="x")
+    for xx in (sg["x"] - 2.8, sg["x"] + 2.8):                                    # hung from the lower deck's beams on iron straps
+        p.block(xx - 0.04, xx + 0.04, ys - 0.2, ys - 0.1, zc + 0.45, Z["lower"] - SLAB + 0.05, "MI_Metal_Iron", nseed(), axis="z")
+    sign_on_y(p, sg["text"], sg["x"], ys - 0.31, zc, 0.45, -1.0)
     export(p)
 
 
@@ -856,15 +897,16 @@ def build_tally():
     st = H.R(HUB["stair"])
     tl = {pr["id"]: pr for pr in H.space("tally")["props"]}
     rng = random.Random(77)
-    stairs(p, st[0], st[1], st[2], st[3], "+x", zq, zl, rails=(True, False), soffit=True)
+    # D70: up along the shop's aft wall (+y), its balustrade on the shop's side, a handrail bracketed to the wall.
+    stairs(p, st[0], st[1], st[2], st[3], HUB["stair"].get("up", "+x"), zq, zl, rails=(False, True), soffit=True)
     run = round((zl - zq) / B.RISER) * B.TREAD
-    a, b = Vector((st[0], st[3] - 0.12, zq + 0.95)), Vector((st[0] + run, st[3] - 0.12, zl + 0.95))
-    p.round(T.straight(a, b, Y, (b - a).normalized().cross(Y)), (b - a).length, 0.045, "MI_Wood_Varnish", nseed(), sides=8)
-    for k in range(5):                                                           # its brackets to the hull's lining
+    a, b = Vector((st[0] + 0.12, st[2], zq + 0.95)), Vector((st[0] + 0.12, st[2] + run, zl + 0.95))
+    p.round(T.straight(a, b, X, (b - a).normalized().cross(X)), (b - a).length, 0.045, "MI_Wood_Varnish", nseed(), sides=8)
+    xwall = round(st[0]) + WALL * 0.5                                            # the shop's aft wall's face
+    for k in range(5):                                                           # its brackets to the wall
         q = a + (b - a) * ((k + 0.5) / 5)
-        yh = H.half_width(q.x, q.z) - 0.1
-        if yh - q.y > 0.05:
-            p.beam(T.straight(q - UP * 0.04, Vector((q.x, yh, q.z - 0.04)), UP, X), yh - q.y, 0.03, 0.05, "MI_Metal_Iron", nseed())
+        if q.x - xwall > 0.05:
+            p.beam(T.straight(q - UP * 0.04, Vector((xwall, q.y, q.z - 0.04)), UP, Y), q.x - xwall, 0.03, 0.05, "MI_Metal_Iron", nseed())
     # The job board on the forward wall: six slips, the TALLY header over it, a chalk slate under it.
     jb = tl["job_board"]
     xw = float(jb["wall"].split("=")[1]) - WALL * 0.5
@@ -1136,117 +1178,6 @@ def build_hoist():
 KEEL_LINE = 0.07              # the gate's glowing lines' width (m)
 
 
-def build_keelgate():
-    p = T.Part("SM_Hub_Keelgate")
-    zq = Z["quay"]
-    kg = H.prop("keelgate", "keelgate")
-    kgx, kgy = HUB["keelgate"]["x"], HUB["keelgate"]["y"]
-    rng = random.Random(88)
-    # The stone apron round the ring, out to the square the floors leave for it (build_hub_rooms.under_keelgate: whole cells).
-    rr = PL.CELL * (math.floor((HUB["keelgate"]["ring"] + 0.3) / PL.CELL - 0.5) + 1)
-    n = 28
-    for k in range(n):
-        a0, a1 = 2 * math.pi * k / n, 2 * math.pi * (k + 1) / n
-        pts = []
-        for a in (a0, a1):
-            pts.append((kgx + math.cos(a) * kg["ring_r"], kgy + math.sin(a) * kg["ring_r"], zq))
-        for a in (a1, a0):
-            r_ = rr / max(abs(math.cos(a)), abs(math.sin(a)))
-            pts.append((kgx + math.cos(a) * r_, kgy + math.sin(a) * r_, zq))
-        p.polygon(pts, STONE, tone=0.5, facing=UP)
-    # The Keelgate (G5): the ring and the disc of pale seamless stone, the turquoise lines (two circles, seven spokes), seven
-    # empty sockets round it (spaces.keelgate.keelgate).
-    raised = kg["raised"]
-    prof = [(0.0, 0.0), (kg["ring_r"], 0.0), (kg["ring_r"], raised * 0.6 - 0.02), (kg["ring_r"] - 0.04, raised * 0.6), (kg["disc_r"] + 0.05, raised * 0.6),
-            (kg["disc_r"] + 0.02, raised * 0.6 + 0.01)]
-    p.lathe(prof + [(kg["disc_r"] + 0.02, raised * 0.6 + 0.01), (0.0, raised * 0.6 + 0.01)], Vector((kgx, kgy, zq)), UP, STONE, sides=64, wear=0.0)
-    p.lathe([(kg["disc_r"], 0.0), (kg["disc_r"], raised - 0.02), (kg["disc_r"] - 0.03, raised), (0.0, raised)], Vector((kgx, kgy, zq)), UP, STONE,
-            sides=64, wear=0.0)
-    zt = zq + raised + 0.004
-    for r in (1.0, 2.1):
-        for k in range(48):
-            a0, a1 = 2 * math.pi * k / 48, 2 * math.pi * (k + 1) / 48
-            pts = [(kgx + math.cos(a) * rr_, kgy + math.sin(a) * rr_, zt) for a, rr_ in ((a0, r - KEEL_LINE * 0.5), (a1, r - KEEL_LINE * 0.5),
-                                                                                       (a1, r + KEEL_LINE * 0.5), (a0, r + KEEL_LINE * 0.5))]
-            p.polygon(pts, "MI_AncientGlow", tone=0.5, facing=UP)
-    for k in range(7):
-        a = 2 * math.pi * k / 7 + 0.2
-        d, nrm = Vector((math.cos(a), math.sin(a), 0.0)), Vector((-math.sin(a), math.cos(a), 0.0))
-        c0, c1 = Vector((kgx, kgy, zt)) + d * 1.0, Vector((kgx, kgy, zt)) + d * 2.8
-        p.polygon([c0 - nrm * KEEL_LINE * 0.5, c1 - nrm * KEEL_LINE * 0.5, c1 + nrm * KEEL_LINE * 0.5, c0 + nrm * KEEL_LINE * 0.5], "MI_AncientGlow",
-                  tone=0.5, facing=UP)
-        s = Vector((kgx, kgy, zq + raised * 0.6 + 0.012)) + d * 3.5
-        p.lathe([(0.0, 0.0), (0.2, 0.0), (0.2, 0.002), (0.0, 0.002)], s, UP, "MI_Hub_Void", sides=16)
-        p.lathe([(0.2, -0.0), (0.24, 0.0), (0.24, 0.01), (0.2, 0.01)], s, UP, STONE, sides=16, caps=False)
-    # The reader's desk with books, a brass lamp and rubbings; the chair behind it.
-    dk = H.prop("keelgate", "desk")
-    zt = zq + dk["h"]
-    p.block(dk["x0"], dk["x1"], dk["y0"], dk["y1"], zt - 0.07, zt, "MI_Wood_Varnish", nseed(), axis="x")
-    for xx in (dk["x0"] + 0.1, dk["x1"] - 0.1):
-        p.block(xx - 0.07, xx + 0.07, dk["y0"] + 0.08, dk["y1"] - 0.08, zq, zt - 0.07, "MI_Wood_TeakDark", nseed(), axis="z")
-    p.block(dk["x0"] + 0.15, dk["x1"] - 0.15, dk["y0"] + 0.12, dk["y0"] + 0.16, zq + 0.1, zt - 0.1, "MI_Wood_TeakDark", nseed(), axis="x")
-    for k in range(5):
-        bx = dk["x0"] + 0.25 + 0.18 * k
-        h = rng.uniform(0.22, 0.32)
-        p.block(bx - 0.07, bx + 0.07, dk["y1"] - 0.4, dk["y1"] - 0.15, zt, zt + h, rng.choice(("MI_Paint_HullDark", "MI_Wood_TeakDark", "MI_Hub_Ochre")),
-                nseed(), axis="z", wear=0.6)
-    p.block(dk["x0"] + 1.4, dk["x0"] + 2.0, dk["y0"] + 0.3, dk["y0"] + 0.75, zt, zt + 0.05, "MI_Paint_HullDark", nseed(), axis="x")    # an open book
-    p.polygon([(dk["x0"] + 1.42, dk["y0"] + 0.32, zt + 0.052), (dk["x0"] + 1.98, dk["y0"] + 0.32, zt + 0.052), (dk["x0"] + 1.98, dk["y0"] + 0.73, zt + 0.052),
-               (dk["x0"] + 1.42, dk["y0"] + 0.73, zt + 0.052)], "MI_Paint_CreamAged", facing=UP)
-    lamp = Vector((dk["x1"] - 0.4, dk["y1"] - 0.4, zt))
-    p.lathe([(0.0, 0.0), (0.12, 0.0), (0.1, 0.03), (0.03, 0.06), (0.025, 0.3), (0.05, 0.32), (0.0, 0.33)], lamp, UP, "MI_Metal_Brass", sides=10)
-    p.lathe([(0.0, 0.3), (0.06, 0.3), (0.08, 0.38), (0.06, 0.46), (0.0, 0.47)], lamp, UP, "MI_LanternGlass", sides=10)
-    ch_ = dk["chair"]
-    p.block(ch_[0], ch_[1], ch_[2], ch_[3], zq + 0.42, zq + 0.48, "MI_Wood_Teak", nseed(), axis="x")
-    for xx in (ch_[0] + 0.05, ch_[1] - 0.05):
-        for yy in (ch_[2] + 0.05, ch_[3] - 0.05):
-            p.block(xx - 0.03, xx + 0.03, yy - 0.03, yy + 0.03, zq, zq + 0.42, "MI_Wood_TeakDark", nseed(), axis="z")
-    p.block(ch_[0], ch_[1], ch_[2], ch_[2] + 0.06, zq + 0.48, zq + 0.95, "MI_Wood_Teak", nseed(), axis="x")
-    # The shelves of salvaged ancient pieces on the port wall: jars and fragments, about a quarter faintly glowing.
-    sv = H.prop("keelgate", "shelves")
-    yw = -12.0 + WALL * 0.5
-    for xx in [sv["x0"] + (sv["x1"] - sv["x0"]) * k / 6 for k in range(7)]:
-        p.block(xx - 0.05, xx + 0.05, yw, yw + sv["depth"], zq, zq + sv["z1"], "MI_Wood_TeakDark", nseed(), axis="z")
-    for k in range(5):
-        zz = zq + 0.15 + (sv["z1"] - 0.3) * k / 4
-        p.block(sv["x0"], sv["x1"], yw, yw + sv["depth"], zz - 0.04, zz, "MI_Wood_Teak", nseed(), axis="x")
-        if k == 4:
-            continue
-        x = sv["x0"] + 0.25
-        while x < sv["x1"] - 0.2:
-            r = rng.uniform(0.07, 0.14)
-            h = rng.uniform(0.18, 0.4)
-            glow = rng.random() < 0.25
-            prof = [(0.0, 0.0), (r * 0.8, 0.0), (r, h * 0.3), (r * 0.9, h * 0.8), (r * 0.5, h * 0.9), (r * 0.55, h), (0.0, h)]
-            p.lathe(prof, Vector((x, yw + rng.uniform(0.18, 0.42), zz)), UP, "MI_Hub_AncientGlowLow" if glow else rng.choice(("MI_Glass_Dark", STONE, "MI_Hub_HullTarDark")),
-                    sides=8)
-            x += r * 2 + rng.uniform(0.08, 0.3)
-    # The rubbings on the forward wall: paper with the gate's lines rubbed in charcoal.
-    rb = H.prop("keelgate", "rubbings")
-    xw = 96.0 - WALL * 0.5
-    y = rb["y0"]
-    while y < rb["y1"] - 0.3:
-        w = rng.uniform(0.7, 1.0)
-        z0 = zq + rb["z0"] + rng.uniform(0.0, 0.15)
-        z1 = zq + rb["z1"] - rng.uniform(0.0, 0.15)
-        p.polygon([(xw - 0.01, y, z0), (xw - 0.01, y + w, z0), (xw - 0.01, y + w, z1), (xw - 0.01, y, z1)], "MI_Paint_CreamAged", tone=rng.random(), facing=-X)
-        c = Vector((xw - 0.015, y + w * 0.5, 0.5 * (z0 + z1)))
-        for r in (0.15, 0.3):
-            for k in range(16):
-                a0, a1 = 2 * math.pi * k / 16, 2 * math.pi * (k + 1) / 16
-                q0 = c + Vector((0.0, math.cos(a0) * r, math.sin(a0) * r))
-                q1 = c + Vector((0.0, math.cos(a1) * r, math.sin(a1) * r))
-                d = (q1 - q0).normalized()
-                p.polygon([q0 - d.cross(X) * 0.008, q1 - d.cross(X) * 0.008, q1 + d.cross(X) * 0.008, q0 + d.cross(X) * 0.008], "MI_Hub_HullTarDark",
-                          tone=0.2, facing=-X)
-        p.lathe([(0.0, 0.0), (0.02, 0.0), (0.02, 0.015), (0.0, 0.02)], Vector((xw - 0.012, y + w * 0.5, z1 - 0.05)), -X, "MI_Metal_Brass", sides=6)
-        y += w + rng.uniform(0.1, 0.25)
-    for x, y, zz in H.prop("keelgate", "lanterns")["at"]:
-        deck_lantern(p, x, y, Z["lower"])
-    export(p)
-
-
-# --- the main deck -----------------------------------------------------------------------------------------------------------
 def small_boat(p, x0, x1, yc, beam, zk, depth, cover=True):
     """A ship's boat on chocks: planked, oxblood with a cream sheer strake, a canvas cover laced over her."""
     db = {"x0": x0, "x1": x1, "y": yc, "beam": beam, "keel_z": zk - Z["quay"]}
@@ -1670,7 +1601,7 @@ def build_gates():
     it fills the opening the floors leave for it (door high, the corridor's width; the floors frame it): G1 a barred double door,
     G2 a rope and a board across the way, G4 shutters, G6 an iron grille with the store's goods stacked behind it; on the forecastle's
     front G3 a ladder chained shut. On the deck: the cargo rope (G2), a chained plate at the shrouds (G3), a padlocked hatch (G3).
-    G5 is the Keelgate (build_keelgate)."""
+    G5 (the Keelgate) is out of the hub for now (D70)."""
     p = T.Part("SM_Hub_Gates")
     rng = random.Random(66)
     for gm in PL.all_gate_marks():
@@ -1810,8 +1741,8 @@ def build_gates():
     export(p)
 
 
-BUILDERS = {"dock": build_dock, "slip": build_slip, "tally": build_tally, "well": build_well, "hoist": build_hoist,
-            "keelgate": build_keelgate, "main": build_main, "chandlery": build_chandlery, "gates": build_gates}
+BUILDERS = {"dock": build_dock, "bridge": build_bridge, "slip": build_slip, "tally": build_tally, "well": build_well, "hoist": build_hoist,
+            "main": build_main, "chandlery": build_chandlery, "gates": build_gates}
 
 if __name__ == "__main__":
     random.seed(62)

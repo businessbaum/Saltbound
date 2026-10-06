@@ -1,30 +1,70 @@
 {
- "_comment": "D64 the side doors (build_hub_doors.py), ship metres. Each leaf mesh's pivot is its hinge axis at z0; open = yaw open_yaw (Unreal, + turns +X to +Y). The aft leaf opens first and shuts last; the fore leaf follows lag_deg behind it. eye: where the leaf's rope takes hold; block: the fixed block it runs to (then down to the capstan, in SM_Hub_DoorFrame).",
- "lag_deg": 10,
+ "_comment": "D64, D70 the side doors (build_hub_doors.py), ship metres, a pair in each side at each station (aft first). Each leaf mesh's pivot is its hinge axis at z0; open = yaw open_yaw (Unreal, + turns +X to +Y). The aft leaf opens first and shuts last; the fore leaf follows its station's lag_deg behind it. eye: where the leaf's rope takes hold; block: the fixed block it runs to (then down to the capstan, in SM_Hub_DoorFrame).",
+ "stations": [
+  {
+   "x0": 32.0,
+   "x1": 40.0,
+   "lag_deg": 10,
+   "z_bottom_mid": -2.5,
+   "z_top_mid": 12.912,
+   "leaf_z_at_x": {
+    "32.0": [
+     -2.424,
+     13.003
+    ],
+    "36.0": [
+     -2.5,
+     12.912
+    ],
+    "40.0": [
+     -2.545,
+     12.858
+    ]
+   }
+  },
+  {
+   "x0": 104.0,
+   "x1": 112.0,
+   "lag_deg": 12,
+   "z_bottom_mid": -2.561,
+   "z_top_mid": 12.839,
+   "leaf_z_at_x": {
+    "104.0": [
+     -2.561,
+     12.839
+    ],
+    "108.0": [
+     -2.561,
+     12.839
+    ],
+    "112.0": [
+     -2.561,
+     12.839
+    ]
+   }
+  }
+ ],
+ "lag_deg": 12,
  "z_bottom_mid": -2.5,
  "z_top_mid": 12.912,
- "leaf_z_at_x": {
-  "32.0": [
-   -2.424,
-   13.003
-  ],
-  "36.0": [
-   -2.5,
-   12.912
-  ],
-  "40.0": [
-   -2.545,
-   12.858
-  ]
- },
  "capstans": [
   [
-   28,
+   28.4,
    16.5,
    1.5
   ],
   [
-   28,
+   28.4,
+   -16.5,
+   1.5
+  ],
+  [
+   100.4,
+   16.5,
+   1.5
+  ],
+  [
+   100.4,
    -16.5,
    1.5
   ]
@@ -32,6 +72,7 @@
  "leaves": [
   {
    "mesh": "SM_Hub_DoorStbdAft",
+   "station": 0,
    "side": "starboard",
    "leaf": "aft",
    "pivot": [
@@ -58,10 +99,16 @@
     30.45,
     15.0,
     12.93
+   ],
+   "capstan": [
+    28.4,
+    16.5,
+    1.5
    ]
   },
   {
    "mesh": "SM_Hub_DoorStbdFore",
+   "station": 0,
    "side": "starboard",
    "leaf": "fore",
    "pivot": [
@@ -88,10 +135,16 @@
     41.6,
     15.0,
     12.93
+   ],
+   "capstan": [
+    28.4,
+    16.5,
+    1.5
    ]
   },
   {
    "mesh": "SM_Hub_DoorPortAft",
+   "station": 0,
    "side": "port",
    "leaf": "aft",
    "pivot": [
@@ -118,10 +171,16 @@
     30.45,
     -15.0,
     12.93
+   ],
+   "capstan": [
+    28.4,
+    -16.5,
+    1.5
    ]
   },
   {
    "mesh": "SM_Hub_DoorPortFore",
+   "station": 0,
    "side": "port",
    "leaf": "fore",
    "pivot": [
@@ -148,6 +207,155 @@
     41.6,
     -15.0,
     12.93
+   ],
+   "capstan": [
+    28.4,
+    -16.5,
+    1.5
+   ]
+  },
+  {
+   "mesh": "SM_Hub_Door2StbdAft",
+   "station": 1,
+   "side": "starboard",
+   "leaf": "aft",
+   "pivot": [
+    102.6,
+    17.509,
+    -2.5
+   ],
+   "open_yaw": -90.0,
+   "x": [
+    104.0,
+    108.0
+   ],
+   "eye_shut": [
+    107.4,
+    18.994,
+    12.072
+   ],
+   "eye_open": [
+    104.085,
+    12.709,
+    12.072
+   ],
+   "block": [
+    102.45,
+    15.0,
+    12.93
+   ],
+   "capstan": [
+    100.4,
+    16.5,
+    1.5
+   ]
+  },
+  {
+   "mesh": "SM_Hub_Door2StbdFore",
+   "station": 1,
+   "side": "starboard",
+   "leaf": "fore",
+   "pivot": [
+    113.4,
+    17.509,
+    -2.5
+   ],
+   "open_yaw": 90.0,
+   "x": [
+    108.0,
+    112.0
+   ],
+   "eye_shut": [
+    108.596,
+    18.989,
+    12.072
+   ],
+   "eye_open": [
+    111.92,
+    12.705,
+    12.072
+   ],
+   "block": [
+    113.6,
+    15.0,
+    12.93
+   ],
+   "capstan": [
+    100.4,
+    16.5,
+    1.5
+   ]
+  },
+  {
+   "mesh": "SM_Hub_Door2PortAft",
+   "station": 1,
+   "side": "port",
+   "leaf": "aft",
+   "pivot": [
+    102.6,
+    -17.509,
+    -2.5
+   ],
+   "open_yaw": 90.0,
+   "x": [
+    104.0,
+    108.0
+   ],
+   "eye_shut": [
+    107.4,
+    -18.994,
+    12.072
+   ],
+   "eye_open": [
+    104.085,
+    -12.709,
+    12.072
+   ],
+   "block": [
+    102.45,
+    -15.0,
+    12.93
+   ],
+   "capstan": [
+    100.4,
+    -16.5,
+    1.5
+   ]
+  },
+  {
+   "mesh": "SM_Hub_Door2PortFore",
+   "station": 1,
+   "side": "port",
+   "leaf": "fore",
+   "pivot": [
+    113.4,
+    -17.509,
+    -2.5
+   ],
+   "open_yaw": -90.0,
+   "x": [
+    108.0,
+    112.0
+   ],
+   "eye_shut": [
+    108.596,
+    -18.989,
+    12.072
+   ],
+   "eye_open": [
+    111.92,
+    -12.705,
+    12.072
+   ],
+   "block": [
+    113.6,
+    -15.0,
+    12.93
+   ],
+   "capstan": [
+    100.4,
+    -16.5,
+    1.5
    ]
   }
  ]

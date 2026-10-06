@@ -51,6 +51,7 @@ COUNTER, POST_X, ROUND = HH.COUNTER, HH.POST_X, HH.ROUND
 GAL = HUB["galleries"]
 GAL_X1 = float(GAL["x1"])                     # D69: the galleries run along the sides to here
 CMD = HUB["command"]
+STONE_HELM = "MI_Hub_AncientStone"             # D70: the ancient helm's pale composite
 LAMPS_JSON = os.path.join(H.ROOT, "Art", "Generated", "hub_lamps.json")
 TEAK = ("MI_Wood_Teak", "MI_Wood_Teak", "MI_Wood_TeakDark", "MI_Wood_TeakLight")
 TAR = ("MI_Hub_HullTar", "MI_Hub_HullTar", "MI_Hub_HullTarFaded", "MI_Hub_HullTarDark")
@@ -1216,9 +1217,117 @@ def build_command():
         a, b = c + Y * sgn * 2.0, c + UP * 0.7
         p.beam(T.straight(a, b, X, (b - a).normalized().cross(X)), (b - a).length, 0.24, 0.22, "MI_Hub_Ochre", nseed(), wear=1.0)
     p.lathe([(0.0, -0.06), (0.32, -0.06), (0.36, 0.0), (0.3, 0.06), (0.0, 0.08)], c + UP * 0.25 + X * 0.1, X, "MI_Metal_Brass", sides=16, wear=0.8)
-    # The hipped copper roof: four slopes from the eaves (0.6 m out) up to a ridge along y, standing seams, a fascia.
+    # Inside the hall, seen through the open doors and the lit panes: a dark floor-to-ceiling backing a little inside the glass.
+    for (ax, ay), (bx, by), nrm in walls:
+        a, b = Vector((ax, ay, zp)), Vector((bx, by, zp))
+        q0, q1 = a - nrm * 0.6, b - nrm * 0.6
+        p.polygon([q0, q1, q1 + UP * h, q0 + UP * h], "MI_Hub_Void", tone=0.1, facing=tuple(nrm))
+    p.polygon([Vector((x0 - 0.1, -hy - 0.1, zt - 0.01)), Vector((x1 + 0.1, -hy - 0.1, zt - 0.01)), Vector((x1 + 0.1, hy + 0.1, zt - 0.01)),
+               Vector((x0 - 0.1, hy + 0.1, zt - 0.01))], "MI_Hub_HullTarDark", tone=0.3, facing=(0.0, 0.0, -1.0))
+    # D70: the bridge, a second storey set in on the hall's roof: a railed walk round it, glass all round, the roof on it.
+    br = CMD["bridge"]
+    zb = zt + 0.45
+    bx0, bx1, bhy = x0 + br["inset"], x1 - br["inset"], hy - br["inset"]
+    walk_roof(p, x0, x1, hy, bx0, bx1, bhy, zb)
+    bridge_storey(p, bx0, bx1, bhy, zb, br)
+    hipped_roof(p, bx0, bx1, bhy, zb + br["h"] + 0.3, rh)
+    helm_console(p, Vector((CMD["console"]["x"], 0.0, zb)), CMD["console"]["r"])
+    HH.export(p)
+
+
+def walk_roof(p, x0, x1, hy, bx0, bx1, bhy, z):
+    """D70: the hall's flat roof round the bridge: copper sheet over a teak curb, an iron railing along its outer edge."""
+    outer = [Vector((x1 + 0.3, -hy - 0.3, z)), Vector((x1 + 0.3, hy + 0.3, z)), Vector((x0 - 0.3, hy + 0.3, z)), Vector((x0 - 0.3, -hy - 0.3, z))]
+    inner = [Vector((bx1, -bhy, z)), Vector((bx1, bhy, z)), Vector((bx0, bhy, z)), Vector((bx0, -bhy, z))]
+    for k in range(4):
+        a, b = outer[k], outer[(k + 1) % 4]
+        c, d = inner[(k + 1) % 4], inner[k]
+        p.polygon([a, b, c, d], "MI_Hub_Copper", tone=0.45, facing=(0.0, 0.0, 1.0))
+    for k in range(4):
+        a, b = outer[k], outer[(k + 1) % 4]
+        t = (b - a).normalized()
+        n = t.cross(UP)
+        a_, b_ = a - n * 0.12 + t * 0.12, b - n * 0.12 - t * 0.12
+        L = (b_ - a_).length
+        p.beam(T.straight(a_ + UP * 0.95, b_ + UP * 0.95, UP, n), L, 0.06, 0.08, IRON, nseed(), seg=2.0, wear=0.3)           # the rail
+        p.beam(T.straight(a_ + UP * 0.45, b_ + UP * 0.45, UP, n), L, 0.03, 0.03, IRON, nseed(), seg=2.0, wear=0.3)           # a middle rail
+        nst = max(2, int(round(L / 1.6)))
+        for i in range(nst + 1):
+            q = a_ + (b_ - a_) * (i / nst)
+            p.beam(T.straight(q, q + UP * 0.95, t, n), 0.95, 0.05, 0.05, IRON, nseed(), seg=1.0, wear=0.3)
+
+
+def bridge_storey(p, x0, x1, hy, zb, br):
+    """D70: the bridge (the control room): glass all round for its panorama, clear panes from a low teak sill to a cornice
+    between slim iron mullions, a transom across at two thirds; a teak floor and a dark ceiling inside."""
+    h, sill, bay = br["h"], br["sill"], br["bay"]
+    rng = random.Random(70)
+    walls = [((x1, -hy), (x1, hy), X), ((x1, hy), (x0, hy), Y), ((x0, hy), (x0, -hy), -X), ((x0, -hy), (x1, -hy), -Y)]
+    for (ax, ay), (bx, by), nrm in walls:
+        a, b = Vector((ax, ay, zb)), Vector((bx, by, zb))
+        L = (b - a).length
+        t = (b - a).normalized()
+        F = (a, t, UP, nrm)
+        HH.lbeam(p, F, 0.0, sill * 0.5, L, sill * 0.5, sill, 0.24, 0.0, "MI_Wood_Varnish", wear=0.8)                 # the sill wall
+        HH.lbeam(p, F, -0.1, sill + 0.03, L + 0.1, sill + 0.03, 0.08, 0.32, 0.03, "MI_Hub_Ochre", wear=1.0)
+        n = max(2, int(round(L / bay)))
+        top = h - 0.35
+        for k in range(n + 1):
+            u = L * k / n
+            HH.lbeam(p, F, u, sill, u, top, 0.1, 0.14, 0.0, IRON, wear=0.4)                                           # mullions
+        HH.lbeam(p, F, 0.0, sill + (top - sill) * 0.68, L, sill + (top - sill) * 0.68, 0.06, 0.1, 0.0, IRON, wear=0.4)  # the transom
+        for k in range(n):
+            ua, ub = L * k / n + 0.05, L * (k + 1) / n - 0.05
+            p.polygon([HH.lpt(F, ua, sill + 0.05, -0.02), HH.lpt(F, ub, sill + 0.05, -0.02), HH.lpt(F, ub, top - 0.02, -0.02),
+                       HH.lpt(F, ua, top - 0.02, -0.02)], "MI_Hub_GlassClear", tone=rng.random(), facing=tuple(nrm))
+        HH.lbeam(p, F, -0.2, top + 0.17, L + 0.2, top + 0.17, 0.34, 0.36, 0.0, "MI_Wood_Varnish", wear=0.8)            # the cornice
+        HH.lbeam(p, F, -0.25, top + 0.38, L + 0.25, top + 0.38, 0.1, 0.46, 0.02, "MI_Hub_Ochre", wear=1.0)
+    for (cx, cy) in ((x0, -hy), (x0, hy), (x1, -hy), (x1, hy)):                                                        # corner posts
+        p.beam(T.straight((cx, cy, zb), (cx, cy, zb + h), X, Y), h, 0.26, 0.26, "MI_Wood_Varnish", nseed(), wear=1.0)
+    # The floor (teak boards across) and the ceiling (dark boards on beams).
+    y = -hy + 0.1
+    while y < hy - 0.15:
+        yb = min(y + 0.22, hy - 0.1)
+        p.polygon([(x0 + 0.1, y, zb + 0.01), (x1 - 0.1, y, zb + 0.01), (x1 - 0.1, yb - 0.008, zb + 0.01), (x0 + 0.1, yb - 0.008, zb + 0.01)],
+                  rng.choice(("MI_Wood_Teak", "MI_Wood_TeakDark", "MI_Wood_TeakLight")), tone=rng.random(), facing=(0.0, 0.0, 1.0))
+        y = yb
+    zc = zb + h
+    p.polygon([Vector((x0, -hy, zc)), Vector((x0, hy, zc)), Vector((x1, hy, zc)), Vector((x1, -hy, zc))], "MI_Hub_HullTarDark", tone=0.3,
+              facing=(0.0, 0.0, -1.0))
+    x = x0 + 1.2
+    while x < x1 - 0.5:
+        p.beam(T.straight((x, -hy, zc - 0.12), (x, hy, zc - 0.12), X, UP), 2 * hy, 0.18, 0.24, "MI_Wood_TeakDark", nseed(), seg=1.0, wear=0.6)
+        x += 2.4
+
+
+def helm_console(p, c, r):
+    """D70: the ancient helm in the bridge (hub.command.console): a pedestal of pale seamless stone (the Old World's composite)
+    with turquoise lines on its top, a curved desk before it facing the bow; dark until the player wakes it."""
+    glow = "MI_Hub_AncientGlowLow"
+    p.lathe([(0.0, 0.0), (r * 1.05, 0.0), (r * 1.05, 0.1), (r * 0.95, 0.16), (0.0, 0.16)], c, UP, STONE_HELM, sides=32)
+    p.lathe([(0.0, 0.16), (0.55, 0.16), (0.42, 0.45), (0.4, 0.82), (0.7, 0.95), (r * 0.82, 1.02), (r * 0.85, 1.08), (0.0, 1.1)], c, UP,
+            STONE_HELM, sides=32)
+    top = c + UP * 1.11
+    for rr in (0.32, 0.72):
+        p.beam(T.arc(top, X, Y, rr, 0.0, 2.0 * math.pi), 2.0 * math.pi * rr, 0.035, 0.012, glow, nseed(), seg=0.08, wear=0.0)
+    for k in range(7):
+        a = 2.0 * math.pi * k / 7.0
+        d = X * math.cos(a) + Y * math.sin(a)
+        p.beam(T.straight(top + d * 0.32, top + d * (r * 0.8), d.cross(UP), UP), r * 0.8 - 0.32, 0.03, 0.012, glow, nseed(), seg=1.0, wear=0.0)
+    # The desk: a low curved wall of the same stone before it, its top edge lined.
+    a0, a1 = math.radians(-62.0), math.radians(62.0)
+    rd = r + 0.75
+    pts = [c + (X * math.cos(a0 + (a1 - a0) * k / 16) + Y * math.sin(a0 + (a1 - a0) * k / 16)) * rd for k in range(17)]
+    f = T.polyline([q + UP * 0.45 for q in pts], lambda q: UP, lambda q, c_=c: (q - c_ - UP * (q - c_).z).normalized())
+    p.beam(f, T.length_of(f), 0.9, 0.34, STONE_HELM, nseed(), seg=0.4, wear=0.0)
+    f2 = T.polyline([q + UP * 0.92 for q in pts], lambda q: UP, lambda q, c_=c: (q - c_ - UP * (q - c_).z).normalized())
+    p.beam(f2, T.length_of(f2), 0.03, 0.36, glow, nseed(), seg=0.4, wear=0.0)
+
+
+def hipped_roof(p, x0, x1, hy, ze, rh):
+    """The command hall's hipped copper roof (D69, on the bridge since D70): four slopes from the eaves (0.6 m out) up to a
+    ridge along y, standing seams, a fascia, and a glazed lantern along its ridge."""
     ex0, ex1, ey = x0 - 0.6, x1 + 0.6, hy + 0.6
-    ze = zt + 0.45
     zr = ze + rh
     ry = ey - (ex1 - ex0) * 0.5 + 0.6                                      # the ridge runs along y, the hips at its ends
     corners = [Vector((ex1, -ey, ze)), Vector((ex1, ey, ze)), Vector((ex0, ey, ze)), Vector((ex0, -ey, ze))]
@@ -1262,15 +1371,6 @@ def build_command():
         p.polygon(poly, "MI_Hub_Copper", tone=0.6, facing=(0.0, 0.0, 1.0))
     for q in (top_a, top_b):
         p.lathe([(0.0, 0.0), (0.1, 0.0), (0.14, 0.12), (0.07, 0.24), (0.11, 0.36), (0.0, 0.55)], q, UP, "MI_Metal_Brass", sides=8, wear=0.8)
-    # Inside, seen through the open doors and the lit panes: a dark floor-to-ceiling backing a little inside the glass.
-    for (ax, ay), (bx, by), nrm in walls:
-        a, b = Vector((ax, ay, zp)), Vector((bx, by, zp))
-        t = (b - a).normalized()
-        q0, q1 = a - nrm * 0.6, b - nrm * 0.6
-        p.polygon([q0, q1, q1 + UP * h, q0 + UP * h], "MI_Hub_Void", tone=0.1, facing=tuple(nrm))
-    p.polygon([Vector((x0 - 0.1, -hy - 0.1, zt - 0.01)), Vector((x1 + 0.1, -hy - 0.1, zt - 0.01)), Vector((x1 + 0.1, hy + 0.1, zt - 0.01)),
-               Vector((x0 - 0.1, hy + 0.1, zt - 0.01))], "MI_Hub_HullTarDark", tone=0.3, facing=(0.0, 0.0, -1.0))
-    HH.export(p)
 
 
 def _plan_gates(level="main"):

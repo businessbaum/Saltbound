@@ -1,4 +1,4 @@
-"""The hub ship's layout for review (D64): plans of every floor, the side, a section through the Water Hall, the stern.
+"""The hub ship's layout for review (D64, D70): plans of every floor, the side, a section through the harbour, the stern.
 
     python Tools/design/hub_review.py            -> Docs/Design/HubShip/HubShip_D64_*.png
 
@@ -23,7 +23,7 @@ import hub_plan as P  # noqa: E402
 OUT = os.path.join(ROOT, "Docs", "Design", "HubShip")
 BG = "#f4efe4"
 INK = "#3b2f25"
-OPEN_COLOURS = {"dock": "#9fd0c0", "dock_g": "#9fd0c0", "slip": "#e6c27a", "keelgate": "#b9b0e0", "tally": "#e7a98f", "lane": "#e7c3b3",
+OPEN_COLOURS = {"harbour": "#9fd0c0", "slip": "#e6c27a", "tally": "#e7a98f", "lane": "#e7c3b3",
                 "well_l": "#c8d9a6", "well_m": "#c8d9a6", "well_u": "#c8d9a6", "well_g": "#c8d9a6", "deck": "#d9cfae", "chandlery": "#e5b3c8"}
 WATER = "#5f9fc0"
 CORR = "#d5ccbb"
@@ -104,13 +104,24 @@ def draw_floor(ax, level_id, title):
             ax.text(x, y, "%s %s" % (k, LOCKED_NAMES.get(k, "")), fontsize=6, ha="center", va="center", color="#6d5d4b", style="italic")
     if level_id == "quay":
         dr = H.HUB["doors"]
-        for s in (-1, 1):
-            ax.add_patch(Rectangle((dr["x0"], s * 19.3 - 0.4), dr["x1"] - dr["x0"], 0.8, fc="#2e7d32", ec="none"))
-            for hx in (dr["x0"], dr["x1"]):                                   # the leaves open
-                ax.plot([hx, hx], [s * 19.0, s * 15.0], color="#2e7d32", lw=2.4)
-        ax.text(36, 20.6, "hidden doors (both sides)", fontsize=6.5, color="#2e7d32", ha="center")
-        for b in [H.prop("dock", "fitting_berth")] + [dict(bb, heading=-90) for bb in H.prop("dock", "fleet_berths")["berths"]]:
-            boat(ax, b["x"], 0.5 * (b["y0"] + b["y1"]), b.get("heading", -90), 10.0 if "10" in b.get("boat", "10 m") else 14.0)
+        for st in dr["stations"]:
+            for s in (-1, 1):
+                ax.add_patch(Rectangle((st["x0"], s * 19.3 - 0.4), st["x1"] - st["x0"], 0.8, fc="#2e7d32", ec="none"))
+                for hx in (st["x0"], st["x1"]):                               # the leaves open
+                    ax.plot([hx, hx], [s * 19.0, s * 15.0], color="#2e7d32", lw=2.4)
+            ax.text(0.5 * (st["x0"] + st["x1"]), 20.6, "hidden doors (both sides)", fontsize=6.5, color="#2e7d32", ha="center")
+        for bx0, bx1, by0, by1 in H.lift_bridges():                          # D70: the lifting bridges, two leaves each
+            ax.add_patch(Rectangle((bx0, by0), bx1 - bx0, by1 - by0, fc="#b07a3a", ec=INK, lw=0.5))
+            ax.plot([0.5 * (bx0 + bx1)] * 2, [by0, by1], color=INK, lw=0.5)
+        for bx0, bx1, by0, by1 in H.fixed_bridges():
+            ax.add_patch(Rectangle((bx0, by0), bx1 - bx0, by1 - by0, fc="#b07a3a", ec=INK, lw=0.5))
+        for d in H.HUB["docking"]:                                            # the player's boat at each docking station
+            x, y, hd = H.docking_pose(d)
+            boat(ax, x, y, hd, 10.0, fc="#c8a23a")
+            ax.text(x, y - 2.6 if y > 0 else y + 2.6, "dock: " + d["id"], fontsize=6, ha="center", color="#6d5d4b")
+        for b in H.prop("harbour", "fleet_berths")["berths"]:
+            x, y, hd = H.docking_pose(dict(b, heading=0))
+            boat(ax, x, y, hd, 10.0 if "10" in b.get("boat", "10 m") else 14.0)
     ax.set_xlim(-4, 164)
     ax.set_ylim(-22, 22)
     ax.set_aspect("equal")
@@ -121,7 +132,7 @@ def draw_floor(ax, level_id, title):
     ax.set_title("%s (z %+.1f)   rooms %d   gates %d" % (title, p.z, rooms, len(gates)), fontsize=9, loc="left", color=INK)
 
 
-def boat(ax, x, y, heading, length):
+def boat(ax, x, y, heading, length, fc="#8a3324"):
     """A boat in plan: a pointed hull length x 3.4 m."""
     a = math.radians(heading)
     fx, fy = math.cos(a), math.sin(a)
@@ -129,11 +140,11 @@ def boat(ax, x, y, heading, length):
     hl, hb = length / 2, 1.7
     pts = [(x + fx * hl, y + fy * hl), (x + fx * hl * 0.4 + rx * hb, y + fy * hl * 0.4 + ry * hb), (x - fx * hl * 0.8 + rx * hb * 0.9, y - fy * hl * 0.8 + ry * hb * 0.9),
            (x - fx * hl, y - fy * hl), (x - fx * hl * 0.8 - rx * hb * 0.9, y - fy * hl * 0.8 - ry * hb * 0.9), (x + fx * hl * 0.4 - rx * hb, y + fy * hl * 0.4 - ry * hb)]
-    ax.add_patch(Polygon(pts, closed=True, fc="#8a3324", ec=INK, lw=0.6))
+    ax.add_patch(Polygon(pts, closed=True, fc=fc, ec=INK, lw=0.6))
 
 
 def plans():
-    groups = [("HubShip_D64_plans_low", [("deep", "The Deep"), ("hold", "Hold"), ("quay", "Dock deck: the Water Hall"), ("lower", "Lower deck")]),
+    groups = [("HubShip_D64_plans_low", [("deep", "The Deep"), ("hold", "Hold"), ("quay", "Dock deck: the harbour"), ("lower", "Lower deck")]),
               ("HubShip_D64_plans_mid", [("middle", "Middle deck"), ("upper", "Upper deck"), ("gun", "Gun deck"), ("main", "Main deck")]),
               ("HubShip_D64_plans_castles", [("sc1", "Sterncastle, first storey (and forecastle)"), ("sc2", "Sterncastle, second storey; quarterdeck"),
                                               ("sc3", "Sterncastle, third storey"), ("poop", "Poop deck")])]
@@ -145,7 +156,7 @@ def plans():
                 p = P.plan("fc1")
                 ax.imshow(np.where(np.array([[[1 if (i, j) in p.lab else 0] for i in range(P.NX)] for j in range(P.NY)]) > 0,
                                    floor_image(p), np.nan), origin="lower", extent=(P.X0, P.X1, P.Y0, P.Y1), interpolation="nearest")
-        fig.suptitle("Hollowkeel, D64 layout: corridors and rooms on every floor (sand), open spaces coloured, water blue, gates red", fontsize=11,
+        fig.suptitle("Hollowkeel, D70 layout: corridors and rooms on every floor (sand), open spaces coloured, water blue, gates red", fontsize=11,
                      color=INK, x=0.01, ha="left")
         fig.tight_layout(rect=(0, 0, 1, 0.97))
         path = os.path.join(OUT, name + ".png")
@@ -173,11 +184,13 @@ def side_and_sections():
             ax.text(max(xs) + 0.5 if lv not in ("sc1", "sc2", "sc3", "poop") else min(xs) - 0.5, z + 0.3, lv, fontsize=6, color="#e8d7b0",
                     ha="left" if lv not in ("sc1", "sc2", "sc3", "poop") else "right")
     dr = H.HUB["doors"]
-    ax.add_patch(Rectangle((dr["x0"], dr["z0"]), dr["x1"] - dr["x0"], dr["z1"] - dr["z0"], fc="none", ec="#7fd18a", lw=1.2, ls="--"))
-    ax.text(36, dr["z1"] + 0.6, "hidden doors (shut: only a seam)", fontsize=7, color="#7fd18a", ha="center")
+    for st in dr["stations"]:
+        ax.add_patch(Rectangle((st["x0"], dr["z0"]), st["x1"] - st["x0"], dr["z1"] - dr["z0"], fc="none", ec="#7fd18a", lw=1.2, ls="--"))
+        ax.text(0.5 * (st["x0"] + st["x1"]), dr["z1"] + 0.6, "hidden doors", fontsize=7, color="#7fd18a", ha="center")
     dk = H.HUB["dock"]
-    ax.add_patch(Rectangle((dk["x0"], dk["floor"]), dk["x1"] - dk["x0"], H.Z["gun"] - 0.3 - dk["floor"], fc="none", ec="#9fd0c0", lw=0.8, ls=":"))
-    ax.text(38, -3.2, "Water Hall", fontsize=7, color="#9fd0c0", ha="center")
+    cn = dk["canal"]
+    ax.add_patch(Rectangle((cn["x0"], dk["floor"]), cn["x1"] - cn["x0"], H.Z["gun"] - 0.3 - dk["floor"], fc="none", ec="#9fd0c0", lw=0.8, ls=":"))
+    ax.text(60, -3.2, "the harbour: the canal the whole length, a basin at each pair of doors", fontsize=7, color="#9fd0c0", ha="center")
     sh = H.HUB["shaft"]
     ax.add_patch(Rectangle((sh["x0"], H.Z["quay"]), sh["x1"] - sh["x0"], H.Z["main"] - H.Z["quay"], fc="none", ec="#c8d9a6", lw=0.8, ls=":"))
     ax.text(84, 2.2, "Well", fontsize=7, color="#c8d9a6", ha="center")
@@ -190,8 +203,8 @@ def side_and_sections():
     ax.set_ylim(-14, 50)
     ax.set_aspect("equal")
     ax.tick_params(labelsize=6)
-    ax.set_title("Side (starboard): 3 m decks, the sterncastle in two tiers, the hidden doors at x 32..40 (masts cut off at 42 %)", fontsize=9, loc="left")
-    # Section through the Water Hall at x 36, looking forward.
+    ax.set_title("Side (starboard): 3 m decks, the sterncastle in two tiers, the hidden doors at x 32..40 and 104..112 (masts cut off at 42 %)", fontsize=9, loc="left")
+    # Section through the aft basin at x 36, looking forward.
     ax = fig.add_axes((0.04, 0.05, 0.44, 0.45))
     zs = np.linspace(-12, H.profile_top(36), 120)
     hw = [H.half_width(36, z) for z in zs]
@@ -206,7 +219,7 @@ def side_and_sections():
         z = H.level_z(lv)
         w = H.floor_half(lv, 36)
         ax.add_patch(Rectangle((-w, z - 0.3), 2 * w, 0.3, fc="#8a6a4a", ec="none"))
-    for lv in ("lower", "middle", "upper"):                                     # the galleries behind (x 26..30, 46..50)
+    for lv in ("lower", "middle", "upper"):                                     # the galleries behind (across the basin's ends)
         z = H.level_z(lv)
         w = H.floor_half(lv, 36)
         ax.plot([-w, w], [z, z], color="#8a6a4a", lw=0.8, ls="--")
@@ -222,7 +235,7 @@ def side_and_sections():
     ax.set_ylim(-13, 21)
     ax.set_aspect("equal")
     ax.tick_params(labelsize=6)
-    ax.set_title("Section through the Water Hall at x 36 (doors open in both sides)", fontsize=9, loc="left")
+    ax.set_title("Section through the aft basin at x 36 (doors open in both sides)", fontsize=9, loc="left")
     # The stern from aft: the widest the hull is at each height over its last 6 m.
     ax = fig.add_axes((0.53, 0.05, 0.43, 0.45))
     zs = np.linspace(-12, H.profile_top(0.5), 160)

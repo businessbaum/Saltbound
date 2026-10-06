@@ -20,6 +20,7 @@ ROW = 0.5                       # wall board width (build_hub_ends.ROW)
 COLOURS = {
     "MI_Hub_HullTar": (0.16, 0.11, 0.08), "MI_Hub_HullTarFaded": (0.24, 0.18, 0.13), "MI_Hub_HullTarDark": (0.1, 0.07, 0.05),
     "MI_Hub_Ochre": (0.62, 0.43, 0.16), "MI_Hub_OchreFaded": (0.7, 0.55, 0.3), "MI_Hub_AncientStone": (0.84, 0.82, 0.74),
+    "MI_Hub_GlassClear": (0.62, 0.76, 0.76), "MI_Hub_AncientGlowLow": (0.3, 0.75, 0.68),
     "MI_AncientGlow": (0.35, 0.95, 0.85), "MI_Caulk_Dark": (0.04, 0.035, 0.03), "MI_Wood_Tarred": (0.06, 0.05, 0.04),
     "MI_Paint_Cream": (0.86, 0.8, 0.64), "MI_Paint_CreamAged": (0.76, 0.68, 0.5), "MI_Metal_Iron": (0.08, 0.08, 0.08),
     "MI_Metal_Brass": (0.6, 0.45, 0.2), "MI_Glass_Dark": (0.12, 0.16, 0.17), "MI_LanternGlass": (1.0, 0.7, 0.35),

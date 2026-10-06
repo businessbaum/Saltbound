@@ -3,7 +3,7 @@ the room layout (hub_plan.py), one mesh per floor: SM_Hub_Lvl_<level> (/Game/Sal
 the blockout's SM_HubBlk_Deck_<level> collides under it).
 
 Owner (D64): "Build all the decks and rooms, you don't need to design every room. Make the decks cozy and not too big." The open
-spaces and what is seen from them (the Water Hall's galleries, the main deck) get the hand-made kit of build_hub_inside.py (boards
+spaces and what is seen from them (the harbour's galleries, the main deck) get the hand-made kit of build_hub_inside.py (boards
 swept one by one, frame posts, skirting, turned balusters, beams, knees); the locked rooms and corridors, seen at most through a
 grille, a lighter finish of the same look: planks as flat faces over a dark backing, beams as blocks, plank doors shut.
 The designed spaces' own things (quays, stairs, counters, the Keelgate, the Chandlery) are build_hub_inside.py's; the castles'
@@ -219,17 +219,8 @@ def windows(level_id):
     return out
 
 
-def under_keelgate(level_id, c):
-    """The Keelgate's stone ring and apron stand in the chamber's floor (build_hub_inside builds them): no boards there."""
-    if level_id != "quay":
-        return False
-    kg = H.HUB["keelgate"]
-    r = kg["ring"] + 0.3
-    return abs(PL.cx(c[0]) - kg["x"]) < r and abs(PL.cy(c[1]) - kg["y"]) < r
-
-
 def floor_style(label):
-    if label[0] == "open" and label[1] in ("dock", "dock_g"):
+    if label[0] == "open" and label[1] == "harbour":                 # D70: the quays' weathered decking
         return dict(mats=I.DOCK, width=I.QUAY_W)
     return dict(mats=I.TEAK, width=I.FLOOR_W)
 
@@ -243,7 +234,7 @@ def build_level(level_id):
     groups = {}
     for c, l in plan.lab.items():
         st = style(plan, c, l)
-        if st is None or under_keelgate(level_id, c):
+        if st is None:
             continue
         key = (st, l[1] if st == "fine" and l[0] == "open" else None)
         groups.setdefault(key, []).append(c)

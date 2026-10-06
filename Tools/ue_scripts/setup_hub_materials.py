@@ -79,4 +79,21 @@ sb_ue.make_mi("MI_Hub_Copper", MI, surf, vectors={"Tint": (0.16, 0.32, 0.27, 1),
 glow = unreal.load_asset(S.MASTER + "/M_SB_Glow")
 sb_ue.make_mi("MI_Hub_AncientGlowLow", MI, glow, vectors={"BaseColor": (0.05, 0.12, 0.12, 1), "GlowColor": (0.35, 0.95, 0.85, 1)},
               scalars={"GlowIntensity": 3.0})                       # the salvaged pieces: faintly (spaces.keelgate.shelves)
+# D70: the control room's panorama glass (the bridge on the command hall: owner, "controll room needs panorama view"): clear,
+# a cool tint, sharp reflections; translucent with forward-shaded lighting (it takes the sky's reflection).
+mel = unreal.MaterialEditingLibrary
+glass = sb_ue.reset_material("M_SB_GlassClear", S.MASTER)
+glass.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+glass.set_editor_property("translucency_lighting_mode", unreal.TranslucencyLightingMode.TLM_SURFACE)
+glass.set_editor_property("two_sided", True)
+g_tint = sb_ue.vector_param(glass, "Tint", (0.55, 0.68, 0.66, 1), -500, 0)
+g_opacity = sb_ue.scalar_param(glass, "Opacity", 0.14, -500, 200)
+g_rough = sb_ue.scalar_param(glass, "Roughness", 0.04, -500, 300)
+g_spec = sb_ue.scalar_param(glass, "Specular", 0.9, -500, 400)
+sb_ue.to_prop(g_tint, "", unreal.MaterialProperty.MP_BASE_COLOR)
+sb_ue.to_prop(g_opacity, "", unreal.MaterialProperty.MP_OPACITY)
+sb_ue.to_prop(g_rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+sb_ue.to_prop(g_spec, "", unreal.MaterialProperty.MP_SPECULAR)
+mel.recompile_material(glass)
+sb_ue.make_mi("MI_Hub_GlassClear", MI, glass)
 print("SB_HUB_MATERIALS_OK")

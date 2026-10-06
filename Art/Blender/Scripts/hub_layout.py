@@ -261,6 +261,63 @@ def inside(r, x, y):
     return r[0] <= x < r[1] and r[2] <= y < r[3]
 
 
+# --- the harbour (D70) -------------------------------------------------------------------------------------------------------
+def canal_half(x):
+    """The canal's half-width at x (narrower under the Well), 0 beyond its ends."""
+    cn = HUB["dock"]["canal"]
+    if not cn["x0"] <= x < cn["x1"]:
+        return 0.0
+    nw = cn["narrow"]
+    return float(nw["half"] if nw["x0"] <= x < nw["x1"] else cn["half"])
+
+
+def canal_rects():
+    """The canal as rectangles (x0, x1, y0, y1): aft of the Well, under it (narrow), forward of it."""
+    cn = HUB["dock"]["canal"]
+    nw = cn["narrow"]
+    h, n = float(cn["half"]), float(nw["half"])
+    return [(cn["x0"], nw["x0"], -h, h), (nw["x0"], nw["x1"], -n, n), (nw["x1"], cn["x1"], -h, h)]
+
+
+def basins():
+    """The basins across the ship (x0, x1, y0, y1), each with its pair of doors."""
+    return [(float(b["x0"]), float(b["x1"]), -20.0, 20.0) for b in HUB["dock"]["basins"]]
+
+
+def water_rects():
+    return canal_rects() + basins()
+
+
+def door_stations():
+    """The doors' stations (x0, x1), one per basin, aft first."""
+    return [(float(s["x0"]), float(s["x1"])) for s in HUB["doors"]["stations"]]
+
+
+def lift_bridges():
+    """The quays' lifting bridges over the basins (x0, x1, y0, y1): two leaves each, hinged at the basin's edges."""
+    lb = HUB["bridges"]["lift"]
+    out = []
+    for k, y in lb["at"]:
+        b = HUB["dock"]["basins"][k]
+        out.append((float(b["x0"]), float(b["x1"]), y - lb["w"] / 2, y + lb["w"] / 2))
+    return out
+
+
+def fixed_bridges():
+    """The fixed footbridges over the canal (x0, x1, y0, y1), from quay to quay."""
+    return [(f["x"] - f["w"] / 2, f["x"] + f["w"] / 2, -canal_half(f["x"]), canal_half(f["x"])) for f in HUB["bridges"]["fixed"]]
+
+
+def docking_pose(d):
+    """A berth along the canal (hub.docking, harbour.fleet_berths): (x, y, heading) of the boat's middle in ship metres, her
+    quay `side` (+1 starboard of her) `reach` m from her middle."""
+    h = math.radians(d["heading"])
+    qy = d["side"] * math.cos(h)                                  # the quay's direction across the canal (+y or -y)
+    x = 0.5 * (d["x0"] + d["x1"])
+    face = math.copysign(canal_half(x), qy)
+    return x, face - math.copysign(d.get("reach", 2.1), qy), float(d["heading"])
+
+
 # --- gates -----------------------------------------------------------------------------------------------------------------
 # The blockout's gate boxes (build_hub_blockout.py draws them, build_hub_inside.py builds the art on them, ASaltHubGate blocks
 # there): width and height (m) per gate type; doors 2.2 x 1.2 m (prompt section 3).

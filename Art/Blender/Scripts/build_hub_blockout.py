@@ -204,12 +204,14 @@ def ring(x):
 
 
 def in_door(x, z):
-    return DOORS["x0"] < x < DOORS["x1"] and DOORS["z0"] < z < DOORS["z1"]
+    """In one of the hidden doors' openings (D70: a station at each basin)."""
+    return DOORS["z0"] < z < DOORS["z1"] and any(a < x < b for a, b in H.door_stations())
 
 
 def shell(part, x0, x1, side=None):
     """Skin the sections between x0 and x1 (side: None both, +1 starboard half, -1 port half); open at the hidden doors."""
-    xs = sorted({x0, x1, DOORS["x0"], DOORS["x1"]} | {float(x) for x in range(int(math.ceil(x0)), int(math.floor(x1)) + 1)})
+    edges = {e for st in H.door_stations() for e in st}
+    xs = sorted({x0, x1} | edges | {float(x) for x in range(int(math.ceil(x0)), int(math.floor(x1)) + 1)})
     xs = [x for x in xs if x0 <= x <= x1]
     rings = [ring(x) for x in xs]
     for (xa, ra), (xb, rb) in zip(zip(xs, rings), zip(xs[1:], rings[1:])):
@@ -270,31 +272,33 @@ def pole(part, a, b, r0, r1, mat, sides=8, collide=True):
     part.hull(pts, mat, collide)
 
 
-# --- the Water Hall ------------------------------------------------------------------------------------------------------
+# --- the harbour (D70) -----------------------------------------------------------------------------------------------------
+QUAY_FACE = 0.4                                   # the quays' faces: this thick, on the quay's side of the water's edge
+
+
 def build_dock():
-    """The water's floor, the quays' faces (stone from the floor up to the quay deck: the boats meet them), the slipway."""
+    """The harbour's water bed (the canal and the basins), the quays' faces (from the bed up to the quay deck: the boats meet
+    them) and the fixed footbridges over the canal. The lifting bridges are actors of their own (they move)."""
     p = Part("SM_HubBlk_Dock", ucx=False)
-    dk = H.HUB["dock"]
-    wx0, wx1 = dk["water"]["x0"], dk["water"]["x1"]
-    fl = dk["floor"]
+    fl = H.HUB["dock"]["floor"]
     zq = Z["quay"]
-    ramp = H.HUB["ramp"]
-    ys = [y * 0.5 for y in range(-42, 43)]
-    for ya, yb in zip(ys[:-1], ys[1:]):
-        ym = 0.5 * (ya + yb)
-        if abs(ym) < H.half_width(0.5 * (wx0 + wx1), fl) - 0.05:
-            p.quad([(wx0, ya, fl), (wx1, ya, fl), (wx1, yb, fl), (wx0, yb, fl)], "MI_HubBlk_Stone")
-    for xq0, xq1 in ((dk["x0"], wx0), (wx1, dk["x1"])):
-        for ya, yb in zip(ys[:-1], ys[1:]):
-            ym = 0.5 * (ya + yb)
-            if abs(ym) >= H.half_width(0.5 * (xq0 + xq1), zq) - 0.4:
-                continue
-            if xq0 == wx1 and ramp["y0"] <= ym < ramp["y1"]:
-                continue                                            # the slipway runs through here
-            p.box(xq0, xq1, ya, yb, fl, zq - SLAB, "MI_HubBlk_Stone")
-    w = ramp["y1"]
-    p.hull([(ramp["x0"], -w, fl), (ramp["x0"], w, fl), (ramp["x0"], -w, ramp["z0"]), (ramp["x0"], w, ramp["z0"]),
-            (ramp["x1"], -w, fl), (ramp["x1"], w, fl), (ramp["x1"], -w, ramp["z1"]), (ramp["x1"], w, ramp["z1"])], "MI_HubBlk_Stone")
+    for x0, x1, y0, y1 in H.water_rects():
+        xs = [x0 + k * 0.5 for k in range(int(round((x1 - x0) / 0.5)) + 1)]
+        for xa, xb in zip(xs[:-1], xs[1:]):
+            hw = min(H.half_width(xa, fl), H.half_width(xb, fl)) - 0.05
+            ya, yb = max(y0, -hw), min(y1, hw)
+            if yb > ya:
+                p.quad([(xa, ya, fl), (xb, ya, fl), (xb, yb, fl), (xa, yb, fl)], "MI_HubBlk_Stone")
+    for axis, line, a0, a1, side in PL.water_edges():
+        t0, t1 = sorted((line, line + side * QUAY_FACE))
+        if axis == "x":
+            p.box(t0, t1, a0, a1, fl, zq - SLAB, "MI_HubBlk_Stone")
+        else:
+            p.box(a0, a1, t0, t1, fl, zq - SLAB, "MI_HubBlk_Stone")
+    for x0, x1, y0, y1 in H.fixed_bridges():
+        p.box(x0, x1, y0 - 0.3, y1 + 0.3, zq - 0.3, zq, "MI_HubBlk_Open")
+        for xr in (x0, x1 - RAIL_T):
+            p.box(xr, xr + RAIL_T, y0, y1, zq, zq + RAIL_H, "MI_HubBlk_Rail")
     p.finish()
 
 
@@ -469,7 +473,7 @@ def edge_rails(part):
 def build_stairs():
     p = Part("SM_HubBlk_Stairs")
     st = H.HUB["stair"]
-    flight(p, st["x0"], st["x1"], st["y0"], st["y1"], "+x", Z["quay"], Z["lower"])                   # the dock stair (in the shop)
+    flight(p, st["x0"], st["x1"], st["y0"], st["y1"], st.get("up", "+x"), Z["quay"], Z["lower"])     # the dock stair (in the shop)
     for f in H.flights():
         flight(p, f["x0"], f["x1"], f["y0"], f["y1"], f["up"], Z[f["from"]], Z[f["to"]])
     for g in H.grand_flights():
@@ -486,10 +490,7 @@ def build_gates():
         g = gm["g"]
         x, y = gm["x"], gm["y"]
         if g == "G5":
-            kg = H.HUB["keelgate"]
-            disc(p, kg["x"], kg["y"], kg["ring"], z, z + H.prop("keelgate", "keelgate")["raised"] * 0.6, "MI_HubBlk_Stone")
-            disc(p, kg["x"], kg["y"], kg["r"], z, z + H.prop("keelgate", "keelgate")["raised"], "MI_HubBlk_Seal")
-            continue
+            continue                                # D70: the Keelgate is out of the hub for now
         kind, box = H.gate_box(gm)
         if kind == "cargo":
             # The cargo rope across the whole deck on stanchions, a board in the middle: it stops the player.
@@ -515,7 +516,7 @@ def disc(part, cx, cy, r, z0, z1, mat, sides=24, collide=True):
 
 
 # --- props, masts, markers ---------------------------------------------------------------------------------------------------
-SPACE_LEVEL = {"slip": "quay", "keelgate": "quay", "tally": "lower", "chandlery": "main", "dock": "quay"}
+SPACE_LEVEL = {"slip": "quay", "tally": "lower", "chandlery": "main", "harbour": "quay"}
 
 
 def wall_prop(part, space_name, pr, floor, depth=0.12, mat="MI_HubBlk_Prop"):
@@ -563,22 +564,44 @@ def simple_hull(part, x0, x1, yc, beam, zk, depth, mat):
     part.hull(top + bot, mat)
 
 
+def bollard_spots():
+    """D70: the bollards along the quays' edges (harbour.bollards: every `every` m along each line, 0.45 m in from the face on
+    the quay's side, none within 0.8 m of a pillar or on a bridge's landing). Shared with the art (build_hub_inside)."""
+    bo = H.prop("harbour", "bollards")
+    pillars = H.prop("harbour", "pillars")["at"]
+    landings = [(x0 - 0.8, x1 + 0.8, y0 - 0.8, y1 + 0.8) for x0, x1, y0, y1 in H.lift_bridges() + H.fixed_bridges()]
+    out = []
+    for x0, y0, x1, y1 in bo["lines"]:
+        length = math.hypot(x1 - x0, y1 - y0)
+        n = max(int(length // bo["every"]), 0)
+        for k in range(n + 1):
+            t = k / n if n else 0.5
+            x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+            if y0 == y1:                                    # a face along x: the quay away from the canal's middle
+                y += math.copysign(0.45, y)
+            else:                                           # a basin's end: the quay away from the basin
+                x += 0.45 if any(abs(x - b["x1"]) < 0.01 for b in H.HUB["dock"]["basins"]) else -0.45
+            if any(abs(x - px) < 0.8 and abs(y - py) < 0.8 for px, py in pillars):
+                continue
+            if any(H.inside(r, x, y) for r in landings):
+                continue
+            out.append((x, y))
+    return out
+
+
+def berths():
+    """D70: every berth along the canal: the docking stations (hub.docking) and the fleet's (harbour.fleet_berths)."""
+    fleet = H.prop("harbour", "fleet_berths")
+    return list(H.HUB["docking"]) + [dict(b, heading=fleet["heading"]) for b in fleet["berths"]]
+
+
 def build_props():
     p = Part("SM_HubBlk_Props")
     zq, zl, zm = Z["quay"], Z["lower"], Z["main"]
-    # The Water Hall: bollards along the quays' edges, the crane's runway beam and hand chain, the lanterns.
-    dk = {pr["id"]: pr for pr in H.space("dock")["props"]}
-    bo = dk["bollards"]
-    for ex, ya, yb in bo["along"]:
-        y = ya
-        while y <= yb + 1e-6:
-            disc(p, ex + (0.6 if ex > 40 else -0.6), y, bo["r"], zq, zq + bo["h"], "MI_HubBlk_Prop", sides=10)
-            y += bo["every"]
-    cr = dk["crane"]
-    bx0, bx1, by, bz = cr["beam"]
-    p.box(min(bx0, bx1), max(bx0, bx1), by - 0.15, by + 0.15, bz - 0.4, bz, "MI_HubBlk_Prop", collide=False)
-    hx, hy = cr["hand_chain"]
-    p.box(hx - 0.02, hx + 0.02, hy - 0.02, hy + 0.02, zq + 1.0, bz - 0.4, "MI_HubBlk_Rail", collide=False)
+    # The harbour (D70): bollards along the quays' edges, the pillars under the galleries' edges, the lanterns.
+    dk = {pr["id"]: pr for pr in H.space("harbour")["props"]}
+    for bx, by in bollard_spots():
+        disc(p, bx, by, dk["bollards"]["r"], zq, zq + dk["bollards"]["h"], "MI_HubBlk_Prop", sides=10)
     lanterns(p, dk["lanterns"], zq)
     pl = dk["pillars"]
     for px, py in pl["at"]:
@@ -587,27 +610,18 @@ def build_props():
     sl = {pr["id"]: pr for pr in H.space("slip")["props"]}
     c = sl["counter"]
     p.box(c["x0"], c["x1"], c["y0"], c["y1"], zq, zq + c["h"], "MI_HubBlk_Prop")
-    pb_ = sl["plans_board"]                                                             # on an easel (no wall there: the shop is open)
-    xe = float(pb_["wall"].split("=")[1]) + EASEL_OUT
-    p.box(xe - 0.1, xe + 0.95, pb_["y0"] - 0.05, pb_["y1"] + 0.05, zq, zq + pb_["z1"] + 0.2, "MI_HubBlk_Prop")
+    wall_prop(p, "slip", sl["plans_board"], zq, depth=0.08)                             # D70: on the shop's aft wall
     wall_prop(p, "slip", sl["half_models"], zq, depth=0.4)
     wb = sl["workbench"]
     p.box(wb["x0"], wb["x1"], wb["y0"], wb["y1"], zq, zq + wb["h"], "MI_HubBlk_Prop")
     wall_prop(p, "slip", sl["timber_racks"], zq, depth=0.6)
-    db = sl["display_boat"]
-    simple_hull(p, db["x0"], db["x1"], db["y"], db["beam"], zq + db["keel_z"], 2.2, "MI_HubBlk_Gate")
-    for cx in cradle_xs(db):                                                         # the cradles (display_boat note)
-        p.box(cx - 0.2, cx + 0.2, db["y"] - 1.2, db["y"] + 1.2, zq, zq + db["keel_z"] + 0.2, "MI_HubBlk_Prop")
-    mz = next(m for m in H.HUB["masts"] if m["id"] == "mizzen")                       # the mizzen's foot through the forward wall
-    pole(p, (mz["x"], 0.0, zq), (mz["x"], 0.0, Z["gun"] - SLAB), H.prop("main_deck", "masts")["r"], H.prop("main_deck", "masts")["r"], "MI_HubBlk_Prop",
-         sides=12)
-    mt = sl["mast_on_trestles"]
-    p.box(mt["x0"], mt["x1"], mt["y"] - 0.2, mt["y"] + 0.2, zq + mt["z"], zq + mt["z"] + 0.4, "MI_HubBlk_Prop")
-    for tx in (mt["x0"] + 2.0, mt["x1"] - 2.0):
-        p.box(tx - 0.1, tx + 0.1, mt["y"] - 0.6, mt["y"] + 0.6, zq, zq + mt["z"], "MI_HubBlk_Prop")
+    qw = sl["quay_work"]                                                                # the trestles and the steam box on the quay
+    sy = 0.5 * (qw["y0"] + qw["y1"])
+    p.box(qw["x0"] - 0.6, qw["x0"] + 4.8, sy - 0.6, sy + 0.6, zq, zq + 1.15, "MI_HubBlk_Prop")
+    p.box(qw["x1"] - 2.6, qw["x1"] - 0.4, qw["y1"] - 1.2, qw["y1"] - 0.2, zq, zq + 1.1, "MI_HubBlk_Prop")
     lanterns(p, sl["lanterns"], zq)
     sg = sl["sign"]
-    p.box(sg["x"] - 0.3, sg["x"], sg["y"] - 3.0, sg["y"] + 3.0, zq + sg["z"] - 0.5, zq + sg["z"] + 0.5, "MI_HubBlk_Canvas", collide=False)
+    p.box(sg["x"] - 3.0, sg["x"] + 3.0, sg["y"] - 0.3, sg["y"], zq + sg["z"] - 0.35, zq + sg["z"] + 0.35, "MI_HubBlk_Canvas", collide=False)
     # The Tally House.
     tl = {pr["id"]: pr for pr in H.space("tally")["props"]}
     pb = tl["pay_booth"]
@@ -630,15 +644,6 @@ def build_props():
         p.box(t["x0"], t["x1"], by0, by1, zl, zl + 0.45, "MI_HubBlk_Prop")
     wall_prop(p, "tally", tl["job_board"], zl)
     lanterns(p, tl["lanterns"], zl)
-    # The Keelgate chamber.
-    kg = {pr["id"]: pr for pr in H.space("keelgate")["props"]}
-    dsk = kg["desk"]
-    p.box(dsk["x0"], dsk["x1"], dsk["y0"], dsk["y1"], zq, zq + dsk["h"], "MI_HubBlk_Prop")
-    ch_ = dsk["chair"]
-    p.box(ch_[0], ch_[1], ch_[2], ch_[3], zq, zq + 0.9, "MI_HubBlk_Prop")
-    wall_prop(p, "keelgate", kg["shelves"], zq)
-    wall_prop(p, "keelgate", kg["rubbings"], zq, depth=0.05, mat="MI_HubBlk_Canvas")
-    lanterns(p, kg["lanterns"], zq)
     # The hoist's guide posts and the counterweight's bay (ASaltHubHoist draws and moves the cage and the weight), the gantry.
     hs = H.R(H.HUB["hoist"])
     top = zm + 7.5                                                                          # gantry note: 7.5 m above the deck
@@ -727,7 +732,7 @@ def build_masts():
 
 def build_markers():
     p = Part("SM_HubBlk_Markers", ucx=False)
-    floors = {"slip": Z["quay"], "tally": Z["lower"], "keelgate": Z["quay"], "chandlery": Z["main"]}
+    floors = {"slip": Z["quay"], "tally": Z["lower"], "chandlery": Z["main"]}
     for name, fl in floors.items():
         sp = H.space(name)
         npc = sp["npc"]
@@ -742,10 +747,9 @@ def build_markers():
         p.box(npc["x"] - 0.04, npc["x"] + 0.04, npc["y"] - 0.04, npc["y"] + 0.04, fl, fl + 1.4, "MI_HubBlk_MarkNPC", collide=False)
         for e in sp["e"]:
             p.box(e["x"] - 0.12, e["x"] + 0.12, e["y"] - 0.12, e["y"] + 0.12, fl + 0.9, fl + 1.14, "MI_HubBlk_MarkE", collide=False)
-    dock = {pr["id"]: pr for pr in H.space("dock")["props"]}
-    for b in [dock["fitting_berth"]] + list(dock["fleet_berths"]["berths"]):
-        x = b["x"]
-        p.box(x - 0.05, x + 0.05, b["y0"], b["y1"], 0.02, 0.08, "MI_HubBlk_MarkBerth", collide=False)      # the berth's line on the water
+    for b in berths():                                                                 # the berths' lines on the water
+        _, y, _ = H.docking_pose(b)
+        p.box(b["x0"], b["x1"], y - 0.05, y + 0.05, 0.02, 0.08, "MI_HubBlk_MarkBerth", collide=False)
     p.finish()
 
 

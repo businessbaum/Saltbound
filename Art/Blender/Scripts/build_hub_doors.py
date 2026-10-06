@@ -1,5 +1,5 @@
 """The hub ship's hidden side doors (D64; hub.doors in the data): the hull itself opens inwards like a double door, in both
-sides, into the water hall; boats come in with their masts up.
+sides, into the harbour's basins (D70: a station at each, x 32..40 and 104..112); boats come in with their masts up.
 
 Each side has two leaves, 4 m wide, from the strake seam at z0 (-2.5 at the doors' middle) to the one under z1 (13.0 at the
 aft jamb), 0.35 m thick and curved like the hull. Shut, the strakes, the waterline belt, the wales and the port lids run on
@@ -17,11 +17,12 @@ How they swing (worked out so nothing runs through anything; the build checks it
     aft leaf (the master) opens first and shuts last; the fore leaf follows it by LAG degrees (printed by the build).
 
 Meshes (/Game/Saltbound/Hub/Art; Nanite; UCX):
-  SM_Hub_DoorStbdAft / SM_Hub_DoorStbdFore / SM_Hub_DoorPortAft / SM_Hub_DoorPortFore
+  SM_Hub_DoorStbdAft / SM_Hub_DoorStbdFore / SM_Hub_DoorPortAft / SM_Hub_DoorPortFore   (the aft station)
+  SM_Hub_Door2StbdAft / ... / SM_Hub_Door2PortFore                                      (D70: the fore station)
                        one leaf each, built where it stands shut; pivot on its hinge axis at z0 (see PIVOTS, printed and in
                        Art/Generated/hub_doors.json with the rope eyes, the blocks and the swing); UCX boxes along its height
-  SM_Hub_DoorFrame     what stays: the four hinge posts (UCX), the jambs, head and sill inside the opening, the capstans'
-                       bases, the rope blocks under the gun deck, the fairleads on the aft quay and the ropes between them
+  SM_Hub_DoorFrame     what stays, at both stations: the hinge posts (UCX), the jambs, head and sill inside the openings, the
+                       capstans' bases, the rope blocks under the gun deck, the fairleads on the basins' aft edges, the ropes
   SM_Hub_Capstan       a capstan's turning part (drum, whelps, bars, the rope's turns); pivot on the deck at its axis (as D62)
   SM_Hub_GateRope      one rope, 27 m hanging down from its pivot (the top); scale it to the length shown (as D62)
 Run: Tools/Build-BlenderAsset.ps1 build_hub_doors [leaves] [frame] [capstan] [rope]
@@ -45,7 +46,8 @@ DO = HUB["doors"]
 X, Y, UP = Vector((1.0, 0.0, 0.0)), Vector((0.0, 1.0, 0.0)), Vector((0.0, 0.0, 1.0))
 nseed = HH.nseed
 PT = HH.PLANK_T
-X0, XM, X1 = HH.DOOR_X
+X0, XM, X1 = HH.DOOR_X                     # the station being built (use_station)
+STATION = 0
 OFFSET = 1.4                 # the hinge axis aft of the aft jamb (forward of the fore one)
 PIVOT_IN = 0.15              # the hinge axis this far inboard of the leaf's innermost point
 INNER = -0.21                # the leaf's inner face (its planks are 0..+0.14 outside the hull's surface: 0.35 thick)
@@ -79,12 +81,31 @@ PIVOT_Y = pivot_y()
 PIVOT_Z = float(DO["z0"])
 
 
+def use_station(k):
+    """D70: build the doors of station k (hub.doors.stations, aft first)."""
+    global STATION, X0, XM, X1, PIVOT_Y
+    STATION = k
+    X0, XM, X1 = HH.DOOR_XS[k]
+    PIVOT_Y = pivot_y()
+
+
+def station_name(k):
+    return "" if k == 0 else str(k + 1)
+
+
+def capstan_at(k, side):
+    """Station k's capstan on its side (hub.doors.capstans: starboard, port for each station in turn)."""
+    return DO["capstans"][2 * k + (0 if side > 0 else 1)]
+
+
 def pivots():
-    """(key, mesh name, pivot (ship m), opening yaw in degrees (Unreal / ship frame: + turns +X towards +Y), x range)."""
+    """(key, mesh name, pivot (ship m), opening yaw in degrees (Unreal / ship frame: + turns +X towards +Y), x range) of the
+    current station."""
     out = []
     for side, sname in ((1, "Stbd"), (-1, "Port")):
-        out.append(((side, "A"), "SM_Hub_Door%sAft" % sname, (X0 - OFFSET, side * PIVOT_Y, PIVOT_Z), -90.0 * side, (X0, XM)))
-        out.append(((side, "F"), "SM_Hub_Door%sFore" % sname, (X1 + OFFSET, side * PIVOT_Y, PIVOT_Z), 90.0 * side, (XM, X1)))
+        pre = "SM_Hub_Door" + station_name(STATION)
+        out.append(((side, "A"), pre + "%sAft" % sname, (X0 - OFFSET, side * PIVOT_Y, PIVOT_Z), -90.0 * side, (X0, XM)))
+        out.append(((side, "F"), pre + "%sFore" % sname, (X1 + OFFSET, side * PIVOT_Y, PIVOT_Z), 90.0 * side, (XM, X1)))
     return out
 
 
@@ -294,6 +315,26 @@ def swing_check(verts_a, verts_f, piv_a, piv_f):
 
 # --- builds ------------------------------------------------------------------------------------------------------------------
 def build_leaves():
+    rows, stations = [], []
+    for k in range(len(HH.DOOR_XS)):
+        use_station(k)
+        sb.reset_scene()
+        stations.append(build_station_leaves(rows))
+    use_station(0)
+    out = os.path.join(H.ROOT, "Art", "Generated", "hub_doors.json")
+    with open(out, "w", encoding="utf-8") as fh:
+        json.dump({"_comment": "D64, D70 the side doors (build_hub_doors.py), ship metres, a pair in each side at each station (aft "
+                   "first). Each leaf mesh's pivot is its hinge axis at z0; open = yaw open_yaw (Unreal, + turns +X to +Y). The aft "
+                   "leaf opens first and shuts last; the fore leaf follows its station's lag_deg behind it. eye: where the leaf's "
+                   "rope takes hold; block: the fixed block it runs to (then down to the capstan, in SM_Hub_DoorFrame).",
+                   "stations": stations, "lag_deg": max(s["lag_deg"] or 0 for s in stations),
+                   "z_bottom_mid": stations[0]["z_bottom_mid"], "z_top_mid": stations[0]["z_top_mid"],
+                   "capstans": [[c[0], c[1], Z["quay"]] for c in DO["capstans"]], "leaves": rows}, fh, indent=1)
+    print("SB_DOORS_JSON", out)
+
+
+def build_station_leaves(rows):
+    """The current station's four leaves: built, bevelled, checked, exported; their rows appended. Returns the station's row."""
     piv = pivots()
     leaves = {key: T.Part(name) for key, name, _, _, _ in piv}
     route = HH.Router(None, doors=leaves, x_range=(X0 - 1.0, X1 + 1.0))
@@ -310,26 +351,19 @@ def build_leaves():
     pa = next(p for k, _, p, _, _ in piv if k == (1, "A"))
     pf = next(p for k, _, p, _, _ in piv if k == (1, "F"))
     lag, hull_hits = swing_check(va, vf, pa, pf)
-    print("SB_DOOR_SWING lag_deg", lag, "hull_contacts", hull_hits)
-    rows = []
+    print("SB_DOOR_SWING station", STATION, "lag_deg", lag, "hull_contacts", hull_hits)
     for key, name, pv, yaw, xr in piv:
         e = eyes[key]
-        rows.append({"mesh": name, "side": "starboard" if key[0] > 0 else "port", "leaf": "aft" if key[1] == "A" else "fore",
+        rows.append({"mesh": name, "station": STATION, "side": "starboard" if key[0] > 0 else "port", "leaf": "aft" if key[1] == "A" else "fore",
                      "pivot": [round(c, 3) for c in pv], "open_yaw": yaw, "x": list(xr),
                      "eye_shut": [round(e.x, 3), round(e.y, 3), round(e.z, 3)],
                      "eye_open": [round(c, 3) for c in rot((e.x, e.y, e.z), pv, yaw)],
-                     "block": [round(c, 3) for c in block_point(key)]})
+                     "block": [round(c, 3) for c in block_point(key)],
+                     "capstan": [capstan_at(STATION, key[0])[0], capstan_at(STATION, key[0])[1], Z["quay"]]})
         HH.export(leaves[key], pivot=pv, ucx=True)
-    out = os.path.join(H.ROOT, "Art", "Generated", "hub_doors.json")
     zb, zt = leaf_z(XM)
-    with open(out, "w", encoding="utf-8") as fh:
-        json.dump({"_comment": "D64 the side doors (build_hub_doors.py), ship metres. Each leaf mesh's pivot is its hinge axis at z0; "
-                   "open = yaw open_yaw (Unreal, + turns +X to +Y). The aft leaf opens first and shuts last; the fore leaf follows "
-                   "lag_deg behind it. eye: where the leaf's rope takes hold; block: the fixed block it runs to (then down to the "
-                   "capstan, in SM_Hub_DoorFrame).",
-                   "lag_deg": lag, "z_bottom_mid": round(zb, 3), "z_top_mid": round(zt, 3), "leaf_z_at_x": {str(x): [round(v, 3) for v in leaf_z(x)] for x in (X0, XM, X1)},
-                   "capstans": [[c[0], c[1], Z["quay"]] for c in DO["capstans"]], "leaves": rows}, fh, indent=1)
-    print("SB_DOORS_JSON", out)
+    return {"x0": X0, "x1": X1, "lag_deg": lag, "z_bottom_mid": round(zb, 3), "z_top_mid": round(zt, 3),
+            "leaf_z_at_x": {str(x): [round(v, 3) for v in leaf_z(x)] for x in (X0, XM, X1)}}
 
 
 def block_point(key):
@@ -341,8 +375,17 @@ def block_point(key):
 
 
 def build_frame():
-    """What stays: hinge posts, the opening's frame inside the hull, the capstans' bases, blocks, fairleads and the ropes."""
+    """What stays: hinge posts, the opening's frame inside the hull, the capstans' bases, blocks, fairleads and the ropes (at
+    every station, one mesh in the ship's frame)."""
     p = T.Part("SM_Hub_DoorFrame")
+    for k in range(len(HH.DOOR_XS)):
+        use_station(k)
+        build_station_frame(p)
+    use_station(0)
+    HH.export(p, pivot=(H.PIVOT_X, 0.0, 0.0), ucx=True)
+
+
+def build_station_frame(p):
     floor = HUB["dock"]["floor"]
     for side in (1, -1):
         # Hinge posts: round oak with iron collars over and under each hinge ring, a shoe on the floor, a cleat under the deck.
@@ -370,7 +413,7 @@ def build_frame():
             fr = T.polyline(pts, lambda q, s=side: frame_at(q.x, q.z, s)[2], lambda q, s=side: frame_at(q.x, q.z, s)[3])
             p.beam(fr, T.length_of(fr), 0.4, 0.3, "MI_Hub_HullTarDark", nseed(), seg=1.0, wear=0.8)
         # The capstan's base on the aft quay: a cross of timbers, an iron pawl ring.
-        cx, cy = DO["capstans"][0][0], side * abs(DO["capstans"][0][1])
+        cx, cy = capstan_at(STATION, side)
         c = Vector((cx, cy, Z["quay"]))
         for k in range(4):
             a = math.pi * k / 4
@@ -383,7 +426,7 @@ def build_frame():
             block(p, b, side)
         # The fairlead: two sheaves between oak cheeks on the aft quay's edge; the ropes come down over the water (clear of the
         # galleries over the quay), wrap under them and run aft over the quay to the capstan's drum.
-        qx = HUB["dock"]["water"]["x0"]
+        qx = HUB["dock"]["basins"][STATION]["x0"]
         sr = 0.26
         sx = ba.x + 0.0 - sr                                             # the ropes come down at the sheaves' forward tangent
         for k, dy in enumerate((-0.17, 0.17)):
@@ -408,7 +451,6 @@ def build_frame():
             rope_run(p, arc, 0.08)
             to = drum + (Vector((sx, yy, drum.z)) - drum).normalized() * 0.5 + UP * (0.06 + 0.1 * k)
             rope_run(p, [arc[-1], to], 0.08)
-    HH.export(p, pivot=(H.PIVOT_X, 0.0, 0.0), ucx=True)
 
 
 def block(p, b, side):
@@ -468,7 +510,10 @@ BUILDERS = {"leaves": build_leaves, "frame": build_frame, "capstan": build_capst
 if __name__ == "__main__":
     random.seed(64)
     wanted = sb.script_args() or list(BUILDERS)
-    print("SB_DOOR_PIVOTS", [(name, [round(c, 3) for c in pv], yaw) for _, name, pv, yaw, _ in pivots()])
+    for k_ in range(len(HH.DOOR_XS)):
+        use_station(k_)
+        print("SB_DOOR_PIVOTS", [(name, [round(c, 3) for c in pv], yaw) for _, name, pv, yaw, _ in pivots()])
+    use_station(0)
     for key in wanted:
         sb.reset_scene()
         BUILDERS[key]()

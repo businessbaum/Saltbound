@@ -74,8 +74,9 @@ rig = spawn(unreal.SaltLightingRig, (0, 0, 300), label="LightingRig")
 
 ocean = spawn(unreal.SaltOcean, (0, 0, 0), label="Ocean")
 ocean.set_editor_property("calm_zones", hub_place.calm_zones(local=False, berth=((BX, BY, BZ), YAW, BERTH_ID)))
-ocean.set_editor_property("shelter", hub_place.shelter_box(local=False, berth=((BX, BY, BZ), YAW, BERTH_ID)))
-print("SB_HUB_ZONES ship", [round(c) for c in world(H.PIVOT_X, 0, 0)[:2]], "hall", [round(c) for c in world(0.5 * sum(hub_place.water_x()), 0, 0)[:2]])
+# D70: the harbour's water sheltered (its canal and its basins; the review map holds her inside, always shown).
+ocean.set_editor_property("shelters", hub_place.shelter_boxes(local=False, berth=((BX, BY, BZ), YAW, BERTH_ID)))
+print("SB_HUB_ZONES ship", [round(c) for c in world(H.PIVOT_X, 0, 0)[:2]], "shelters", len(hub_place.shelter_rects()))
 # The far floor, 60 m down under her (the visual test map's floor; it is not under her whole hull there).
 floor = spawn(unreal.StaticMeshActor, (BX, BY, -6000), label="Seabed")
 floor.static_mesh_component.set_static_mesh(unreal.load_asset("/Engine/BasicShapes/Cube"))
@@ -100,7 +101,7 @@ def label(text, x, y, z, face_deg, colour, size=34.0):
     return t
 
 
-FLOORS = {"slip": H.Z["quay"], "tally": H.Z["lower"], "keelgate": H.Z["quay"], "chandlery": H.Z["main"]}
+FLOORS = {"slip": H.Z["quay"], "tally": H.Z["lower"], "chandlery": H.Z["main"]}
 SVC = {o["id"]: o.get("svc", "") for o in H.OPEN}
 for name, fl in ({} if ART else FLOORS).items():
     sp = H.space(name)
@@ -128,12 +129,13 @@ for gm in ([] if ART else hub_place.PL.all_gate_marks()):
     zl = H.level_z(gm["level"])
     label("%s %s" % (gm["g"], gm["zone"]), gm["x"], gm["y"], zl + 2.6, open_side(gm), unreal.Color(r=255, g=70, b=50, a=255), size=28.0)
 
-# --- the player's boat at the fitting berth, the player on the forward quay beside her ------------------------------------
+# --- the player's boat at the fitting berth (D70: the aft docking station), the player on the quay beside her -------------
 _bid, bx, by, bh, breach = hub_place.berth_spots()[0]
 boat = spawn(unreal.SaltBoat, world(bx, by, 0.0), (0, YAW + bh, 0), "Boat")
-boat.set_editor_property("mooring_reach", breach * 100.0)                           # to the forward quay's edge, on her starboard
+boat.set_editor_property("mooring_reach", breach * 100.0)                           # to the quay's edge, on her starboard
 boat.set_editor_property("mooring_pier_height", H.Z["quay"] * 100.0)
-spawn(unreal.PlayerStart, world(bx + breach + 1.5, by, H.Z["quay"] + 0.95), (0, YAW + 180.0, 0), "PlayerStart")
+side = 1.0 if breach > 0 else -1.0
+spawn(unreal.PlayerStart, world(bx + 1.0, by + side * (abs(breach) + 1.5), H.Z["quay"] + 0.95), (0, YAW + bh - side * 90.0, 0), "PlayerStart")
 rig.set_editor_property("start_region", "ShoresOfPlenty")
 rig.set_editor_property("start_weather", "Clear")
 rig.set_editor_property("start_sea_state", "Rough")

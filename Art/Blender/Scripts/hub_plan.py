@@ -461,7 +461,7 @@ def stair_holes(level_id):
         return {"-x": ("x", r[0]), "+x": ("x", r[1]), "-y": ("y", r[2]), "+y": ("y", r[3])}[up]
     out = [(H.R(f), arrive(H.R(f), f["up"])) for f in H.flights() if f["to"] == level_id]
     if level_id == "lower":
-        out.append((H.R(H.HUB["stair"]), arrive(H.R(H.HUB["stair"]), "+x")))
+        out.append((H.R(H.HUB["stair"]), arrive(H.R(H.HUB["stair"]), H.HUB["stair"].get("up", "+x"))))
     return out
 
 
@@ -520,3 +520,34 @@ def all_gate_marks():
     for lv in H.LEVELS:
         out += plan(lv).gates
     return out + list(H.GATE_MARKS)
+
+
+def water_edges(level_id="quay"):
+    """D70: the quays' faces on the dock deck: the edges between the water and the floor beside it, merged into runs
+    [(axis, line, a0, a1, side)]: axis 'x' a face along y at x = line, 'y' a face along x at y = line; side the way from the
+    water to the quay (+1 / -1 along the axis' own direction). Where the water meets the hull (the doors) there is no face."""
+    p = plan(level_id)
+    runs = {}
+    for (i, j), lab in p.lab.items():
+        if lab[0] != "water":
+            continue
+        for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            other = p.lab.get((i + di, j + dj))
+            if other is None or other[0] == "water":
+                continue
+            if di:
+                runs.setdefault(("x", round(cx(i) + di * CELL / 2, 3), di), []).append(cy(j))
+            else:
+                runs.setdefault(("y", round(cy(j) + dj * CELL / 2, 3), dj), []).append(cx(i))
+    out = []
+    for (axis, line, side), centres in sorted(runs.items()):
+        centres.sort()
+        start = prev = centres[0]
+        for c in centres[1:] + [None]:
+            if c is not None and c - prev < CELL * 1.01:
+                prev = c
+                continue
+            out.append((axis, line, start - CELL / 2, prev + CELL / 2, side))
+            if c is not None:
+                start = prev = c
+    return out

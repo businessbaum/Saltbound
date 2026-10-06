@@ -1,6 +1,6 @@
 """Phase 1 measurements of the hub ship's blockout (D61) on L_HubBlockout (open it in the editor first).
 
-  python Tools/hub_blockout_checks.py [headroom] [walk | walk:<slip|tally|keelgate|chandlery>] [boat] [water]
+  python Tools/hub_blockout_checks.py [headroom] [walk | walk:<slip|tally|chandlery>] [water]
 
 headroom runs in the editor world; the others start PIE, drive Tools/ue_scripts/hub_checks.py inside the editor and print
 its SB_ lines. Short runs: each part alone (the owner finds long suites too slow).
@@ -43,7 +43,7 @@ def headroom():
     show(wait_for(off, r"SB_HEADROOM DONE", 600), "HEADROOM")
 
 
-def walks(names=("slip", "tally", "keelgate", "chandlery")):
+def walks(names=("slip", "tally", "chandlery")):
     pie.start_pie(2.0)
     try:
         time.sleep(3.0)
@@ -51,21 +51,6 @@ def walks(names=("slip", "tally", "keelgate", "chandlery")):
             off = pie.log_size()
             run("hub_checks.walk(%r)" % name)
             show(wait_for(off, r"SB_WALK DONE", 200), "WALK")
-    finally:
-        pie.stop_pie()
-
-
-def boat():
-    pie.start_pie(2.0)
-    try:
-        time.sleep(3.0)
-        for name in ("in", "turn", "out"):
-            off = pie.log_size()
-            run("hub_checks.boat(%r)" % name)
-            text = wait_for(off, r"SB_HUBBOAT DONE", 120)
-            show(text, "HUBBOAT")
-            contacts = [int(c) for c in re.findall(r"SB_BOAT .*?contacts=(\d+)", text)]
-            print("   contacts per second:", contacts)
     finally:
         pie.stop_pie()
 
@@ -84,15 +69,13 @@ def water():
 
 
 if __name__ == "__main__":
-    parts = sys.argv[1:] or ["headroom", "walk", "boat", "water"]
+    parts = sys.argv[1:] or ["headroom", "walk", "water"]
     if "headroom" in parts:
         headroom()
     if "walk" in parts:
         walks()
-    for name in ("slip", "tally", "keelgate", "chandlery"):
+    for name in ("slip", "tally", "chandlery"):
         if "walk:" + name in parts:
             walks((name,))
-    if "boat" in parts:
-        boat()
     if "water" in parts:
         water()

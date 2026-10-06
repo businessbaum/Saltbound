@@ -61,14 +61,22 @@ WAKE_PARAMS = ["BoatPos", "BoatAxisX", "BoatWake", "BoatWakeExtent"]
 # Its trail (D45): 16 stern positions, two per vector, and how fast the boat went there (SaltBoatWake.ush).
 TRAIL_PARAMS = ["BoatTrailP%d" % i for i in range(8)] + ["BoatTrailS%d" % i for i in range(4)]
 PS_EXTRA = ["RippleOffsets", "LookCrest"]
-# D69: water under a roof (the hub's water hall, ASaltOcean::Shelter): ShelterA = (centre xy, half extents), ShelterB = (its
+# D69: water under a roof (the hub's water hall, ASaltOcean::Shelters): ShelterA = (centre xy, half extents), ShelterB = (its
 # axis cos, sin, the fading edge cm, amount). The sky light reaches the water's volume unoccluded, so sheltered water glowed.
-SHELTER_PARAMS = ["ShelterA", "ShelterB"]
+# D70: three boxes (the harbour's canal and its two basins): ShelterA/B, ShelterA1/B1, ShelterA2/B2; the most sheltered wins.
+SHELTER_PARAMS = ["ShelterA", "ShelterB", "ShelterA1", "ShelterB1", "ShelterA2", "ShelterB2"]
 SHELTER_CODE = """
-float2 D = WorldPos.xy - ShelterA.xy;
-float2 L = float2(dot(D, ShelterB.xy), dot(D, float2(-ShelterB.y, ShelterB.x)));
-float2 E = ShelterA.zw - abs(L);
-return saturate(min(E.x, E.y) / max(ShelterB.z, 1.0)) * ShelterB.w;
+float S = 0.0;
+float4 As[3] = { ShelterA, ShelterA1, ShelterA2 };
+float4 Bs[3] = { ShelterB, ShelterB1, ShelterB2 };
+for (int i = 0; i < 3; i++)
+{
+    float2 D = WorldPos.xy - As[i].xy;
+    float2 L = float2(dot(D, Bs[i].xy), dot(D, float2(-Bs[i].y, Bs[i].x)));
+    float2 E = As[i].zw - abs(L);
+    S = max(S, saturate(min(E.x, E.y) / max(Bs[i].z, 1.0)) * Bs[i].w);
+}
+return S;
 """
 
 
@@ -89,7 +97,8 @@ MPC_DEFAULTS = {
     "BoatWake": (0, 0, 1, 0),
     "LookCrest": (0.1, 0.95, 0.9, 1),
     "UnderwaterFog": (0.12, 1.0, 0.3, 0.3), "UnderwaterSky": (0.25, 0.06, 0.3, 0.6), "UnderwaterColor": (0.12, 0.48, 0.62, 1.0),
-    "ShelterA": (0, 0, 0, 0), "ShelterB": (1, 0, 150, 0),
+    "ShelterA": (0, 0, 0, 0), "ShelterB": (1, 0, 150, 0), "ShelterA1": (0, 0, 0, 0), "ShelterB1": (1, 0, 150, 0),
+    "ShelterA2": (0, 0, 0, 0), "ShelterB2": (1, 0, 150, 0),
 }
 
 

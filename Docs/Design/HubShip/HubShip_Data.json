@@ -90,19 +90,44 @@
    "fore": 118
   },
   "dock": {
-   "x0": 26,
-   "x1": 50,
-   "water": {
-    "x0": 30,
-    "x1": 46
+   "canal": {
+    "x0": 12,
+    "x1": 148,
+    "half": 5,
+    "over": 6.5,
+    "narrow": {
+     "x0": 72,
+     "x1": 96,
+     "half": 3
+    }
    },
+   "basins": [
+    {
+     "x0": 30,
+     "x1": 42
+    },
+    {
+     "x0": 102,
+     "x1": 114
+    }
+   ],
+   "quay": 10,
+   "edge": 3,
    "floor": -4,
    "ceiling": "gun",
    "mast_max": 12
   },
   "doors": {
-   "x0": 32,
-   "x1": 40,
+   "stations": [
+    {
+     "x0": 32,
+     "x1": 40
+    },
+    {
+     "x0": 104,
+     "x1": 112
+    }
+   ],
    "z0": -2.5,
    "z1": 13,
    "thick": 0.35,
@@ -111,28 +136,80 @@
    "open_m": 45,
    "capstans": [
     [
-     28,
+     28.4,
      16.5
     ],
     [
-     28,
+     28.4,
+     -16.5
+    ],
+    [
+     100.4,
+     16.5
+    ],
+    [
+     100.4,
      -16.5
     ]
    ]
   },
-  "ramp": {
-   "x0": 46,
-   "x1": 60,
-   "y0": -5,
-   "y1": 5,
-   "z0": -3,
-   "z1": 1.5
-  },
-  "hall": {
-   "x0": 50,
-   "x1": 68,
-   "y0": -10,
-   "y1": 10
+  "docking": [
+   {
+    "id": "aft",
+    "basin": 0,
+    "x0": 44,
+    "x1": 54,
+    "heading": 0,
+    "side": 1,
+    "reach": 2.1
+   },
+   {
+    "id": "fore",
+    "basin": 1,
+    "x0": 117,
+    "x1": 127,
+    "heading": 0,
+    "side": 1,
+    "reach": 2.1
+   }
+  ],
+  "bridges": {
+   "lift": {
+    "w": 3,
+    "open": 80,
+    "at": [
+     [
+      0,
+      7.75
+     ],
+     [
+      0,
+      -7.75
+     ],
+     [
+      1,
+      7.75
+     ],
+     [
+      1,
+      -7.75
+     ]
+    ]
+   },
+   "fixed": [
+    {
+     "x": 76.5,
+     "w": 2.4
+    },
+    {
+     "x": 91.5,
+     "w": 2.4
+    },
+    {
+     "x": 136,
+     "w": 3
+    }
+   ]
   },
   "shop": {
    "x0": 50,
@@ -142,9 +219,10 @@
   },
   "stair": {
    "x0": 50.5,
-   "x1": 56,
-   "y0": 16.5,
-   "y1": 19
+   "x1": 53,
+   "y0": 11,
+   "y1": 16.5,
+   "up": "+y"
   },
   "tally": {
    "x0": 50,
@@ -170,17 +248,11 @@
    "y0": -11,
    "y1": 11
   },
-  "chamber": {
+  "well_floor": {
    "x0": 72,
    "x1": 96,
    "y0": -12,
    "y1": 12
-  },
-  "keelgate": {
-   "x": 84,
-   "y": 0,
-   "r": 3,
-   "ring": 4
   },
   "hoist": {
    "x0": 78.2,
@@ -275,7 +347,17 @@
    "x1": 21,
    "half": 11.5,
    "h": 4.4,
-   "roof": 2.6
+   "roof": 2.6,
+   "bridge": {
+    "inset": 1.2,
+    "h": 3.4,
+    "sill": 0.5,
+    "bay": 1.6
+   },
+   "console": {
+    "x": 14,
+    "r": 1.5
+   }
   },
   "beakhead": {
    "x0": 158,
@@ -464,21 +546,51 @@
      ],
      "rects": [
       {
-       "x0": 26,
+       "x0": 12,
+       "x1": 72,
+       "y0": -9,
+       "y1": -6.5
+      },
+      {
+       "x0": 12,
+       "x1": 72,
+       "y0": 6.5,
+       "y1": 9
+      },
+      {
+       "x0": 96,
+       "x1": 148,
+       "y0": -9,
+       "y1": -6.5
+      },
+      {
+       "x0": 96,
+       "x1": 148,
+       "y0": 6.5,
+       "y1": 9
+      },
+      {
+       "x0": 27,
        "x1": 30,
        "y0": -20,
        "y1": 20
       },
       {
-       "x0": 46,
-       "x1": 50,
+       "x0": 42,
+       "x1": 45,
        "y0": -20,
-       "y1": -5
+       "y1": 20
       },
       {
-       "x0": 46,
-       "x1": 50,
-       "y0": 5,
+       "x0": 99,
+       "x1": 102,
+       "y0": -20,
+       "y1": 20
+      },
+      {
+       "x0": 114,
+       "x1": 117,
+       "y0": -20,
        "y1": 20
       }
      ]
@@ -487,14 +599,9 @@
   },
   "links": [
    [
-    "dock",
+    "harbour",
     "slip",
     "open"
-   ],
-   [
-    "dock_g",
-    "tally",
-    "door"
    ],
    [
     "tally",
@@ -505,11 +612,6 @@
     "lane",
     "well_l",
     "open"
-   ],
-   [
-    "slip",
-    "keelgate",
-    "wall"
    ],
    [
     "deck",
@@ -1388,22 +1490,28 @@
    "z": 10.5,
    "voids": [
     {
+     "x0": 12,
+     "x1": 72,
+     "y0": -6.5,
+     "y1": 6.5
+    },
+    {
+     "x0": 96,
+     "x1": 148,
+     "y0": -6.5,
+     "y1": 6.5
+    },
+    {
      "x0": 30,
-     "x1": 46,
+     "x1": 42,
      "y0": -20,
      "y1": 20
     },
     {
-     "x0": 46,
-     "x1": 50,
-     "y0": -5,
-     "y1": 5
-    },
-    {
-     "x0": 50,
-     "x1": 68,
-     "y0": -10,
-     "y1": 10
+     "x0": 102,
+     "x1": 114,
+     "y0": -20,
+     "y1": 20
     },
     {
      "x0": 78,
@@ -1419,22 +1527,28 @@
    "z": 7.5,
    "voids": [
     {
+     "x0": 12,
+     "x1": 72,
+     "y0": -6.5,
+     "y1": 6.5
+    },
+    {
+     "x0": 96,
+     "x1": 148,
+     "y0": -6.5,
+     "y1": 6.5
+    },
+    {
      "x0": 30,
-     "x1": 46,
+     "x1": 42,
      "y0": -20,
      "y1": 20
     },
     {
-     "x0": 46,
-     "x1": 50,
-     "y0": -5,
-     "y1": 5
-    },
-    {
-     "x0": 50,
-     "x1": 68,
-     "y0": -10,
-     "y1": 10
+     "x0": 102,
+     "x1": 114,
+     "y0": -20,
+     "y1": 20
     },
     {
      "x0": 78,
@@ -1450,22 +1564,28 @@
    "z": 4.5,
    "voids": [
     {
+     "x0": 12,
+     "x1": 72,
+     "y0": -6.5,
+     "y1": 6.5
+    },
+    {
+     "x0": 96,
+     "x1": 148,
+     "y0": -6.5,
+     "y1": 6.5
+    },
+    {
      "x0": 30,
-     "x1": 46,
+     "x1": 42,
      "y0": -20,
      "y1": 20
     },
     {
-     "x0": 46,
-     "x1": 50,
-     "y0": -5,
-     "y1": 5
-    },
-    {
-     "x0": 50,
-     "x1": 68,
-     "y0": -10,
-     "y1": 10
+     "x0": 102,
+     "x1": 114,
+     "y0": -20,
+     "y1": 20
     },
     {
      "x0": 78,
@@ -1481,24 +1601,34 @@
    "z": 1.5,
    "water": [
     {
+     "x0": 12,
+     "x1": 72,
+     "y0": -5,
+     "y1": 5
+    },
+    {
+     "x0": 72,
+     "x1": 96,
+     "y0": -3,
+     "y1": 3
+    },
+    {
+     "x0": 96,
+     "x1": 148,
+     "y0": -5,
+     "y1": 5
+    },
+    {
      "x0": 30,
-     "x1": 46,
+     "x1": 42,
      "y0": -20,
      "y1": 20
     },
     {
-     "x0": 46,
-     "x1": 50,
-     "y0": -5,
-     "y1": 5
-    }
-   ],
-   "slots": [
-    {
-     "x0": 50,
-     "x1": 60,
-     "y0": -5,
-     "y1": 5
+     "x0": 102,
+     "x1": 114,
+     "y0": -20,
+     "y1": 20
     }
    ]
   },
@@ -1508,16 +1638,34 @@
    "z": -1.5,
    "voids": [
     {
-     "x0": 26,
-     "x1": 50,
+     "x0": 12,
+     "x1": 72,
+     "y0": -5,
+     "y1": 5
+    },
+    {
+     "x0": 72,
+     "x1": 96,
+     "y0": -3,
+     "y1": 3
+    },
+    {
+     "x0": 96,
+     "x1": 148,
+     "y0": -5,
+     "y1": 5
+    },
+    {
+     "x0": 30,
+     "x1": 42,
      "y0": -20,
      "y1": 20
     },
     {
-     "x0": 50,
-     "x1": 60,
-     "y0": -5,
-     "y1": 5
+     "x0": 102,
+     "x1": 114,
+     "y0": -20,
+     "y1": 20
     }
    ],
    "void_edge": "wall"
@@ -1528,8 +1676,32 @@
    "z": -4.5,
    "voids": [
     {
-     "x0": 26,
-     "x1": 50,
+     "x0": 12,
+     "x1": 72,
+     "y0": -5,
+     "y1": 5
+    },
+    {
+     "x0": 72,
+     "x1": 96,
+     "y0": -3,
+     "y1": 3
+    },
+    {
+     "x0": 96,
+     "x1": 148,
+     "y0": -5,
+     "y1": 5
+    },
+    {
+     "x0": 30,
+     "x1": 42,
+     "y0": -20,
+     "y1": 20
+    },
+    {
+     "x0": 102,
+     "x1": 114,
      "y0": -20,
      "y1": 20
     }
@@ -1538,78 +1710,50 @@
  ],
  "open": [
   {
-   "id": "dock",
-   "name": "Water Hall",
-   "sub": "water and quays",
+   "id": "harbour",
+   "name": "The harbour",
+   "sub": "the water street and its quays",
    "level": "quay",
+   "water": true,
    "rects": [
     {
-     "x0": 26,
-     "x1": 30,
+     "x0": 10,
+     "x1": 150,
+     "y0": -10,
+     "y1": 10
+    },
+    {
+     "x0": 27,
+     "x1": 45,
      "y0": -20,
      "y1": 20
     },
     {
-     "x0": 46,
-     "x1": 50,
+     "x0": 99,
+     "x1": 117,
      "y0": -20,
-     "y1": -5
+     "y1": 20
     },
     {
-     "x0": 46,
-     "x1": 50,
-     "y0": 5,
-     "y1": 20
-    }
-   ],
-   "water": true
-  },
-  {
-   "id": "dock_g",
-   "name": "Water Hall galleries",
-   "level": "lower",
-   "rects": [
-    {
-     "x0": 46,
-     "x1": 50,
-     "y0": 5,
-     "y1": 20
+     "x0": 72,
+     "x1": 96,
+     "y0": -12,
+     "y1": 12
     }
    ]
   },
   {
    "id": "slip",
    "name": "The Slip",
-   "sub": "boat hall and shop",
+   "sub": "the shipwright’s shop",
    "svc": "S",
    "level": "quay",
    "rects": [
     {
      "x0": 50,
      "x1": 68,
-     "y0": -10,
-     "y1": 10
-    },
-    {
-     "x0": 50,
-     "x1": 68,
      "y0": 10,
      "y1": 20
-    }
-   ]
-  },
-  {
-   "id": "keelgate",
-   "name": "The Keelgate",
-   "sub": "chamber at the foot of the Well",
-   "svc": "Q",
-   "level": "quay",
-   "rects": [
-    {
-     "x0": 72,
-     "x1": 96,
-     "y0": -12,
-     "y1": 12
     }
    ]
   },
@@ -1850,7 +1994,7 @@
     ]
    },
    "gate": "G1",
-   "sees": "Doors off the Water Hall’s aft quay, and the aft galleries over the water with their shutters."
+   "sees": "Doors off the harbour’s aft quays, and the galleries over the water with their shutters."
   },
   {
    "id": "L3",
@@ -1859,14 +2003,14 @@
     "quay": [
      {
       "x0": 0,
-      "x1": 26,
+      "x1": 27,
       "y0": -20,
       "y1": 20
      }
     ]
    },
    "gate": "G4",
-   "sees": "Shuttered bays along the Water Hall’s aft quay."
+   "sees": "Shuttered bays along the harbour’s aft quays."
   },
   {
    "id": "L4",
@@ -1886,19 +2030,25 @@
   },
   {
    "id": "L5",
-   "name": "Keel Walk",
+   "name": "Warehouses",
    "levels": {
     "quay": [
      {
-      "x0": 68,
-      "x1": 72,
-      "y0": -20,
+      "x0": 45,
+      "x1": 99,
+      "y0": 10,
       "y1": 20
+     },
+     {
+      "x0": 45,
+      "x1": 99,
+      "y0": -20,
+      "y1": -10
      }
     ]
    },
    "gate": "G1",
-   "sees": "A heavy door in the Slip’s forward wall and another in the Keelgate chamber: the first shortcut to open."
+   "sees": "Barred doors along the harbour’s quays amidships."
   },
   {
    "id": "L6",
@@ -1906,22 +2056,10 @@
    "levels": {
     "quay": [
      {
-      "x0": 96,
+      "x0": 117,
       "x1": 160,
       "y0": -20,
       "y1": 20
-     },
-     {
-      "x0": 72,
-      "x1": 96,
-      "y0": 12,
-      "y1": 20
-     },
-     {
-      "x0": 72,
-      "x1": 96,
-      "y0": -20,
-      "y1": -12
      }
     ],
     "hold": [
@@ -1934,7 +2072,7 @@
     ]
    },
    "gate": "G6",
-   "sees": "Iron grilles in the Keelgate chamber’s forward wall; padlocked cargo hatches on the main deck."
+   "sees": "Iron grilles along the forward quays; padlocked cargo hatches on the main deck."
   },
   {
    "id": "L7",
@@ -2002,7 +2140,7 @@
    "levels": {
     "middle": [
      {
-      "x0": 46,
+      "x0": 42,
       "x1": 73,
       "y0": -20,
       "y1": 20
@@ -2010,15 +2148,15 @@
     ],
     "lower": [
      {
-      "x0": 46,
-      "x1": 50,
+      "x0": 42,
+      "x1": 68,
       "y0": -20,
-      "y1": 5
+      "y1": 20
      }
     ]
    },
    "gate": "G1",
-   "sees": "Doors with painted crests off the Well’s aft gallery; their galleries over the Water Hall’s forward quay."
+   "sees": "Doors with painted crests off the Well’s aft gallery; their galleries over the harbour."
   },
   {
    "id": "L11",
@@ -2062,7 +2200,7 @@
     ]
    },
    "gate": "G1",
-   "sees": "A door with a brass plate off the Well’s aft gallery; its galleries high over the Water Hall."
+   "sees": "A door with a brass plate off the Well’s aft gallery; its galleries high over the harbour."
   },
   {
    "id": "L13",
@@ -2163,7 +2301,7 @@
     ]
    },
    "gate": "G5",
-   "sees": "The Keelgate: the ancient seal in the floor at the foot of the Well, faintly lit from inside."
+   "sees": "Under the waterline; no way down yet (D70: the Keelgate is out of the hub for now)."
   },
   {
    "id": "L18",
@@ -2226,13 +2364,6 @@
  },
  "gate_marks": [
   {
-   "level": "quay",
-   "x": 84,
-   "y": 0,
-   "g": "G5",
-   "zone": "L17"
-  },
-  {
    "level": "main",
    "x": 122,
    "y": 0,
@@ -2278,172 +2409,341 @@
  ],
  "where": {
   "L1": "Main deck aft and the sterncastle over it: the great cabin, the stern galleries, the quarterdeck, the poop",
-  "L2": "Lower and middle deck aft, over the Water Hall’s aft quay and the stern",
-  "L3": "Dock deck aft of the Water Hall",
-  "L4": "Dock deck, port of the Slip",
-  "L5": "Dock deck, between the Slip and the Keelgate",
-  "L6": "Dock deck forward and round the Keelgate chamber; the hold under everything",
+  "L2": "Lower and middle deck aft, over the harbour’s aft quays and the stern",
+  "L3": "Dock deck aft, round the canal’s end",
+  "L4": "Dock deck, across the canal from the Slip",
+  "L5": "Dock deck amidships, along both quays",
+  "L6": "Dock deck forward of the fore basin; the hold under everything",
   "L7": "Lower deck, between the Tally House and the Well",
   "L8": "Lower deck, port side, 120 m long",
   "L9": "Lower deck forward",
-  "L10": "Middle deck aft (over the Water Hall and the Slip)",
+  "L10": "Middle deck aft (over the harbour and the Slip)",
   "L11": "Middle deck forward",
   "L12": "Upper deck aft",
   "L13": "Upper deck forward and round the Well",
   "L14": "The forecastle’s two storeys, round the Chandlery",
   "L15": "The forecastle deck, the beakhead and the bowsprit",
   "L16": "Three masts, their tops and yards",
-  "L17": "The Deep, under the waterline, behind the Keelgate",
+  "L17": "The Deep, under the waterline",
   "L18": "Gun deck, all of it but the Well’s gallery"
  },
  "spaces": {
-  "dock": {
+  "harbour": {
    "level": "quay",
    "floor": 1.5,
-   "name": "The Water Hall",
+   "name": "The harbour",
    "props": [
     {
      "id": "water",
-     "x0": 30,
-     "x1": 46,
-     "note": "sea water from door to door, its floor z -4; the quays’ faces timber on piles; open up to the gun deck (13.2 m over the water)"
+     "note": "hub.dock: the canal (|y| < 5, 3 under the Well) from x 12 to 148 and the two basins across the ship; sea water, its floor z -4; open up to the gun deck (13.2 m over the water) but under the Well’s galleries"
     },
     {
      "id": "quays",
-     "note": "x 26..30 (aft) and 46..50 (forward) at +1.5, from side to side; the forward quay is cut by the slipway (y -5..5)"
+     "note": "at +1.5: along the canal to |y| 10, across the basins’ ends (3 m), round the Well’s foot; faces of timber on piles with fenders; the decks above stand back to |y| 6.5"
     },
     {
      "id": "doors",
-     "note": "hub.doors: a pair in each side at x 32..40, 15.5 m tall; shut, a seam in the planking; open, the leaves stand in the water along x 32 and x 40, between the galleries"
+     "note": "hub.doors: a pair in each side at both basins, 15.5 m tall; shut, a seam in the planking; open, the leaves stand in the basin along its edges"
     },
     {
      "id": "bollards",
      "every": 5,
-     "along": [
-      [
-       30,
-       -17,
-       17
-      ],
-      [
-       46,
-       -17,
-       -6
-      ],
-      [
-       46,
-       6,
-       17
-      ]
-     ],
      "r": 0.3,
      "h": 0.6,
-     "note": "on the quays’ edges (x, y from, y to)"
+     "lines": [
+      [
+       12.5,
+       5,
+       29.5,
+       5
+      ],
+      [
+       45,
+       5,
+       71.5,
+       5
+      ],
+      [
+       72.5,
+       3,
+       77.5,
+       3
+      ],
+      [
+       83,
+       3,
+       95.5,
+       3
+      ],
+      [
+       96.5,
+       5,
+       101.5,
+       5
+      ],
+      [
+       117.5,
+       5,
+       147,
+       5
+      ],
+      [
+       12.5,
+       -5,
+       29.5,
+       -5
+      ],
+      [
+       45,
+       -5,
+       71.5,
+       -5
+      ],
+      [
+       72.5,
+       -3,
+       95.5,
+       -3
+      ],
+      [
+       96.5,
+       -5,
+       101.5,
+       -5
+      ],
+      [
+       117.5,
+       -5,
+       147,
+       -5
+      ],
+      [
+       30,
+       10.6,
+       30,
+       18
+      ],
+      [
+       30,
+       -18,
+       30,
+       -10.6
+      ],
+      [
+       42,
+       10.6,
+       42,
+       18
+      ],
+      [
+       42,
+       -18,
+       42,
+       -10.6
+      ],
+      [
+       102,
+       10.6,
+       102,
+       18
+      ],
+      [
+       102,
+       -18,
+       102,
+       -10.6
+      ],
+      [
+       114,
+       10.6,
+       114,
+       18
+      ],
+      [
+       114,
+       -18,
+       114,
+       -10.6
+      ]
+     ]
     },
     {
      "id": "rung_ladders",
      "at": [
       [
-       30,
-       14
+       20,
+       5,
+       90
+      ],
+      [
+       20,
+       -5,
+       -90
+      ],
+      [
+       62,
+       -5,
+       -90
+      ],
+      [
+       98.5,
+       -5,
+       -90
+      ],
+      [
+       140,
+       5,
+       90
+      ],
+      [
+       140,
+       -5,
+       -90
       ],
       [
        30,
-       -15
+       14.5,
+       180
       ],
       [
-       46,
-       -8
+       42,
+       -14.5,
+       0
       ],
       [
-       46,
-       17
+       102,
+       14.5,
+       180
+      ],
+      [
+       114,
+       -14.5,
+       0
       ]
-     ],
-     "note": "from the water onto the quays (the D54 ladder); [x of the edge, y]"
-    },
-    {
-     "id": "fitting_berth",
-     "x": 43.9,
-     "y0": 6,
-     "y1": 16,
-     "heading": -90,
-     "note": "along the forward quay (its edge x 46), bow to port: a boat that came in by the starboard doors slides alongside; the quay to her starboard (reach 2.1 m)"
+     ]
     },
     {
      "id": "fleet_berths",
      "berths": [
       {
-       "x": 43.9,
-       "y0": -16,
-       "y1": -6,
+       "x0": 44,
+       "x1": 54,
+       "side": -1,
        "boat": "10 m",
        "reach": 2.1
       },
       {
-       "x": 32.3,
-       "y0": -7,
-       "y1": 7,
+       "x0": 57,
+       "x1": 71,
+       "side": 1,
        "boat": "14 m",
-       "reach": -2.3
+       "reach": 2.3
       }
      ],
-     "heading": -90,
-     "note": "bow to port: the 10 m along the forward quay’s port side (the quay to her starboard; the fore leaves never swing past x 41.4), the 14 m along the middle of the aft quay (the quay to her port side): the aft leaves stand open at y 12.3..16.3 and sweep x 30.6..36.5 beyond |y| 12"
-    },
-    {
-     "id": "crane",
-     "beam": [
-      50,
-      44.2,
-      11,
-      12.6
-     ],
-     "hook_rope_x": 44.6,
-     "hand_chain": [
-      45.8,
-      11
-     ],
-     "note": "a runway beam under the ceiling from the forward wall out over the fitting berth (above the galleries and a mast), a trolley with a block; its hand chain hangs just off the quay’s edge"
+     "heading": 0,
+     "note": "a 10 m across the canal from the player’s boat at the aft station; the 14 m cutter at the Slip’s quay, forward of it"
     },
     {
      "id": "pillars",
+     "size": 0.36,
      "at": [
       [
-       29.8,
-       -10.5
+       16,
+       6.75
       ],
       [
-       29.8,
-       -4.5
+       16,
+       -6.75
       ],
       [
-       29.8,
-       4.5
+       25,
+       6.75
       ],
       [
-       29.8,
+       25,
+       -6.75
+      ],
+      [
+       47.5,
+       6.75
+      ],
+      [
+       47.5,
+       -6.75
+      ],
+      [
+       57,
+       6.75
+      ],
+      [
+       57,
+       -6.75
+      ],
+      [
+       66.5,
+       6.75
+      ],
+      [
+       66.5,
+       -6.75
+      ],
+      [
+       120.5,
+       6.75
+      ],
+      [
+       120.5,
+       -6.75
+      ],
+      [
+       130,
+       6.75
+      ],
+      [
+       130,
+       -6.75
+      ],
+      [
+       139.5,
+       6.75
+      ],
+      [
+       139.5,
+       -6.75
+      ],
+      [
+       29.75,
        10.5
       ],
       [
-       46.2,
-       -15
+       29.75,
+       -10.5
       ],
       [
-       46.2,
-       -10
+       42.25,
+       10.5
       ],
       [
-       46.2,
-       10
+       42.25,
+       -10.5
       ],
       [
-       46.2,
-       15
+       101.75,
+       10.5
+      ],
+      [
+       101.75,
+       -10.5
+      ],
+      [
+       114.25,
+       10.5
+      ],
+      [
+       114.25,
+       -10.5
       ]
-     ],
-     "size": 0.36,
-     "note": "posts under the galleries’ edges, from the quays to the gun deck; clear of the bollards, ladders, capstans and the berth board"
+     ]
     },
     {
      "id": "galleries",
@@ -2452,67 +2752,208 @@
       "middle",
       "upper"
      ],
-     "aft": [
-      26,
-      30
-     ],
-     "fore": [
-      46,
-      50
-     ],
-     "note": "balconies over both quays on three decks, balustraded on the water side; the lower forward-starboard one (y 5..20) is open, with a door into the Tally House; the others belong to the rooms behind them"
+     "note": "walkways along the canal (|y| 6.5..9) and across the basins’ ends on three decks, balustraded on the water side; they belong to the rooms behind them"
     },
     {
      "id": "lanterns",
+     "hook_z": 3,
      "at": [
       [
-       28,
-       10,
+       15,
+       8.5,
        2.6
       ],
       [
-       28,
-       -10,
+       15,
+       -8.5,
+       2.6
+      ],
+      [
+       22,
+       8.5,
+       2.6
+      ],
+      [
+       22,
+       -8.5,
        2.6
       ],
       [
        48,
-       12,
+       8.5,
        2.6
       ],
       [
        48,
-       -12,
+       -8.5,
        2.6
       ],
       [
-       29.6,
-       0,
+       56,
+       8.5,
+       2.6
+      ],
+      [
+       56,
+       -8.5,
+       2.6
+      ],
+      [
+       64,
+       8.5,
+       2.6
+      ],
+      [
+       64,
+       -8.5,
+       2.6
+      ],
+      [
+       121,
+       8.5,
+       2.6
+      ],
+      [
+       121,
+       -8.5,
+       2.6
+      ],
+      [
+       129,
+       8.5,
+       2.6
+      ],
+      [
+       129,
+       -8.5,
+       2.6
+      ],
+      [
+       137,
+       8.5,
+       2.6
+      ],
+      [
+       137,
+       -8.5,
+       2.6
+      ],
+      [
+       143,
+       8.5,
+       2.6
+      ],
+      [
+       143,
+       -8.5,
+       2.6
+      ],
+      [
+       28.5,
+       13,
+       2.6
+      ],
+      [
+       28.5,
+       -13,
+       2.6
+      ],
+      [
+       43.5,
+       13,
+       2.6
+      ],
+      [
+       43.5,
+       -13,
+       2.6
+      ],
+      [
+       100.5,
+       13,
+       2.6
+      ],
+      [
+       100.5,
+       -13,
+       2.6
+      ],
+      [
+       115.5,
+       13,
+       2.6
+      ],
+      [
+       115.5,
+       -13,
+       2.6
+      ],
+      [
+       75,
+       8,
+       2.6
+      ],
+      [
+       75,
+       -8,
+       2.6
+      ],
+      [
+       93,
+       8,
+       2.6
+      ],
+      [
+       93,
+       -8,
+       2.6
+      ],
+      [
+       20,
+       6.9,
        5.6
       ],
       [
-       46.4,
-       12,
+       26,
+       -6.9,
+       8.6
+      ],
+      [
+       60,
+       -6.9,
        5.6
       ],
       [
-       29.6,
-       0,
+       66,
+       6.9,
        8.6
       ],
       [
-       46.4,
-       -12,
+       124,
+       6.9,
+       5.6
+      ],
+      [
+       132,
+       -6.9,
        8.6
+      ],
+      [
+       140,
+       -6.9,
+       5.6
       ]
-     ],
-     "hook_z": 3,
-     "note": "under the galleries over the quays, and from the galleries’ edges; none hang over the water or the slipway (masts)"
+     ]
+    },
+    {
+     "id": "stations",
+     "note": "at each: the gangway’s landing (a gap in the bollards, a lantern on a post), the station’s board with its name"
     }
    ],
    "gates": [
-    "L3 shuttered bays along the aft quay (x 26)",
-    "L2 doors at the aft quay’s ends"
+    "L3 shuttered bays along the aft quays",
+    "L5 barred doors along the quays amidships",
+    "L6 grilles along the forward quays"
    ]
   },
   "slip": {
@@ -2535,35 +2976,26 @@
     },
     {
      "id": "plans",
-     "x": 50.6,
-     "y": 12,
+     "x": 51.2,
+     "y": 18,
      "prompt": "Look at the plans"
     },
     {
      "id": "display_boat",
-     "x": 61.5,
-     "y": 4.7,
+     "x": 64,
+     "y": 7.4,
      "prompt": "Look her over",
-     "note": "beside her, at the head of the slipway"
+     "note": "on the quay by the cutter’s gangway"
     },
     {
      "id": "fitting_berth",
-     "x": 47,
-     "y": 13.5,
+     "x": 53,
+     "y": 6.6,
      "prompt": "Read the berth board",
-     "note": "a board at the quay’s edge by the fitting berth, between two bollards"
+     "note": "a board on a post at the quay’s edge by the bow of the aft docking station, between two bollards"
     }
    ],
    "props": [
-    {
-     "id": "hall",
-     "x0": 50,
-     "x1": 68,
-     "y0": -10,
-     "y1": 10,
-     "h": 11.7,
-     "note": "open to the Water Hall’s forward quay along x 50; its ceiling is the gun deck (a boat on the slipway keeps her mast)"
-    },
     {
      "id": "shop",
      "x0": 50,
@@ -2571,7 +3003,7 @@
      "y0": 10,
      "y1": 20,
      "h": 3,
-     "note": "open to the hall along y 10; the Tally House above it; the dock stair in its aft-starboard corner"
+     "note": "open to the starboard quay along y 10; the Tally House above it; the dock stair up along its aft wall"
     },
     {
      "id": "counter",
@@ -2585,11 +3017,11 @@
     {
      "id": "plans_board",
      "wall": "x=50",
-     "y0": 10.6,
-     "y1": 13.6,
+     "y0": 17,
+     "y1": 19,
      "z0": 0.9,
      "z1": 2.4,
-     "note": "pinned plans of the upgrades, by the door from the quay"
+     "note": "pinned plans of the upgrades on the aft wall, past the stair"
     },
     {
      "id": "half_models",
@@ -2611,68 +3043,47 @@
     {
      "id": "timber_racks",
      "wall": "x=68",
-     "y0": -5.4,
-     "y1": 5.4,
-     "z0": 0.6,
-     "z1": 3.5,
-     "note": "four rows of planks on iron brackets, either side of the mizzen’s foot (the mast comes down through the forward wall to its step), clear of the Keel Walk’s doors"
+     "y0": 12.5,
+     "y1": 17.5,
+     "z0": 0.4,
+     "z1": 1.7,
+     "note": "planks on iron brackets on the forward wall, under the half-models"
     },
     {
-     "id": "display_boat",
-     "x0": 52,
-     "x1": 66,
-     "y": 7.5,
-     "beam": 4.4,
-     "keel_z": 0.6,
-     "note": "the 14 m cutter (D51), unrigged, bow forward, on cradles at x 55, 59, 63 on the starboard side of the hall: the slipway’s way (y -5..5) stays clear"
-    },
-    {
-     "id": "mast_on_trestles",
-     "x0": 51.5,
-     "x1": 64.5,
-     "y": -7,
-     "z": 1.1,
-     "note": "her mast lying on two trestles, port side (the grille to the timber store behind it stays in reach)"
+     "id": "quay_work",
+     "x0": 58,
+     "x1": 68,
+     "y0": 8.6,
+     "y1": 9.9,
+     "note": "the shipwright’s work on the quay along the shop’s front: a spar on trestles, coils, a grindstone, the steam box (the covered quay in front of it stays free to walk)"
     },
     {
      "id": "lanterns",
      "at": [
       [
        62,
-       7.5,
-       7
+       15,
+       2.2
       ],
       [
-       62,
-       -5,
-       7
-      ],
-      [
-       56,
-       -7.5,
-       7
-      ],
-      [
-       62,
+       54,
        15,
        2.2
       ]
      ],
-     "hook_z": 11.7,
-     "note": "none over the slipway (masts)"
+     "hook_z": 2.7
     },
     {
      "id": "sign",
-     "x": 50,
-     "y": 0,
-     "z": 10.9,
+     "x": 59,
+     "y": 10,
+     "z": 2.2,
      "text": "SHIPWRIGHT",
-     "note": "over the hall mouth under the gun deck, facing aft over the Water Hall (above a mast on the slipway)"
+     "note": "over the shop’s open front, facing the quay and the canal"
     }
    ],
    "gates": [
-    "L5 door in the forward wall (x 68)",
-    "L4 grilles on the port side (y -10)"
+    "L5 door in the forward wall (x 68)"
    ]
   },
   "tally": {
@@ -2718,17 +3129,10 @@
     {
      "id": "stair_hole",
      "x0": 50.5,
-     "x1": 56,
-     "y0": 16.5,
-     "y1": 19,
-     "note": "the dock stair arrives here, a rail round it"
-    },
-    {
-     "id": "gallery_door",
-     "wall": "x=50",
+     "x1": 53,
      "y0": 11,
-     "y1": 12.2,
-     "note": "out onto the Water Hall gallery"
+     "y1": 16.5,
+     "note": "the dock stair arrives here along the aft wall, a rail round it"
     },
     {
      "id": "lane_door",
@@ -2770,12 +3174,12 @@
     },
     {
      "id": "salt_cakes",
-     "x0": 51.2,
-     "x1": 52,
+     "x0": 64.6,
+     "x1": 65.4,
      "y0": 10.6,
      "y1": 11.4,
      "h": 0.9,
-     "note": "stacked by the windows over the Slip, out of the stair’s way"
+     "note": "stacked by the lane door, out of the way to it"
     },
     {
      "id": "table",
@@ -2801,27 +3205,6 @@
      ],
      "z0": 0.8,
      "z1": 1.8
-    },
-    {
-     "id": "hall_windows",
-     "wall": "y=10",
-     "spans": [
-      [
-       54,
-       57
-      ],
-      [
-       58,
-       61
-      ],
-      [
-       62,
-       65
-      ]
-     ],
-     "z0": 0.8,
-     "z1": 2.2,
-     "note": "look down into the Slip"
     },
     {
      "id": "lanterns",
@@ -2864,7 +3247,7 @@
      "x1": 90,
      "y0": -6,
      "y1": 6,
-     "note": "open from the Keelgate floor (+1.5) to the sky; rails 1.0 m round it on every gallery"
+     "note": "open from the canal and the quays round it (+1.5) to the sky; rails 1.0 m round it on every gallery"
     },
     {
      "id": "galleries",
@@ -2890,12 +3273,12 @@
     },
     {
      "id": "counterweight",
-     "x0": 78.2,
-     "x1": 79,
-     "y0": 1.6,
-     "y1": 2.8,
+     "x0": 81.2,
+     "x1": 82,
+     "y0": 3.4,
+     "y1": 4.6,
      "h": 1.5,
-     "note": "its rope over the gantry beam’s second sheave; at the bottom of its run it sits in a railed bay on the chamber floor"
+     "note": "its rope over the gantry beam’s second sheave; at the bottom of its run it sits in a railed bay on the quay beside the cage (D70: the canal runs where it stood)"
     },
     {
      "id": "gantry",
@@ -2910,113 +3293,6 @@
      "id": "lanterns",
      "note": "one on each gallery corner, a ring lantern in the shaft at the middle deck on a chain from the gantry’s apex"
     }
-   ]
-  },
-  "keelgate": {
-   "svc": "Q",
-   "level": "quay",
-   "floor": 1.5,
-   "name": "The Keelgate (main quest)",
-   "npc": {
-    "x": 75.8,
-    "y": -9.4,
-    "face": 48,
-    "note": "behind the reading desk by the port wall"
-   },
-   "e": [
-    {
-     "id": "talk",
-     "x": 76.2,
-     "y": -5.6,
-     "prompt": "Talk"
-    },
-    {
-     "id": "gate",
-     "x": 81,
-     "y": 1.7,
-     "prompt": "Look at the gate"
-    },
-    {
-     "id": "hoist",
-     "x": 77.4,
-     "y": 4.5,
-     "prompt": "Ride the hoist"
-    }
-   ],
-   "props": [
-    {
-     "id": "chamber",
-     "x0": 72,
-     "x1": 96,
-     "y0": -12,
-     "y1": 12,
-     "h": 3,
-     "note": "the middle 12 x 12 m (the shaft) open 15 m up to the sky"
-    },
-    {
-     "id": "keelgate",
-     "x": 84,
-     "y": 0,
-     "ring_r": 4,
-     "disc_r": 3,
-     "raised": 0.12,
-     "note": "pale seamless ancient stone; turquoise lines: circles r 1.0 and 2.1, seven radial lines r 1.0..2.8; seven empty sockets at r 3.5"
-    },
-    {
-     "id": "desk",
-     "x0": 74,
-     "x1": 77.5,
-     "y0": -8.4,
-     "y1": -6.6,
-     "h": 0.85,
-     "chair": [
-      75.4,
-      76.2,
-      -10.4,
-      -9.6
-     ],
-     "note": "books, a brass lamp, rubbings"
-    },
-    {
-     "id": "shelves",
-     "wall": "y=-12",
-     "x0": 83.8,
-     "x1": 94,
-     "depth": 0.6,
-     "z0": 0,
-     "z1": 2.6,
-     "note": "salvaged ancient pieces in jars; about a quarter faintly glowing"
-    },
-    {
-     "id": "rubbings",
-     "wall": "x=96",
-     "y0": -2.8,
-     "y1": 3,
-     "z0": 1.2,
-     "z1": 2.4,
-     "note": "paper rubbings of the gate’s lines"
-    },
-    {
-     "id": "lanterns",
-     "at": [
-      [
-       94,
-       0,
-       2.2
-      ],
-      [
-       84,
-       -10,
-       2.2
-      ]
-     ],
-     "hook_z": 2.7
-    }
-   ],
-   "gates": [
-    "L5 door in the aft wall (x 72)",
-    "L6 grilles in the forward wall (x 96)",
-    "L17 the Keelgate itself (G5)"
    ]
   },
   "chandlery": {
@@ -3320,16 +3596,16 @@
   }
  },
  "outside": {
-  "hull_section": "Planked all the way down (D64: no pale ancient band outside; the ancient hull shows only inside, at the Keelgate and the Deep): flat bottom +/-6 m at the keel (z -12), +/-16 m at z -6, +/-19 m at the waterline, widest +/-20 m at z +6, tumblehome to +/-18.8 m at the main deck rail and +/-17.4 m at the taffrail. Fine at the ends below the water (hub.form): the run aft narrows to the sternpost, the entry forward is finer than the deck outline.",
+  "hull_section": "Planked all the way down (D64: no pale ancient band outside; the ancient hull shows only inside, in the Deep): flat bottom +/-6 m at the keel (z -12), +/-16 m at z -6, +/-19 m at the waterline, widest +/-20 m at z +6, tumblehome to +/-18.8 m at the main deck rail and +/-17.4 m at the taffrail. Fine at the ends below the water (hub.form): the run aft narrows to the sternpost, the entry forward is finer than the deck outline.",
   "stern": "A galleon’s stern (D64, D69): the sterncastle rises in two tiers, the quarterdeck over x 24..48 (deck 22.5) and the poop over x 0..24 (three storeys, deck 28.5). Below the counter (z 8.5) the hull narrows to the sternpost and the one rudder; above it the stern is full width and round in plan, a half ellipse 9.5 m deep that runs into the sides without a corner, leaning aft a little. On its face: rows of tall cabin windows on each storey; grand open galleries at sc1 and sc2, 3.4 m deep, round the stern and along both sides to x 21.5, on carved brackets with balustrades and columns, the upper one roofed; glazed doors from the cabins onto them. Her name in carved brass letters under the taffrail, three great lanterns on the taffrail. The castles’ fronts are glazed in iron frames, with grand stairs along the bulwarks up to the quarterdeck and the poop; on the poop the command hall in glass under a copper roof. The tiller comes in through the counter; the lashed great wheel is on the quarterdeck.",
-  "sides": "Dark tarred planking in strakes about 0.55 m wide with a lively sheer (hub.sheer: up 2.2 m at the stern, 2.6 m at the stem); heavy wales in a belt at the waterline and at the deck lines, standing out like mouldings; ochre bands; lidded square ports (1 m) on every deck below the main deck down to the dock deck, cream-framed windows above it; most shut, some lit at night. Channels with deadeyes at each mast. The hidden doors at x 32..40 on both sides, from under the water to 13 m: shut, the planking, wales and painted port lids run on across them; only a seam and the iron hinge straps show.",
+  "sides": "Dark tarred planking in strakes about 0.55 m wide with a lively sheer (hub.sheer: up 2.2 m at the stern, 2.6 m at the stem); heavy wales in a belt at the waterline and at the deck lines, standing out like mouldings; ochre bands; lidded square ports (1 m) on every deck below the main deck down to the dock deck, cream-framed windows above it; most shut, some lit at night. Channels with deadeyes at each mast. The hidden doors (D70: four) at x 32..40 and 104..112 on both sides, from under the water to 13 m: shut, the planking, wales and painted port lids run on across them; only a seam and the iron hinge straps show.",
   "masts": "x 68, 100, 140 (hub.rig in numbers); 54, 76, 64 m above the main deck; square yards on all three (D69: the mizzen’s lateen yard is gone); every sail furled on its yard, gathered canvas bound by gaskets; shrouds to the channels, stays forward, a long oxblood-and-cream pennant at the main truck.",
   "bow": "Forecastle x 134..160, a storey over the main deck with a rail; a plain stem with two hawse holes and their cables to the anchors ahead; the beakhead out from the stem under the bowsprit (a grated platform, headrails curving up to the forecastle, a carved figurehead); the bowsprit from (154, 23.5) to (188, 30.5) with its spritsail yard, held down by its bobstay.",
   "colours": "Hull planking dark tarred brown; ochre bands, muted; window frames cream; carvings and the name brass, muted; decks teak and its light and dark variants; canvas; iron."
  },
  "areas": {
-  "total": 47603,
-  "open": 8301,
+  "total": 41159,
+  "open": 8654,
   "levels": {
    "poop": {
     "total": 950,
@@ -3364,27 +3640,27 @@
     "open": 340
    },
    "upper": {
-    "total": 4731,
+    "total": 3667,
     "open": 340
    },
    "middle": {
-    "total": 4731,
+    "total": 3667,
     "open": 340
    },
    "lower": {
-    "total": 4731,
-    "open": 610
+    "total": 3667,
+    "open": 548
    },
    "quay": {
-    "total": 5235,
-    "open": 1396
+    "total": 3931,
+    "open": 1811
    },
    "hold": {
-    "total": 4855,
+    "total": 3931,
     "open": 0
    },
    "deep": {
-    "total": 4955,
+    "total": 3931,
     "open": 0
    }
   },
@@ -3397,33 +3673,31 @@
    "well_g": 340,
    "well_u": 340,
    "well_m": 340,
-   "dock_g": 60,
    "tally": 180,
-   "lane": 30,
+   "lane": 28,
    "well_l": 340,
-   "dock": 280,
-   "slip": 540,
-   "keelgate": 576
+   "harbour": 1631,
+   "slip": 180
   },
   "locked_by_zone": {
    "L1": 5718,
    "L15": 613,
    "L14": 992,
    "L18": 5431,
-   "L12": 1870,
-   "L13": 2521,
-   "L2": 2379,
-   "L10": 696,
-   "L11": 2521,
-   "L8": 961,
-   "L7": 125,
-   "L9": 1825,
+   "L12": 1806,
+   "L13": 1521,
+   "L2": 1911,
+   "L10": 1086,
+   "L11": 1521,
+   "L8": 891,
+   "L7": 75,
+   "L9": 957,
    "rest_lower": 4,
-   "L3": 1030,
+   "L3": 730,
+   "L5": 624,
    "L4": 180,
-   "L5": 160,
-   "L6": 7324,
-   "L17": 4955
+   "L6": 4517,
+   "L17": 3931
   }
  }
 }

@@ -692,6 +692,41 @@
     "collision": "ucx",
     "_note": "D69: not Nanite, so ray-traced reflections see its thin boards (the hall's water mirrored the sky through it). D64 the hidden side doors (build_hub_doors.py): one leaf, pivot on its hinge axis at z0; Art/Generated/hub_doors.json has the pivots, swing and rope eyes"
   },
+  "SM_Hub_Door2StbdAft": {
+    "fbx": "Hub/SM_Hub_Door2StbdAft.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D70 the fore station's hidden side doors (build_hub_doors.py, a pair in each side at the fore basin): one leaf, pivot on its hinge axis at z0, not Nanite (as D69); Art/Generated/hub_doors.json has the pivots, swing and rope eyes"
+  },
+  "SM_Hub_Door2StbdFore": {
+    "fbx": "Hub/SM_Hub_Door2StbdFore.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D70 the fore station's hidden side doors (build_hub_doors.py, a pair in each side at the fore basin): one leaf, pivot on its hinge axis at z0, not Nanite (as D69); Art/Generated/hub_doors.json has the pivots, swing and rope eyes"
+  },
+  "SM_Hub_Door2PortAft": {
+    "fbx": "Hub/SM_Hub_Door2PortAft.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D70 the fore station's hidden side doors (build_hub_doors.py, a pair in each side at the fore basin): one leaf, pivot on its hinge axis at z0, not Nanite (as D69); Art/Generated/hub_doors.json has the pivots, swing and rope eyes"
+  },
+  "SM_Hub_Door2PortFore": {
+    "fbx": "Hub/SM_Hub_Door2PortFore.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": false,
+    "collision": "ucx",
+    "_note": "D70 the fore station's hidden side doors (build_hub_doors.py, a pair in each side at the fore basin): one leaf, pivot on its hinge axis at z0, not Nanite (as D69); Art/Generated/hub_doors.json has the pivots, swing and rope eyes"
+  },
+  "SM_Hub_BridgeLeaf": {
+    "fbx": "Hub/SM_Hub_BridgeLeaf.fbx",
+    "dest": "/Game/Saltbound/Hub/Art",
+    "nanite": true,
+    "collision": "ucx",
+    "_note": "D70 one leaf of the harbour's lifting bridges (build_hub_inside.py bridge): pivot at its hinge on the quay's deck, built out along +X; its own collision (it moves)"
+  },
   "SM_Hub_DoorFrame": {
     "fbx": "Hub/SM_Hub_DoorFrame.fbx",
     "dest": "/Game/Saltbound/Hub/Art",
@@ -855,13 +890,6 @@
   },
   "SM_Hub_Well": {
     "fbx": "Hub/SM_Hub_Well.fbx",
-    "dest": "/Game/Saltbound/Hub/Art",
-    "nanite": true,
-    "collision": "none",
-    "_note": "D62 the open spaces inside (build_hub_inside.py): visual only, the blockout collides"
-  },
-  "SM_Hub_Keelgate": {
-    "fbx": "Hub/SM_Hub_Keelgate.fbx",
     "dest": "/Game/Saltbound/Hub/Art",
     "nanite": true,
     "collision": "none",

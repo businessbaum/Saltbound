@@ -242,8 +242,9 @@ def _grid_origin():
     it, so the doors' bottom and top edges are seams (z0 at the middle; the top one at z1 at the aft jamb, where the sheer
     lifts it most)."""
     z0 = float(DOORS["z0"])
+    st = DOORS["stations"][0]                                # the aft station: the sheer lifts its seams (the fore one is level)
     for _ in range(20):
-        z0 -= line_z(z0, 0.5 * (DOORS["x0"] + DOORS["x1"])) - DOORS["z0"]
+        z0 -= line_z(z0, 0.5 * (st["x0"] + st["x1"])) - DOORS["z0"]
     return z0
 
 
@@ -287,8 +288,12 @@ def nearest_line(z, x, below=None):
 
 
 # The doors: their bottom and top edges follow seams (the top one stays under z1 even at the aft jamb, where the sheer lifts it).
-DOOR_X = (float(DOORS["x0"]), 0.5 * (DOORS["x0"] + DOORS["x1"]), float(DOORS["x1"]))
+# D70: a pair in each side at each basin (hub.doors.stations), aft first; the fore station lies where the sheer is level, so the
+# same seams bound its leaves.
+DOOR_XS = [(float(st["x0"]), 0.5 * (st["x0"] + st["x1"]), float(st["x1"])) for st in DOORS["stations"]]
+DOOR_X = DOOR_XS[0]
 DOOR_J = (nearest_line(DOORS["z0"], DOOR_X[1]), nearest_line(DOORS["z1"], DOOR_X[0], below=True))
+DOOR_CUTS = tuple(x for dx in DOOR_XS for x in dx)
 
 
 def door_band(z0a, z0b):
@@ -297,9 +302,12 @@ def door_band(z0a, z0b):
 
 
 def door_leaf(x, z0a, z0b, side):
-    """The leaf a piece at x with midship band z0a..z0b belongs to: (side, 'A' aft / 'F' fore) or None."""
-    if DOOR_X[0] < x < DOOR_X[2] and door_band(z0a, z0b):
-        return (side, "A" if x < DOOR_X[1] else "F")
+    """The leaf a piece at x with midship band z0a..z0b belongs to: (side, 'A' aft / 'F' fore) or None (whichever station)."""
+    if not door_band(z0a, z0b):
+        return None
+    for x0, xm, x1 in DOOR_XS:
+        if x0 < x < x1:
+            return (side, "A" if x < xm else "F")
     return None
 
 
@@ -413,7 +421,7 @@ def plank_mat(rng):
 
 
 def cuts_for(za, zb):
-    return PARTS_X + (DOOR_X if door_band(za, zb) else ())
+    return PARTS_X + (DOOR_CUTS if door_band(za, zb) else ())
 
 
 def planking(route, holes_by_side):
@@ -665,7 +673,7 @@ def bow_turn(x, z, side):
 def data_openings():
     """The open spaces' ports through the hull side (the Tally House's hull_ports): (side, x0, x1, z0, z1), absolute z."""
     out = []
-    floors = {"slip": Z["quay"], "tally": Z["lower"], "keelgate": Z["quay"], "chandlery": Z["main"]}
+    floors = {"slip": Z["quay"], "tally": Z["lower"], "chandlery": Z["main"]}
     for name, fl in floors.items():
         for pr in H.space(name)["props"]:
             wall = pr.get("wall", "")
@@ -703,7 +711,7 @@ def fittings():
         return all(abs(x - f) > half + 0.75 for f in FENDERS) and abs(x - ENTRY_X) > half + 1.4
 
     def seam_clear(x, half, z0, z1):
-        cuts = PARTS_X + (HUB["poopX"], HUB["qdX"], HUB["fcX"]) + (DOOR_X if door_band(z0 - 0.6, z1 + 0.6) or door_band(z0, z1) else ())
+        cuts = PARTS_X + (HUB["poopX"], HUB["qdX"], HUB["fcX"]) + (DOOR_CUTS if door_band(z0 - 0.6, z1 + 0.6) or door_band(z0, z1) else ())
         return all(abs(x - c) > half + 0.45 for c in cuts)
 
     for side in (1, -1):
@@ -1188,7 +1196,7 @@ def build_sides():
     write_hull_ropes(entry_ports(route))
     write_outside_json(fits)
     print("SB_FITTINGS", {k: sum(1 for f in fits if f["kind"] == k) for k in ("room", "shut", "lid", "open", "lit", "patched", "round", "round_lit", "glass", "glow", "shutter")})
-    print("SB_DOOR_LINES", DOOR_J, LINES[DOOR_J[0]], LINES[DOOR_J[1]], [round(line_z(LINES[j], x), 3) for j in DOOR_J for x in DOOR_X])
+    print("SB_DOOR_LINES", DOOR_J, LINES[DOOR_J[0]], LINES[DOOR_J[1]], [round(line_z(LINES[j], x), 3) for j in DOOR_J for x in DOOR_CUTS])
     for part in parts.values():
         export(part)
 
