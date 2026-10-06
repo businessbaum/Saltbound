@@ -1,6 +1,7 @@
 // Saltbound - the sailing boat: a kinematic rigid body moved by our own integrator (D7, D36).
 
 #include "Boat/SaltBoat.h"
+#include "Hub/SaltHubPassage.h"
 
 #include "Boat/SaltHullShape.h"
 #include "CableComponent.h"
@@ -857,6 +858,46 @@ void ASaltBoat::SetControlOverride(bool bEnable, float Rudder01)
 	OverrideRudder = FMath::Clamp(Rudder01, -1.f, 1.f);
 }
 
+void ASaltBoat::SetScripted(bool bEnable)
+{
+	if (bEnable == bScripted)
+	{
+		return;
+	}
+	bScripted = bEnable;
+	if (bEnable)
+	{
+		SetHold(ESaltBoatHold::Free);
+		ScriptedHeel = 0.f;
+	}
+	// Either way the water under her and her contacts are found afresh.
+	for (FColumn& C : Columns)
+	{
+		C.bHasWater = false;
+	}
+	Contacts.Reset();
+}
+
+void ASaltBoat::SetScriptedPose(const FVector& LocationCm, float Yaw, float DeltaSeconds)
+{
+	const USaltOceanSubsystem* Sub = GetWorld() ? GetWorld()->GetSubsystem<USaltOceanSubsystem>() : nullptr;
+	const double WaterZ = Sub ? Sub->SampleWater(FVector2D(LocationCm.X, LocationCm.Y)).Location.Z : 0.0;
+	const FVector OldOrigin = X - Q.RotateVector(CoM);
+	const float YawRate = DeltaSeconds > 0.f ? FRotator::NormalizeAxis(Yaw - (float)Q.Rotator().Yaw) / DeltaSeconds : 0.f;
+	if (DeltaSeconds > 0.f)
+	{
+		ScriptedHeel = FMath::FInterpTo(ScriptedHeel, FMath::Clamp(-YawRate * 0.12f, -3.f, 3.f), DeltaSeconds, 1.5f);
+	}
+	const FVector Origin = FVector(LocationCm.X, LocationCm.Y, WaterZ) * 0.01;
+	Q = FRotator(0.f, Yaw, ScriptedHeel).Quaternion();
+	X = Origin + Q.RotateVector(CoM);
+	if (DeltaSeconds > 0.f)
+	{
+		V = (Origin - OldOrigin) / DeltaSeconds;
+		W = FVector(0.0, 0.0, FMath::DegreesToRadians(YawRate));
+	}
+}
+
 void ASaltBoat::MoorAtStart()
 {
 	using namespace SaltHull;
@@ -924,6 +965,18 @@ void ASaltBoat::HandleSailRope(USaltInteractableComponent* Interactable, ASaltPl
 
 void ASaltBoat::HandleWindlass(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
 {
+	// D70: casting off at one of the hub's berths is the departure (asked first; the passage takes her out).
+	if (Hold == ESaltBoatHold::Moored && Mooring.Id.ToString().StartsWith(TEXT("Hub")))
+	{
+		if (ASaltHubPassage* Passage = ASaltHubPassage::Get(GetWorld()))
+		{
+			if (!Passage->IsRunning() && !bScripted)
+			{
+				Passage->AskDeparture(this, Player);
+			}
+			return;
+		}
+	}
 	ToggleHold();
 	if (Hold == ESaltBoatHold::Moored)
 	{
@@ -1158,6 +1211,19 @@ void ASaltBoat::Tick(float DeltaSeconds)
 	}
 	LastTrueWind = Wind;
 
+	if (bScripted)
+	{
+		// D70: a passage sails her; only how she looks follows.
+		UpdateControls(Dt);
+		ApplyTransform(Dt);
+		UpdateVisuals(Dt);
+		UpdateRopes(Dt);
+		UpdateLantern(Dt);
+		UpdateMastChart();
+		UpdateTrail(Dt);
+		PushOceanMask(bMasksOcean);
+		return;
+	}
 	UpdateControls(Dt);
 	SampleWater(Dt);
 	FindContacts();

@@ -89,6 +89,12 @@ public:
 	void SetHold(ESaltBoatHold NewHold);
 	/** Development and tests: fixed rudder (-1..1, + = starboard), ignoring the helm. */
 	void SetControlOverride(bool bEnable, float Rudder01 = 0.f);
+	/** D70: a cutscene sails her (the hub's harbour passages): her own simulation rests and SetScriptedPose places her each
+	 *  frame (her origin, cm, on the water there; her heading), her velocity following from the moves (wake, ropes, the player
+	 *  standing on her). Enabling it casts her off. */
+	void SetScripted(bool bEnable);
+	bool IsScripted() const { return bScripted; }
+	void SetScriptedPose(const FVector& LocationCm, float Yaw, float DeltaSeconds);
 	/** Development and tests (with the override): the rudder holds a heading (degrees). */
 	void SetAutopilot(bool bEnable, float HeadingYaw = 0.f) { bAutopilot = bEnable; AutopilotYaw = HeadingYaw; }
 	/** Development and tests: add velocity (m/s, world) and angular velocity (rad/s, world). */
@@ -515,6 +521,9 @@ private:
 	FVector2D LastTrueWind = FVector2D::ZeroVector;       // world XY, m/s
 
 	ESaltBoatHold Hold = ESaltBoatHold::Free;
+	/** D70: a passage sails her (SetScripted); she leans a little into its turns. */
+	bool bScripted = false;
+	float ScriptedHeel = 0.f;
 	TArray<FLine> Lines;
 	TArray<FContact> Contacts;
 	float MaxContactDepth = 0.f;
