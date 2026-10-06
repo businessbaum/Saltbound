@@ -250,6 +250,9 @@ for a higher screen percentage (for example 75 %) and more content.
   the pier's beach with its counter, smoking chimney, nets and lanterns, the Keeper's spot and `Keeper_Point` ("Talk to the Harbour
   Keeper"). Scripts: `place_home_island.py` (the island's actors), `setup_island_materials.py`, `build_home_props.py`,
   `gen_island_textures.py`; views: `Tools/island_shots.py`.
+- **D78 (the island's grass and forest floor, waiting for the owner's look):** a dense meadow of real blades (about 4 500 a
+  square metre, combed with the wind, no star tufts), a calm darker green floor under it, real 3D fallen leaves on the brown parts,
+  and the ground material fixed for DX11 (shared sampler). Views: `Tools/island_shots.py` (grass_top, meadow_eye, litter_top ...).
 - **D76 (seagulls and the hub at once, waiting for the owner's look):** the gulls are a skinned herring gull (`SK_Gull`: hooked beak
   with the red spot, eyes, a fanned tail, tapered wings with the black tip wedge and white mirror) whose bones are posed every
   frame: a wingbeat with the hand trailing the arm and the wing folding on the upstroke, the crooked glide, banking with the tail

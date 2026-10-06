@@ -2338,3 +2338,40 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     `sb.Story.Beats [Beat]` prints or records beats.
 - **Tests:** `sb.Dev.RunPrologueTests` 7/7 (the start on the wreck beach at dawn with nothing, the four beach finds on the sand, the sail locked while ripped, the sea chest's compass and spyglass, the Keeper's shovel and lantern, the cache mending the sail so it sets, the beats saved and the lock restored on loading). The real New voyage path (`sb.Dev.MenuFlow`) runs the prologue and saves it; frames of the wake-up checked in play (lying under the palms, sitting up, standing on the beach facing the wreck). Unchanged: menus 22/22, dig 7/7, repair 8/8, save 6/6, inventory 43/44 (`SaveSignShows`, known).
 - **Next:** FH2, people v1 (the Harbour Keeper's figure and lines first).
+
+### D78 · The home island's grass and forest floor after the owner's look: a dense meadow, real fallen leaves, a calm green floor; the ground compiles for DX11 (Adopted: waiting for the owner's look)
+- **Owner (2026-10-06), with a close screenshot from above:** "create even denser grass, and real leaves for the braun part, also
+  change the green floor desing ... its horrible".
+- **What made it read that way:** D71's painted grass set (`T_IslGrass`) drew clumps of blades fanned out from their middles: from
+  above (and between the lawn's blades) they read as neon stars or pine needles; its sunlit tips were a bright yellow-green, and the
+  lawn's blades let much light through (two-sided foliage) and glowed against the sun. The brown parts showed whole leaves painted flat
+  into the litter set.
+- **The green floor:** the grass set repainted as a calm thatch (`gen_island_textures.grass`): fine blades lying combed along a slowly
+  wandering flow, old dark blades and a little earth between them, broad soft patches of deeper and drier green, no clumps, no flowers,
+  matte. Under the lawn it is darkened (`GrassUnder` 0.55), so the gaps between the blades read as shade; where the lawn ends (45-70 m)
+  it takes the lawn's own colour (`GrassFarTint`), so the meadow carries on without a ring.
+- **Denser grass, a meadow instead of tufts:** the lawn kit rebuilt (`build_vegetation.grass_patch`): about 2 400 blades a square metre
+  per patch, standing evenly in groups of one to three on a jittered grid, mostly upright and curving over, heights rolling in soft
+  waves; every patch combed along its local +X and turned with the wind when placed (towards about 20 degrees, wandering slowly), so
+  neighbouring patches show no borders from above. 51 400 patches (1.9 a square metre, about 4 500 blades a square metre), a thinner
+  fringe round the grass's edge and its sandy fingers, culled from 50-70 m, the wind's sway only within 25 m. Colours deeper and less
+  yellow (`MI_IslGrass_Lawn`), less light through the blades.
+- **Real leaves on the brown parts:** `SM_Litter_PatchA/B/Sparse` (`build_vegetation.litter_patch`): fallen leaves as geometry, three
+  shapes (oval, long, heart) 8-26 cm, cupped, arched or curling at the tip, most dry in browns to ochre, some yellowed or still green,
+  in low heaps (each lying on the ones under it) and scattered between, with twigs. 18 550 patches over the litter (thick under the
+  crowns, thinning out on the grass at their edges, a few on the footpath under trees), culled from 40-55 m, no wind
+  (`MI_IslLeaf_Litter`). The litter set keeps only humus, moss, roots, twigs, small broken bits and husks; the path's earth set lost its
+  painted leaves too.
+- **DX11 (SM5):** `M_SB_IslandGround` failed for `PCD3D_SM5` ("error X4510: maximum ps_5_0 sampler register index (16) exceeded"), so the
+  cooked game drew the default material there on DX11. A custom node passes each texture object with its own sampler whatever its
+  sampler source says (`HLSLMaterialTranslator`: `ParamCode + "Sampler"`), so the ground's code now samples every texture with the view's
+  shared wrap sampler (`View.MaterialTextureBilinearWrapedSampler`: the world group's filter and the view's mip bias); the unused samplers
+  are stripped. Checked in a standalone `-game -d3d11` run of `L_VisualTest`: no compile error, the island's ground drawn with its
+  material.
+- **Also:** the island's material script saves its instances even when the editor does not mark them dirty (D76's lesson), so earlier
+  parameter changes reach the disk.
+- **Tests:** no collision changed (no boat or swim runs needed). Performance in PIE in the editor (2038 x 1222 at 75 %): 93-100 fps,
+  GPU 8.8-9.5 ms in the meadow, at the pier, in the forest and over the island from the hill (D71: 97-102 fps, 8.6-9.0 ms).
+- **Evidence:** `Docs/Evidence/D78/D78_grass_leaves_sheet.jpg` (D71 / D78 pairs: from above as in the owner's screenshot, at eye height,
+  far, the forest floor); the D71 views in `Docs/Evidence/D78/before/`.
+- **Open:** sandy fingers inside the meadow are fringed but still bare; flowers in the meadow (none now) could come back as geometry.
