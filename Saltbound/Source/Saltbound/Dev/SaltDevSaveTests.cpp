@@ -54,6 +54,9 @@ namespace
 		const FVector OwnWind(Wind->GetBaseFromDeg(), Wind->GetBaseSpeed(), Wind->GetGustiness());
 		const FVector OwnFeet = Feet();
 		const float OwnYaw = PC->GetControlRotation().Yaw;
+		const float OwnHour = Rig->GetTimeOfDay();
+		const int32 OwnDay = Rig->GetDay();
+		const bool bOwnHeld = Rig->IsClockHeld();
 		Saves->Slot = TEXT("SaltDevTest");
 		UGameplayStatics::DeleteGameInSlot(Saves->Slot, 0);
 
@@ -61,6 +64,9 @@ namespace
 		const FVector At(6000.f, -9000.f, 0.f);
 		Rig->SetSeaState(TEXT("Moderate"), 0.f);
 		Wind->SetBaseWind(120.f, 650.f, 0.2f);
+		// D72: late on the voyage's fourth day.
+		Rig->SetDay(4);
+		Rig->SetTimeOfDay(22.4f, false);
 		Boat->RestoreState(At, 37.f, ESaltBoatHold::Anchored, true);
 		const FVector DeckLocal(-100.f, 45.f, SaltHull::SheerZ(-1.f) * 100.f + 2.f);
 		Player->TeleportFeetTo(Boat->GetActorTransform().TransformPosition(DeckLocal), Boat->GetYawDeg() + 20.f);
@@ -72,6 +78,8 @@ namespace
 		Player->TeleportFeetTo(FVector(1200.f, 0.f, 112.f), 0.f);
 		Rig->SetSeaState(TEXT("Calm"), 0.f);
 		Wind->SetBaseWind(0.f, 0.f, 0.f);
+		Rig->SetDay(1);
+		Rig->SetTimeOfDay(9.f, true);
 		const bool bLoaded = Saves->LoadGame(World);
 		const float BoatOff = (float)FVector::Dist2D(Boat->GetActorLocation(), At);
 		const float YawOff = FMath::Abs(FRotator::NormalizeAxis(Boat->GetYawDeg() - 37.f));
@@ -87,6 +95,10 @@ namespace
 			&& FMath::IsNearlyEqual(Wind->GetBaseSpeed(), 650.f, 1.f), FString::Printf(TEXT("sea=%s wind=%.0fdeg %.0fcm/s"),
 			*Rig->CurrentSeaState.ToString(), Wind->GetBaseFromDeg(), Wind->GetBaseSpeed()));
 
+		Report(TEXT("LoadTime"), Rig->DayCycle.Num() == 0 || (FMath::Abs(Rig->GetTimeOfDay() - 22.4f) < 0.02f && Rig->GetDay() == 4
+			&& !Rig->IsClockHeld()), FString::Printf(TEXT("hour=%.2f day=%d held=%d (want 22.40, 4, running)"), Rig->GetTimeOfDay(),
+			Rig->GetDay(), Rig->IsClockHeld() ? 1 : 0));
+
 		// Mooring at the windlass ends a voyage and saves.
 		Boat->ResetToStart();                    // lying still at the mooring...
 		Boat->SetHold(ESaltBoatHold::Free);      // ...cast off
@@ -101,6 +113,8 @@ namespace
 		Saves->Slot = OwnSlot;
 		Boat->ResetToStart();
 		Rig->SetSeaState(OwnSea, 0.f);
+		Rig->SetDay(OwnDay);
+		Rig->SetTimeOfDay(OwnHour, bOwnHeld);
 		Wind->SetBaseWind(OwnWind.X, OwnWind.Y, OwnWind.Z);
 		Player->TeleportFeetTo(OwnFeet, OwnYaw);
 		UE_LOG(LogSaltbound, Display, TEXT("SB_TEST SaveSuite DONE passed=%d failed=%d"), Passed, Failed);

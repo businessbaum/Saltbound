@@ -36,6 +36,9 @@ public:
 	UPROPERTY() FName Weather;
 	UPROPERTY() FName SeaState;
 	UPROPERTY() FVector Wind = FVector::ZeroVector;            // from (deg), speed (cm/s), gustiness
+	// D72: the day's clock (hours 0..24; -1 in saves from before it, which keep only Preset) and the day of the voyage.
+	UPROPERTY() float TimeOfDay = -1.f;
+	UPROPERTY() int32 DayNumber = 1;
 
 	// D50: the satchel and the pickups already taken (by PickupId).
 	UPROPERTY() bool bHasInventory = false;

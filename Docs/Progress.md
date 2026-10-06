@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69).
+Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; M6 step 1, the day's clock D72).
 
 ## Milestone status
 
@@ -234,6 +234,11 @@ for a higher screen percentage (for example 75 %) and more content.
   every rope end attached, 36 hanging ropes as real cables in the wind. The hull's sides: gunports, lids, round portholes, skids,
   rosettes, entry ports, scuppers. Wood, paint and metal got relief (plane marks, grain grooves, brush ridges, cracks, dents).
   `sb.Dev.HubGoto quarterdeck|poop`; `Tools/hub_pie_shot.py` for captures in play.
+- **D72 (M6 step 1, waiting for the owner's look):** a running day and night (40 minutes, the night faster): the sun moves through
+  Morning, Day, Evening, Dusk and Twilight into the Night, a moon lights the night sky, the sea and the clouds, stars come out
+  (a sky dome that draws the atmosphere itself), lanterns light at dusk and go out in the morning (a lantern you doused stays out until
+  the light changes), the hour and the day are saved, the pause card says "day 2 · evening, the sun low in the west". Try it:
+  `sb.Time 22`, `sb.Time.Scale 60`, `sb.Lighting Night`.
 - **D65:** the starter boat is calmer in the waves (`sb.Dev.BoatMotion`) and carries a square sail that always pulls. Known
   issue: the furled sail renders dark; `sb.Dev.RunBoatTests Float,RollKick` to re-run in a fresh PIE.
 - **D64 (the owner's review of the hub, waiting for the next look):** boats come in from the side through hidden doors in the hull
@@ -365,7 +370,9 @@ the sail and cast off.
 | Store (barrel or crate on the boat, E at its lid) | Click moves the stack, Shift-click one; drag to a chosen slot on either side (Shift: one); arrows choose, Enter moves the stack; E / Esc close | D-pad, A (the stack), X (one), B close |
 
 Developer console (`~`, non-shipping builds):
-- `sb.Lighting Day|Evening|Dusk`
+- `sb.Lighting Day|Evening|Dusk|Night|Dawn|Morning|Twilight` (jumps the clock there and holds it, D72)
+- D72: `sb.Time` (print), `sb.Time <hour 0-24> [hold]`, `sb.Time run|hold`, `sb.Time day <n>`, `sb.Time.Scale <x>`, `sb.Sky.Dome 1|0`,
+  `sb.Dev.RunClockTests`
 - `sb.Region ShoresOfPlenty|AncientIsles|Wilds|DevilsRoar [blend s]`, `sb.Weather Clear|Cloudy|Overcast|Storm [blend s]`,
   `sb.SeaState Calm|Moderate|Rough|Storm [blend s]`, `sb.Env` (print the composed state)
 - `sb.SeaState Flat|Calm|Moderate|Rough|Storm [blend s]` (Flat = windless biome)

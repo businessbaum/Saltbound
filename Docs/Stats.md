@@ -74,6 +74,23 @@ Every number from `Docs/Design/HubShip/HubShip_Data.json` (generated from `hub_d
 | Salt purse (D63) | a saved number, 0 at the start; nothing spends it yet | `sb.Dev.Salt <n>` |
 | Storm sea at her (D63, `HubSeaLow`) | under the hull up to +1.20 m, in the basin up to +0.36 m (60 s) | right at the 1.2 m limit; D61 measured +1.06 m in another minute of the same sea |
 
+## Time of day (D72)
+
+The day's clock lives on the lighting rig (`World/SaltLightingRig.*`: `DayCycle`, `DayLengthMinutes`, `NightSpeed`, the Moon category).
+
+| Stat | Value | What it does |
+|---|---|---|
+| A day | 40 real minutes at the normal rate | `DayLengthMinutes`; `sb.Time.Scale` speeds it up for tests |
+| Night | 1.5 times faster | `NightSpeed`, blended in with the moon: about 8 minutes of full night |
+| Sunrise / sunset | about 5.2 h / 19.4 h | the day's keys (`MakeDayCycle`) |
+| Full night | 21 h to 3.8 h | |
+| Lanterns | lit while the sun is below 6 degrees | `LanternSunElevation` |
+| The sun's steps | 0.2 degrees | `SunStepDegrees`: each step re-renders the cached shadows |
+| Twilight fall-off | 0.6 stops a degree below -4 degrees; the sun hidden below -18 | in `PushEnvironment` |
+| The moon | 2.5 lux, colour (0.7, 0.82, 1.0), disc 1.2 degrees drawn at 0.2 | rises 19 h in the east-south-east, 50 degrees high, sets 5.5 h |
+| Stars | brightness 6 cd/m2, tint (0.85, 0.92, 1.0) | `M_SB_Sky` parameters `StarBrightness`, `StarTint`; `MPC_Sky.StarAmount` follows the moon |
+| The new game | starts at the start look's hour (Day, 8.5 h) | `StartPreset` |
+
 ## Player
 
 | Stat | Value | What it does |

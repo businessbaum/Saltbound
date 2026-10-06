@@ -8,6 +8,8 @@
 #include "Components/SceneComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Core/SaltContent.h"
 #include "Engine/DirectionalLight.h"
@@ -47,10 +49,40 @@ namespace
 
 	FAutoConsoleCommandWithWorldAndArgs CmdLighting(
 		TEXT("sb.Lighting"),
-		TEXT("Time of day: sb.Lighting Day | Evening | Dusk"),
+		TEXT("Time of day: sb.Lighting Day | Evening | Dusk | Night | Dawn | Morning (jumps the clock there and holds it; sb.Time run lets it go on)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			if (Args.Num() > 0) { ForEachRig(World, [&](ASaltLightingRig& R) { R.ApplyPreset(FName(*Args[0])); }); }
+		}));
+
+	// D72: the day's clock.
+	TAutoConsoleVariable<float> CVarTimeScale(
+		TEXT("sb.Time.Scale"), 1.f,
+		TEXT("How fast the day's clock runs (1 = a day in the rig's DayLengthMinutes; 60 = an hour of game time a second at 40 minutes)."));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdSkyDome(
+		TEXT("sb.Sky.Dome"),
+		TEXT("D72: sb.Sky.Dome 1 | 0 (the rig's sky dome with the stars; 0 lets the atmosphere draw the sky itself)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ForEachRig(World, [&](ASaltLightingRig& R) { R.SetSkyDomeVisible(Args.Num() == 0 || FCString::Atoi(*Args[0]) != 0); });
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdTime(
+		TEXT("sb.Time"),
+		TEXT("The day's clock: sb.Time (print) | sb.Time <hour 0-24> [hold] | sb.Time run | sb.Time hold | sb.Time day <n>"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ForEachRig(World, [&](ASaltLightingRig& R)
+			{
+				if (Args.Num() == 1 && Args[0] == TEXT("run")) { R.SetClockHeld(false); }
+				else if (Args.Num() == 1 && Args[0] == TEXT("hold")) { R.SetClockHeld(true); }
+				else if (Args.Num() == 2 && Args[0] == TEXT("day")) { R.SetDay(FCString::Atoi(*Args[1])); }
+				else if (Args.Num() > 0) { R.SetTimeOfDay(FCString::Atof(*Args[0]), Args.Num() > 1 && Args[1] == TEXT("hold")); }
+				UE_LOG(LogSaltbound, Display, TEXT("SB_TIME day=%d hour=%.2f phase=%s sun=%.1f night=%.2f held=%d lanterns=%d"), R.GetDay(),
+					R.GetTimeOfDay(), *R.GetDayPhase().ToString(), R.GetSunElevation(), R.GetNightAmount(), R.IsClockHeld() ? 1 : 0,
+					R.ShouldLanternsBeLit() ? 1 : 0);
+			});
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdRegion(
@@ -91,6 +123,144 @@ namespace
 	const FName PAbsorption(TEXT("LookAbsorption"));
 	const FName PScattering(TEXT("LookScattering"));
 	const FName PCrest(TEXT("LookCrest"));
+
+	/**
+	 * D72: the looks the clock adds to Day, Evening and Dusk. Morning is the evening's sister in the east, a little cooler;
+	 * Dawn the blue hour before it; Night is lit by the moon (the rig's second atmosphere light): a deep blue "day for night"
+	 * sky, cool and a little desaturated, the eye opened far (EV100 about 1), so the lanterns burn in warm pools.
+	 */
+	TArray<FSaltLightingPreset> MakeClockLooks()
+	{
+		TArray<FSaltLightingPreset> Looks;
+
+		FSaltLightingPreset Morning;
+		Morning.Name = TEXT("Morning");
+		Morning.SunElevation = 5.f;
+		Morning.SunYaw = 245.f;
+		Morning.SunTemperature = 5300.f;
+		Morning.SunSourceAngle = 1.8f;
+		Morning.SkyLightIntensity = 0.9f;
+		Morning.SkyLightTint = FLinearColor(0.85f, 0.92f, 1.12f);
+		Morning.FogDensity = 0.045f;
+		Morning.FogHeightFalloff = 0.1f;
+		Morning.FogInscattering = FLinearColor(0.22f, 0.26f, 0.36f);
+		Morning.FogDirectionalInscattering = FLinearColor(0.95f, 0.6f, 0.42f);
+		Morning.FogStartDistance = 800.f;
+		Morning.ExposureMinEV = 9.5f;
+		Morning.ExposureMaxEV = 12.5f;
+		Morning.ExposureBias = -0.4f;
+		Morning.Saturation = 1.f;
+		Morning.Gain = FLinearColor(1.f, 0.99f, 1.02f);
+		Morning.Contrast = 1.05f;
+		Morning.ShadowGain = FLinearColor(0.9f, 0.94f, 1.12f);
+		Morning.HighlightGain = FLinearColor(1.08f, 1.f, 0.92f);
+		Morning.bLanternsLit = true;
+		Looks.Add(Morning);
+
+		FSaltLightingPreset Dawn;
+		Dawn.Name = TEXT("Dawn");
+		Dawn.SunElevation = -4.f;
+		Dawn.SunYaw = 235.f;
+		Dawn.SunTemperature = 6000.f;
+		Dawn.SkyLightIntensity = 1.f;
+		Dawn.FogDensity = 0.04f;
+		Dawn.FogHeightFalloff = 0.1f;
+		Dawn.FogInscattering = FLinearColor(0.09f, 0.1f, 0.17f);
+		Dawn.FogDirectionalInscattering = FLinearColor(0.16f, 0.1f, 0.1f);
+		Dawn.FogStartDistance = 600.f;
+		Dawn.ExposureMinEV = 4.5f;
+		Dawn.ExposureMaxEV = 8.f;
+		Dawn.ExposureBias = -0.9f;
+		Dawn.Saturation = 0.93f;
+		Dawn.Contrast = 1.04f;
+		Dawn.ShadowGain = FLinearColor(0.92f, 0.95f, 1.1f);
+		Dawn.Gain = FLinearColor(0.98f, 0.97f, 1.05f);
+		Dawn.bLanternsLit = true;
+		Looks.Add(Dawn);
+
+		// Between the blue hour and the night: the eye may open anywhere from the night's to the evening's, so it follows the
+		// sky as the last glow goes (no burnt-white sky, no black jump).
+		FSaltLightingPreset Twilight;
+		Twilight.Name = TEXT("Twilight");
+		Twilight.SunElevation = -11.f;
+		Twilight.SunYaw = 165.f;
+		Twilight.SkyLightIntensity = 1.f;
+		Twilight.SkyLightTint = FLinearColor(0.82f, 0.9f, 1.15f);
+		Twilight.FogDensity = 0.032f;
+		Twilight.FogHeightFalloff = 0.11f;
+		Twilight.FogInscattering = FLinearColor(0.05f, 0.06f, 0.11f);
+		Twilight.FogDirectionalInscattering = FLinearColor(0.09f, 0.07f, 0.08f);
+		Twilight.FogStartDistance = 600.f;
+		Twilight.ExposureMinEV = -1.f;
+		Twilight.ExposureMaxEV = 7.f;
+		Twilight.ExposureBias = -1.3f;
+		Twilight.Saturation = 0.86f;
+		Twilight.Gain = FLinearColor(0.93f, 0.97f, 1.1f);
+		Twilight.Contrast = 1.05f;
+		Twilight.ShadowGain = FLinearColor(0.9f, 0.94f, 1.15f);
+		Twilight.HighlightGain = FLinearColor(0.98f, 1.f, 1.03f);
+		Twilight.bLanternsLit = true;
+		Looks.Add(Twilight);
+
+		FSaltLightingPreset Night;
+		Night.Name = TEXT("Night");
+		Night.SunElevation = -30.f;
+		Night.SunYaw = 200.f;
+		Night.SkyLightIntensity = 1.f;
+		Night.SkyLightTint = FLinearColor(0.8f, 0.9f, 1.2f);
+		Night.FogDensity = 0.03f;
+		Night.FogHeightFalloff = 0.12f;
+		Night.FogInscattering = FLinearColor(0.02f, 0.03f, 0.06f);
+		Night.FogDirectionalInscattering = FLinearColor(0.05f, 0.06f, 0.09f);
+		Night.FogStartDistance = 600.f;
+		Night.ExposureMinEV = -1.5f;
+		Night.ExposureMaxEV = 2.5f;
+		Night.ExposureBias = -1.6f;
+		Night.Saturation = 0.78f;
+		Night.Gain = FLinearColor(0.9f, 0.96f, 1.12f);
+		Night.Contrast = 1.06f;
+		Night.ShadowGain = FLinearColor(0.88f, 0.94f, 1.18f);
+		Night.HighlightGain = FLinearColor(0.96f, 1.f, 1.05f);
+		Night.bLanternsLit = true;
+		Looks.Add(Night);
+		return Looks;
+	}
+
+	/**
+	 * D72: the day. Hours, look, sun elevation, sun azimuth (unwrapped: midnight's 20 degrees follow the evening's 352 as 380).
+	 * Day, Evening and Dusk stand where their presets stood (Day 32 degrees at azimuth 120, Evening 4 and Dusk -3 at 340), so
+	 * sb.Lighting gives the reviewed looks. Night runs from 21 to 3.8 (faster, NightSpeed), the sun is up from about 5.2 to 19.4.
+	 * Dusk and Dawn hold down to -8 degrees: the twilight sky darkens far faster than the hours pass, and an eye opened for
+	 * the night while the sky still glows burns it white.
+	 */
+	TArray<FSaltTimeKey> MakeDayCycle()
+	{
+		auto Key = [](float Hour, const TCHAR* Look, float Elevation, float Azimuth)
+		{
+			FSaltTimeKey K;
+			K.Hour = Hour;
+			K.Look = Look;
+			K.SunElevation = Elevation;
+			K.SunAzimuth = Azimuth;
+			return K;
+		};
+		return {
+			Key(0.f, TEXT("Night"), -34.f, 20.f),
+			Key(3.8f, TEXT("Night"), -16.f, 44.f),
+			Key(4.05f, TEXT("Twilight"), -12.f, 47.f),
+			Key(4.3f, TEXT("Dawn"), -8.f, 50.f),
+			Key(4.8f, TEXT("Dawn"), -4.f, 55.f),
+			Key(5.8f, TEXT("Morning"), 5.f, 65.f),
+			Key(8.5f, TEXT("Day"), 32.f, 120.f),
+			Key(13.f, TEXT("Day"), 52.f, 190.f),
+			Key(17.f, TEXT("Day"), 28.f, 275.f),
+			Key(19.f, TEXT("Evening"), 4.f, 340.f),
+			Key(19.75f, TEXT("Dusk"), -3.f, 340.f),
+			Key(20.3f, TEXT("Dusk"), -8.f, 346.f),
+			Key(20.65f, TEXT("Twilight"), -12.f, 349.f),
+			Key(21.f, TEXT("Night"), -16.f, 352.f),
+		};
+	}
 }
 
 ASaltLightingRig::ASaltLightingRig()
@@ -175,6 +345,10 @@ ASaltLightingRig::ASaltLightingRig()
 	Dusk.Gain = FLinearColor(0.96f, 0.98f, 1.06f);
 	Dusk.bLanternsLit = true;
 	Presets.Add(Dusk);
+
+	// D72: Morning, Dawn, Twilight and Night, and the day's keys.
+	Presets.Append(MakeClockLooks());
+	DayCycle = MakeDayCycle();
 
 	// --- Regions (D25). Reference directions from the Sea of Thieves regions; water values are absolute,
 	// atmosphere / light / grading multiply the time-of-day preset.
@@ -307,6 +481,312 @@ ASaltLightingRig::ASaltLightingRig()
 	Sea(TEXT("Storm"),    1.8f,  1.f,   0.35f, 650.f, 6000.f, 4.f,  5.f, 2.f,  1.25f, 0.f, 1.3f, 1.f);}
 
 // --- Layers ---------------------------------------------------------------------------------------
+
+FSaltLightingPreset ASaltLightingRig::LerpLook(const FSaltLightingPreset& A, const FSaltLightingPreset& B, float T)
+{
+	FSaltLightingPreset R = T < 0.5f ? A : B;
+	auto L = [T](float X, float Y) { return FMath::Lerp(X, Y, T); };
+	auto C = [T](const FLinearColor& X, const FLinearColor& Y) { return X + (Y - X) * T; };
+	R.SunElevation = L(A.SunElevation, B.SunElevation);
+	R.SunIlluminance = L(A.SunIlluminance, B.SunIlluminance);
+	R.SunTemperature = L(A.SunTemperature, B.SunTemperature);
+	R.SunSourceAngle = L(A.SunSourceAngle, B.SunSourceAngle);
+	R.SkyLightIntensity = L(A.SkyLightIntensity, B.SkyLightIntensity);
+	R.SkyLightTint = C(A.SkyLightTint, B.SkyLightTint);
+	R.RayleighScale = L(A.RayleighScale, B.RayleighScale);
+	R.MieScale = L(A.MieScale, B.MieScale);
+	R.FogDensity = L(A.FogDensity, B.FogDensity);
+	R.FogHeightFalloff = L(A.FogHeightFalloff, B.FogHeightFalloff);
+	R.FogInscattering = C(A.FogInscattering, B.FogInscattering);
+	R.FogDirectionalInscattering = C(A.FogDirectionalInscattering, B.FogDirectionalInscattering);
+	R.FogStartDistance = L(A.FogStartDistance, B.FogStartDistance);
+	R.ExposureMinEV = L(A.ExposureMinEV, B.ExposureMinEV);
+	R.ExposureMaxEV = L(A.ExposureMaxEV, B.ExposureMaxEV);
+	R.ExposureBias = L(A.ExposureBias, B.ExposureBias);
+	R.Saturation = L(A.Saturation, B.Saturation);
+	R.Gain = C(A.Gain, B.Gain);
+	R.Contrast = L(A.Contrast, B.Contrast);
+	R.ShadowGain = C(A.ShadowGain, B.ShadowGain);
+	R.HighlightGain = C(A.HighlightGain, B.HighlightGain);
+	return R;
+}
+
+// --- The day's clock (D72) --------------------------------------------------------------------------
+
+const FSaltLightingPreset* ASaltLightingRig::FindLook(FName Look) const
+{
+	return Presets.FindByPredicate([Look](const FSaltLightingPreset& X) { return X.Name == Look; });
+}
+
+void ASaltLightingRig::EnsureDefaultLooks()
+{
+	for (const FSaltLightingPreset& Look : MakeClockLooks())
+	{
+		if (!FindLook(Look.Name))
+		{
+			Presets.Add(Look);
+		}
+	}
+}
+
+float ASaltLightingRig::GetLookHour(FName Look) const
+{
+	for (const FSaltTimeKey& K : DayCycle)
+	{
+		if (K.Look == Look)
+		{
+			return K.Hour;
+		}
+	}
+	return -1.f;
+}
+
+FSaltLightingPreset ASaltLightingRig::ComposeTimeLook(float Hour, float& OutSunElevation, float& OutSunAzimuth) const
+{
+	const int32 N = DayCycle.Num();
+	Hour = FMath::Fmod(Hour, 24.f);
+	if (Hour < 0.f)
+	{
+		Hour += 24.f;
+	}
+	// The last key at or before the hour; before the first key that is yesterday's last.
+	int32 I = N - 1;
+	for (int32 K = 0; K < N; ++K)
+	{
+		if (DayCycle[K].Hour <= Hour)
+		{
+			I = K;
+		}
+		else
+		{
+			break;
+		}
+	}
+	const FSaltTimeKey& A = DayCycle[I];
+	const FSaltTimeKey& B = DayCycle[(I + 1) % N];
+	float HourA = A.Hour, AzimuthA = A.SunAzimuth;
+	float HourB = B.Hour, AzimuthB = B.SunAzimuth;
+	if (I == N - 1)
+	{
+		if (Hour < A.Hour)
+		{
+			HourA -= 24.f;
+			AzimuthA -= 360.f;
+		}
+		else
+		{
+			HourB += 24.f;
+			AzimuthB += 360.f;
+		}
+	}
+	const float T = HourB > HourA ? FMath::Clamp((Hour - HourA) / (HourB - HourA), 0.f, 1.f) : 0.f;
+	// The sun moves evenly between keys; the look eases from one to the next.
+	OutSunElevation = FMath::Lerp(A.SunElevation, B.SunElevation, T);
+	OutSunAzimuth = FMath::Lerp(AzimuthA, AzimuthB, T);
+	const FSaltLightingPreset* LookA = FindLook(A.Look);
+	const FSaltLightingPreset* LookB = FindLook(B.Look);
+	const FSaltLightingPreset Fallback = Presets.Num() > 0 ? Presets[0] : FSaltLightingPreset();
+	return LerpLook(LookA ? *LookA : Fallback, LookB ? *LookB : Fallback, Smooth(T));
+}
+
+FName ASaltLightingRig::GetDayPhase() const
+{
+	if (DayCycle.Num() == 0)
+	{
+		return CurrentPreset;
+	}
+	const float E = NowSunElevation;
+	const bool bMorning = TimeOfDay < 12.f;
+	if (E < -6.f)
+	{
+		return TEXT("Night");
+	}
+	if (E < 2.f)
+	{
+		return bMorning ? TEXT("Dawn") : TEXT("Dusk");
+	}
+	if (bMorning)
+	{
+		return E < 20.f ? TEXT("Morning") : TEXT("Day");
+	}
+	if (E < 15.f)
+	{
+		return TEXT("Evening");
+	}
+	return TimeOfDay >= 15.f ? TEXT("Afternoon") : TEXT("Day");
+}
+
+void ASaltLightingRig::SetTimeOfDay(float Hour, bool bHold)
+{
+	TimeOfDay = FMath::Fmod(Hour, 24.f);
+	if (TimeOfDay < 0.f)
+	{
+		TimeOfDay += 24.f;
+	}
+	bClockHeld = bHold;
+	bForceSunStep = true;
+	LanternState = -1;
+	ApplyEnvironment();
+}
+
+void ASaltLightingRig::EnsureMoon()
+{
+	if (Moon && Moon->IsRegistered())
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World || !World->IsGameWorld() || DayCycle.Num() == 0)
+	{
+		return;
+	}
+	// Transient, like the clouds: never saved with the level. The atmosphere's second light: it lights the sky, the clouds
+	// and the sea's glitter at night and draws its own disc.
+	Moon = NewObject<UDirectionalLightComponent>(this, TEXT("Moon"), RF_Transient);
+	Moon->SetupAttachment(GetRootComponent());
+	Moon->SetMobility(EComponentMobility::Movable);
+	Moon->SetAtmosphereSunLight(true);
+	Moon->SetAtmosphereSunLightIndex(1);
+	Moon->SetUseTemperature(false);
+	Moon->SetLightColor(MoonColor, false);
+	Moon->SetLightSourceAngle(MoonSourceAngle);
+	Moon->SetAtmosphereSunDiskColorScale(FLinearColor(MoonDiskScale, MoonDiskScale, MoonDiskScale));
+	Moon->SetIntensity(0.f);
+	Moon->SetCastShadows(false);
+	Moon->SetVisibility(false);
+	Moon->RegisterComponent();
+	MoonShadowState = 0;
+	ForwardState = -1;
+	bForceSunStep = true;
+}
+
+void ASaltLightingRig::EnsureSkyDome()
+{
+	UWorld* World = GetWorld();
+	if (!bSkyDome || (SkyDome && SkyDome->IsRegistered()) || !World || !World->IsGameWorld())
+	{
+		return;
+	}
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, SaltContent::SkyDomeMesh);
+	UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, SaltContent::SkyMaterial);
+	SkyCollection = LoadObject<UMaterialParameterCollection>(nullptr, SaltContent::SkyCollection);
+	if (!Mesh || !Material)
+	{
+		UE_LOG(LogSaltbound, Warning, TEXT("Sky dome: %s or %s missing (Tools/ue_scripts/setup_night_sky.py)"), SaltContent::SkyDomeMesh,
+			SaltContent::SkyMaterial);
+		return;
+	}
+	SkyDome = NewObject<UStaticMeshComponent>(this, TEXT("SkyDome"), RF_Transient);
+	SkyDome->SetupAttachment(GetRootComponent());
+	SkyDome->SetUsingAbsoluteLocation(true);
+	SkyDome->SetUsingAbsoluteRotation(true);
+	SkyDome->SetUsingAbsoluteScale(true);
+	SkyDome->SetStaticMesh(Mesh);
+	SkyDome->SetMaterial(0, Material);
+	// The mesh's radius is 4096 cm; far beyond the clouds and the haze.
+	SkyDome->SetWorldLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+	SkyDome->SetWorldScale3D(FVector(SkyDomeRadius / 4096.f));
+	SkyDome->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SkyDome->SetCastShadow(false);
+	SkyDome->SetAffectDistanceFieldLighting(false);
+	SkyDome->SetAffectDynamicIndirectLighting(false);
+	SkyDome->SetVisibleInRayTracing(false);
+	SkyDome->bNeverDistanceCull = true;
+	SkyDome->bVisibleInRealTimeSkyCaptures = true;
+	SkyDome->RegisterComponent();
+}
+
+void ASaltLightingRig::SetSkyDomeVisible(bool bVisible)
+{
+	bSkyDome = bVisible;
+	EnsureSkyDome();
+	if (SkyDome)
+	{
+		SkyDome->SetVisibility(bVisible);
+	}
+}
+
+void ASaltLightingRig::PushMoon(float SunElevation, float Hour)
+{
+	// The moon takes over as the sun sinks from -2 to -9 degrees (and hands back at dawn).
+	const float Amount = Smooth((-2.f - SunElevation) / 7.f);
+	NowNight = Amount;
+	// The stars come out with the moon.
+	if (UWorld* World = GetWorld(); World && SkyCollection)
+	{
+		if (UMaterialParameterCollectionInstance* Inst = World->GetParameterCollectionInstance(SkyCollection))
+		{
+			Inst->SetScalarParameterValue(TEXT("StarAmount"), Amount);
+		}
+	}
+	EnsureMoon();
+	if (!Moon)
+	{
+		return;
+	}
+	float Span = MoonSetHour - MoonRiseHour;
+	if (Span <= 0.f)
+	{
+		Span += 24.f;
+	}
+	float Since = Hour - MoonRiseHour;
+	if (Since < 0.f)
+	{
+		Since += 24.f;
+	}
+	// Rises in the east-south-east, crosses the south, sets in the west-south-west.
+	const float P = FMath::Clamp(Since / Span, 0.f, 1.f);
+	const float Azimuth = 100.f + 160.f * P;
+	const float Elevation = 10.f + (MoonHighestElevation - 10.f) * FMath::Sin(PI * P);
+	const FRotator Rotation(-Elevation, Azimuth + 180.f, 0.f);
+	if (bForceSunStep || !LastMoonRotation.Equals(Rotation, SunStepDegrees))
+	{
+		Moon->SetWorldRotation(Rotation);
+		LastMoonRotation = Rotation;
+	}
+	const bool bVisible = Amount > 0.001f;
+	Moon->SetIntensity(MoonIlluminance * Amount);
+	if (Moon->IsVisible() != bVisible)
+	{
+		Moon->SetVisibility(bVisible);
+	}
+	const int32 Shadow = Amount > 0.4f ? 1 : 0;
+	if (Shadow != MoonShadowState)
+	{
+		Moon->SetCastShadows(Shadow != 0);
+		MoonShadowState = Shadow;
+	}
+	// Forward shading (the water's glitter, translucency) takes one directional light: the one that rules the sky now.
+	const int32 MoonFirst = Amount > 0.5f ? 1 : 0;
+	if (MoonFirst != ForwardState)
+	{
+		ForwardState = MoonFirst;
+		Moon->SetForwardShadingPriority(MoonFirst);
+		if (UDirectionalLightComponent* SunLight = Sun ? Cast<UDirectionalLightComponent>(Sun->GetLightComponent()) : nullptr)
+		{
+			SunLight->SetForwardShadingPriority(1 - MoonFirst);
+		}
+	}
+}
+
+void ASaltLightingRig::PushLanterns(bool bLit, bool bForce)
+{
+	bLanternsShouldBeLit = bLit;
+	// Only when the light changes (or the clock was set): a lantern the player lit or doused keeps its state until then.
+	if (!bForce && LanternState == (bLit ? 1 : 0))
+	{
+		return;
+	}
+	LanternState = bLit ? 1 : 0;
+	for (TActorIterator<ASaltLantern> It(GetWorld()); It; ++It)
+	{
+		It->SetLit(bLit);
+	}
+	for (TActorIterator<ASaltBoat> It(GetWorld()); It; ++It)
+	{
+		It->SetLanternLit(bLit);
+	}
+}
 
 FSaltRegionPreset ASaltLightingRig::LerpRegion(const FSaltRegionPreset& A, const FSaltRegionPreset& B, float T)
 {
@@ -456,8 +936,8 @@ bool ASaltLightingRig::SetSeaState(FName SeaStateName, float BlendSeconds)
 
 FString ASaltLightingRig::DescribeEnvironment() const
 {
-	return FString::Printf(TEXT("time=%s region=%s (%.0f%%) weather=%s (%.0f%%) sea=%s (%.0f%%) zones=%.2f seaZones=%.2f"),
-		*CurrentPreset.ToString(), *CurrentRegion.ToString(), RegionLayer.Alpha * 100.f, *CurrentWeather.ToString(),
+	return FString::Printf(TEXT("time=%s (day %d, %.2f h%s) region=%s (%.0f%%) weather=%s (%.0f%%) sea=%s (%.0f%%) zones=%.2f seaZones=%.2f"),
+		*CurrentPreset.ToString(), DayOfVoyage, TimeOfDay, bClockHeld ? TEXT(", held") : TEXT(""), *CurrentRegion.ToString(), RegionLayer.Alpha * 100.f, *CurrentWeather.ToString(),
 		WeatherLayer.Alpha * 100.f, *CurrentSeaState.ToString(), SeaLayer.Alpha * 100.f, FMath::Max(LastZoneWeightSum, 0.f),
 		FMath::Max(LastSeaZoneWeightSum, 0.f));
 }
@@ -533,9 +1013,18 @@ void ASaltLightingRig::OnConstruction(const FTransform& Transform)
 void ASaltLightingRig::BeginPlay()
 {
 	Super::BeginPlay();
+	EnsureDefaultLooks();
 	EnsureClouds();
 	InitLayersIfNeeded();
-	if (!StartPreset.IsNone())
+	if (DayCycle.Num() > 0)
+	{
+		// D72: the clock starts at the start look's hour and runs (a loaded game sets its own time).
+		EnsureMoon();
+		EnsureSkyDome();
+		const float StartHour = GetLookHour(StartPreset);
+		SetTimeOfDay(StartHour >= 0.f ? StartHour : 8.5f, false);
+	}
+	else if (!StartPreset.IsNone())
 	{
 		ApplyPreset(StartPreset);
 	}
@@ -561,6 +1050,32 @@ void ASaltLightingRig::Tick(float DeltaSeconds)
 	Advance(RegionLayer);
 	Advance(WeatherLayer);
 	Advance(SeaLayer);
+	// D72: the clock. The look is recomposed four times a second; the sun itself turns in small steps (PushEnvironment).
+	UWorld* World = GetWorld();
+	if (DayCycle.Num() > 0 && bClockRuns && !bClockHeld && World && World->IsGameWorld())
+	{
+		const float Scale = FMath::Max(CVarTimeScale.GetValueOnGameThread(), 0.f);
+		const float Rate = 24.f / (FMath::Max(DayLengthMinutes, 1.f) * 60.f) * Scale * FMath::Lerp(1.f, NightSpeed, NowNight);
+		TimeOfDay += DeltaSeconds * Rate;
+		while (TimeOfDay >= 24.f)
+		{
+			TimeOfDay -= 24.f;
+			++DayOfVoyage;
+		}
+		ClockApplyAccum += DeltaSeconds;
+		if (ClockApplyAccum >= 0.25f)
+		{
+			ClockApplyAccum = 0.f;
+			bChanged = true;
+		}
+	}
+	// Lanterns and boats that started after the rig get the lantern state once more, a second into play.
+	if (!bClockStarted && GetGameTimeSinceCreation() > 1.f)
+	{
+		bClockStarted = true;
+		LanternState = -1;
+		bChanged = true;
+	}
 	float ZoneSum = 0.f;
 	ComposeRegion(&ZoneSum);
 	if (FMath::Abs(ZoneSum - LastZoneWeightSum) > 0.002f)
@@ -671,14 +1186,24 @@ void ASaltLightingRig::ResolveSceneActors()
 
 bool ASaltLightingRig::ApplyPreset(FName PresetName)
 {
+	EnsureDefaultLooks();
 	const FSaltLightingPreset* P = Presets.FindByPredicate([PresetName](const FSaltLightingPreset& X) { return X.Name == PresetName; });
 	if (!P)
 	{
 		UE_LOG(LogSaltbound, Warning, TEXT("Lighting preset '%s' not found"), *PresetName.ToString());
 		return false;
 	}
-	CurrentPreset = PresetName;
-	ApplyEnvironment();
+	// D72: with a clock the preset is a moment of the day; the clock goes there and holds.
+	const float Hour = GetLookHour(PresetName);
+	if (DayCycle.Num() > 0 && Hour >= 0.f)
+	{
+		SetTimeOfDay(Hour, true);
+	}
+	else
+	{
+		CurrentPreset = PresetName;
+		ApplyEnvironment();
+	}
 	UE_LOG(LogSaltbound, Log, TEXT("Applied lighting preset %s"), *PresetName.ToString());
 	return true;
 }
@@ -686,6 +1211,31 @@ bool ASaltLightingRig::ApplyPreset(FName PresetName)
 void ASaltLightingRig::ApplyEnvironment()
 {
 	InitLayersIfNeeded();
+	if (DayCycle.Num() > 0)
+	{
+		// D72: the look of the clock's hour, with the sun where the day's keys put it.
+		float Elevation = 0.f;
+		float Azimuth = 0.f;
+		FSaltLightingPreset Look = ComposeTimeLook(TimeOfDay, Elevation, Azimuth);
+		Look.SunElevation = Elevation;
+		Look.SunYaw = Azimuth + 180.f;   // the light shines away from the sun
+		Look.bLanternsLit = Elevation < LanternSunElevation;
+		NowSunElevation = Elevation;
+		Look.Name = GetDayPhase();
+		CurrentPreset = Look.Name;
+		ResolveSceneActors();
+		EnsureClouds();
+		float ZoneSum = 0.f;
+		const FSaltRegionPreset R = ComposeRegion(&ZoneSum);
+		LastZoneWeightSum = ZoneSum;
+		float SeaZoneSum = 0.f;
+		const FSaltSeaStatePreset S = ComposeSeaState(&SeaZoneSum);
+		LastSeaZoneWeightSum = SeaZoneSum;
+		PushEnvironment(Look, R, LerpWeather(WeatherLayer.From, WeatherLayer.To, Smooth(WeatherLayer.Alpha)), S);
+		PushMoon(Elevation, TimeOfDay);
+		bForceSunStep = false;
+		return;
+	}
 	const FName Tod = CurrentPreset.IsNone() ? StartPreset : CurrentPreset;
 	const FSaltLightingPreset* P = Presets.FindByPredicate([Tod](const FSaltLightingPreset& X) { return X.Name == Tod; });
 	if (!P && Presets.Num() > 0)
@@ -712,15 +1262,38 @@ void ASaltLightingRig::PushEnvironment(const FSaltLightingPreset& P, const FSalt
 {
 	if (Sun)
 	{
-		// Directional light points along its forward vector: pitch = -elevation.
-		Sun->SetActorRotation(FRotator(-P.SunElevation, P.SunYaw, 0.f));
+		// Directional light points along its forward vector: pitch = -elevation. D72: it turns in steps (each one re-renders
+		// the cached shadow pages), unless the clock was just set.
+		const FRotator SunRotation(-P.SunElevation, P.SunYaw, 0.f);
+		if (bForceSunStep || !LastSunRotation.Equals(SunRotation, SunStepDegrees))
+		{
+			Sun->SetActorRotation(SunRotation);
+			LastSunRotation = SunRotation;
+		}
 		if (UDirectionalLightComponent* C = Cast<UDirectionalLightComponent>(Sun->GetLightComponent()))
 		{
-			C->SetIntensity(P.SunIlluminance * R.SunIntensityMul * W.SunIntensityMul);
+			// D72: below -4 degrees the sun's light falls off by 0.6 stops a degree. The engine's atmosphere keeps the high sky
+			// glowing long after sunset (at -11 degrees it still burnt white against the night's open eye); real twilight
+			// fades about this fast.
+			const float Twilight = P.SunElevation < -4.f ? FMath::Exp2((P.SunElevation + 4.f) * 0.6f) : 1.f;
+			C->SetIntensity(P.SunIlluminance * R.SunIntensityMul * W.SunIntensityMul * Twilight);
 			C->SetUseTemperature(true);
 			C->SetTemperature(P.SunTemperature);
 			C->SetLightColor(R.SunTint, false);
 			C->SetLightSourceAngle(P.SunSourceAngle);
+			// D72: well below the horizon the sun lights nothing; it stops casting shadows (the moon casts them) and, deeper,
+			// stops being drawn at all.
+			const int32 Shadow = P.SunElevation > -4.f ? 1 : 0;
+			if (Shadow != SunShadowState)
+			{
+				C->SetCastShadows(Shadow != 0);
+				SunShadowState = Shadow;
+			}
+			const bool bSunVisible = P.SunElevation > -18.f;
+			if (C->IsVisible() != bSunVisible)
+			{
+				C->SetVisibility(bSunVisible);
+			}
 		}
 	}
 	if (SkyLight && SkyLight->GetLightComponent())
@@ -825,14 +1398,8 @@ void ASaltLightingRig::PushEnvironment(const FSaltLightingPreset& P, const FSalt
 			}
 		}
 	}
-	for (TActorIterator<ASaltLantern> It(GetWorld()); It; ++It)
-	{
-		It->SetLit(P.bLanternsLit);
-	}
-	for (TActorIterator<ASaltBoat> It(GetWorld()); It; ++It)
-	{
-		It->SetLanternLit(P.bLanternsLit);
-	}
+	// Without the clock every preset change lights or douses them (as before D72); with it only a change of light does.
+	PushLanterns(P.bLanternsLit, DayCycle.Num() == 0);
 }
 
 // --- Sea state zone -------------------------------------------------------------------------------

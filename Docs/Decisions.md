@@ -1931,6 +1931,11 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   about 8 kn with a bigger bank: late in the game the player chooses how to travel, never without thinking of power and the dark.
 - **Next:** M6, the first playable hour; the concept's remaining questions (section 12) keep their recommended defaults until the
   owner says otherwise.
+- **Round 4 (2026-10-06):** "1. ship is the starter ship 2. ship is a bigger ship 3. Will be an ancient ship with full automated
+  (unknown power source)"; "on the start island is an helper NPC, he will give out a shovel"; "Make an ship repair system"; "Start
+  with the steps". Revision 4 of the concept: the ancient ship (Act III, sails a set course herself, power unknown until the Deep),
+  the Harbour Keeper gives the shovel (at the keeper's place the island agent builds, D71), the ship repair system (holes, bilge
+  water, patching, bailing, mending the sail, the Shipwright's full repair; the concept's 5.5). M6 is being built (D72 on).
 
 ### D69 · The hub after the owner's second review: no haze or sun inside, warm lanterns, a round stern with grand galleries, a glazed sterncastle with grand stairs and the command hall, the Chandlery in the forecastle, rope that is rope, a reinforced hull, surface relief (Adopted: waiting for the owner's look)
 - **Owner (2026-10-06), with screenshots:** "there is fog in the hub" (and why games load into levels); "the light from the lanterns
@@ -1991,3 +1996,39 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   in patches, fine cracks; iron round hammer dents with brighter rims; the hub's tar and ochre show the relief more.
 - **Tools:** `Tools/hub_shot.py` (editor captures) and `Tools/hub_pie_shot.py` (in play: the doors shut, the renderer's frames)
   take poses in the ship's frame; `sb.Dev.HubGoto quarterdeck|poop`.
+
+### D72 · M6 step 1: the day's clock, the moon and a sky with stars (Adopted: waiting for the owner's look)
+- **Why:** the concept (D67, D68) needs a running day: night is where the measured horror lives, the lanterns' warm pools are the
+  harbour's welcome, and voyages are planned around daylight. The rig had three fixed presets (Day, Evening, Dusk) and no night.
+- **The clock** (`ASaltLightingRig`): a day of keys (hour, look, sun elevation, sun azimuth unwrapped so the sun always travels the
+  same way): Night 0-3.8, Twilight 4.05, Dawn 4.3-4.8, Morning 5.8, Day 8.5-17, Evening 19, Dusk 19.75-20.3, Twilight 20.65, Night 21.
+  The look eases between keys, the sun moves evenly. Day, Evening and Dusk stand exactly where their presets stood (Day 32 degrees
+  at azimuth 120, Evening 4 and Dusk -3 at 340), so `sb.Lighting Day|Evening|Dusk` (which now jumps the clock there and holds it)
+  gives the reviewed looks for captures and benchmarks. 40 real minutes a day; the night runs 1.5 times faster (about 8 minutes of
+  full night). New looks: Morning, Dawn, Twilight, Night. The day of the voyage counts up at midnight.
+- **The moon:** a second atmosphere light (index 1, a transient component of the rig, 2.5 lux, cool blue, a 1.2 degree disc). It rises
+  in the east-south-east at 19, crosses the south (50 degrees high) and sets at 5.5, and takes over as the sun sinks from -2 to -9
+  degrees: it lights the sky ("day for night" blue), the clouds and the sea's glitter. Forward shading (the water, translucency) takes
+  whichever light rules the sky (the engine warned on screen while both had the same priority). Shadows: the sun's off below -4, the
+  moon's on above 40 % of its light.
+- **Twilight:** below -4 degrees the sun's light falls off by 0.6 stops a degree (the engine's atmosphere keeps the high sky glowing
+  long after sunset: at -11 degrees it burnt the night's open eye white), Dusk and Dawn hold down to -8 degrees, and a Twilight look
+  with a wide exposure range (EV -1 to 7) lets the eye follow the last glow; the sun is hidden below -18. Measured sky brightness from
+  19.75 to 21.0: 150, 142, 112, 116, 100, 78, 42 (no jump, no white sky).
+- **The sun turns in steps of 0.2 degrees** (about once a second): every turn re-renders the cached virtual shadow pages.
+- **Lanterns** light below 6 degrees of sun and go out above it, only when the light changes (or the clock is set): a lantern the
+  player lit or doused keeps its state until then. Lanterns that start after the rig get the state a second into play.
+- **The sky dome** (`Tools/ue_scripts/setup_night_sky.py`: `M_SB_Sky`, `MPC_Sky`, `SM_SkyDome`, a copy of the engine's sky sphere
+  scaled to 400 km): a sky material in the scene stops the atmosphere from drawing the sky's pixels (the engine's
+  `bSceneHasSkyMaterial`), so the dome draws them: the atmosphere's view luminance, the discs of the sun and the moon, and the stars
+  (two layers of crisp dots in a grid on the sphere, dense and faint, sparse and bright, a slow twinkle, faded towards the horizon),
+  which come out with the moon (`StarAmount`). A/B by day and at evening with `sb.Sky.Dome 0`: the frames' means agree within 0.6
+  of 255 (the rest is the moving clouds and sea).
+- **Save:** the hour and the day (`TimeOfDay`, `DayNumber` on the save; older saves keep their preset's hour, running). The pause
+  card says "day 3 · afternoon, the sun going west".
+- **Commands:** `sb.Time` (print), `sb.Time <hour> [hold]`, `sb.Time run|hold`, `sb.Time day <n>`, `sb.Time.Scale <x>`, `sb.Sky.Dome 1|0`,
+  `sb.Lighting Day|Evening|Dusk|Night|Dawn|Morning|Twilight`.
+- **Tests:** `sb.Dev.RunClockTests` 6/6 (the preset hold, the night and moon, the clock's rate, the faster night, the new day, a doused
+  lantern kept); `sb.Dev.RunSaveTests` 6/6 (new: `LoadTime`, 22.40 h on day 4, running); `sb.Dev.RunMenuTests` 22/22.
+- **Open:** the night's look is a first pass for the owner (how dark, how blue, the stars' size and number); the underwater view at
+  night has not been looked at; no moon phases; nothing sleeps yet (the bunk and the Inn come with the cutter and the hub's zones).

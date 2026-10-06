@@ -24,6 +24,10 @@ namespace SaltContent
 	inline const TCHAR* UnderwaterParticleMesh = TEXT("/Engine/BasicShapes/Plane.Plane");
 	inline const TCHAR* LanternMesh = TEXT("/Game/Saltbound/Props/SM_Lantern.SM_Lantern");
 	inline const TCHAR* CloudMaterial = TEXT("/Game/Saltbound/Environment/Sky/MI_Clouds_Stylized.MI_Clouds_Stylized");
+	/** D72: the sky dome (the atmosphere, the sun's and the moon's discs, the stars) and its parameters (setup_night_sky.py). */
+	inline const TCHAR* SkyDomeMesh = TEXT("/Game/Saltbound/Environment/Sky/SM_SkyDome.SM_SkyDome");
+	inline const TCHAR* SkyMaterial = TEXT("/Game/Saltbound/Environment/Sky/M_SB_Sky.M_SB_Sky");
+	inline const TCHAR* SkyCollection = TEXT("/Game/Saltbound/Environment/Sky/MPC_Sky.MPC_Sky");
 	/** Rope material for the boat's physics ropes (cable components). */
 	inline const TCHAR* RopeMaterial = TEXT("/Game/Saltbound/Materials/Instances/MI_Rope_Hemp.MI_Rope_Hemp");
 	/** Seagull parts (Art/Blender/Scripts/build_birds.py): Body, WingL, WingR. */

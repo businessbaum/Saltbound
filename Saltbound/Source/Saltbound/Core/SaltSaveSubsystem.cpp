@@ -132,6 +132,8 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 	if (const ASaltLightingRig* Rig = FindFirst<ASaltLightingRig>(World))
 	{
 		Save->Preset = Rig->CurrentPreset;
+		Save->TimeOfDay = Rig->GetTimeOfDay();
+		Save->DayNumber = Rig->GetDay();
 		Save->Region = Rig->CurrentRegion;
 		Save->Weather = Rig->CurrentWeather;
 		Save->SeaState = Rig->CurrentSeaState;
@@ -193,7 +195,14 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 	// The sea and the weather first, so the boat settles on the right waves.
 	if (ASaltLightingRig* Rig = FindFirst<ASaltLightingRig>(World))
 	{
-		if (!Save->Preset.IsNone() && Save->Preset != Rig->CurrentPreset)
+		// D72: the clock goes on from the saved hour; saves from before it keep only a preset (its hour, running).
+		const float SavedHour = Save->TimeOfDay >= 0.f ? Save->TimeOfDay : Rig->GetLookHour(Save->Preset);
+		if (Rig->DayCycle.Num() > 0 && SavedHour >= 0.f)
+		{
+			Rig->SetDay(Save->DayNumber);
+			Rig->SetTimeOfDay(SavedHour, false);
+		}
+		else if (!Save->Preset.IsNone() && Save->Preset != Rig->CurrentPreset)
 		{
 			Rig->ApplyPreset(Save->Preset);
 		}

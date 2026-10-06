@@ -8,6 +8,7 @@
 #include "SaltLightingRig.generated.h"
 
 class ADirectionalLight;
+class UDirectionalLightComponent;
 class ASkyLight;
 class AExponentialHeightFog;
 class APostProcessVolume;
@@ -16,6 +17,8 @@ class ASaltOcean;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UVolumetricCloudComponent;
+class UStaticMeshComponent;
+class UMaterialParameterCollection;
 
 /** Time of day: sun position and the base light, sky, fog and exposure. */
 USTRUCT(BlueprintType)
@@ -62,6 +65,22 @@ struct FSaltLightingPreset
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grading") FLinearColor HighlightGain = FLinearColor(1.f, 1.f, 1.f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Props") bool bLanternsLit = false;
+};
+
+/**
+ * D72: one key of the day's clock. At Hour the look is the preset named Look, and the sun stands SunElevation degrees above
+ * the horizon at compass bearing SunAzimuth (degrees clockwise from north, +X). Azimuths are unwrapped (they keep rising
+ * through the day, past 360), so the sun always travels the same way round between keys.
+ */
+USTRUCT(BlueprintType)
+struct FSaltTimeKey
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Time") float Hour = 12.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Time") FName Look = TEXT("Day");
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Time") float SunElevation = 32.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Time") float SunAzimuth = 120.f;
 };
 
 /**
@@ -177,9 +196,83 @@ class SALTBOUND_API ASaltLightingRig : public AActor
 public:
 	ASaltLightingRig();
 
-	/** Time of day. Re-applies all layers. */
+	/** Time of day. Re-applies all layers. D72: jumps the clock to the first key with this look and holds it there (captures,
+	 *  benchmarks and tests see a steady light); SetTimeOfDay(Hour) lets it run again. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Environment")
 	bool ApplyPreset(FName PresetName);
+
+	// --- D72: the day's clock ---------------------------------------------------------------------------------------
+	/** Sets the clock (hours, 0..24) and recomposes the look at once; bHold stops the clock there. */
+	UFUNCTION(BlueprintCallable, Category = "Time")
+	void SetTimeOfDay(float Hour, bool bHold = false);
+	float GetTimeOfDay() const { return TimeOfDay; }
+	/** The day of the voyage (1 at the start; a new day begins at midnight). */
+	int32 GetDay() const { return DayOfVoyage; }
+	void SetDay(int32 InDay) { DayOfVoyage = FMath::Max(InDay, 1); }
+	bool IsClockHeld() const { return bClockHeld; }
+	void SetClockHeld(bool bHeld) { bClockHeld = bHeld; }
+	/** The sun's height above the horizon now (degrees). */
+	float GetSunElevation() const { return NowSunElevation; }
+	/** 0 by day .. 1 at full night (how far the moon has taken over). */
+	float GetNightAmount() const { return NowNight; }
+	/** Lanterns burn now (the sun is below LanternSunElevation). Lanterns that start later ask this. */
+	bool ShouldLanternsBeLit() const { return bLanternsShouldBeLit; }
+	/** The hour of the first key with this look (-1 if none). */
+	float GetLookHour(FName Look) const;
+	/** Where the day is, as a word key: Night, Dawn, Morning, Day, Afternoon, Evening, Dusk. */
+	FName GetDayPhase() const;
+
+	/** The day: keys in rising hours from 0 to 24; between two keys the look blends and the sun moves on. Empty: no clock (the
+	 *  presets alone, as before D72). */
+	UPROPERTY(EditAnywhere, Category = "Time")
+	TArray<FSaltTimeKey> DayCycle;
+
+	/** A full day in real minutes at the clock's normal rate. */
+	UPROPERTY(EditAnywhere, Category = "Time", meta = (Units = "min", ClampMin = "1"))
+	float DayLengthMinutes = 40.f;
+
+	/** The night runs this much faster (full night; blended in with the moon): a shorter night without a sudden jump. */
+	UPROPERTY(EditAnywhere, Category = "Time", meta = (ClampMin = "0.1"))
+	float NightSpeed = 1.5f;
+
+	/** The clock runs in play (not in the editor). Tests and captures hold it with sb.Lighting or sb.Time ... hold. */
+	UPROPERTY(EditAnywhere, Category = "Time")
+	bool bClockRuns = true;
+
+	/** Lanterns are lit while the sun is lower than this (degrees). */
+	UPROPERTY(EditAnywhere, Category = "Time")
+	float LanternSunElevation = 6.f;
+
+	/** The sun turns in steps of this many degrees: every step re-renders the cached shadows (virtual shadow maps). */
+	UPROPERTY(EditAnywhere, Category = "Time", meta = (Units = "deg"))
+	float SunStepDegrees = 0.2f;
+
+	/** The moon: a second atmosphere light (index 1) the rig owns. It rises at MoonRiseHour in the east-south-east, crosses
+	 *  the south and sets at MoonSetHour in the west-south-west; it takes over as the sun sinks below -2 degrees. */
+	UPROPERTY(EditAnywhere, Category = "Moon", meta = (Units = "lux"))
+	float MoonIlluminance = 2.5f;
+	UPROPERTY(EditAnywhere, Category = "Moon")
+	FLinearColor MoonColor = FLinearColor(0.7f, 0.82f, 1.f);
+	UPROPERTY(EditAnywhere, Category = "Moon", meta = (Units = "deg"))
+	float MoonSourceAngle = 1.2f;
+	/** Brightness of the moon's disc in the sky (the atmosphere draws it; 1 = as bright as its light implies). */
+	UPROPERTY(EditAnywhere, Category = "Moon")
+	float MoonDiskScale = 0.2f;
+	UPROPERTY(EditAnywhere, Category = "Moon")
+	float MoonRiseHour = 19.f;
+	UPROPERTY(EditAnywhere, Category = "Moon")
+	float MoonSetHour = 5.5f;
+	UPROPERTY(EditAnywhere, Category = "Moon", meta = (Units = "deg"))
+	float MoonHighestElevation = 50.f;
+
+	/** The sky dome (D72): with a sky material in the scene the atmosphere no longer draws the sky's pixels; the dome's
+	 *  material draws them (the atmosphere's luminance, the sun's and the moon's discs) and adds the stars at night. Only in
+	 *  play; sb.Sky.Dome 0 hides it (the atmosphere draws the sky again, for comparison). */
+	UPROPERTY(EditAnywhere, Category = "Sky")
+	bool bSkyDome = true;
+	UPROPERTY(EditAnywhere, Category = "Sky", meta = (Units = "cm"))
+	float SkyDomeRadius = 40000000.f;
+	void SetSkyDomeVisible(bool bVisible);
 
 	UFUNCTION(CallInEditor, Category = "Environment")
 	void ApplyDay() { ApplyPreset(TEXT("Day")); }
@@ -246,6 +339,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Scene") TObjectPtr<ASkyAtmosphere> Atmosphere;
 	UPROPERTY(EditAnywhere, Category = "Scene") TObjectPtr<ASaltOcean> Ocean;
 
+	static FSaltLightingPreset LerpLook(const FSaltLightingPreset& A, const FSaltLightingPreset& B, float T);
 	static FSaltRegionPreset LerpRegion(const FSaltRegionPreset& A, const FSaltRegionPreset& B, float T);
 	static FSaltWeatherPreset LerpWeather(const FSaltWeatherPreset& A, const FSaltWeatherPreset& B, float T);
 	static FSaltSeaStatePreset LerpSeaState(const FSaltSeaStatePreset& A, const FSaltSeaStatePreset& B, float T);
@@ -279,6 +373,36 @@ private:
 	float BaseFogDensity = 0.f;
 	float BaseFogStartCm = 0.f;
 	float LastInteriorWeight = -1.f;
+
+	// D72: the clock.
+	/** The look at Hour from the day's keys, with the sun's elevation and its (unwrapped) azimuth. */
+	FSaltLightingPreset ComposeTimeLook(float Hour, float& OutSunElevation, float& OutSunAzimuth) const;
+	const FSaltLightingPreset* FindLook(FName Look) const;
+	/** Adds the looks the clock needs (Morning, Dawn, Twilight, Night) when a placed rig was saved without them. */
+	void EnsureDefaultLooks();
+	void EnsureMoon();
+	void PushMoon(float SunElevation, float Hour);
+	void PushLanterns(bool bLit, bool bForce);
+	void EnsureSkyDome();
+	float TimeOfDay = 8.5f;
+	int32 DayOfVoyage = 1;
+	bool bClockHeld = false;
+	bool bClockStarted = false;
+	/** The next push turns the sun and the moon to where they are, however small the step (the clock was set). */
+	bool bForceSunStep = true;
+	float ClockApplyAccum = 0.f;
+	float NowSunElevation = 32.f;
+	float NowNight = 0.f;
+	bool bLanternsShouldBeLit = false;
+	int32 LanternState = -1;
+	int32 SunShadowState = -1;
+	int32 MoonShadowState = -1;
+	int32 ForwardState = -1;
+	FRotator LastSunRotation = FRotator::ZeroRotator;
+	FRotator LastMoonRotation = FRotator::ZeroRotator;
+	UPROPERTY(Transient) TObjectPtr<UDirectionalLightComponent> Moon;
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> SkyDome;
+	UPROPERTY(Transient) TObjectPtr<UMaterialParameterCollection> SkyCollection;
 
 	FLayer<FSaltRegionPreset> RegionLayer;
 	FLayer<FSaltWeatherPreset> WeatherLayer;

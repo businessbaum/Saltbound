@@ -1,4 +1,4 @@
-# Saltbound: the game concept (proposal, revision 3)
+# Saltbound: the game concept (proposal, revision 4)
 
 Owner (2026-10-06): develop a concept for what the game is about and what the player can do. "Besides a good story it is above
 all about an exciting experience that does not get boring." Inspiration from other games is allowed; it can include a combat
@@ -30,8 +30,17 @@ do they progress, how do we hook them?
 |---|---|
 | The gap | **About 300 years** after the Old World. |
 | The Grey | **An Old World warden machine**, overgrown until it looks like an animal. |
-| How futuristic | **Salvaged machines rigged into wooden boats**; the ark is the only true Old World ship. |
+| How futuristic | **Salvaged machines rigged into wooden boats**; the ark is the only true Old World ship (round 4: ship 3 is an ancient ship too). |
 | The motor | **A real alternative to the sail** (6.1: the sail charges what the motor spends). |
+
+**Round 4 (on revision 3, 2026-10-06):**
+
+| Question | Answer |
+|---|---|
+| The ships | **Ship 1 is the starter boat, ship 2 a bigger ship, ship 3 an ancient ship, fully automated, with an unknown power source** (6.2). This replaces round 3's "the ark is the only true Old World ship". |
+| The start island | **A helper NPC on the start island gives out the shovel** (the Harbour Keeper, at his place by the pier's beach). |
+| Repairs | **A ship repair system** (5.5). |
+| Next | **Start with the steps** (10.2): M6 is being built. |
 
 Everything else is a proposal. Names (the Tidewrights, Tidestones, the Gale, the Grey, the Cartographer, material names...) are
 working names. Open questions are at the end (section 12, recommendation first).
@@ -172,7 +181,7 @@ The sea opens in rings, and the boat decides how far the player can go.
   The Cartographer is trapped in its eye.
 - **The shard is the ark's key.** The glowing shard from Ruin Isle leads the player like a compass needle all game long (the
   logo's north point). It is the key the Keelgate waits for, the seventh "stone".
-- **The Grey** is the Old World's too (section 5.5): a warden machine the size of a whale, overgrown until it looks like an animal,
+- **The Grey** is the Old World's too (section 5.6): a warden machine the size of a whale, overgrown until it looks like an animal,
   running wild since the southern core was taken.
 - **The ending.** With six stations restored and the shard set, the Keelgate opens. In the Deep the ark's heart wakes, with the
   last message of her crew, and her lashed wheel turns. The player chooses: **open the Gale and sail her out** (the sheltered sea
@@ -230,7 +239,7 @@ behind counters, hatches and desks, few animations, text on parchment, murmurs i
 
 | Where | Role | What they do |
 |---|---|---|
-| Saltbound Cove | **the Harbour Keeper** | The first face. Gives the boat ("Make her sail and she's yours") and a shovel, the first small jobs |
+| Saltbound Cove | **the Harbour Keeper** (the owner's helper NPC, round 4) | The first face, at his place by the pier's beach. Gives the boat ("Make her sail and she's yours") and **the shovel**, the first small jobs |
 | The Slip | **the Shipwright** | Sail-age upgrades from your materials, repairs, the second boat, towing a wrecked boat home |
 | The Tally House | **the Purser** | Jobs and pay; buys finds once the Lantern Market is open |
 | The Keelgate | **the Reader** | The main quest, the Old World's writing |
@@ -295,7 +304,7 @@ Every threat follows the same four rules, so danger is exciting and never unfair
 | **Reef sharks** | Reefs, while swimming or diving | Fins, shadows circling | Leave the water, a flare under water, the lantern | A bite (hurt) | Act I |
 | **Fog** | The Mistreach, calm dawns | The haze closes in | Compass, bell buoys, ring your own bell and listen, go slow, sonar | Lost, aground | Act II |
 | **Rams** | Gull Rock's waters at dusk | Wakes racing in | Steer away, the harpoon stings them, the bell scares them | Holes in the hull | Act II |
-| **The Grey** | Deep water at night | Section 5.5 | Darkness and silence, a decoy, the shallows | A heavy blow: big holes, a knockdown | Act II |
+| **The Grey** | Deep water at night | Section 5.6 | Darkness and silence, a decoy, the shallows | A heavy blow: big holes, a knockdown | Act II |
 | **Wardens** (small Old World drones) | The Old World's sites | A turquoise eye opens, a hum | Stay out of their light, break their line of sight, cut their power, turn them with the lens | Thrown out to the room's start | Act I-III |
 | **The storm** | The Storm Waters | The whole southern horizon | Everything at once: carry little sail, steer the waves, patch, bail | Wreck | Act III |
 
@@ -313,9 +322,7 @@ Nothing has a health bar. Creatures and machines that are driven off leave. Ever
 | **The lens** (Old World spectacles) | Wardens (turns them friendly) | Reads Old World writing, shows hidden marks | A site in Act II |
 
 ### 5.4 Damage, failure and recovery
-- **The hull:** holes where it is hit (seen and heard: water spurts in), water in the bilge (the boat sits lower, slower, rolls
-  more). Full, she founders. **Patch** a hole: hold E with a plank and the repair kit. **Bail** with a bucket (it returns with a
-  purpose, D52); later a hand pump, then an electric one.
+- **The hull:** holes where it is hit, water in the bilge, patching and bailing: the ship repair system (5.5).
 - **The sail:** too much sail in a squall tears it (less drive until it is mended with a sail patch or at the Slip). This makes the
   existing trim (W / S at the helm, D59) a real decision.
 - **Power:** Old World machines run on cells that charge by day and run down at night (6.1). An empty cell at the wrong moment is
@@ -327,7 +334,50 @@ Nothing has a health bar. Creatures and machines that are driven off leave. Ever
   in her stores floats at the wreck under a buoy for a day, then sinks (salvage it with the winch or by diving).
 - **Never lost:** tools, boats, upgrades, plans, knowledge, the salt purse. No permanent death.
 
-### 5.5 The night: a bit of horror
+### 5.5 The ship repair system
+Owner (round 4): "Make an ship repair system". The boat wears and breaks where it is used, the player keeps her afloat with their
+own hands at sea, and the Shipwright makes her whole again in harbour.
+
+**What breaks her**
+| Cause | Damage |
+|---|---|
+| A hard knock (rocks, a reef, the pier, a quay, another hull) above a speed | A hole where she was hit: small, medium or large by the blow's strength |
+| Running aground hard | Holes along the keel |
+| Rams, the Grey | Large holes |
+| Too much sail in a squall or a gale | A torn sail |
+| Big seas over the deck (Rough, Storm) | Water aboard (no hole) |
+
+Upgrades raise what she can take: tarred seams (small leaks close by themselves), copper sheathing (a reef's scrape makes no hole),
+ribs and knees (the speed for a hole rises), Old World composite plates (holes need twice the blow).
+
+**What it does**
+- **Holes** are things on the boat: sprung planks with water spurting in, seen and heard, each at the place of the blow. A hole
+  below the waterline lets water in by its size; one above it only when she heels or the sea washes over.
+- **Water in the bilge** is a level inside the hull: she sits lower, slows and rolls more, water sloshes over the floorboards,
+  and the creak and gurgle grow. Full, she founders (5.4: the wreck).
+- **The sail** torn drives less (in steps: a tear, a rip, in shreds).
+- No health bars: the boat shows her state herself (the water on the boards, how low she sits). The pause card says it in words
+  ("taking water"), and the mast chart gets a small water mark.
+
+**What the player does at sea**
+- **Patch a hole:** hold E at it with a plank (timber) and the repair kit: hammering, a board nailed across. A patch stops the
+  water but stays visible as a patch (the boat collects her history, D41's old repairs) and lets a little through in a storm.
+- **Bail:** hold E at the bilge with the bucket (it returns with a purpose, D52); the hand pump and later the electric pump bail
+  faster (the electric one by itself, on power).
+- **Mend the sail:** hold E at the mast with canvas: a tear in a few seconds, a rip longer; shreds need the Slip.
+- **In a storm** holes come faster than one pair of hands can patch: the choice is what to patch first, when to bail, when to run
+  for shelter.
+
+**What the Shipwright does**
+- At the Slip (or the fitting berth): a full repair for salt and timber, every hole and patch replaced with new planks, the sail
+  restored. Her new boards are paler until they weather.
+- After a wreck he tows her home (5.4) and she needs that repair before she sails well again.
+
+**Numbers** (start values, in the stats table like D59's): a hole at about 2 m/s against rock (4 m/s with ribs and knees); a
+small hole lets in about 2 l/s, a medium 6, a large 15 (below the waterline); the double-ender founders with about 4 t of water
+(she weighs 10.9 t); the bucket bails about 4 l/s, the hand pump 8, the electric pump 15.
+
+### 5.6 The night: a bit of horror
 Owner (round 2): "a bit of horror is good", especially at night on the sea. The day is for exploring; the night is for dread.
 
 **Principles**
@@ -374,7 +424,7 @@ Turquoise stays reserved for the Old World (UI_Design); on the boat it now means
 1. **Power is limited.** Old World machines run on cells. Cells charge from solar film by day and run down at night; the cells'
    glow is the gauge (no HUD bar). More cells and film are upgrades.
 2. **Sail and motor are two ways to travel** (owner, round 3: the motor is a real alternative), each with its own costs (below).
-3. **Machines are loud to the Grey** (5.5).
+3. **Machines are loud to the Grey** (5.6).
 4. **Every upgrade adds a capability** (something new to do or reach), not just a bigger number.
 
 **Sail and motor**
@@ -400,10 +450,14 @@ Turquoise stays reserved for the Old World (UI_Design); on the boat it now means
 |---|---|---|---|
 | **The double-ender** (10 m, exists) | The prologue: the Cartographer's | Inner Waters; Outer Isles once reinforced | Open deck, barrel and crate, the mast chart, shallow draught (1.45 m) |
 | **The cutter** (14 m, D51) | About hour 5: the boat on the Slip (already built in the hub), through the Shipwright's line, materials and salt | Outer Isles, Rough seas | Lower deck with a bunk (sleep and save at anchor anywhere), a stove, a workbench, **the map table** (chart stage 2, D57), a hold for big finds and deliveries; faster, points higher; deeper draught (2.05 m) |
+| **The ancient ship** (round 4) | Act III (about hour 10): found and woken at an Old World site (the drowned harbour of Longshoal, or the ark's own tender in the Deep: question 11) | The Storm Waters and every sea | **Fully automated:** set a course on her map table and she sails it herself (the player is free to walk her decks, fish, keep watch); the wheel still takes over at once. Pale Old World hull with turquoise light, no sail, no cells: **her power source is unknown**, and only the Deep explains it. Steady in any sea |
 | **The Hollowkeel** | The ending | Through the Gale | Her wheel turns |
 
-- **Both boats stay useful:** the double-ender at a fleet berth (they exist for this, D63) is the boat for Longshoal's shallows and
-  the reefs; the cutter is for open water, long trips and heavy salvage.
+- **Every boat stays useful:** the double-ender at a fleet berth (they exist for this, D63) is the boat for Longshoal's shallows and
+  the reefs; the cutter is for the work (salvage, cargo, the winch); the ancient ship for the far waters and the storm.
+- **The ancient ship comes late on purpose:** the player has sailed and motored for ten hours by then, so a ship that sails herself
+  is a reward, not a replacement. Her automation follows the course; the sea's dangers still need the player (the Grey, the
+  wardens, a reef her old charts do not know).
 - **Upgrades show on the boat,** never only in a menu (D53: every part made for its purpose and attached properly).
 - **The boat as a home:** hull paint (the old open decision 3), sail patches and colours, flags and pennants, a figurehead,
   trophies from sites and digs on deck (a road sign, a warden's eye, a lucky float).
@@ -682,7 +736,7 @@ greets them with a line from the Cartographer's log.
 | Check | How the concept meets it |
 |---|---|
 | The README's premise: atmospheric first-person sailing and exploration; a mysterious sea of islands, ruins and a lost civilisation; the boat is transport, home, storage and workspace and grows | Made concrete: the Old World, the Gale, the stations; the boat carries stores, repairs, upgrades, machines and trophies |
-| The owner's answers (rounds 1 and 2) | Light tool-based danger (5), a hand-made sea in rings with a story and an ending (3, 7), only boat and sea pressure (5.4), about 13 hours (8.4); the night horror (5.5); people behind counters (3.7); digging and materials for upgrades (6.3); the ancients as our world in fifty years and futuristic upgrades (3.3, 6.1) |
+| The owner's answers (rounds 1 and 2) | Light tool-based danger (5), a hand-made sea in rings with a story and an ending (3, 7), only boat and sea pressure (5.4), about 13 hours (8.4); the night horror (5.6); people behind counters (3.7); digging and materials for upgrades (6.3); the ancients as our world in fifty years and futuristic upgrades (3.3, 6.1) |
 | Simple sailing (D41, D65) | Kept: depth from weather, sea and route. The motor (a real alternative, owner) comes after hours of sailing, and the sail charges it, so both stay worth using (6.1) |
 | Charts belong to the boats (D57) | Kept: the mast chart and the map table; nothing in the satchel |
 | The hand-crafted look (D16, D38) with futuristic technology | The Old World's look already exists (pale, seamless, turquoise lines). On the boat its parts are rigged into wood with rope and iron, each made for its purpose (D53). Turquoise stays the Old World's colour, now meaning power |
@@ -793,3 +847,7 @@ Still open; the recommendations stand as defaults until the owner says otherwise
    Mistreach, the Storm Waters).
 9. **Navigation help:** **no markers, an optional bearing pin in Settings** · always show the goal.
 10. **Fishing:** **a small calm activity** · leave it out.
+11. **Where the ancient ship is found:** **the drowned harbour of Longshoal** (raised with the barrier's basin, 7.1) · the ark's own
+    tender in the Deep (then she comes only at the very end) · somewhere new.
+12. **The Grey and the ancient ship:** **the Grey knows her and keeps away** (a warden and an Old World ship; the last nights are
+    calmer, the storm is the danger) · the Grey hunts her most of all (she is the brightest thing at sea).

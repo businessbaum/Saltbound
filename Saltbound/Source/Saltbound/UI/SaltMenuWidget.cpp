@@ -59,11 +59,14 @@ namespace
 
 	FText TimeWords(FName Preset)
 	{
-		if (Preset == TEXT("Day")) { return NSLOCTEXT("SaltPause", "Day", "day, the sun high"); }
+		if (Preset == TEXT("Day")) { return NSLOCTEXT("SaltPause", "Day", "the sun high"); }
 		if (Preset == TEXT("Evening")) { return NSLOCTEXT("SaltPause", "Evening", "evening, the sun low in the west"); }
 		if (Preset == TEXT("Dusk")) { return NSLOCTEXT("SaltPause", "Dusk", "dusk, the light going"); }
 		if (Preset == TEXT("Night")) { return NSLOCTEXT("SaltPause", "Night", "night"); }
 		if (Preset == TEXT("Dawn")) { return NSLOCTEXT("SaltPause", "Dawn", "dawn"); }
+		// D72: the clock's other moments.
+		if (Preset == TEXT("Morning")) { return NSLOCTEXT("SaltPause", "Morning", "morning, the sun low in the east"); }
+		if (Preset == TEXT("Afternoon")) { return NSLOCTEXT("SaltPause", "Afternoon", "afternoon, the sun going west"); }
 		return Preset.IsNone() ? FText::FromString(TEXT("-")) : FText::FromString(Preset.ToString().ToLower());
 	}
 
@@ -193,7 +196,10 @@ void USaltMenuWidget::Refresh()
 		Rig = *It;
 		break;
 	}
-	TimeText->SetText(TimeWords(Rig ? Rig->CurrentPreset : NAME_None));
+	// D72: the day of the voyage and where the day is ("day 3 · afternoon, the sun going west").
+	TimeText->SetText(Rig && Rig->DayCycle.Num() > 0
+		? FText::Format(NSLOCTEXT("SaltPause", "DayAndTime", "day {0} · {1}"), FText::AsNumber(Rig->GetDay()), TimeWords(Rig->CurrentPreset))
+		: TimeWords(Rig ? Rig->CurrentPreset : NAME_None));
 
 	if (const USaltWindSubsystem* Wind = World ? World->GetSubsystem<USaltWindSubsystem>() : nullptr)
 	{

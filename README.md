@@ -63,6 +63,7 @@ All scripts are PowerShell (`powershell -ExecutionPolicy Bypass -File Tools\<scr
 | Automated movement tests in PIE | `python Tools\run_pie_test.py "sb.Dev.RunMovementTests 1 300 8"` |
 | Capture the visual test shots (Day/Evening/Dusk) | `python Tools\capture_shots.py visualtest --presets Day Evening Dusk` |
 | Automated sailing tests in PIE (`L_VisualTest`) | `python Tools\run_pie_test.py "sb.Dev.RunBoatTests" --timeout 600 --done "SB_TEST BoatSuite DONE"` |
+| The day's clock checks in PIE (D72) | `python Tools\run_pie_test.py "sb.Dev.RunClockTests" --done "SB_TEST ClockSuite DONE"` |
 | Settings menu and save/load checks in PIE | `python Tools\run_pie_test.py "sb.Dev.RunMenuTests" --done "SB_TEST MenuSuite DONE"` (and `sb.Dev.RunSaveTests` / `SaveSuite`) |
 | Regenerate procedural textures | `python Tools\textures\gen_textures.py` (then `import_textures.py`) |
 
