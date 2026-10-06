@@ -31,7 +31,7 @@ GEN_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "Art", "Generated"
 LEVELS_UP = sorted(H.LEVELS, key=H.level_z)
 OUTSIDE_FLOORS = {"poop", "fcTop"}         # the castles' weather decks are the outside's (build_hub_ends.py)
 # The outside (build_hub_hull/ends/doors/rig.py), the designed spaces (build_hub_inside.py), every floor (build_hub_rooms.py).
-ART_PARTS = (["HullStern", "HullWaistS", "HullWaistP", "HullBow", "Stern", "Galleries", "Castles", "Head", "DoorFrame",
+ART_PARTS = (["HullStern", "HullWaistS", "HullWaistP", "HullBow", "Stern", "Castles", "Command", "Head", "DoorFrame",
               "MastMizzen", "MastMain", "MastFore", "Spritsail"]
              + ["Dock", "Slip", "Tally", "Well", "Keelgate", "MainDeck", "Chandlery", "Gates"]
              + ["Lvl_" + lv for lv in LEVELS_UP if lv not in OUTSIDE_FLOORS])
@@ -57,9 +57,10 @@ LANTERN_K = 1900.0
 # the Keelgate in the packaged build (D63). 240 cd still gives 2 lux at 11 m, where the window fades it out.
 LANTERN_RADIUS = 1100.0
 # D69: inside the hull the sea's haze stays outside (ASaltInteriorZone; ship metres x0, x1, y0, y1, z0, z1): the fog starts beyond
-# the ship's length and is half as dense. The hold up to the gun deck, the sterncastle's storeys, the forecastle's.
-INTERIOR_ZONES = {"Hull": (-2.0, 162.0, -21.0, 21.0, -6.0, 16.3), "Sterncastle": (-2.0, 48.0, -20.0, 20.0, 16.3, 28.4),
-                  "Forecastle": (134.0, 162.0, -20.0, 20.0, 16.3, 22.4)}
+# the ship's length and is half as dense. The hold up to the gun deck, the sterncastle's storeys under the quarterdeck and under
+# the poop (the quarterdeck itself is open deck, D69), the forecastle's.
+INTERIOR_ZONES = {"Hull": (-2.0, 162.0, -21.0, 21.0, -6.0, 16.3), "Sterncastle": (-2.0, 48.0, -20.0, 20.0, 16.3, 22.4),
+                  "Poop": (-2.0, 24.0, -20.0, 20.0, 22.4, 28.4), "Forecastle": (134.0, 162.0, -20.0, 20.0, 16.3, 22.4)}
 # D69: her water hall is sheltered (no sun or sky glow in its water's volume): a box round its water, fading over its last 1.2 m.
 SHELTER_EDGE = 120.0
 INTERIOR_MIN_EV = 3.0      # how far the eye opens up below decks (the Day preset stops at EV 11, Dusk at 5)
@@ -68,7 +69,7 @@ INTERIOR_MAX_EV = 7.5      # and how far it may close there (the shaft's dayligh
 # shut by its doors).
 INTERIORS = {"WaterHall": (26.0, 50.0, -20.0, 20.0, 1.5, 13.2), "Slip": (50.0, 68.0, -10.0, 20.0, 1.5, 13.2),
              "TallyLane": (50.0, 73.0, 6.0, 20.0, 4.5, 7.5), "KeelgateWell": (72.0, 96.0, -12.0, 12.0, 1.5, 16.5),
-             "Chandlery": (98.0, 114.0, -17.5, -8.0, 16.5, 22.9)}
+             "Chandlery": (134.0, 143.0, -1.0, 12.0, 16.5, 22.4)}       # D69: in the forecastle's front, two storeys high
 # The hoist (well.hoist, counterweight, gantry): the cage's floor centre at the quay stop is the actor (build_hub_inside.py
 # hoist_pivots); the gantry stands 7.5 m over the main deck, its sheaves 0.25 m under its beam; the cage's yoke 3.2 m over
 # its floor; the counterweight's eye 0.2 m over its top.
@@ -321,7 +322,7 @@ def ropes(p):
         return 0
     a = p.spawn(unreal.SaltHubRopes, p.world(H.PIVOT_X, 0.0, 0.0), 0.0, "HubRopes", "Art")
     spans = []
-    for r in data["spans"]:
+    for r in data["spans"] + data.get("hull_spans", []):
         sp = unreal.SaltRopeSpan()
         sp.set_editor_property("start", unreal.Vector(*H.to_unreal(*r["a"])))
         sp.set_editor_property("end", unreal.Vector(*H.to_unreal(*r["b"])))

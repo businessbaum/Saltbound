@@ -327,7 +327,7 @@ namespace SaltHubCommands
 	};
 	// Where each space is entered (ship metres, the data's frame; face: 0 bow, 90 starboard). D64: the Water Hall from its aft quay,
 	// the Slip from the forward quay, the Tally House where the dock stair arrives, the Well's lower gallery, the Keelgate chamber,
-	// the main deck's waist, the Chandlery's counter.
+	// the main deck's waist, the Chandlery's door (D69: in the forecastle's front), the quarterdeck (D69: up the grand stairs).
 	const FGoto Places[] = {
 		{ TEXT("dock"), FVector(27.5, 0.0, 1.5), 0.f },
 		{ TEXT("slip"), FVector(49.0, 9.5, 1.5), 30.f },
@@ -335,7 +335,9 @@ namespace SaltHubCommands
 		{ TEXT("well"), FVector(74.5, 7.0, 4.5), 0.f },
 		{ TEXT("keelgate"), FVector(76.0, 2.0, 1.5), -20.f },
 		{ TEXT("main"), FVector(60.0, 0.0, 16.5), 0.f },
-		{ TEXT("chandlery"), FVector(105.0, -4.0, 16.5), -90.f },
+		{ TEXT("chandlery"), FVector(131.0, 5.75, 16.5), 0.f },
+		{ TEXT("quarterdeck"), FVector(40.0, 6.0, 22.5), 180.f },
+		{ TEXT("poop"), FVector(22.6, 0.0, 28.5), 180.f },
 	};
 
 	FAutoConsoleCommandWithWorldAndArgs CmdShow(
@@ -412,7 +414,7 @@ namespace SaltHubCommands
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdGoto(
-		TEXT("sb.Dev.HubGoto"), TEXT("sb.Dev.HubGoto <dock|slip|tally|well|keelgate|main|chandlery>: to a space of the hub (shows her)."),
+		TEXT("sb.Dev.HubGoto"), TEXT("sb.Dev.HubGoto <dock|slip|tally|well|keelgate|main|chandlery|quarterdeck|poop>: to a space of the hub (shows her)."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			ASaltHubShip* Ship = ASaltHubShip::Find(World);

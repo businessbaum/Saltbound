@@ -230,6 +230,25 @@ def wood_field(size, seed=0, rings=90.0, line_w=0.07):
     return latewood, knot_dark, band, fibers, broad
 
 
+def tool_marks(size, seed, pitch=(7, 11), across=0.35):
+    """D69: the marks of hand-finishing on a board, 1 tile = 1 m with the grain along U: shallow scallops across the grain where a
+    plane or an adze took the wood off (a stroke every 7-11 cm along U, each a little skewed and of its own depth), and their
+    ridges. Returns height (0 at the ridges, negative in the hollows) and the ridges' mask (the worn, polished edges)."""
+    y, x = np.mgrid[0:size, 0:size] / size
+    rng = np.random.default_rng(700 + seed)
+    n = rng.integers(pitch[0], pitch[1] + 1)
+    wob = spectral_noise(size, 1, 5, -2.0, seed=701 + seed, aniso=(1.0, 6.0)) * 0.02
+    u = x * n + wob * n + across * (y - 0.5) * rng.uniform(-0.3, 0.3)
+    k = np.floor(u)
+    t = u - k
+    depth = 0.55 + 0.45 * np.sin(k * 12.9898 + seed) ** 2                      # each stroke its own depth (periodic in k)
+    hollow = -(4.0 * t * (1.0 - t)) * depth
+    lanes = spectral_noise(size, 2, 8, -1.8, seed=702 + seed, aniso=(0.5, 3.0))  # strokes run across part of the board's width
+    height = hollow * (0.6 + 0.4 * n01(lanes))
+    ridge = np.clip(1.0 - np.minimum(t, 1.0 - t) / 0.06, 0, 1)
+    return height, ridge
+
+
 def wood_grain():
     """Hand-painted wood for the boat (tinted per material), 1 tile = 1 m at 2048 px, grain along U (D38).
     Simplified after the owner's style brief: broad colour bands and a few soft, readable grain grooves (~5.5 cm
@@ -239,11 +258,16 @@ def wood_grain():
     # D41: the grain reads again (owner: "the mast has no texture"), still broad and calm.
     albedo = 0.6 + 0.1 * broad + 0.07 * (band - 0.5) - 0.13 * latewood - 0.2 * knot_dark
     rgb = np.stack([albedo * 1.00, albedo * 0.93, albedo * 0.84], -1)
-    height = -latewood * 1.0 + band * 0.15 - knot_dark * 0.4
+    # D69: surface finishing. The grain grooves are V-cut and crisp (a narrower profile than the colour's line), the plane marks
+    # scallop across the board, the knots stand a little proud; the grooves hold dirt (rougher, a touch of AO), the ridges of
+    # the tool marks are worn smooth (glossier).
+    groove = np.clip(latewood, 0, 1) ** 1.8
+    marks, ridge = tool_marks(size, 4)
+    height = -groove * 1.0 + band * 0.12 + knot_dark * 0.25 + marks * 0.55
     save_rgb(os.path.join(OUT, "Wood", "T_WoodGrain_D.png"), rgb)
-    save_normal(os.path.join(OUT, "Wood", "T_WoodGrain_N.png"), height_to_normal(height, 3.2))
-    ao = 1.0 - 0.08 * latewood - 0.15 * knot_dark
-    rough = np.clip(0.66 + 0.08 * latewood - 0.04 * broad, 0, 1)
+    save_normal(os.path.join(OUT, "Wood", "T_WoodGrain_N.png"), height_to_normal(height, 5.0))
+    ao = 1.0 - 0.14 * groove - 0.15 * knot_dark + 0.04 * marks
+    rough = np.clip(0.66 + 0.12 * groove - 0.04 * broad - 0.1 * ridge + 0.04 * (-marks), 0, 1)
     save_rgb(os.path.join(OUT, "Wood", "T_WoodGrain_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
 
 
@@ -259,10 +283,11 @@ def wood_weathered():
               - 0.01 * np.abs(fibers) - 0.16 * knot_dark)
     rgb = np.stack([albedo, albedo * 0.96, albedo * 0.9], -1)
     save_rgb(os.path.join(OUT, "Wood", "T_WoodWeathered_D.png"), rgb)
-    height = -latewood * 1.0 + streaks * 0.6 + band * 0.15 - knot_dark * 0.5 + fibers * 0.04
-    save_normal(os.path.join(OUT, "Wood", "T_WoodWeathered_N.png"), height_to_normal(height, 4.0))
-    ao = 1.0 - 0.1 * latewood - 0.15 * knot_dark
-    rough = np.clip(0.86 + 0.04 * latewood + 0.03 * streaks, 0, 1)
+    marks, ridge = tool_marks(size, 11, pitch=(5, 8))                         # D69: adze marks, softened by the weather
+    height = -latewood * 1.0 + streaks * 0.6 + band * 0.15 - knot_dark * 0.5 + fibers * 0.04 + marks * 0.4
+    save_normal(os.path.join(OUT, "Wood", "T_WoodWeathered_N.png"), height_to_normal(height, 5.0))
+    ao = 1.0 - 0.12 * latewood - 0.15 * knot_dark
+    rough = np.clip(0.86 + 0.05 * latewood + 0.03 * streaks - 0.06 * ridge, 0, 1)
     save_rgb(os.path.join(OUT, "Wood", "T_WoodWeathered_ORM.png"), np.stack([ao, rough, np.zeros_like(ao)], -1))
 
 
@@ -280,9 +305,13 @@ def metal():
     size = 512
     dents = spectral_noise(size, 6, 40, -1.8, seed=51)
     scratches = spectral_noise(size, 60, 220, -0.8, seed=52, aniso=(10.0, 1.0))
-    height = dents * 0.8 + scratches * 0.08
-    save_normal(os.path.join(OUT, "Metal", "T_Metal_N.png"), height_to_normal(height, 1.6))
-    rough = np.clip(0.38 + 0.12 * n01(spectral_noise(size, 2, 20, -1.5, seed=53)) + 0.06 * scratches, 0, 1)
+    # D69: hammer blows: round shallow dents (cells), each with a brighter, smoother rim where the iron was struck.
+    cells = worley(size, 14, seed=54)
+    blows = -np.clip(1.0 - (cells / 0.75) ** 2, 0, 1)                         # round dimples with soft bottoms
+    rim = np.clip(1.0 - np.abs(cells - 0.72) / 0.12, 0, 1)
+    height = dents * 0.6 + blows * 0.7 + scratches * 0.08
+    save_normal(os.path.join(OUT, "Metal", "T_Metal_N.png"), height_to_normal(height, 2.2))
+    rough = np.clip(0.38 + 0.12 * n01(spectral_noise(size, 2, 20, -1.5, seed=53)) + 0.06 * scratches - 0.1 * rim, 0, 1)
     save_rgb(os.path.join(OUT, "Metal", "T_Metal_ORM.png"), np.stack([np.ones_like(rough), rough, np.ones_like(rough)], -1))
 
 
@@ -489,10 +518,17 @@ def paint_surface():
     blotch = spectral_noise(size, 1, 6, -2.0, seed=92)
     albedo = 0.62 + 0.03 * brush + 0.04 * blotch - 0.02 * latewood - 0.03 * knot_dark
     save_rgb(os.path.join(OUT, "Paint", "T_PaintSurface_D.png"), np.stack([albedo, albedo, albedo], -1))
-    height = brush * 0.5 - latewood * 0.25 - knot_dark * 0.15 + blotch * 0.05
-    save_normal(os.path.join(OUT, "Paint", "T_PaintSurface_N.png"), height_to_normal(height, 1.6))
-    rough = np.clip(0.6 + 0.05 * brush + 0.04 * blotch, 0, 1)
-    save_rgb(os.path.join(OUT, "Paint", "T_PaintSurface_ORM.png"), np.stack([np.ones_like(rough), rough, np.zeros_like(rough)], -1))
+    # D69: the paint's own surface: crisp brush ridges along the strokes, and in old paint a sparse network of fine cracks
+    # (craquelure, only in patches); the ridges are glossier, the cracks matte and a little dark in AO.
+    ridges = np.clip(spectral_noise_dir(size, 20, 90, -1.2, 93, 0.0, 14.0) * 2.5, -1, 1)
+    web = spectral_noise(size, 10, 36, -1.4, seed=94)                          # its zero lines meander into a net of cracks
+    web = web / (np.abs(web).mean() + 1e-9)
+    patches = np.clip(n01(spectral_noise(size, 1, 6, -2.0, seed=95)) * 2.0 - 0.9, 0, 1)
+    crack = np.clip(1.0 - np.abs(web) / 0.045, 0, 1) * patches
+    height = brush * 0.5 + ridges * 0.12 - latewood * 0.25 - knot_dark * 0.15 + blotch * 0.05 - crack * 0.3
+    save_normal(os.path.join(OUT, "Paint", "T_PaintSurface_N.png"), height_to_normal(height, 2.6))
+    rough = np.clip(0.6 + 0.05 * brush + 0.04 * blotch - 0.06 * np.clip(ridges, 0, 1) + 0.15 * crack, 0, 1)
+    save_rgb(os.path.join(OUT, "Paint", "T_PaintSurface_ORM.png"), np.stack([1.0 - 0.25 * crack, rough, np.zeros_like(rough)], -1))
 
 
 def canvas():

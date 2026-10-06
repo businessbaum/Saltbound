@@ -237,8 +237,8 @@ def side_and_sections():
         ax.plot([-w, w], [z + 1.0, z + 1.0], color="#e8d7b0", lw=1.0)
         for k in range(-int(w), int(w) + 1, 2):
             ax.plot([k, k], [z, z + 1.0], color="#e8d7b0", lw=0.5)
-    q = gl["quarter"]
-    for s in (-1, 1):
+    q = gl.get("quarter")                       # D69: the quarter galleries are gone (the galleries run along the sides)
+    for s in ((-1, 1) if q else ()):
         w = H.half_width(4, q["z0"])
         ax.add_patch(Rectangle((s * w if s > 0 else -w - q["out"], q["z0"]), q["out"], q["z1"] - q["z0"], fc="#5b4030", ec="#b07a3a", lw=1.0))
     for lv in ("sc1", "sc2", "sc3"):
@@ -253,7 +253,7 @@ def side_and_sections():
     ax.set_ylim(-13, 33)
     ax.set_aspect("equal")
     ax.tick_params(labelsize=6)
-    ax.set_title("The stern from aft: narrow to the rudder below the counter (8.5 m), full and round above, galleries and quarter galleries", fontsize=8.5, loc="left")
+    ax.set_title("The stern from aft: narrow to the rudder below the counter (8.5 m), full and round above, the galleries", fontsize=8.5, loc="left")
     path = os.path.join(OUT, "HubShip_D64_side_sections.png")
     fig.savefig(path, dpi=110)
     plt.close(fig)

@@ -33,16 +33,21 @@ LEVEL_ORDER = sorted(H.LEVELS, key=lambda lv: H.level_z(lv))
 OUTSIDES = {"poop", "fcTop"}   # floors the outside builds (the castles' weather decks)
 
 
+def _weather_open(zid):
+    """D69: an open zone under the sky (the quarterdeck, the poop: hub_data.js OPEN weather)."""
+    return bool(next((z for z in H.OPEN if z["id"] == zid), {}).get("weather"))
+
+
 def weather(label):
     """Open to the sky: the main deck's waist and the cargo deck, the castles' tops."""
-    return label is not None and (label[0] == "air" or (label[0] == "open" and label[1] == "deck"))
+    return label is not None and (label[0] == "air" or (label[0] == "open" and (label[1] == "deck" or _weather_open(label[1]))))
 
 
 def style(plan, c, label):
     """'fine' (the hand-made kit), 'light' (planks as faces) or None (someone else builds it)."""
     if label is None or label[0] in ("water", "void", "slot"):
         return None
-    if label[0] == "air" and (plan.level in OUTSIDES or plan.level == "sc2"):
+    if weather(label) and label[1] != "deck" and (plan.level in OUTSIDES or plan.level == "sc2"):
         return None                                   # the quarterdeck, the poop, the forecastle deck: the outside's
     if label[0] in ("open", "air") or c in plan.walk:
         return "fine"

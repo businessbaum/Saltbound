@@ -643,12 +643,12 @@
     "collision": "none",
     "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
   },
-  "SM_Hub_Galleries": {
-    "fbx": "Hub/SM_Hub_Galleries.fbx",
+  "SM_Hub_Command": {
+    "fbx": "Hub/SM_Hub_Command.fbx",
     "dest": "/Game/Saltbound/Hub/Art",
     "nanite": true,
     "collision": "none",
-    "_note": "D62 hub art (build_hub_hull.py / build_hub_ends.py): visual only, the blockout is the collision"
+    "_note": "D69 the command hall on the poop (build_hub_ends.py command): visual only, the blockout's poop deck walls collide"
   },
   "SM_Hub_Castles": {
     "fbx": "Hub/SM_Hub_Castles.fbx",

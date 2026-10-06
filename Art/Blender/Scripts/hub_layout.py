@@ -115,10 +115,24 @@ def stern_lean(z):
     return st["rake"] * min(max((z - st["counter"]) / max(top - st["counter"], 1.0), 0.0), 1.0)
 
 
+def stern_round(xp):
+    """The stern face's half-width as a share of the full half-width, xp metres forward of the face's middle (0..round): D69 a
+    half ellipse (it meets the sides without a corner), D64 a parabola (corners `round` m forward of the middle)."""
+    st = FORM["stern"]
+    t = min(max(xp / st["round"], 0.0), 1.0)
+    if st.get("shape") == "ellipse":
+        return math.sqrt(max(1.0 - (1.0 - t) ** 2, 0.0))
+    return math.sqrt(t)
+
+
 def stern_face_x(y, z, w):
-    """D64: where the stern face is at (y, z) above the counter: round in plan (its corners `round` m forward of its middle,
-    w the half-width there) and leaning aft towards the taffrail."""
-    return FORM["stern"]["round"] * (y / max(w, 1e-3)) ** 2 - stern_lean(z)
+    """Where the stern face is at (y, z) above the counter: round in plan (w the half-width there) and leaning aft towards the
+    taffrail."""
+    st = FORM["stern"]
+    u = min(abs(y) / max(w, 1e-3), 1.0)
+    if st.get("shape") == "ellipse":
+        return st["round"] * (1.0 - math.sqrt(max(1.0 - u * u, 0.0))) - stern_lean(z)
+    return st["round"] * u ** 2 - stern_lean(z)
 
 
 def half_width(x, z):
@@ -144,12 +158,12 @@ def half_width(x, z):
             below = 1.0 - _smooth(run["blend"][0], run["blend"][1], z)
             w *= 1.0 - (1.0 - run["post"]) * t ** run["pow"] * below
     else:
-        # Round in plan: at x the face spans |y| <= w sqrt((x + lean) / round).
+        # Round in plan (stern_round).
         lean = stern_lean(z)
         if xo + lean < st["round"]:
             if xo + lean <= 0.0:
                 return 0.0
-            w *= math.sqrt((xo + lean) / st["round"])
+            w *= stern_round(xo + lean)
     en = FORM["entry"]
     if xo > en["x0"] and z < en["top"]:
         t = min(max((xo - en["x0"]) / (deck_stem - en["x0"]), 0.0), 1.0)
@@ -212,6 +226,27 @@ def voids(level_id):
 def flights():
     """The Well's four flights: dicts with from, to, the rectangle and the way up (+x, -x, +y, -y)."""
     return HUB["flights"]
+
+
+GRAND_RISER, GRAND_TREAD = 0.18, 0.28
+
+
+def grand_flights():
+    """D69: the grand stairs (hub.grand), one flight along each bulwark per step of the sterncastle, rising aft (-x) from the
+    lower deck to arrive at the upper deck's forward edge (x): dicts with id, side, from, to, x0 (the top, at the edge), x1 (the
+    foot), y0, y1, z0, z1, n risers, rise, tread. Their outboard side stands clear of the bulwark's stanchions."""
+    out = []
+    for g in HUB.get("grand", []):
+        z0, z1 = Z[g["from"]], Z[g["to"]]
+        n = int(round((z1 - z0) / GRAND_RISER))
+        run = (n - 1) * GRAND_TREAD
+        xa, xb = float(g["x"]), float(g["x"]) + run
+        yo = min(half_width(x, z0 + 1.0) for x in (xa, 0.5 * (xa + xb), xb)) - 0.35
+        for side in (1, -1):
+            y0, y1 = sorted((side * (yo - g["w"]), side * yo))
+            out.append({"id": g["id"], "side": side, "from": g["from"], "to": g["to"], "x0": xa, "x1": xb, "y0": y0, "y1": y1,
+                        "z0": z0, "z1": z1, "n": n, "rise": (z1 - z0) / n, "tread": GRAND_TREAD})
+    return out
 
 
 def space(name):

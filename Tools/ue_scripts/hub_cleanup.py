@@ -15,7 +15,7 @@ import hub_place  # noqa: E402
 importlib.reload(hub_place)
 
 STALE = (["/Game/Saltbound/Hub/Blockout/SM_HubBlk_" + n for n in ("Basin", "Quay", "Lower", "Middle", "Upper", "Main")]
-         + ["/Game/Saltbound/Hub/Art/SM_Hub_" + n for n in ("Ancient", "SeaGate", "SeaGateFrame")])
+         + ["/Game/Saltbound/Hub/Art/SM_Hub_" + n for n in ("Ancient", "SeaGate", "SeaGateFrame", "Galleries")])     # D69: no quarter galleries
 VISUAL_TEST = "/Game/Saltbound/Maps/L_VisualTest"
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)

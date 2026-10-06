@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68).
+Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69).
 
 ## Milestone status
 
@@ -225,6 +225,15 @@ for a higher screen percentage (for example 75 %) and more content.
 - **D41 / D42 (awaiting the owner's check):** simple sailing (sail down = go, sail up = slow), wheel only steers, rope
   points and a windlass with an anchor, a sail that fills and breathes, physics ropes, properly laced deadeyes, an
   old boat in shape (hewn spars, cracks, nails, repairs, patched sail); the sea is cut out inside the hull.
+- **D69 (the owner's second review of the hub, waiting for the next look):** no sea haze inside the hull (interior zones push the fog
+  out), the water hall's water dark and mirroring the lanterns (sheltered water, the hidden shell casting shadows, screen traces
+  inside), warm 240 cd lanterns that flicker. The stern is a round half ellipse with grand galleries round three sides; the
+  quarterdeck's and the poop's fronts are glazed in iron frames with grand stairs along both bulwarks up to the quarterdeck and the
+  poop (both open decks now); the command hall stands on the poop in glass under a copper roof. The Chandlery is a shop in the
+  forecastle's front (the cargo deck is part of the waist). The rig: square yards only, gathered furls, hemp ratlines with knots,
+  every rope end attached, 36 hanging ropes as real cables in the wind. The hull's sides: gunports, lids, round portholes, skids,
+  rosettes, entry ports, scuppers. Wood, paint and metal got relief (plane marks, grain grooves, brush ridges, cracks, dents).
+  `sb.Dev.HubGoto quarterdeck|poop`; `Tools/hub_pie_shot.py` for captures in play.
 - **D65:** the starter boat is calmer in the waves (`sb.Dev.BoatMotion`) and carries a square sail that always pulls. Known
   issue: the furled sail renders dark; `sb.Dev.RunBoatTests Float,RollKick` to re-run in a fresh PIE.
 - **D64 (the owner's review of the hub, waiting for the next look):** boats come in from the side through hidden doors in the hull
@@ -376,7 +385,7 @@ Developer console (`~`, non-shipping builds):
 - Hub blockout (D61, on `L_HubBlockout`): `python Tools/hub_blockout_checks.py [headroom] [walk | walk:<space>] [boat] [water]`
 - Hub (D63): `sb.Hub.Show 1|0|-1`, `sb.Hub.Berth <id>`, `sb.Hub.Unlock <L#>|all|none`, `sb.Hub.Info`, `sb.Hub.Hoist <stop> [now]`,
   `sb.Hub.Doors open|close|toggle|snapopen|snapclosed|watchon|watchoff` (D64; the sea gate is gone), `sb.Dev.Salt <n>`,
-  `sb.Dev.HubGoto dock|slip|tally|well|keelgate|main|chandlery`,
+  `sb.Dev.HubGoto dock|slip|tally|well|keelgate|main|chandlery|quarterdeck|poop`,
   `sb.Dev.RunHubTests [placed|sealow|nolowfloor|headroom|route|gates|boatdock|slipway|hoist|follow|save|ladder]`
   (`python Tools/run_pie_test.py "sb.Dev.RunHubTests hoist" --done "SB_TEST HubSuite DONE"`)
 - `sb.Boat.Reset` (back to the mooring), `sb.Boat.Recover` (upright at the last safe position), `sb.Boat.Info`

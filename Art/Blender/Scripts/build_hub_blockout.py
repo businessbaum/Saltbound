@@ -9,7 +9,8 @@ Meshes (pivot at the ship's x 80 on the waterline, bow to +X; /Game/Saltbound/Hu
   SM_HubBlk_ShellStern / ShellWaistS / ShellWaistP / ShellBow   the hull's skin (complex collision); open at the hidden doors
   SM_HubBlk_Dock           the Water Hall's water floor, the quays' faces and the stone under them, the slipway (complex)
   SM_HubBlk_Deck_<level>   one per floor: its slabs, walls (door high openings), rails, the hull's lining (UCX boxes)
-  SM_HubBlk_Stairs         the Well's five flights and the dock stair: visual steps, ramp collision
+  SM_HubBlk_Stairs         the Well's five flights and the dock stair: visual steps, ramp collision; D69 the grand stairs up
+                           the sterncastle (solid, a ramp to walk) and the rails along the quarterdeck's and the poop's edges
   SM_HubBlk_Gates          every gate (hub_plan.all_gate_marks) as a marked block (G5: the Keelgate)
   SM_HubBlk_Props          the designed spaces' props as boxes, the hoist's guide posts, the gantry, the main deck's things
   SM_HubBlk_Masts          the three masts with tops, crosstrees, yards and furled sails
@@ -325,6 +326,16 @@ def build_deck(level_id):
         key = (g["axis"], round(g["x"] if g["axis"] == "x" else g["y"], 3))
         mid = g["y"] if g["axis"] == "x" else g["x"]
         openings.setdefault(key, []).append((mid - g["w"] / 2, mid + g["w"] / 2))
+    # D69: a gate mark of the data standing in one of this floor's walls (the command hall's doors) gets its doorway too.
+    for gm in H.GATE_MARKS:
+        if gm["level"] != level_id or gm["g"] != "G1":
+            continue
+        found = H.gate_axis(gm)
+        if found:
+            ax, ln = found[0], found[1]
+            mid = gm["y"] if ax == "x" else gm["x"]
+            w = H.GATE_SIZE["G1"][0] + 0.4
+            openings.setdefault((ax, round(ln, 3)), []).append((mid - w / 2, mid + w / 2))
     lines = {}
     for w in plan.walls:
         if w["kind"] == "bulwark":
@@ -425,12 +436,45 @@ def flight(part, x0, x1, y0, y1, up, z0, z1, rails=True):
                            (c - t, hi, z1), (c + t, hi, z1), (c - t, hi, z1 + RAIL_H), (c + t, hi, z1 + RAIL_H)], "MI_HubBlk_Rail")
 
 
+def grand_flight(part, g):
+    """D69: one grand flight (H.grand_flights): solid from the deck up to its steps (nobody stands under it), visual steps, a ramp
+    to walk, a rail on its open side (towards the deck's middle); its other side is the bulwark."""
+    x0, x1, y0, y1, z0, z1, n = g["x0"], g["x1"], g["y0"], g["y1"], g["z0"], g["z1"], g["n"]
+    for k in range(n - 1):
+        top = z0 + (k + 1) * g["rise"]
+        part.box(x1 - (k + 1) * g["tread"], x1 - k * g["tread"], y0, y1, z0, top, "MI_HubBlk_Open", collide=False)
+    part.hull([(x1, y0, z0), (x1, y1, z0), (x0, y0, z0), (x0, y1, z0), (x0, y0, z1), (x0, y1, z1), (x1, y0, z0 + 0.02), (x1, y1, z0 + 0.02)],
+              "MI_HubBlk_Open")
+    yi = y0 if g["side"] > 0 else y1
+    t = RAIL_T / 2
+    part.hull([(x1, yi - t, z0), (x1, yi + t, z0), (x1, yi - t, z0 + RAIL_H), (x1, yi + t, z0 + RAIL_H),
+               (x0, yi - t, z1), (x0, yi + t, z1), (x0, yi - t, z1 + RAIL_H), (x0, yi + t, z1 + RAIL_H)], "MI_HubBlk_Rail")
+
+
+def edge_rails(part):
+    """D69: rails along the forward edges of the open decks the grand stairs reach (the quarterdeck's at qdX, the poop's at
+    poopX), open where the flights arrive."""
+    for gid in sorted({g["id"] for g in H.grand_flights()}):
+        fl = [g for g in H.grand_flights() if g["id"] == gid]
+        x, z = fl[0]["x0"], fl[0]["z1"]
+        w = H.half_width(x - 0.2, z + 0.5) - 0.2
+        cuts = sorted((g["y0"] - 0.05, g["y1"] + 0.05) for g in fl)
+        y = -w
+        for a, b in cuts + [(w, w)]:
+            if a - y > 0.2:
+                part.box(x - 0.2 - RAIL_T, x - 0.2, y, a, z, z + RAIL_H, "MI_HubBlk_Rail")
+            y = max(y, b)
+
+
 def build_stairs():
     p = Part("SM_HubBlk_Stairs")
     st = H.HUB["stair"]
     flight(p, st["x0"], st["x1"], st["y0"], st["y1"], "+x", Z["quay"], Z["lower"])                   # the dock stair (in the shop)
     for f in H.flights():
         flight(p, f["x0"], f["x1"], f["y0"], f["y1"], f["up"], Z[f["from"]], Z[f["to"]])
+    for g in H.grand_flights():
+        grand_flight(p, g)
+    edge_rails(p)
     p.finish()
 
 
@@ -619,48 +663,29 @@ def build_props():
             pieces = [(a0 - 0.2, hs[2]), (hs[3], a1 + 0.2)]                                # open where the hoist's cage stops
         for pa, pb in pieces:
             wall_box(p, ax, ln, pa, pb, zm, zm + co["h"], "MI_HubBlk_Rail", 0.35)
-    # The Chandlery: the deckhouse (front = the counter, posts, door), pitched roof, shelves, table, the try-it spots.
+    # The Chandlery (D69: in the forecastle's front; its walls and door are the main deck's floor plan): the counter, the shelves
+    # (open where a gate stands in the back wall), the display table, the spyglass's tripod, the goods outside the front.
     cd = {pr["id"]: pr for pr in H.space("chandlery")["props"]}
-    dh = cd["deckhouse"]
-    eav, ridge = dh["h"], dh["ridge"]
-    p.box(dh["x0"], dh["x1"], dh["y0"], dh["y0"] + 0.3, zm, zm + eav, "MI_HubBlk_Wall")
-    win = cd["window"]
-    p.box(dh["x0"], dh["x0"] + 0.3, dh["y0"], dh["y1"], zm, zm + eav, "MI_HubBlk_Wall")
-    p.box(dh["x1"] - 0.3, dh["x1"], dh["y0"], win["y0"], zm, zm + eav, "MI_HubBlk_Wall")
-    p.box(dh["x1"] - 0.3, dh["x1"], win["y1"], dh["y1"], zm, zm + eav, "MI_HubBlk_Wall")
-    p.box(dh["x1"] - 0.3, dh["x1"], win["y0"], win["y1"], zm, zm + win["z0"], "MI_HubBlk_Wall")
-    p.box(dh["x1"] - 0.3, dh["x1"], win["y0"], win["y1"], zm + win["z1"], zm + eav, "MI_HubBlk_Wall")
-    cf = cd["counter_front"]
-    p.box(cf["x0"], cf["x1"], cf["y0"], cf["y1"], zm, zm + cf["h"], "MI_HubBlk_Prop")
-    p.box(cf["x0"], cf["x1"], cf["y0"] - 0.2, cf["y1"], zm + cf["h"], zm + cf["top"], "MI_HubBlk_Prop")
-    for px0, px1 in ((98.0, 99.5), (110.0, 111.0), (113.0, 114.0)):                         # the posts (counter_front note)
-        p.box(px0, px1, cf["y0"], cf["y1"], zm, zm + eav, "MI_HubBlk_Wall")
-    door = cd["door"]
-    p.box(door["x0"], door["x1"], cf["y0"], cf["y1"], zm + DOOR_H + 0.2, zm + eav, "MI_HubBlk_Wall")
-    aw = cd["awning"]
-    p.box(cf["x0"], cf["x1"], cf["y0"], cf["y1"], zm + aw["from"][1], zm + eav, "MI_HubBlk_Wall")
-    for s in (-1, 1):
-        yo = dh["y0"] if s < 0 else dh["y1"]
-        yr = 0.5 * (dh["y0"] + dh["y1"])
-        p.hull([(dh["x0"] - 0.3, yo, zm + eav), (dh["x1"] + 0.3, yo, zm + eav), (dh["x0"] - 0.3, yr, zm + ridge), (dh["x1"] + 0.3, yr, zm + ridge),
-                (dh["x0"] - 0.3, yo, zm + eav + 0.2), (dh["x1"] + 0.3, yo, zm + eav + 0.2), (dh["x0"] - 0.3, yr, zm + ridge + 0.2),
-                (dh["x1"] + 0.3, yr, zm + ridge + 0.2)], "MI_HubBlk_Locked", collide=False)
-    (ay0, az0), (ay1, az1) = aw["from"], aw["to"]
-    p.hull([(aw["x0"], ay0, zm + az0), (aw["x1"], ay0, zm + az0), (aw["x0"], ay1, zm + az1), (aw["x1"], ay1, zm + az1),
-            (aw["x0"], ay0, zm + az0 + 0.05), (aw["x1"], ay0, zm + az0 + 0.05), (aw["x0"], ay1, zm + az1 + 0.05), (aw["x1"], ay1, zm + az1 + 0.05)],
-           "MI_HubBlk_Canvas", collide=False)
-    for ax_ in (aw["x0"], aw["x1"]):
-        p.box(ax_ - 0.06, ax_ + 0.06, ay1 - 0.06, ay1 + 0.06, zm, zm + az1, "MI_HubBlk_Prop")
+    cn = cd["counter"]
+    p.box(cn["x0"], cn["x1"], cn["y0"], cn["y1"], zm, zm + cn["top"], "MI_HubBlk_Prop")
+    shp = cd["shop"]
+    gaps = [(g["y"] - 1.0, g["y"] + 1.0) for g in PL.plan("main").gates if abs(g["x"] - shp["x1"]) < 0.3]
     shv = cd["shelves"]
     for sx0, sx1, sy0, sy1 in shv["runs"]:
-        p.box(sx0, sx1, sy0, sy1, zm, zm + shv["h"], "MI_HubBlk_Prop")
+        if (sx1 - sx0) > (sy1 - sy0):
+            p.box(sx0, sx1, sy0, sy1, zm, zm + shv["h"], "MI_HubBlk_Prop")
+            continue
+        a = sy0
+        for ga, gb in sorted(gaps) + [(sy1, sy1)]:
+            if ga - a > 0.4:
+                p.box(sx0, sx1, a, min(ga, sy1), zm, zm + shv["h"], "MI_HubBlk_Prop")
+            a = max(a, gb)
     dt = cd["display_table"]
     p.box(dt["x0"], dt["x1"], dt["y0"], dt["y1"], zm, zm + dt["h"], "MI_HubBlk_Prop")
-    for key in ("tripod_spyglass", "binnacle"):
-        r = cd[key]
-        p.box(r["x"] - 0.25, r["x"] + 0.25, r["y"] - 0.25, r["y"] + 0.25, zm, zm + r["h"], "MI_HubBlk_Prop")
-    bc = cd["barrels_crates"]
-    p.box(bc["x0"], bc["x1"], bc["y0"], bc["y1"], zm, zm + 1.0, "MI_HubBlk_Prop")
+    r = cd["spyglass_stand"]
+    p.box(r["x"] - 0.25, r["x"] + 0.25, r["y"] - 0.25, r["y"] + 0.25, zm, zm + r["h"], "MI_HubBlk_Prop")
+    for gx0, gx1, gy0, gy1 in cd["goods"]["boxes"]:
+        p.box(gx0, gx1, gy0, gy1, zm, zm + 1.0, "MI_HubBlk_Prop")
     # The main deck: fife rails round the masts, hatches, the ship's boats, capstan, the galley's chimney.
     md = {pr["id"]: pr for pr in H.space("main_deck")["props"]}
     for mx, my in md["masts"]["at"]:

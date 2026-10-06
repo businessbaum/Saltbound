@@ -25,10 +25,11 @@ const HUB = {
   // The hull's form at the ends (D64: "more shape"). run: aft of x1 and below the counter the bottom narrows to the sternpost
   // (its half-width there `post` x the section's), blending to the full section between z blend[0] and the counter;
   // entry: forward of x0 and below z top the bow's bottom is finer than the deck outline (down to `fine` x at the stem).
-  // stern: the stern face is round in plan, its corners `round` m forward of its middle; above the counter it overhangs the
-  // sternpost (x post_x) and rakes aft 1 m by the taffrail.
+  // stern: above the counter the stern is round in plan: a half ellipse `round` m deep (D69, owner: "the end needs to be more
+  // round, it looks like a square"; it was a flat curve 2.6 m deep that met the sides in a corner), meeting the sides without a
+  // corner; it overhangs the sternpost (x post_x) and rakes aft 1 m by the taffrail.
   form: { run: { x1: 30, post: 0.06, pow: 1.6, blend: [2.5, 8.5] }, entry: { x0: 118, fine: 0.82, top: 6, pow: 1.4 },
-          stern: { round: 2.6, counter: 8.5, post_x: 1.6, rake: 1.0 } },
+          stern: { round: 9.5, shape: 'ellipse', counter: 8.5, post_x: 1.6, rake: 1.0 } },
   // The planking's sheer: the bands, wales and ports rise towards the ends (m at the stern and at the stem); the decks inside
   // stay level. aft/fore: where the rise starts.
   sheer: { stern: 2.2, aft: 44, bow: 2.6, fore: 118 },
@@ -62,15 +63,28 @@ const HUB = {
     { from: 'upper', to: 'gun', x0: 73, x1: 76, y0: 0.6, y1: 6, up: '+y' },
     { from: 'gun', to: 'main', x0: 84.6, x1: 90, y0: 8, y1: 11, up: '+x' },
   ],
-  chandlery: { x0: 98, x1: 114, y0: -17.5, y1: -8, h: 4.2 },
+  // D69 (owner: "implement the Chandler better into the ship, it just stands around ... at the front of the ship"): the shop is
+  // built into the forecastle's front at the main deck, two storeys high (the forecastle's storey above is open over it).
+  chandlery: { x0: 134, x1: 143, y0: -1, y1: 12, h: 5.7 },
   wing: 10,     // (kept for the room layout: the old wings' line, |y| 10)
   fcX: 134,     // the forecastle starts here
   // A galleon's stern rises in tiers: the quarterdeck over the first storey (x poopX..qdX, its deck at sc2), the poop over three
   // (x 0..poopX, its deck at poop). D64: the castle is a storey taller at 3 m a storey and wider at the top.
   poopX: 24, qdX: 48,
-  // Stern galleries (D64): open balconies across the stern face at sc1 and sc2 (out `out` m, balustraded), running round the
-  // corners into the quarter galleries, enclosed bays standing out from the sides (x0..x1, out m) over three storeys, domed.
-  galleries: { levels: ['sc1', 'sc2'], out: 2.0, quarter: { x0: 2, x1: 13, out: 2.6, z0: 19.5, z1: 28.5 } },
+  // Stern galleries (D69, owner: "make them more grand, more space, put them around all 3 sides of the back of the ship"):
+  // open balconies at sc1 and sc2 standing `out` m from the hull, round the stern and along both sides forward to x1 (the poop's
+  // length), on carved brackets, balustraded, columns up to the roof over the upper one. The closed quarter galleries are gone.
+  galleries: { levels: ['sc1', 'sc2'], out: 3.4, x1: 21.5 },
+  // The grand stairs (D69, owner: "two grand stairs on each side going up"): a pair at each step of the sterncastle, along the
+  // bulwarks, rising aft from `from` to `to` and arriving at the upper deck's forward edge (x); `w` wide, 0.18 m risers on 0.28 m
+  // treads. The glazed fronts stay free between them.
+  grand: [{ id: 'quarterdeck', from: 'main', to: 'sc2', x: 48, w: 2.6 },
+          { id: 'poop', from: 'sc2', to: 'poop', x: 24, w: 2.6 }],
+  // The command hall on the poop (D69, owner: "where the command centre is ... big rooms, glass, a bit more modern ... a roof above
+  // the back part"): the ship's council (L1). Glass walls in iron frames between oak posts from the poop deck up `h` m over
+  // x0..x1 and |y| < half (the poop's own deck a walk round it, wider at its round aft end), a copper roof `roof` m high with a
+  // glazed lantern along its ridge.
+  command: { x0: 5, x1: 21, half: 11.5, h: 4.4, roof: 2.6 },
   beakhead: { x0: 158, x1: 171, z: 18.5, halfW: 2.2, rails_to: 22.5, figure: [171.6, 0, 19.2] },
   masts: [
     { id: 'mizzen', name: 'Mizzen', x: 68, h: 54 },
@@ -102,7 +116,7 @@ const HUB = {
            walks: [{ levels: ['lower', 'middle', 'upper'], rects: [R(26, 30, -20, 20), R(46, 50, -20, -5), R(46, 50, 5, 20)] }] },
   // How the open spaces meet (D64): 'open' (no wall between them), 'door' (a wall with a doorway), anything else a wall.
   links: [['dock', 'slip', 'open'], ['dock_g', 'tally', 'door'], ['tally', 'lane', 'door'], ['lane', 'well_l', 'open'],
-          ['slip', 'keelgate', 'wall']],
+          ['slip', 'keelgate', 'wall'], ['deck', 'chandlery', 'door']],
 };
 
 /** Half-beam of the deck outline at x (D64: the stern is full and round, wider at the top than before). */
@@ -139,7 +153,7 @@ const LEVELS = [
   { id: 'sc2', name: 'Sterncastle, second storey (quarterdeck)', z: HUB.Z.sc2, only: [AFT, QD] },
   { id: 'sc1', name: 'Sterncastle, first storey', z: HUB.Z.sc1, only: [AFT, QD] },
   { id: 'fcTop', name: 'Forecastle deck', z: HUB.Z.fcTop, only: [R(134, 160, -20, 20)], deck: true },
-  { id: 'fc1', name: 'Forecastle, storey', z: HUB.Z.fc1, only: [R(134, 160, -20, 20)] },
+  { id: 'fc1', name: 'Forecastle, storey', z: HUB.Z.fc1, only: [R(134, 160, -20, 20)], voids: [R(HUB.chandlery.x0, HUB.chandlery.x1, HUB.chandlery.y0, HUB.chandlery.y1)] },
   { id: 'main', name: 'Main deck', z: HUB.Z.main, voids: [HUB.shaft], deck: true },
   { id: 'gun', name: 'Gun deck', z: HUB.Z.gun, voids: [HUB.shaft] },
   { id: 'upper', name: 'Upper deck', z: HUB.Z.upper, voids: [WATER, OVER_RAMP, HUB.hall, HUB.shaft] },
@@ -164,14 +178,20 @@ const OPEN = [
   { id: 'well_m', name: 'The Well', level: 'middle', rects: [HUB.ring] },
   { id: 'well_u', name: 'The Well', level: 'upper', rects: [HUB.ring] },
   { id: 'well_g', name: 'The Well', level: 'gun', rects: [HUB.ring] },
-  { id: 'deck', name: 'Main deck', sub: 'the Waist', level: 'main', rects: [R(HUB.qdX, 116, -20, 20)] },
-  { id: 'chandlery', name: 'Chandlery', sub: 'deckhouse', svc: 'E', level: 'main', rects: [R(98, 114, -17.5, -8)], inside: 'deck' },
+  // D69: the waist runs on to the forecastle's front (the cargo deck is open: its boats and padlocked hatches stand on it).
+  { id: 'deck', name: 'Main deck', sub: 'the Waist', level: 'main', rects: [R(HUB.qdX, HUB.fcX, -20, 20)] },
+  // D69: the grand stairs make the quarterdeck and the poop open decks (weather: deck under the sky, the bulwark is the edge);
+  // the command hall stands on the poop behind its doors (a gate mark), its glass walls round it (a walk of the poop round it).
+  { id: 'quarterdeck', name: 'Quarterdeck', sub: 'the great wheel', level: 'sc2', rects: [QD], weather: true },
+  { id: 'command', name: 'Command hall', sub: 'the ship\u2019s council (locked)', level: 'poop', rects: [R(5, 21, -11.5, 11.5)] },
+  { id: 'poop', name: 'Poop', sub: 'round the command hall', level: 'poop', rects: [AFT], weather: true },
+  { id: 'chandlery', name: 'Chandlery', sub: 'in the forecastle', svc: 'E', level: 'main', rects: [R(HUB.chandlery.x0, HUB.chandlery.x1, HUB.chandlery.y0, HUB.chandlery.y1)] },
 ];
 
 /** Planned, locked, not designed: working names only. gate = how its corridors meet the open spaces (see GATES).
  *  Every room of these is built (D64), behind its gates; on the levels in `air` the zone is open deck under the sky (no rooms). */
 const LOCKED = [
-  { id: 'L1', name: 'Sterncastle', levels: { main: [AFT, QD], sc1: [AFT, QD], sc2: [AFT, QD], sc3: [AFT], poop: [AFT] }, air: { sc2: [QD], poop: [AFT] }, gate: 'G1', sees: 'Tall doors at the aft end of the main deck, barred from inside. The stern windows glow at night; the great wheel on the quarterdeck is lashed and never turns.' },
+  { id: 'L1', name: 'Sterncastle', levels: { main: [AFT, QD], sc1: [AFT, QD], sc2: [AFT], sc3: [AFT] }, gate: 'G1', sees: 'Tall doors at the aft end of the main deck, barred from inside. The stern windows glow at night; the great wheel on the quarterdeck is lashed and never turns.' },
   { id: 'L2', name: 'Stern quarters', levels: { lower: [R(0, 30, -20, 20)], middle: [R(0, 26, -20, 20), R(26, 30, -20, 20)] }, gate: 'G1', sees: 'Doors off the Water Hall’s aft quay, and the aft galleries over the water with their shutters.' },
   { id: 'L3', name: 'Stern stores', levels: { quay: [R(0, 26, -20, 20)] }, gate: 'G4', sees: 'Shuttered bays along the Water Hall’s aft quay.' },
   { id: 'L4', name: 'Timber store', levels: { quay: [R(50, 68, -20, -10)] }, gate: 'G6', sees: 'Iron grilles on the port side of the Slip; stacked timber behind them.' },
@@ -184,8 +204,8 @@ const LOCKED = [
   { id: 'L11', name: 'Lantern Market', levels: { middle: [R(95, 160, -20, 20), R(73, 95, 11, 20), R(73, 95, -20, -11)] }, gate: 'G2', sees: 'A rope across the forward gallery with a board: “Market closed”; light and voices behind shutters.' },
   { id: 'L12', name: 'Archive', levels: { upper: [R(0, 73, -20, 20)] }, gate: 'G1', sees: 'A door with a brass plate off the Well’s aft gallery; its galleries high over the Water Hall.' },
   { id: 'L13', name: 'Inn and bunkrooms', levels: { upper: [R(95, 160, -20, 20), R(73, 95, 11, 20), R(73, 95, -20, -11)] }, gate: 'G1', sees: 'A door off the forward gallery; laughter behind it in the evening.' },
-  { id: 'L14', name: 'Forecastle and bow', levels: { main: [R(134, 160, -20, 20)], fc1: [R(134, 160, -20, 20)], fcTop: [R(134, 160, -20, 20)] }, air: { fcTop: [R(134, 160, -20, 20)] }, gate: 'G3', sees: 'Chained ladders and closed doors at the forward end of the main deck; the bowsprit beyond.' },
-  { id: 'L15', name: 'Cargo deck', levels: { main: [R(116, 134, -20, 20)] }, air: { main: [R(116, 134, -20, 20)] }, gate: 'G2', sees: 'The forward end of the main deck behind a rope and a board (“Cargo work, keep clear”): lashed cargo under nets, the padlocked hatches, the ship’s boats.' },
+  { id: 'L14', name: 'Forecastle', levels: { main: [R(134, 160, -20, 20)], fc1: [R(134, 160, -20, 20)] }, gate: 'G1', sees: 'A barred door in the forecastle’s front beside the Chandlery, and one in the shop’s back wall; a gallery high over the shop.' },
+  { id: 'L15', name: 'Forecastle deck and the head', levels: { fcTop: [R(134, 160, -20, 20)] }, air: { fcTop: [R(134, 160, -20, 20)] }, gate: 'G3', sees: 'Chained ladders up the forecastle’s front at both ends; the bowsprit and the beakhead beyond.' },
   { id: 'L16', name: 'Masts and tops', levels: {}, gate: 'G3', sees: 'Shrouds whose ratlines start out of reach; the tops’ lanterns at night.' },
   { id: 'L17', name: 'The Deep', levels: { deep: [R(0, 160, -20, 20)] }, gate: 'G5', sees: 'The Keelgate: the ancient seal in the floor at the foot of the Well, faintly lit from inside.' },
   { id: 'L18', name: 'Sail lofts and workshops', levels: { gun: [R(0, 160, -20, 20)] }, gate: 'G1', sees: 'Doors off the Well’s gun-deck gallery; canvas and tar.' },
@@ -302,26 +322,23 @@ const SPACES = {
   },
   chandlery: {
     svc: 'E', level: 'main', floor: 16.5, name: 'Chandlery (equipment)',
-    npc: { x: 105, y: -9.6, face: 90, note: 'behind the counter, facing out to the open deck and the main mast' },
+    npc: { x: 140.6, y: 5.5, face: 180, note: 'behind the counter, facing the door and the deck beyond it' },
     e: [
-      { id: 'counter', x: 105, y: -6.6, prompt: 'Talk' },
-      { id: 'try_spyglass', x: 106, y: -3.6, prompt: 'Try the spyglass' },
-      { id: 'try_compass', x: 110.4, y: -3.6, prompt: 'Try the compass' },
+      { id: 'counter', x: 138.7, y: 5.5, prompt: 'Talk' },
+      { id: 'try_spyglass', x: 136.3, y: 9.3, prompt: 'Try the spyglass' },
+      { id: 'try_compass', x: 136.3, y: 2.2, prompt: 'Try the compass' },
     ],
     props: [
-      { id: 'deckhouse', x0: 98, x1: 114, y0: -17.5, y1: -8, h: 4.2, ridge: 5.4, note: 'pitched roof, ridge along x at y -12.75' },
-      { id: 'counter_front', x0: 99.5, x1: 110, y0: -8.4, y1: -8, h: 0.9, top: 0.95, note: 'the front wall is the counter; posts at x 98..99.5, 110..111, 113..114' },
-      { id: 'door', wall: 'y=-8', x0: 111, x1: 113 },
-      { id: 'awning', x0: 99, x1: 110.5, from: [-8, 3.3], to: [-5.8, 2.75], note: 'canvas in muted oxblood and cream stripes on two posts at y -5.8' },
-      { id: 'sign', wall: 'y=-8', x0: 101, x1: 109, z0: 3.5, z1: 4.4, text: 'CHANDLER' },
-      { id: 'shelves', runs: [[98.5, 113.5, -17.2, -16.6], [98.3, 98.9, -16.6, -9.2]], h: 3.6, note: 'along the back wall and the aft wall; tins, jars, coils, boxes; a ladder on a rail' },
-      { id: 'display_table', x0: 103, x1: 108, y0: -14.5, y1: -12.5, h: 0.85, note: 'compass, spyglass, lantern; room for more' },
-      { id: 'window', wall: 'x=114', y0: -15, y1: -12.5, z0: 0.9, z1: 2.3 },
-      { id: 'beams', at_x: [102, 106, 110], z: 3.9, note: 'stock hangs from them: lanterns, coils, a net' },
-      { id: 'tripod_spyglass', x: 106, y: -4.5, h: 1.15 },
-      { id: 'binnacle', x: 110, y: -4.5, h: 1.0 },
-      { id: 'fife_rail', x0: 98, x1: 102, y0: -2, y1: 2, h: 0.9, note: 'round the main mast (x 100, r 1.0), with belaying pins' },
-      { id: 'barrels_crates', x0: 112, x1: 114, y0: -7.6, y1: -6 },
+      { id: 'shop', x0: 134, x1: 143, y0: -1, y1: 12, h: 5.7, note: 'in the forecastle at the main deck, two storeys high; its front is the forecastle’s, its door onto the deck (links)' },
+      { id: 'front', wall: 'x=134', spans: [[-0.4, 3.8], [7.6, 11.4]], z0: 0.7, z1: 3.0, note: 'two shop windows of small panes either side of the door, lit inside (cut through the wall: spans)' },
+      { id: 'sign', wall: 'x=134', y0: 0.0, y1: 11.0, z0: 3.6, z1: 4.5, text: 'CHANDLER' },
+      { id: 'awning', y0: -1.2, y1: 12.2, from: [134, 3.35], to: [131.8, 2.75], note: 'striped oxblood and cream canvas on two iron arms' },
+      { id: 'counter', x0: 139.2, x1: 140.0, y0: 1.4, y1: 9.6, h: 1.0, top: 1.05, note: 'across the shop facing the door' },
+      { id: 'shelves', runs: [[142.35, 142.95, -0.7, 11.7], [134.6, 142.3, 11.1, 11.7], [134.6, 142.3, -0.7, -0.1]], h: 5.3, note: 'up to the beams: tins, jars, coils, boxes; a ladder on a brass rail along the back; open where a gate stands' },
+      { id: 'display_table', x0: 135.6, x1: 137.0, y0: 1.3, y1: 3.1, h: 0.85, note: 'the compass to try, a chart, dividers' },
+      { id: 'spyglass_stand', x: 136.3, y: 9.9, h: 1.15, note: 'a spyglass on its tripod' },
+      { id: 'beams', at_x: [136.3, 139.6], z: 5.0, note: 'stock hangs from them: lanterns, coils, a net' },
+      { id: 'goods', boxes: [[131.5, 133.7, 9.8, 11.9], [131.7, 133.7, -1.1, 0.7]], note: 'outside the front, either side of the windows: barrels, crates, coils, an anchor, oars' },
     ],
     gates: [],
   },
@@ -338,7 +355,7 @@ const SPACES = {
       { id: 'galley_chimney', x: 120.8, y: 8, h: 4.5, note: 'smokes: the mess below (L9)' },
       { id: 'bowsprit', from: [154, 0, 23.5], to: [188, 0, 30.5], note: 'absolute z' },
       { id: 'bobstay', from: [186, 0, 30], to: [158.5, 0, 5], note: 'holds the bowsprit down against the forestays: from its end to the stem' },
-      { id: 'lanterns', at: [[86, 7.6, 2.2], [99, -5.6, 2.6], [110.5, -5.6, 2.6], [100, 2.3, 2.0]], hook_z: 2.8 },
+      { id: 'lanterns', at: [[86, 7.6, 2.2], [100, 2.3, 2.0]], hook_z: 2.8 },
     ],
   },
 };
@@ -347,24 +364,26 @@ const SPACES = {
    the shrouds, the Keelgate. The rest stand where a locked zone's corridor meets an open space (hub_layout.gate_marks). */
 const GATE_MARKS = [
   { level: 'quay', x: 84, y: 0, g: 'G5', zone: 'L17' },
-  { level: 'main', x: 116, y: 0, g: 'G2', zone: 'L15', line: 'Cargo work, keep clear.' }, { level: 'main', x: 122, y: 0, g: 'G3', zone: 'L6' },
-  { level: 'main', x: 134, y: 15, g: 'G3', zone: 'L14' }, { level: 'main', x: 134, y: -15, g: 'G3', zone: 'L14' },
+  { level: 'main', x: 122, y: 0, g: 'G3', zone: 'L6' },
+  { level: 'main', x: 134, y: 15, g: 'G3', zone: 'L15' }, { level: 'main', x: 134, y: -15, g: 'G3', zone: 'L15' },
   { level: 'main', x: 68, y: 17.6, g: 'G3', zone: 'L16' }, { level: 'main', x: 100, y: 17.6, g: 'G3', zone: 'L16' },
+  // D69: the command hall's glass doors, at its front on the poop.
+  { level: 'poop', x: 21, y: 0, g: 'G1', zone: 'L1', line: 'Barred from inside. The council meets here.' },
 ];
 const WHERE = {
   L1: 'Main deck aft and the sterncastle over it: the great cabin, the stern galleries, the quarterdeck, the poop',
   L2: 'Lower and middle deck aft, over the Water Hall’s aft quay and the stern', L3: 'Dock deck aft of the Water Hall', L4: 'Dock deck, port of the Slip',
   L5: 'Dock deck, between the Slip and the Keelgate', L6: 'Dock deck forward and round the Keelgate chamber; the hold under everything', L7: 'Lower deck, between the Tally House and the Well',
   L8: 'Lower deck, port side, 120 m long', L9: 'Lower deck forward', L10: 'Middle deck aft (over the Water Hall and the Slip)',
-  L11: 'Middle deck forward', L12: 'Upper deck aft', L13: 'Upper deck forward and round the Well', L14: 'Bow: the forecastle and the bowsprit',
-  L15: 'Main deck between the Waist and the forecastle', L16: 'Three masts, their tops and yards', L17: 'The Deep, under the waterline, behind the Keelgate',
+  L11: 'Middle deck forward', L12: 'Upper deck aft', L13: 'Upper deck forward and round the Well', L14: 'The forecastle’s two storeys, round the Chandlery',
+  L15: 'The forecastle deck, the beakhead and the bowsprit', L16: 'Three masts, their tops and yards', L17: 'The Deep, under the waterline, behind the Keelgate',
   L18: 'Gun deck, all of it but the Well’s gallery',
 };
 
 /* The outside, for the build (metres, absolute z). */
 const OUTSIDE = {
   hull_section: 'Planked all the way down (D64: no pale ancient band outside; the ancient hull shows only inside, at the Keelgate and the Deep): flat bottom +/-6 m at the keel (z -12), +/-16 m at z -6, +/-19 m at the waterline, widest +/-20 m at z +6, tumblehome to +/-18.8 m at the main deck rail and +/-17.4 m at the taffrail. Fine at the ends below the water (hub.form): the run aft narrows to the sternpost, the entry forward is finer than the deck outline.',
-  stern: 'A galleon’s stern (D64): the sterncastle rises in two tiers, the quarterdeck over x 24..48 (deck 22.5) and the poop over x 0..24 (three storeys, deck 28.5). Below the counter (z 8.5) the hull narrows to the sternpost and the one rudder; above it the stern is full width, round in plan (its corners 2.6 m forward of its middle) and leans aft a little. On its face: rows of tall cabin windows on each storey, open stern galleries with balustrades at sc1 and sc2 running round the corners into the quarter galleries (x 2..13, standing out 2.6 m, three storeys, domed), the name in carved brass letters under the taffrail, three great lanterns on the taffrail. The tiller comes in through the counter; the lashed great wheel is on the quarterdeck.',
+  stern: 'A galleon’s stern (D64, D69): the sterncastle rises in two tiers, the quarterdeck over x 24..48 (deck 22.5) and the poop over x 0..24 (three storeys, deck 28.5). Below the counter (z 8.5) the hull narrows to the sternpost and the one rudder; above it the stern is full width and round in plan, a half ellipse 9.5 m deep that runs into the sides without a corner, leaning aft a little. On its face: rows of tall cabin windows on each storey; grand open galleries at sc1 and sc2, 3.4 m deep, round the stern and along both sides to x 21.5, on carved brackets with balustrades and columns, the upper one roofed; glazed doors from the cabins onto them. Her name in carved brass letters under the taffrail, three great lanterns on the taffrail. The castles’ fronts are glazed in iron frames, with grand stairs along the bulwarks up to the quarterdeck and the poop; on the poop the command hall in glass under a copper roof. The tiller comes in through the counter; the lashed great wheel is on the quarterdeck.',
   sides: 'Dark tarred planking in strakes about 0.55 m wide with a lively sheer (hub.sheer: up 2.2 m at the stern, 2.6 m at the stem); heavy wales in a belt at the waterline and at the deck lines, standing out like mouldings; ochre bands; lidded square ports (1 m) on every deck below the main deck down to the dock deck, cream-framed windows above it; most shut, some lit at night. Channels with deadeyes at each mast. The hidden doors at x 32..40 on both sides, from under the water to 13 m: shut, the planking, wales and painted port lids run on across them; only a seam and the iron hinge straps show.',
   masts: 'x 68, 100, 140 (hub.rig in numbers); 54, 76, 64 m above the main deck; square yards on all three (D69: the mizzen’s lateen yard is gone); every sail furled on its yard, gathered canvas bound by gaskets; shrouds to the channels, stays forward, a long oxblood-and-cream pennant at the main truck.',
   bow: 'Forecastle x 134..160, a storey over the main deck with a rail; a plain stem with two hawse holes and their cables to the anchors ahead; the beakhead out from the stem under the bowsprit (a grated platform, headrails curving up to the forecastle, a carved figurehead); the bowsprit from (154, 23.5) to (188, 30.5) with its spritsail yard, held down by its bobstay.',

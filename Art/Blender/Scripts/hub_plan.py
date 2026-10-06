@@ -444,6 +444,8 @@ class Plan:
             other = b if a is None else a
             if other[0] == "water":
                 return None
+            if other[0] == "open" and next((z for z in H.OPEN if z["id"] == other[1]), {}).get("weather"):
+                return "bulwark"                    # D69: an open deck under the sky (the quarterdeck, the poop): the bulwark
             return "bulwark" if other[0] in ("air",) or (other[0] == "open" and H.LEVELS[self.level].get("deck")) else "hull"
         return self._kind(a, b)
 

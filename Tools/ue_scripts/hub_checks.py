@@ -67,6 +67,17 @@ def _flight(frm, to, down=False):
     return list(reversed(ends)) if down else list(ends)
 
 
+def _to_chandlery(m):
+    """D69: from the Well's last flight forward along the waist (between the cargo hatches and the starboard boat) to the
+    Chandlery's door in the forecastle's front, in and to its counter."""
+    import hub_plan as PL
+    door = next(d for d in PL.plan("main").doors if d["kind"] == "link" and {d["a"][1], d["b"][1]} == {"deck", "chandlery"})
+    hatch_y = max(b[3] for b in H.prop("main_deck", "cargo_hatches")["boxes"])
+    boat_y = min(b[2] for b in H.prop("main_deck", "ships_boats")["boxes"] if b[2] > 0)
+    lane = 0.5 * (hatch_y + boat_y)
+    return [(112.0, lane, m), (door["x"] - 1.5, door["y"], m), (door["x"] + 1.2, door["y"], m), _e("chandlery", "counter") + (m,)]
+
+
 def routes():
     """The walks from the fitting berth's board to each service (D64): along the forward quay into the shop; up the dock stair
     to the Tally House; through the lane and down the Well's first flight to the Keelgate; round the Well's galleries and up its
@@ -91,7 +102,7 @@ def routes():
     chand = to_well + [(f_lm[0][0] - 2.5, sh[3] + 1.0, lw), (f_lm[0][0], f_lm[0][1] + 3.0, lw)] + f_lm + \
         [(f_mu[0][0] + 3.0, f_mu[0][1] + 1.5, md)] + f_mu + [(f_ug[0][0] + 1.0, f_mu[1][1] + 2.5, up)] + f_ug + \
         [(f_gm[0][0] - 3.0, f_gm[0][1] - 1.5, gn)] + f_gm + \
-        [(f_gm[1][0] + 5.4, sh[3] - 2.0, m), (f_gm[1][0] + 12.9, sh[3] - 3.0, m), (f_gm[1][0] + 13.4, -4.0, m), _e("chandlery", "counter") + (m,)]
+        [(f_gm[1][0] + 5.4, sh[3] - 2.0, m)] + _to_chandlery(m)
     return {"slip": slip, "tally": to_pay, "keelgate": keel, "chandlery": chand}
 
 

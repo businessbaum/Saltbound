@@ -25,7 +25,8 @@ Meshes (/Game/Saltbound/Hub/Art, ship pivot; Nanite; no collision of their own):
   SM_Hub_Keelgate   the Keelgate's ring, disc and lines, its apron, the reader's desk, shelves, rubbings, lanterns
   SM_Hub_MainDeck   the bulwarks' inner side, the Well's coaming and rails, the companion's hood, fife rails, hatches, boats,
                     capstan, chimney, lanterns
-  SM_Hub_Chandlery  the deckhouse and its stock
+  SM_Hub_Chandlery  the shop in the forecastle's front (D69): its front's shop windows, sign, awning, door and goods outside;
+                    the counter, shelves, ladder, beams with stock, the display table and the spyglass inside
   SM_Hub_Gates      every gate
 Run: Tools/Build-BlenderAsset.ps1 build_hub_inside [dock slip tally well hoist keelgate main chandlery gates]
 """
@@ -1431,182 +1432,224 @@ def build_main():
 
 # --- the Chandlery ------------------------------------------------------------------------------------------------------------
 def build_chandlery():
+    """The Chandlery in the forecastle's front (spaces.chandlery, D69: owner "implement the Chandler better into the ship, it just
+    stands around ... at the front of the ship"): a shop two storeys high at the main deck. Outside, on the forecastle's front: two
+    shop windows of small panes either side of the door (lit inside), the CHANDLER board over them, a striped awning on iron arms,
+    lanterns by the door, goods stacked outside. Inside (its floor, walls and ceiling are the floors' build): the counter across
+    the shop facing the door, shelves of stock up to the beams with a ladder on a brass rail, the beams hung with lanterns, coils
+    and a net, the display table with the compass, the spyglass on its tripod."""
     p = T.Part("SM_Hub_Chandlery")
     zm = Z["main"]
     cd = {pr["id"]: pr for pr in H.space("chandlery")["props"]}
-    dh = cd["deckhouse"]
-    eav, ridge = dh["h"], dh["ridge"]
-    yr = 0.5 * (dh["y0"] + dh["y1"])
+    sh = cd["shop"]
+    x0, x1, y0, y1 = sh["x0"], sh["x1"], sh["y0"], sh["y1"]
     rng = random.Random(41)
-    PAINT = ("MI_Paint_Cream", "MI_Paint_Cream", "MI_Paint_CreamAged")
-    # The deckhouse's walls: cream-painted boards outside on posts, plain planks inside; the window in the forward wall.
-    win = cd["window"]
-    door = cd["door"]
-    cf = cd["counter_front"]
-    for (axis, line, a0, a1, s_out) in (("y", dh["y0"] + 0.15, dh["x0"], dh["x1"], -1.0), ("x", dh["x0"] + 0.15, dh["y0"], dh["y1"], -1.0),
-                                        ("x", dh["x1"] - 0.15, dh["y0"], dh["y1"], 1.0)):
-        ops = [(win["y0"], win["y1"], zm + win["z0"], zm + win["z1"])] if (axis == "x" and line > 110) else []
-        wall(p, axis, line, a0, a1, zm, zm + eav, s_out, ops, mats=PAINT, seal=0.0)
-        wall(p, axis, line, a0, a1, zm, zm + eav, -s_out, ops, posts=False, seal=0.0)
-    if True:                                                                      # the window: glass in its frame
-        F = (Vector((dh["x1"], 0.5 * (win["y0"] + win["y1"]), zm + 0.5 * (win["z0"] + win["z1"]))), Y, UP, X)
-        HE.window_unit(p, F, 0.5 * (win["y1"] - win["y0"]), 0.5 * (win["z1"] - win["z0"]), -0.15, "glass", "MI_Paint_Cream", panes=(2, 1))
-    # The front: the counter (cf), its posts, the door, the fascia over the opening with the CHANDLER sign, the awning.
-    yf = dh["y1"]
-    Fc = (Vector((0.0, cf["y1"], 0.0)), X, UP, Y)
-    HE.wall_boards(p, Fc, cf["x0"], cf["x1"], zm, zm + cf["h"], None, mats=("MI_Wood_Varnish", "MI_Wood_TeakDark"))
-    p.block(cf["x0"] - 0.05, cf["x1"] + 0.05, cf["y0"] - 0.2, cf["y1"] + 0.06, zm + cf["h"], zm + cf["top"], "MI_Wood_TeakLight", nseed(), axis="x")
-    for px0, px1 in ((98.0, 99.5), (110.0, 111.0), (113.0, 114.0)):
-        p.block(px0, px1, cf["y0"], cf["y1"], zm, zm + eav, "MI_Paint_Cream", nseed(), axis="z")
-    dw = door["x1"] - door["x0"]                                                  # the door, open: swung in against its post
+    door = next(d for d in PL.plan("main").doors if d["kind"] == "link" and {d["a"][1], d["b"][1]} == {"deck", "chandlery"})
+    dy, dw = door["y"], door["w"]
+    gates_back = [g for g in PL.plan("main").gates if abs(g["x"] - x1) < 0.3]
+    # --- the front, outside (x0, facing aft) ---
+    xf = x0 - 0.02
+    F = (Vector((xf, 0.0, zm)), -Y, UP, -X)                                         # t along -y so u = -y, n aft
+    fr = cd["front"]
+    wins = fr["spans"]
+
+    def keep(u, v):
+        y = -u
+        if abs(y - dy) < dw * 0.5 + 0.35 and v < 2.75:
+            return False
+        for wa, wb in wins:
+            if wa - 0.2 < y < wb + 0.2 and fr["z0"] - 0.15 < v < fr["z1"] + 0.15:
+                return False
+        return True
+    sg_top = cd["sign"]["z1"] + 0.2                                               # the shopfront's boards run up behind the board
+    HE.wall_boards(p, F, -(y1 + 0.2), -(y0 - 0.2), 0.0, sg_top, keep, mats=("MI_Paint_Hull", "MI_Paint_Hull", "MI_Paint_HullFaded"))
+    for wa, wb in wins:                                                           # the shop windows: small panes, lit inside
+        u = -0.5 * (wa + wb)
+        Fw = (HH.lpt(F, u, 0.5 * (fr["z0"] + fr["z1"]), 0.0), F[1], F[2], F[3])
+        hw_, hh = 0.5 * (wb - wa), 0.5 * (fr["z1"] - fr["z0"])
+        p.polygon([HH.lpt(Fw, a, b, -0.14) for a, b in ((-hw_, -hh), (hw_, -hh), (hw_, hh), (-hw_, hh))], "MI_LanternGlass", tone=0.5, facing=F[3])
+        nv, nh = int(round(2 * hw_ / 0.42)), int(round(2 * hh / 0.4))
+        for k in range(1, nv):
+            HH.lbeam(p, Fw, -hw_ + 2 * hw_ * k / nv, -hh, -hw_ + 2 * hw_ * k / nv, hh, 0.05, 0.06, -0.12, "MI_Paint_Cream", wear=0.6)
+        for k in range(1, nh):
+            HH.lbeam(p, Fw, -hw_, -hh + 2 * hh * k / nh, hw_, -hh + 2 * hh * k / nh, 0.05, 0.06, -0.12, "MI_Paint_Cream", wear=0.6)
+        for a in (-hw_ - 0.1, hw_ + 0.1):
+            HH.lbeam(p, Fw, a, -hh - 0.1, a, hh + 0.12, 0.22, 0.18, 0.0, "MI_Paint_Cream", wear=0.8)
+        HH.lbeam(p, Fw, -hw_ - 0.25, -hh - 0.14, hw_ + 0.25, -hh - 0.14, 0.24, 0.42, 0.06, "MI_Hub_Ochre", wear=1.0)     # the sill shelf
+        HH.lbeam(p, Fw, -hw_ - 0.25, hh + 0.2, hw_ + 0.25, hh + 0.2, 0.2, 0.3, 0.04, "MI_Paint_Cream", wear=0.8)
+        for k in range(int(2 * hw_ / 0.5)):                                       # stock on the sill: tins and jars
+            c = HH.lpt(Fw, -hw_ + 0.25 + 0.5 * k, -hh - 0.02, 0.18)
+            r = rng.uniform(0.06, 0.11)
+            p.lathe([(0.0, 0.0), (r, 0.0), (r * 1.05, r * 1.8), (r * 0.7, r * 2.1), (0.0, r * 2.1)], c, UP,
+                    rng.choice(("MI_Metal_Brass", "MI_Glass_Dark", "MI_Paint_Hull", "MI_Metal_Iron")), sides=8)
+    # The door: its frame, a fanlight, the leaf standing open inward against the jamb.
+    Fd = (HH.lpt(F, -dy, 0.0, 0.0), F[1], F[2], F[3])
+    for a in (-dw * 0.5 - 0.12, dw * 0.5 + 0.12):
+        HH.lbeam(p, Fd, a, 0.0, a, 2.6, 0.24, 0.24, 0.0, "MI_Paint_Cream", wear=1.0)
+    HH.lbeam(p, Fd, -dw * 0.5 - 0.3, 2.68, dw * 0.5 + 0.3, 2.68, 0.2, 0.3, 0.02, "MI_Hub_Ochre", wear=1.0)
+    for k in range(5):                                                            # the fanlight's rays
+        a = math.pi * (k + 1) / 6
+        c = HH.lpt(Fd, 0.0, 2.35, -0.05)
+        q = c + (F[1] * math.cos(a) + UP * math.sin(a)) * 0.28
+        p.beam(T.straight(c, q, F[3], (q - c).normalized().cross(F[3])), 0.28, 0.03, 0.03, "MI_Paint_Cream", nseed())
+    p.polygon([HH.lpt(Fd, a, b, -0.08) for a, b in ((-dw * 0.5, 2.3), (dw * 0.5, 2.3), (dw * 0.5, 2.6), (-dw * 0.5, 2.6))], "MI_LanternGlass", tone=0.5, facing=F[3])
+    hinge = Vector((x0 + 0.05, dy - dw * 0.5, zm))
     for k in range(3):
-        v = cf["y0"] - 0.1 - dw * (k + 0.5) / 3
-        p.block(door["x1"] - 0.08, door["x1"] - 0.02, v - dw / 6 + 0.01, v + dw / 6 - 0.01, zm + 0.02, zm + B.DOOR_H,
+        xx = hinge.x + dw * (k + 0.5) / 3
+        p.block(xx - dw / 6 + 0.01, xx + dw / 6 - 0.01, hinge.y - 0.08, hinge.y - 0.02, zm + 0.02, zm + 2.28,
                 "MI_Paint_Hull" if k != 1 else "MI_Paint_HullFaded", nseed(), axis="z")
-    p.block(door["x0"], door["x1"], cf["y0"], cf["y1"], zm + B.DOOR_H + 0.2, zm + eav, "MI_Paint_Cream", nseed(), axis="x")
-    aw = cd["awning"]
-    (ay0, az0), (ay1, az1) = aw["from"], aw["to"]
-    p.block(cf["x0"], cf["x1"], cf["y0"], cf["y1"], zm + az0, zm + eav, "MI_Paint_Cream", nseed(), axis="x")       # the fascia
+    # The CHANDLER board and the awning on two iron arms, striped canvas with a scalloped valance.
     sg = cd["sign"]
-    p.block(sg["x0"], sg["x1"], yf, yf + 0.08, zm + sg["z0"], zm + sg["z1"], "MI_Paint_HullDark", nseed(), axis="x")
-    sign_on_y(p, sg["text"], 0.5 * (sg["x0"] + sg["x1"]), yf + 0.09, zm + 0.5 * (sg["z0"] + sg["z1"]), 0.5, 1.0)
-    n = 10                                                                        # striped canvas, oxblood and cream
+    p.block(x0 - 0.3, x0 - 0.16, sg["y0"], sg["y1"], zm + sg["z0"], zm + sg["z1"], "MI_Paint_HullDark", nseed(), axis="y")
+    for zz in (sg["z0"] - 0.05, sg["z1"] + 0.05):
+        p.block(x0 - 0.34, x0 - 0.16, sg["y0"] - 0.1, sg["y1"] + 0.1, zm + zz - 0.04, zm + zz + 0.04, "MI_Hub_Ochre", nseed(), axis="y")
+    sign_on_x(p, sg["text"], x0 - 0.305, 0.5 * (sg["y0"] + sg["y1"]), zm + 0.5 * (sg["z0"] + sg["z1"]), 0.55, -1.0)
+    aw = cd["awning"]
+    (axa, aza), (axb, azb) = aw["from"], aw["to"]
+    n = 14
     for k in range(n):
-        xa = aw["x0"] + (aw["x1"] - aw["x0"]) * k / n
-        xb = aw["x0"] + (aw["x1"] - aw["x0"]) * (k + 1) / n
+        ya = aw["y0"] + (aw["y1"] - aw["y0"]) * k / n
+        yb = aw["y0"] + (aw["y1"] - aw["y0"]) * (k + 1) / n
         mat = "MI_Hub_CanvasRed" if k % 2 == 0 else "MI_Canvas"
-        sag = 0.06
-        p.polygon([(xa, ay0, zm + az0), (xb, ay0, zm + az0), (xb, ay1, zm + az1 - sag), (xa, ay1, zm + az1 - sag)], mat, tone=0.5, facing=UP)
-        p.polygon([(xa, ay0, zm + az0 - 0.01), (xa, ay1, zm + az1 - sag - 0.01), (xb, ay1, zm + az1 - sag - 0.01), (xb, ay0, zm + az0 - 0.01)], mat, tone=0.5,
+        sag = 0.07
+        p.polygon([(axa, ya, zm + aza), (axa, yb, zm + aza), (axb, yb, zm + azb - sag), (axb, ya, zm + azb - sag)], mat, tone=0.5, facing=UP)
+        p.polygon([(axa, ya, zm + aza - 0.01), (axb, ya, zm + azb - sag - 0.01), (axb, yb, zm + azb - sag - 0.01), (axa, yb, zm + aza - 0.01)], mat, tone=0.5,
                   facing=-UP)
-        for x0_ in (xa,):                                                        # the scalloped valance
-            p.polygon([(xa, ay1, zm + az1 - sag), (xb, ay1, zm + az1 - sag), (0.5 * (xa + xb), ay1 + 0.01, zm + az1 - sag - 0.25)], mat, tone=0.5,
-                      facing=Y)
-    for ax_ in (aw["x0"], aw["x1"]):
-        p.beam(T.straight((ax_, ay1, zm), (ax_, ay1, zm + az1 + 0.05), X, Y), az1 + 0.05, 0.12, 0.12, "MI_Wood_Varnish", nseed())
-        for x, y, zz in H.prop("main_deck", "lanterns")["at"]:
-            if abs(x - ax_) < 0.6 and abs(y - ay1) < 0.3:
-                bracket_lantern(p, Vector((ax_ + 0.06, ay1, zm)), (0.0, 1.0, 0.0), zz + 0.05, drop=0.05)
-    # The pitched roof: rafters, boards, shingle rows of tarred boards, a ridge board, the gables' trim.
-    for s in (-1.0, 1.0):
-        ye = dh["y0"] - 0.35 if s < 0 else dh["y1"] + 0.35
-        ze = zm + eav - 0.12 * 0.35 / ((yr - dh["y0"]) / (ridge - eav))
-        top = Vector((0.0, yr, zm + ridge))
-        bot = Vector((0.0, ye, zm + eav - 0.35 * (ridge - eav) / abs(yr - dh["y0"])))
-        d = (top - bot)
-        L = d.length
-        d.normalize()
-        nrm = X.cross(d) if X.cross(d).z > 0 else d.cross(X)
-        k = 0
-        while k * 0.35 < L:
-            c0 = bot + d * (k * 0.35 + 0.17) + nrm * 0.06
-            p.board(T.straight(Vector((dh["x0"] - 0.35, c0.y, c0.z)), Vector((dh["x1"] + 0.35, c0.y, c0.z)), d, nrm), dh["x1"] - dh["x0"] + 0.7, 0.4, 0.05,
-                    rng.choice(("MI_Hub_HullTarDark", "MI_Hub_HullTar", "MI_Hub_HullTarFaded")), nseed(), seg=1.0, wear=0.8)
-            k += 1
-        p.polygon([(dh["x0"] - 0.35, ye, bot.z), (dh["x0"] - 0.35, yr, top.z), (dh["x1"] + 0.35, yr, top.z), (dh["x1"] + 0.35, ye, bot.z)], "MI_Wood_Planks",
-                  tone=0.4, facing=-nrm)
-        for xr in [dh["x0"] + (dh["x1"] - dh["x0"]) * j / 8 for j in range(9)]:
-            xr = min(max(xr, dh["x0"] + 0.1), dh["x1"] - 0.1)
-            p.beam(T.straight(Vector((xr, ye, bot.z - 0.1)), Vector((xr, yr, top.z - 0.1)), X, -nrm), L, 0.12, 0.16, "MI_Wood_TeakDark", nseed())
-    p.beam(T.straight((dh["x0"] - 0.4, yr, zm + ridge + 0.08), (dh["x1"] + 0.4, yr, zm + ridge + 0.08), Y, UP), dh["x1"] - dh["x0"] + 0.8, 0.3, 0.12,
-           "MI_Wood_Varnish", nseed())
-    for xg in (dh["x0"], dh["x1"]):                                              # the gables
-        s = -1.0 if xg == dh["x0"] else 1.0
-        p.polygon([(xg + s * 0.0, dh["y0"], zm + eav), (xg, dh["y1"], zm + eav), (xg, yr, zm + ridge)], "MI_Paint_Cream", tone=0.5, facing=(s, 0.0, 0.0))
-        p.polygon([(xg - s * 0.3, dh["y0"], zm + eav), (xg - s * 0.3, yr, zm + ridge), (xg - s * 0.3, dh["y1"], zm + eav)], "MI_Wood_Planks", tone=0.5,
-                  facing=(-s, 0.0, 0.0))
-    # Inside: the shelves with their stock, the ladder on its rail, the display table, the beams with hanging stock.
+        p.polygon([(axb, ya, zm + azb - sag), (axb, yb, zm + azb - sag), (axb - 0.01, 0.5 * (ya + yb), zm + azb - sag - 0.26)], mat, tone=0.5, facing=-X)
+    for yy in (aw["y0"] + 0.3, aw["y1"] - 0.3):
+        a, b = Vector((x0 - 0.05, yy, zm + aza - 0.9)), Vector((axb + 0.05, yy, zm + azb - 0.05))
+        p.beam(T.straight(a, b, Y, (b - a).normalized().cross(Y)), (b - a).length, 0.07, 0.07, "MI_Metal_Iron", nseed())
+        p.beam(T.straight(Vector((x0 - 0.05, yy, zm + aza)), b, Y, UP), (b - Vector((x0 - 0.05, yy, zm + aza))).length, 0.05, 0.05, "MI_Metal_Iron", nseed())
+    for yy in (dy - dw * 0.5 - 0.7, dy + dw * 0.5 + 0.7):                         # lanterns either side of the door
+        bracket_lantern(p, Vector((x0 - 0.04, yy, zm)), (-1.0, 0.0, 0.0), 2.45, drop=0.05, arm=0.5, s=0.8)
+    # Goods outside: barrels, crates, coils, an anchor, oars leaning on the front.
+    for gx0, gx1, gy0, gy1 in cd["goods"]["boxes"]:
+        bx, by = gx0 + 0.45, gy0 + 0.45
+        for k, (ox, oy) in enumerate(((0.0, 0.0), (0.0, 0.8), (0.8, 0.0))):
+            if bx + ox > gx1 - 0.3 or by + oy > gy1 - 0.3:
+                continue
+            c = Vector((bx + ox, by + oy, zm))
+            p.lathe([(0.0, 0.0), (0.3, 0.0), (0.36, 0.25), (0.38, 0.45), (0.36, 0.65), (0.3, 0.9), (0.0, 0.9)], c, UP, "MI_Wood_Planks", sides=14)
+            for zz in (0.15, 0.75):
+                p.lathe([(0.34, zz - 0.04), (0.36, zz), (0.34, zz + 0.04)], c, UP, "MI_Metal_Iron", sides=14, caps=False)
+        p.block(gx1 - 0.85, gx1 - 0.05, gy1 - 0.8, gy1 - 0.05, zm, zm + 0.6, "MI_Wood_Planks", nseed(), axis="x")
+        p.block(gx1 - 0.75, gx1 - 0.15, gy1 - 0.7, gy1 - 0.15, zm + 0.6, zm + 0.95, "MI_Wood_TeakLight", nseed(), axis="y")
+        c = Vector((gx0 + 1.2, 0.5 * (gy0 + gy1), zm))                            # a coil of new rope
+        for j in range(5):
+            p.beam(T.arc(c + UP * (0.04 + 0.06 * j), X, Y, 0.32 - 0.015 * j, 0.0, 2 * math.pi), 2.0, 0.05, 0.05, "MI_Rope_Hemp", nseed(), seg=0.08, wear=0.0)
+    for k, yy in enumerate((dy + dw * 0.5 + 1.25, dy + dw * 0.5 + 1.45)):          # two oars leaning on the front
+        a, b = Vector((x0 - 0.75, yy, zm)), Vector((x0 - 0.08, yy + 0.12 * k, zm + 2.9))
+        p.round(T.straight(a, b, Y, X), (b - a).length, 0.04, "MI_Wood_Varnish", nseed(), sides=8)
+        p.beam(T.straight(a, a + (b - a).normalized() * 0.9, Y, X), 0.9, 0.16, 0.03, "MI_Wood_Varnish", nseed())
+    c = Vector((x0 - 0.7, dy - dw * 0.5 - 1.4, zm))                             # a small anchor against the front
+    p.beam(T.straight(c, c + UP * 1.3 + X * 0.35, Y, X), 1.35, 0.1, 0.1, "MI_Metal_Iron", nseed(), wear=0.5)
+    p.beam(T.arc(c + UP * 0.35 + X * 0.1, Y, UP, 0.45, math.pi * 1.1, math.pi * 1.9), 1.0, 0.09, 0.09, "MI_Metal_Iron", nseed(), wear=0.5)
+    p.lathe([(0.12, -0.03), (0.15, 0.0), (0.12, 0.03)], c + UP * 1.4 + X * 0.38, X, "MI_Metal_Iron", sides=10, caps=False)
+    # --- inside ---
+    cn = cd["counter"]
+    Fc = (Vector((cn["x0"], 0.0, 0.0)), Y, UP, -X)
+    HE.wall_boards(p, Fc, cn["y0"], cn["y1"], zm, zm + cn["h"], None, mats=("MI_Wood_Varnish", "MI_Wood_TeakDark"))
+    p.block(cn["x0"] - 0.12, cn["x1"] + 0.05, cn["y0"] - 0.05, cn["y1"] + 0.05, zm + cn["h"], zm + cn["top"], "MI_Wood_TeakLight", nseed(), axis="y")
+    p.block(cn["x0"] + 0.1, cn["x1"], cn["y0"], cn["y0"] + 0.1, zm, zm + cn["h"], "MI_Wood_TeakDark", nseed(), axis="z")
+    p.block(cn["x0"] + 0.1, cn["x1"], cn["y1"] - 0.1, cn["y1"], zm, zm + cn["h"], "MI_Wood_TeakDark", nseed(), axis="z")
+    tz = zm + cn["top"]                                                          # on the counter: the ledger, scales, a lamp
+    p.block(cn["x0"] + 0.15, cn["x0"] + 0.55, 4.6, 5.2, tz, tz + 0.05, "MI_Paint_CreamAged", nseed(), axis="y")
+    p.lathe([(0.0, 0.0), (0.12, 0.0), (0.04, 0.05), (0.03, 0.4), (0.0, 0.42)], Vector((cn["x0"] + 0.4, 7.0, tz)), UP, "MI_Metal_Brass", sides=8)
+    p.beam(T.straight((cn["x0"] + 0.4, 6.7, tz + 0.4), (cn["x0"] + 0.4, 7.3, tz + 0.4), X, UP), 0.6, 0.02, 0.02, "MI_Metal_Brass", nseed())
+    lantern(p, Vector((cn["x0"] + 0.4, 3.2, tz)), r=0.12, lit=True)
     shv = cd["shelves"]
+    gap_ys = [(g["y"] - 1.0, g["y"] + 1.0) for g in gates_back]
     for (sx0, sx1, sy0, sy1) in shv["runs"]:
         along_x = (sx1 - sx0) > (sy1 - sy0)
-        for k in range(6):
-            zz = zm + 0.2 + (shv["h"] - 0.3) * k / 5
-            p.block(sx0, sx1, sy0, sy1, zz - 0.04, zz, "MI_Wood_Teak", nseed(), axis="x" if along_x else "y")
-            if k == 5:
-                continue
-            a, b = (sx0, sx1) if along_x else (sy0, sy1)
-            u = a + 0.15
-            while u < b - 0.2:
-                w = rng.uniform(0.12, 0.35)
-                kind = rng.random()
-                c = Vector(((u + w / 2) if along_x else 0.5 * (sx0 + sx1), 0.5 * (sy0 + sy1) if along_x else (u + w / 2), zz))
-                if kind < 0.35:                                                  # tins and jars
-                    p.lathe([(0.0, 0.0), (w * 0.4, 0.0), (w * 0.42, w * 0.9), (w * 0.3, w * 1.0), (0.0, w * 1.0)], c, UP,
-                            rng.choice(("MI_Metal_Brass", "MI_Metal_Iron", "MI_Glass_Dark", "MI_Paint_Hull")), sides=8)
-                elif kind < 0.6:                                                 # coils of rope
-                    for j in range(3):
-                        p.beam(T.arc(c + UP * (0.04 + 0.05 * j), X, Y, w * 0.38, 0.0, 2 * math.pi), w * 2.4, 0.04, 0.04, "MI_Rope_Hemp", nseed(), seg=0.08,
-                               wear=0.0)
-                else:                                                            # boxes
-                    p.block(c.x - w * 0.45, c.x + w * 0.45, c.y - 0.2, c.y + 0.2, zz, zz + rng.uniform(0.15, 0.35),
-                            rng.choice(("MI_Wood_Planks", "MI_Wood_TeakLight", "MI_Paint_CreamAged")), nseed(), axis="x")
-                u += w + rng.uniform(0.05, 0.15)
-        for xx in ((sx0 + 0.03, sx1 - 0.03) if along_x else (0.5 * (sx0 + sx1),)):
-            pass
-        if along_x:
-            for xx in [sx0 + (sx1 - sx0) * j / 5 for j in range(6)]:
-                p.block(xx - 0.04, xx + 0.04, sy0, sy1, zm, zm + shv["h"], "MI_Wood_TeakDark", nseed(), axis="z")
-            rail_y = sy1 + 0.25
-            p.round(T.straight((sx0, rail_y, zm + shv["h"] - 0.2), (sx1, rail_y, zm + shv["h"] - 0.2), Y, UP), sx1 - sx0, 0.03, "MI_Metal_Brass", nseed(),
-                    sides=6)
-            lx = sx0 + (sx1 - sx0) * 0.62                                         # the ladder on its rail
-            for dx in (-0.25, 0.25):
-                p.beam(T.straight((lx + dx, sy1 + 1.0, zm), (lx + dx, rail_y, zm + shv["h"] - 0.15), X, Y), 3.5, 0.06, 0.08, "MI_Wood_Varnish", nseed())
-            for j in range(1, 11):
-                t = j / 11
-                q = Vector((lx, sy1 + 1.0 + (rail_y - sy1 - 1.0) * t, zm + (shv["h"] - 0.15) * t))
-                p.round(T.straight(q - X * 0.25, q + X * 0.25, Y, UP), 0.5, 0.025, "MI_Wood_Varnish", nseed(), sides=6)
+        spans = [(sx0, sx1) if along_x else (sy0, sy1)]
+        if not along_x:                                                          # open where a gate stands in the back wall
+            for ga, gb in gap_ys:
+                nxt = []
+                for a, b in spans:
+                    if ga < b and gb > a:
+                        if ga - a > 0.4:
+                            nxt.append((a, ga))
+                        if b - gb > 0.4:
+                            nxt.append((gb, b))
+                    else:
+                        nxt.append((a, b))
+                spans = nxt
+        for a, b in spans:
+            bx0, bx1, by0, by1 = (a, b, sy0, sy1) if along_x else (sx0, sx1, a, b)
+            for k in range(8):
+                zz = zm + 0.2 + (shv["h"] - 0.3) * k / 7
+                p.block(bx0, bx1, by0, by1, zz - 0.04, zz, "MI_Wood_Teak", nseed(), axis="x" if along_x else "y")
+                if k == 7:
+                    continue
+                u = a + 0.15
+                while u < b - 0.2:
+                    w = rng.uniform(0.12, 0.35)
+                    kind = rng.random()
+                    c = Vector(((u + w / 2) if along_x else 0.5 * (bx0 + bx1), 0.5 * (by0 + by1) if along_x else (u + w / 2), zz))
+                    if kind < 0.35:
+                        p.lathe([(0.0, 0.0), (w * 0.4, 0.0), (w * 0.42, w * 0.9), (w * 0.3, w * 1.0), (0.0, w * 1.0)], c, UP,
+                                rng.choice(("MI_Metal_Brass", "MI_Metal_Iron", "MI_Glass_Dark", "MI_Paint_Hull")), sides=8)
+                    elif kind < 0.6:
+                        for j in range(3):
+                            p.beam(T.arc(c + UP * (0.04 + 0.05 * j), X, Y, w * 0.38, 0.0, 2 * math.pi), w * 2.4, 0.04, 0.04, "MI_Rope_Hemp", nseed(), seg=0.08,
+                                   wear=0.0)
+                    else:
+                        p.block(c.x - (w * 0.45 if along_x else 0.2), c.x + (w * 0.45 if along_x else 0.2), c.y - (0.2 if along_x else w * 0.45),
+                                c.y + (0.2 if along_x else w * 0.45), zz, zz + rng.uniform(0.15, 0.35),
+                                rng.choice(("MI_Wood_Planks", "MI_Wood_TeakLight", "MI_Paint_CreamAged")), nseed(), axis="x")
+                    u += w + rng.uniform(0.05, 0.15)
+            for uu in [a + (b - a) * j / max(1, int((b - a) / 1.6)) for j in range(int((b - a) / 1.6) + 1)]:
+                if along_x:
+                    p.block(uu - 0.04, uu + 0.04, by0, by1, zm, zm + shv["h"], "MI_Wood_TeakDark", nseed(), axis="z")
+                else:
+                    p.block(bx0, bx1, uu - 0.04, uu + 0.04, zm, zm + shv["h"], "MI_Wood_TeakDark", nseed(), axis="z")
+        if not along_x:                                                          # the ladder on its brass rail, along the back
+            rail_x = sx0 - 0.3
+            p.round(T.straight((rail_x, sy0 + 0.2, zm + shv["h"] - 0.2), (rail_x, sy1 - 0.2, zm + shv["h"] - 0.2), X, UP), sy1 - sy0 - 0.4, 0.03,
+                    "MI_Metal_Brass", nseed(), sides=6)
+            ly = sy0 + (sy1 - sy0) * 0.22
+            for dyy in (-0.25, 0.25):
+                p.beam(T.straight((rail_x - 1.3, ly + dyy, zm), (rail_x, ly + dyy, zm + shv["h"] - 0.15), Y, X), 5.3, 0.06, 0.08, "MI_Wood_Varnish", nseed())
+            for j in range(1, 16):
+                t = j / 16
+                q = Vector((rail_x - 1.3 + 1.3 * t, ly, zm + (shv["h"] - 0.15) * t))
+                p.round(T.straight(q - Y * 0.25, q + Y * 0.25, X, UP), 0.5, 0.025, "MI_Wood_Varnish", nseed(), sides=6)
     dt = cd["display_table"]
     p.block(dt["x0"], dt["x1"], dt["y0"], dt["y1"], zm + dt["h"] - 0.06, zm + dt["h"], "MI_Wood_Varnish", nseed(), axis="x")
-    for xx in (dt["x0"] + 0.15, dt["x1"] - 0.15):
-        for yy in (dt["y0"] + 0.15, dt["y1"] - 0.15):
+    for xx in (dt["x0"] + 0.12, dt["x1"] - 0.12):
+        for yy in (dt["y0"] + 0.12, dt["y1"] - 0.12):
             p.lathe([(0.06, 0.0), (0.05, 0.1), (0.07, dt["h"] * 0.5), (0.05, dt["h"] - 0.06)], Vector((xx, yy, zm)), UP, "MI_Wood_TeakDark", sides=8)
     tz = zm + dt["h"]
-    p.lathe([(0.0, 0.0), (0.16, 0.0), (0.16, 0.08), (0.14, 0.1), (0.0, 0.1)], Vector((104.0, -13.5, tz)), UP, "MI_Metal_Brass", sides=14)        # compass
-    p.polygon([(103.88, -13.62, tz + 0.105), (104.12, -13.62, tz + 0.105), (104.12, -13.38, tz + 0.105), (103.88, -13.38, tz + 0.105)], "MI_Paint_CreamAged",
-              facing=UP)
-    p.round(T.straight((105.3, -13.2, tz + 0.06), (106.4, -13.6, tz + 0.06), Y, UP), 1.17, lambda s: 0.05 + 0.02 * s, "MI_Metal_Brass", nseed(), sides=10)  # spyglass
-    lantern(p, Vector((107.4, -13.4, tz)), r=0.13, lit=False)
-    for bx in cd["beams"]["at_x"]:
-        zb = zm + cd["beams"]["z"]
-        p.beam(T.straight((bx, dh["y0"] + 0.3, zb), (bx, dh["y1"] - 0.3, zb), X, UP), dh["y1"] - dh["y0"] - 0.6, 0.24, 0.26, "MI_Wood_TeakDark", nseed())
-        for k, yy in enumerate([dh["y0"] + 1.5 + 2.2 * j for j in range(4)]):
-            if k % 3 == 0:
-                lantern(p, Vector((bx, yy, zb - 1.2)), chain_to=(bx, yy, zb - 0.12), r=0.15,
-                        lit=k == 3 and bx in cd["beams"]["at_x"][::2])           # stock: two burn, by the counter
-            elif k % 3 == 1:
-                for j in range(4):
-                    p.beam(T.arc(Vector((bx, yy, zb - 0.55 - 0.04 * j)), X, UP, 0.28 - 0.01 * j, -math.pi * 0.4, math.pi * 1.4), 1.4, 0.04, 0.04, "MI_Rope_Hemp",
-                           nseed(), seg=0.08, wear=0.0)
-            else:
-                pts = [Vector((bx + 0.0, yy - 0.6 + 1.2 * t, zb - 0.15 - 0.9 * math.sin(math.pi * t))) for t in (j / 8 for j in range(9))]
-                for dz in (0.0, -0.2, -0.4):
-                    f = T.polyline([q + UP * dz for q in pts], lambda q: X, lambda q: UP)
-                    p.round(f, T.length_of(f), 0.012, "MI_Rope_Hemp", nseed(), sides=4, wear=0.0)
-    # Outside the front: the try-it spyglass on its tripod, the binnacle, the barrels and crates.
-    tp = cd["tripod_spyglass"]
+    cc = Vector((0.5 * (dt["x0"] + dt["x1"]), dt["y0"] + 0.5, tz))
+    p.lathe([(0.0, 0.0), (0.16, 0.0), (0.16, 0.08), (0.14, 0.1), (0.0, 0.1)], cc, UP, "MI_Metal_Brass", sides=14)            # the compass
+    p.polygon([cc + Vector((-0.12, -0.12, 0.105)), cc + Vector((0.12, -0.12, 0.105)), cc + Vector((0.12, 0.12, 0.105)), cc + Vector((-0.12, 0.12, 0.105))],
+              "MI_Paint_CreamAged", facing=UP)
+    p.polygon([Vector((dt["x0"] + 0.1, dt["y1"] - 0.75, tz + 0.005)), Vector((dt["x1"] - 0.1, dt["y1"] - 0.75, tz + 0.005)),
+               Vector((dt["x1"] - 0.1, dt["y1"] - 0.1, tz + 0.005)), Vector((dt["x0"] + 0.1, dt["y1"] - 0.1, tz + 0.005))], "MI_Paint_CreamAged", facing=UP)  # a chart
+    tp = cd["spyglass_stand"]
     c = Vector((tp["x"], tp["y"], zm))
     for k in range(3):
         a = 2 * math.pi * k / 3 + 0.3
         foot = c + Vector((math.cos(a) * 0.45, math.sin(a) * 0.45, 0.0))
         p.beam(T.straight(foot, c + UP * (tp["h"] - 0.15), X, Y), (c + UP * (tp["h"] - 0.15) - foot).length, 0.05, 0.05, "MI_Wood_Varnish", nseed())
-    p.round(T.straight(c + UP * tp["h"] + Vector((-0.45, 0.2, -0.03)), c + UP * tp["h"] + Vector((0.45, -0.2, 0.06)), Y, UP), 0.99,
+    p.round(T.straight(c + UP * tp["h"] + Vector((0.45, 0.2, -0.03)), c + UP * tp["h"] + Vector((-0.45, -0.2, 0.06)), Y, UP), 0.99,
             lambda s: 0.045 + 0.035 * s, "MI_Metal_Brass", nseed(), sides=10)
-    bn = cd["binnacle"]
-    c = Vector((bn["x"], bn["y"], zm))
-    p.lathe([(0.0, 0.0), (0.32, 0.0), (0.3, 0.1), (0.22, 0.2), (0.2, bn["h"] - 0.3), (0.3, bn["h"] - 0.2), (0.32, bn["h"] - 0.05), (0.0, bn["h"] - 0.05)],
-            c, UP, "MI_Wood_Varnish", sides=12)
-    p.lathe([(0.0, bn["h"] - 0.05), (0.28, bn["h"] - 0.05), (0.3, bn["h"] + 0.1), (0.22, bn["h"] + 0.22), (0.0, bn["h"] + 0.26)], c, UP, "MI_Metal_Brass",
-            sides=14)
-    bc = cd["barrels_crates"]
-    for k, (bx, by) in enumerate(((bc["x0"] + 0.4, bc["y0"] + 0.4), (bc["x0"] + 1.3, bc["y0"] + 0.45))):
-        prof = [(0.0, 0.0), (0.3, 0.0), (0.36, 0.25), (0.38, 0.45), (0.36, 0.65), (0.3, 0.9), (0.0, 0.9)]
-        p.lathe(prof, Vector((bx, by, zm)), UP, "MI_Wood_Planks", sides=14)
-        for zz in (0.15, 0.75):
-            p.lathe([(0.34, zz - 0.04), (0.36, zz), (0.34, zz + 0.04)], Vector((bx, by, zm)), UP, "MI_Metal_Iron", sides=14, caps=False)
-    p.block(bc["x0"] + 0.1, bc["x1"] - 0.1, bc["y1"] - 0.75, bc["y1"] - 0.05, zm, zm + 0.6, "MI_Wood_Planks", nseed(), axis="x")
-    p.block(bc["x0"] + 0.4, bc["x1"] - 0.5, bc["y1"] - 0.65, bc["y1"] - 0.15, zm + 0.6, zm + 1.0, "MI_Wood_TeakLight", nseed(), axis="x")
-    # Inside lanterns are the beams' stock; the inside under the roof gets two more from the rafters.
+    bm = cd["beams"]
+    zb = zm + bm["z"]
+    for bx in bm["at_x"]:
+        p.beam(T.straight((bx, y0 + 0.2, zb), (bx, y1 - 0.2, zb), X, UP), y1 - y0 - 0.4, 0.26, 0.28, "MI_Wood_TeakDark", nseed())
+        for k, yy in enumerate([y0 + 1.6 + 2.4 * j for j in range(5)]):
+            if k % 3 == 0:
+                lantern(p, Vector((bx, yy, zb - 1.3)), chain_to=(bx, yy, zb - 0.14), r=0.16, lit=(k == 0 or bx == bm["at_x"][1]))
+            elif k % 3 == 1:
+                for j in range(4):
+                    p.beam(T.arc(Vector((bx, yy, zb - 0.55 - 0.04 * j)), X, UP, 0.28 - 0.01 * j, -math.pi * 0.4, math.pi * 1.4), 1.4, 0.04, 0.04, "MI_Rope_Hemp",
+                           nseed(), seg=0.08, wear=0.0)
+            else:
+                pts = [Vector((bx, yy - 0.6 + 1.2 * t, zb - 0.15 - 0.9 * math.sin(math.pi * t))) for t in (j / 8 for j in range(9))]
+                for dz in (0.0, -0.2, -0.4):
+                    f = T.polyline([q + UP * dz for q in pts], lambda q: X, lambda q: UP)
+                    p.round(f, T.length_of(f), 0.012, "MI_Rope_Hemp", nseed(), sides=4, wear=0.0)
     export(p)
 
 

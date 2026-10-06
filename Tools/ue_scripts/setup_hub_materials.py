@@ -24,12 +24,12 @@ rock = unreal.load_asset(S.MASTER + "/M_SB_Rock")
 
 tar = dict(vectors={"Tint": (0.052, 0.036, 0.024, 1), "WearColor": (0.15, 0.1, 0.06, 1), "GrimeColor": (0.42, 0.5, 0.34, 1),
                     "VarTint": (0.9, 0.95, 1.05, 1)},
-           scalars={"RoughScale": 0.85, "NormalStrength": 0.8, "WearStrength": 0.8, "WearRoughness": 0.7, "VarAmount": 0.22,
+           scalars={"RoughScale": 0.85, "NormalStrength": 1.0, "WearStrength": 0.8, "WearRoughness": 0.7, "VarAmount": 0.22,
                     "VarHue": 0.3, "GrimeAmount": 1.0, "GrimeRoughness": 0.4, "MacroAmount": 0.12},
            textures=S.wood_textures())
 ochre = dict(vectors={"Tint": (0.36, 0.215, 0.06, 1), "WearColor": (0.1, 0.06, 0.03, 1), "GrimeColor": (0.5, 0.48, 0.36, 1),
                       "VarTint": (1.06, 0.95, 0.82, 1)},
-             scalars={"TexNormalize": 2.6, "NormalStrength": 0.6, "RoughScale": 1.0, "VarAmount": 0.12, "VarHue": 0.35,
+             scalars={"TexNormalize": 2.6, "NormalStrength": 0.9, "RoughScale": 1.0, "VarAmount": 0.12, "VarHue": 0.35,
                       "WearStrength": 1.2, "WearRoughness": 0.7, "GrimeAmount": 0.9},
              textures=S.paint_textures())
 
@@ -40,6 +40,7 @@ def variant(base, **tints):
     return kw
 
 
+# D69 (owner: "more detail ... through surface finishing"): the tar and the ochre show the boards' relief more.
 sb_ue.make_mi("MI_Hub_HullTar", MI, surf, **tar)
 sb_ue.make_mi("MI_Hub_HullTarFaded", MI, surf, **variant(tar, Tint=(0.085, 0.066, 0.048, 1)))      # sun-bleached boards
 sb_ue.make_mi("MI_Hub_HullTarDark", MI, surf, **variant(tar, Tint=(0.03, 0.021, 0.015, 1)))        # fresh tar
@@ -69,6 +70,12 @@ pennant = dict(scalars={"TexNormalize": 2.6, "NormalStrength": 0.5, "RoughScale"
 sb_ue.make_mi("MI_Hub_Pennant", MI, flag, vectors={"Tint": (0.36, 0.075, 0.05, 1)}, **pennant)
 sb_ue.make_mi("MI_Hub_PennantCream", MI, flag, vectors={"Tint": (0.6, 0.53, 0.4, 1)}, **pennant)
 sb_ue.make_mi("MI_Hub_CanvasRed", MI, surf, vectors={"Tint": (0.3, 0.06, 0.04, 1), "VarTint": (1.05, 0.9, 0.9, 1)}, **canvas)   # the awning's stripes
+# D69: the command hall's roof: old copper gone green (verdigris), a little metallic where it is rubbed, darker in the seams.
+sb_ue.make_mi("MI_Hub_Copper", MI, surf, vectors={"Tint": (0.16, 0.32, 0.27, 1), "WearColor": (0.42, 0.22, 0.1, 1), "VarTint": (0.92, 1.05, 1.0, 1),
+                                                   "GrimeColor": (0.12, 0.18, 0.15, 1)},
+              scalars={"Metallic": 0.15, "WearMetallic": 0.9, "WearRoughness": 0.3, "WearStrength": 0.8, "RoughScale": 0.9, "NormalStrength": 0.6,
+                       "VarAmount": 0.18, "VarHue": 0.25, "GrimeAmount": 0.6, "TexNormalize": 1.4},
+              textures={"BaseTexture": S.TEX + "/Paint/T_PaintSurface_D", "NormalTexture": S.TEX + "/Metal/T_Metal_N", "ORMTexture": S.TEX + "/Metal/T_Metal_ORM"})
 glow = unreal.load_asset(S.MASTER + "/M_SB_Glow")
 sb_ue.make_mi("MI_Hub_AncientGlowLow", MI, glow, vectors={"BaseColor": (0.05, 0.12, 0.12, 1), "GlowColor": (0.35, 0.95, 0.85, 1)},
               scalars={"GlowIntensity": 3.0})                       # the salvaged pieces: faintly (spaces.keelgate.shelves)

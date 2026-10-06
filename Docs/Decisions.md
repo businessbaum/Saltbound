@@ -1931,3 +1931,63 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   about 8 kn with a bigger bank: late in the game the player chooses how to travel, never without thinking of power and the dark.
 - **Next:** M6, the first playable hour; the concept's remaining questions (section 12) keep their recommended defaults until the
   owner says otherwise.
+
+### D69 · The hub after the owner's second review: no haze or sun inside, warm lanterns, a round stern with grand galleries, a glazed sterncastle with grand stairs and the command hall, the Chandlery in the forecastle, rope that is rope, a reinforced hull, surface relief (Adopted: waiting for the owner's look)
+- **Owner (2026-10-06), with screenshots:** "there is fog in the hub" (and why games load into levels); "the light from the lanterns
+  are not good. Create strong and warm lightsources"; the sterncastle's front "is boring and repetitive ... This is where the
+  command center is. It needs to look grand, big rooms, glass, a bit more modern look (dont overdo it). Two grand stairs on each
+  side going up, and a Roof above the Back part. This space is completly unused"; "the end needs to be more round. it looks like a
+  square"; "the Balconies are a good idea, make them more grand more space, put them around all 3 sides of the back of the
+  ship"; "make the sail normal"; "these nets dont look like ropes"; "Implement the Chandler better into the ship, it just stands
+  around ... at the front of the ship"; "The whole ship has loose ends and no physik in the ropes"; "a bit more details in all
+  textures. Not only through color. Through Surface Finishing too"; the hull side "is boring ... I dont say there cant be windows
+  but only? Create reinforcements on the hull".
+- **Answers before building:** "make the sail normal" = square yards and a real furl (not set sails); the command centre = a glass
+  hall on the poop with grand stairs; the closed quarter galleries are replaced by the galleries round three sides.
+- **Levels (the owner's question):** the hub is already its own level (`L_Hub`), streamed in the background at her berth (no
+  loading screen; sailing in through the side doors without a cut is worth keeping). The fog was not a level problem: the height
+  fog is one for the world and walls do not stop it.
+- **Interiors:** `ASaltInteriorZone` boxes (the hull below the main deck, the sterncastle under the quarterdeck and under the
+  poop, the forecastle): while the camera is inside, the lighting rig starts the fog 165 m away and halves it (blended over 2.5 m
+  at the faces). The water hall's water is sheltered (`FSaltShelterBox` on the berth and the ocean, MPC `ShelterA/B`): no
+  in-scattering and no crest light inside the box (the sun lit the water's volume without shadow and it glowed cyan, at the
+  interior's open exposure even 6 % did). The hidden collision's shell and decks cast shadows (`bCastHiddenShadow`): watertight,
+  they stop the sun and the seams of light the boarded art let in. The interior volumes turn Lumen's screen traces back on (flat
+  water there; ray tracing alone missed thin boards and showed the sky), and the side doors' leaves are not Nanite any more (ray
+  tracing never saw their boards).
+- **Lanterns:** 240 cd at 1 900 K (was 60 cd, 2 100 K), 11 m, a 4 cm flame for soft shadows, a slight flicker (`ASaltHubRopes`);
+  new lanterns on the galleries, the grand stairs' newels, the Chandlery's door and inside.
+- **The rig:** the mizzen's lateen yard is gone, every yard is square; yards, slings, parrels and lifts hang on the mast piece at
+  their height (the upper yards' gear had hung behind the topmast in the air); furled sails are gathered canvas (lumpy, fat at the
+  bunt, tapering to the yardarms) pinched by gaskets that go round sail and yard; ratlines are hemp lines sagging between the
+  shrouds, seized to each with a knot, every fifth out to the aftmost shroud; ropes sag with their length; blocks at every lift
+  and brace. `check_ends()` measures every rope end against the spars, blocks, deadeyes, pins and decks: 0 loose of 4 140.
+  Thirty-two braces and clewlines and the entry ports' four man-ropes are real cables (`ASaltHubRopes`, `hub_ropes.json`) that
+  hang, sway and gust in the wind blowing aft.
+- **The stern:** a half ellipse 9.5 m deep in plan (`form.stern.shape`), meeting the sides without a corner. The galleries are 3.4 m
+  deep at sc1 and sc2, round the stern and along both sides to x 21.5, on carved knees, balustraded, with columns, the upper one
+  roofed, lanterns on its columns; the cabins open onto them through glazed doors. No quarter galleries.
+- **The sterncastle:** the quarterdeck's and the poop's fronts are glazed: tall windows in slim iron grids inside cream
+  architraves between oxblood pilasters, glazed double doors where the gates stand, a great window over both storeys in the
+  quarterdeck's front. Grand stairs along both bulwarks (2.6 m, 33 risers of 0.18 m) climb from the main deck to the quarterdeck and
+  from it to the poop: oak treads over oxblood risers, a panelled side under a moulded stringer, a turned balustrade, a handrail
+  on the bulwark, newel posts with lanterns. The quarterdeck and the poop are open decks now (`weather`); the great cabin stays
+  locked behind its doors.
+- **The command hall** (`hub.command`, `SM_Hub_Command`) on the poop: oak posts on a panelled plinth, glass between them in iron
+  frames (some panes lit), glazed doors under a pediment (a gate: "Barred from inside. The council meets here."), a hipped roof of
+  green copper with standing seams and a glazed lantern on its ridge (`MI_Hub_Copper`).
+- **The Chandlery** moves into the forecastle's front at the main deck, two storeys high (the forecastle's storey is open over
+  it): two shop windows of small panes, lit, either side of the door, the CHANDLER board, a striped awning on iron arms, lanterns,
+  goods outside (barrels, crates, coils, oars, an anchor); inside the counter facing the door, shelves to the beams with a ladder
+  on a brass rail, beams hung with stock, the compass and the spyglass to try. The cargo deck is part of the open waist now (its
+  boats and padlocked hatches stay); L14 is the forecastle's rooms (a barred door beside the shop and one in its back wall), L15
+  the forecastle deck and the head (the chained ladders).
+- **The hull's sides:** each deck's row its own: ochre-framed gunports on the gun deck, tarred lids twice as far apart on the
+  upper and middle decks, round brass portholes on the lower and quay decks; six pairs of iron-banded skids a side over the
+  wales; carved rosettes along the main deck's band; an entry port amidships each side (posts, a carved hood, batten steps down to
+  the water, man-ropes); iron-lipped scuppers along the deck line.
+- **Surface finishing** (`gen_textures.py`, colours unchanged): wood has crisp V-cut grain grooves and plane marks across the
+  boards (the grooves rougher and darker, the marks' ridges worn smooth); weathered timber adze marks; paint brush ridges and,
+  in patches, fine cracks; iron round hammer dents with brighter rims; the hub's tar and ochre show the relief more.
+- **Tools:** `Tools/hub_shot.py` (editor captures) and `Tools/hub_pie_shot.py` (in play: the doors shut, the renderer's frames)
+  take poses in the ship's frame; `sb.Dev.HubGoto quarterdeck|poop`.

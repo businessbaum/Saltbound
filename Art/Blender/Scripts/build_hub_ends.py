@@ -7,19 +7,26 @@ The stern (D64, owner: "rounder, wider and bigger at the back top like a real ga
     fashion pieces, the one rudder hung on the post, the deadwood and the keel's sole under it.
   - The counter: a heavy wing transom across the tuck's head, the soffit under the stern's overhang, a moulded counter rail.
   - Above it the stern face is round in plan and leans aft to the taffrail: planked in rows across, a moulded band at every
-    deck, rows of tall cabin windows on every storey, open galleries at sc1 and sc2 (balustraded, on brackets, the upper one
-    roofed) running round the corners into the quarter galleries, her name in brass under the taffrail, three great lanterns.
+    deck, rows of tall cabin windows on every storey, her name in brass under the taffrail, three great lanterns.
+
+D69 (owner's review): the stern is a half ellipse in plan ("the end needs to be more round"); the galleries are grand ("more
+space, around all 3 sides of the back"): 3.4 m deep at sc1 and sc2, round the stern and along both sides to x 21.5, glazed doors
+onto them, the upper one roofed; the closed quarter galleries are gone. The castles' fronts are glazed in iron frames ("big
+rooms, glass, a bit more modern, don't overdo it"), grand stairs climb along the bulwarks to the quarterdeck and the poop ("two
+grand stairs on each side going up"), and the command hall stands on the poop in glass under a copper roof ("a roof above the
+back part ... this space is completely unused").
 
 Meshes (pivot at the ship's x 80 on the waterline; /Game/Saltbound/Hub/Art; Nanite):
   SM_Hub_Stern      the tuck, sternpost, deadwood, counter, the stern face with its windows, bands and galleries, the frieze
                     with her name, the taffrail and its lanterns, the rudder, the stern moorings
-  SM_Hub_Galleries  the two quarter galleries (three storeys of windows, the brass drop, the roof and dome)
   SM_Hub_Castles    the poop, quarterdeck and forecastle decks, their bulwarks' inner sides, balustrades, the castles' fronts,
-                    the lashed great wheel
+                    the lashed great wheel, the grand stairs
+  SM_Hub_Command    the command hall on the poop (D69)
   SM_Hub_Head       the stem, the knee of the head, the beakhead with its headrails and figurehead, the bowsprit, the
                     catheads, the hawse holes and bow cables, the bobstay
-Run: Tools/Build-BlenderAsset.ps1 build_hub_ends [stern] [galleries] [castles] [head]
+Run: Tools/Build-BlenderAsset.ps1 build_hub_ends [stern] [castles] [command] [head]
 """
+import json
 import math
 import os
 import random
@@ -42,7 +49,9 @@ DECK_W, DECK_T = 0.32, 0.1      # deck boards on the castles
 POOP_X, QD_X, FC_X = HUB["poopX"], HUB["qdX"], HUB["fcX"]
 COUNTER, POST_X, ROUND = HH.COUNTER, HH.POST_X, HH.ROUND
 GAL = HUB["galleries"]
-QG = GAL["quarter"]
+GAL_X1 = float(GAL["x1"])                     # D69: the galleries run along the sides to here
+CMD = HUB["command"]
+LAMPS_JSON = os.path.join(H.ROOT, "Art", "Generated", "hub_lamps.json")
 TEAK = ("MI_Wood_Teak", "MI_Wood_Teak", "MI_Wood_TeakDark", "MI_Wood_TeakLight")
 TAR = ("MI_Hub_HullTar", "MI_Hub_HullTar", "MI_Hub_HullTarFaded", "MI_Hub_HullTarDark")
 STERN_TOP = H.profile_top(POST_X) - 0.05      # the stern face's top (the taffrail's), level across
@@ -352,7 +361,7 @@ def stern_openings():
             u = (k - n * 0.5) * pitch
             if abs(u) > f.half - 1.3:
                 continue
-            kind = "door" if style == "door" and k % 3 == 1 else rng.choice(("glass", "glass", "glow", "shutter") if style != "small" else ("glow", "shutter", "glass", "shutter"))
+            kind = "door" if style == "door" and k % 2 == 0 else rng.choice(("glass", "glass", "glow", "shutter") if style != "small" else ("glow", "shutter", "glass", "shutter"))
             out.append((u, z0, z1, w, kind))
     return out
 
@@ -415,38 +424,48 @@ def stern_face(p):
             p.block(c.x - 0.6, c.x + 0.45, c.y - 0.6, c.y + 0.6, zc - 0.4, zc + 0.4, "MI_Hub_Ochre", nseed(), axis="z")
 
 
-def gallery_line(z, d):
-    """The open galleries' line at height z, d metres out: across the stern face, round its corners (an arc about each), and
-    on along the side to the quarter gallery's aft face. Plan points from port to starboard."""
+def gallery_line(z, d, n_face=80, n_side=14):
+    """The galleries' line at height z, d metres out from the hull: along the port side from x GAL_X1 aft, round the stern face
+    and forward along the starboard side to GAL_X1 (D69: the stern's half ellipse meets the sides without a corner). Plan points;
+    every call has the same count, so lines at different d match point for point."""
     f = face(z)
-    mid = []
-    k = 60
-    for j in range(k + 1):
-        u = -f.half + 2.0 * f.half * j / k
-        mid.append(f.at(u, d)[0])
+    mid = [f.at(-f.half + 2.0 * f.half * j / n_face, d)[0] for j in range(n_face + 1)]
     out = []
     for side in (-1, 1):
-        cp = f.at(side * f.half)[0]                 # the corner
-        n0 = f.at(side * f.half)[2]
-        a0 = math.atan2(n0.y, n0.x)
-        a1 = math.atan2(side, 0.0)
-        arc = []
-        for j in range(1, 7):
-            a = a0 + (a1 - a0) * j / 6
-            arc.append(Vector((cp.x + math.cos(a) * d, cp.y + math.sin(a) * d, z)))
-        xq = QG["x0"] + 0.6 * d / QG["out"]
-        if xq > arc[-1].x + 0.05:
-            arc.append(Vector((xq, cp.y + side * d, z)))
-        out.append(arc if side > 0 else list(reversed(arc)))
+        cp = f.at(side * f.half)[0]
+        xs = [cp.x + (GAL_X1 - cp.x) * j / n_side for j in range(1, n_side + 1)]
+        pts = [Vector((x, side * (hw(x, z) + PT + d), z)) for x in xs]
+        out.append(list(reversed(pts)) if side < 0 else pts)
     return out[0] + mid + out[1]
 
 
+def _arc_points(line, step):
+    """Points every `step` metres along a polyline (and its end), with their index position for the matching lines."""
+    acc = [0.0]
+    for a, b in zip(line[:-1], line[1:]):
+        acc.append(acc[-1] + (b - a).length)
+    n = max(2, int(acc[-1] / step))
+    out = []
+    for k in range(n + 1):
+        sv = acc[-1] * k / n
+        j = next((i for i in range(len(acc) - 1) if acc[i + 1] >= sv), len(acc) - 2)
+        t = (sv - acc[j]) / max(acc[j + 1] - acc[j], 1e-9)
+        out.append((j, t))
+    return out
+
+
+def _at(line, jt):
+    j, t = jt
+    return line[j].lerp(line[j + 1], t)
+
+
 def stern_galleries(p):
-    """Open galleries at sc1 and sc2 across the stern and round its corners: plank floors on carved brackets, an ochre fascia,
-    a balustrade, turned columns carrying the gallery over it, and a roof over the upper one."""
+    """The grand galleries (D69): at sc1 and sc2, GAL_OUT deep, round the stern and along both sides: plank floors on carved knees
+    from the hull, an ochre fascia, a balustrade with posts, turned columns from each floor up to the next and the upper one's
+    roof, lanterns on the columns at the stern's middle and the ends."""
     rng = random.Random(77)
     for gi, zf in enumerate(GAL_LEVELS):
-        # Floor boards following the line, 0.3 m rows from the face out.
+        # Floor boards along the line, 0.3 m rows from the hull out.
         rows = int(GAL_OUT / 0.3)
         for r in range(rows):
             d = 0.12 + (GAL_OUT - 0.1) * (r + 0.5) / rows
@@ -459,59 +478,90 @@ def stern_galleries(p):
                 fr = T.polyline(pts, lambda q, ln=line: _across_h(ln, q), lambda q: UP)
                 p.board(fr, T.length_of(fr), (GAL_OUT - 0.1) / rows - 0.02, 0.1, rng.choice(TEAK), nseed(), seg=0.8, wear=0.8, bend=0.005, twist=0.3)
                 j = je
-        # Under the floor: a dark soffit (the gallery below sees it as its ceiling) and the edge beam.
+        # Under the floor: a dark soffit (the gallery below sees it as its ceiling), joists across it, the edge beam.
         inner, outer = gallery_line(zf - 0.32, 0.0), gallery_line(zf - 0.32, GAL_OUT + 0.1)
         for a0, a1, b0, b1 in zip(inner[:-1], inner[1:], outer[:-1], outer[1:]):
             p.polygon([a0, b0, b1, a1], "MI_Hub_HullTarDark", tone=0.3, facing=(0.0, 0.0, -1.0))
+        for jt in _arc_points(inner, 1.1):
+            a, b = _at(gallery_line(zf - 0.42, 0.05), jt), _at(gallery_line(zf - 0.42, GAL_OUT), jt)
+            dvec = (b - a).normalized()
+            p.beam(T.straight(a, b, UP.cross(dvec), UP), (b - a).length, 0.16, 0.2, "MI_Hub_HullTarDark", nseed(), seg=1.0, wear=0.7)
         fl = gallery_line(zf - 0.2, GAL_OUT + 0.05)
         fr = T.polyline(fl, lambda q, ln=fl: _across_h(ln, q), lambda q: UP)
-        p.sweep(fr, T.length_of(fr, 60), [(-0.06, -0.24, ""), (0.12, -0.24, "c"), (0.2, -0.12, "c"), (0.2, 0.12, "t"), (0.12, 0.2, "c"), (-0.06, 0.2, "")],
+        p.sweep(fr, T.length_of(fr, 80), [(-0.06, -0.3, ""), (0.14, -0.3, "c"), (0.24, -0.15, "c"), (0.24, 0.12, "t"), (0.14, 0.2, "c"), (-0.06, 0.2, "")],
                 "MI_Hub_Ochre", nseed(), seg=0.8, wear=1.0, wobble=0.004)
-        # Brackets under it: carved knees from the face, every 2.6 m along it.
-        f = face(zf)
-        nb = int(2 * f.half / 2.6)
-        for k in range(nb + 1):
-            u = -f.half + 2 * f.half * (k + 0.0) / nb
-            if abs(abs(u) - f.half) < 0.3:
-                u = (f.half - 0.6) * (1 if u > 0 else -1)
-            p0, tg, n0 = face(zf - 1.7).at(u, 0.0)
-            p1, _, n1 = face(zf - 0.3).at(u, GAL_OUT - 0.3)
-            p2, _, _ = face(zf - 0.3).at(u, 0.0)
-            ctrl = p2 + (p1 - p2) * 0.15 + (p0 - p2) * 0.15
-            pts = [p0 * (1 - t) ** 2 + ctrl * 2 * t * (1 - t) + p1 * t * t for t in (j / 8 for j in range(9))]
+        # Knees under it: carved timbers from the hull, every 2.6 m along it, scrolled at their foot.
+        base = gallery_line(zf - 2.6, 0.0)
+        top_in, top_out = gallery_line(zf - 0.32, 0.1), gallery_line(zf - 0.32, GAL_OUT - 0.35)
+        for jt in _arc_points(base, 2.6):
+            p0, p2, p1 = _at(base, jt), _at(top_in, jt), _at(top_out, jt)
+            ctrl = p2 + (p1 - p2) * 0.12 + (p0 - p2) * 0.12
+            pts = [p0 * (1 - t) ** 2 + ctrl * 2 * t * (1 - t) + p1 * t * t for t in (j / 10 for j in range(11))]
+            tg = _across_h(top_in, p2).cross(UP)
             fr = T.polyline(pts, lambda q, tg=tg: tg, None)
-            p.beam(fr, T.length_of(fr), 0.32, 0.36, "MI_Hub_HullTarDark", nseed(), seg=0.4, wear=1.0)
-            p.lathe([(0.0, 0.0), (0.17, 0.0), (0.2, 0.1), (0.12, 0.2), (0.15, 0.32), (0.0, 0.42)], p0 - UP * 0.02, -UP, "MI_Hub_Ochre", sides=8)
-        # The balustrade along the edge, and the columns at every second post, up to the next floor or the roof.
-        bl = gallery_line(zf, GAL_OUT - 0.18)
-        baluster_row(p, [(q.x, q.y) for q in bl], lambda q: zf, height=1.0, posts=2.6)
+            p.beam(fr, T.length_of(fr), 0.36, 0.42, "MI_Hub_HullTarDark", nseed(), seg=0.4, wear=1.0)
+            p.lathe([(0.0, 0.0), (0.2, 0.0), (0.24, 0.12), (0.14, 0.24), (0.18, 0.38), (0.0, 0.5)], p0 - UP * 0.02, -UP, "MI_Hub_Ochre", sides=8)
+        # The balustrade along the edge, and the columns at every other post, up to the next floor or the roof.
+        bl = gallery_line(zf, GAL_OUT - 0.2)
+        baluster_row(p, [(q.x, q.y) for q in bl], lambda q: zf, height=1.05, posts=2.6)
         top = (GAL_LEVELS[gi + 1] - 0.34) if gi + 1 < len(GAL_LEVELS) else GAL_ROOF - 0.05
-        Ltot = sum((b - a).length for a, b in zip(bl[:-1], bl[1:]))
-        ncol = max(2, int(Ltot / 5.2))
-        acc = [0.0]
-        for a, b in zip(bl[:-1], bl[1:]):
-            acc.append(acc[-1] + (b - a).length)
-        for k in range(ncol + 1):
-            s = Ltot * k / ncol
-            j = next((i for i in range(len(acc) - 1) if acc[i + 1] >= s), len(acc) - 2)
-            t = (s - acc[j]) / max(acc[j + 1] - acc[j], 1e-9)
-            c = bl[j].lerp(bl[j + 1], t)
+        cols = _arc_points(bl, 5.2)
+        for k, jt in enumerate(cols):
+            c = _at(bl, jt)
             c = Vector((c.x, c.y, zf))
             hgt = top - c.z
-            prof = [(0.17, 0.0), (0.2, 0.08), (0.14, 0.2), (0.15, 0.35), (0.12, 0.6), (0.13, 0.85), (0.11, 0.92), (0.19, 0.97), (0.22, 1.0)]
+            prof = [(0.2, 0.0), (0.24, 0.1), (0.17, 0.22), (0.18, 0.36), (0.15, 0.6), (0.16, 0.85), (0.13, 0.92), (0.23, 0.97), (0.27, 1.0)]
             p.lathe([(r, h * hgt) for r, h in prof], c, UP, "MI_Paint_Cream", sides=10, wear=0.8)
+            if gi == len(GAL_LEVELS) - 1 and k in (0, len(cols) // 2, len(cols) - 1):
+                out_n = _across_h(bl, c)
+                if out_n.dot(c - Vector((12.0, 0.0, c.z))) < 0.0:
+                    out_n = -out_n
+                gallery_lamp(p, c + UP * 2.0 + out_n * 0.3, c + UP * 2.4)
     # The roof over the upper gallery: boards falling outward, a fascia and a cornice.
     zr = GAL_ROOF
-    rows = 8
+    rows = 10
     for r in range(rows):
-        d0, d1 = 0.05 + (GAL_OUT + 0.35) * r / rows, 0.05 + (GAL_OUT + 0.35) * (r + 1) / rows
+        d0, d1 = 0.05 + (GAL_OUT + 0.45) * r / rows, 0.05 + (GAL_OUT + 0.45) * (r + 1) / rows
         dm = 0.5 * (d0 + d1)
-        line = gallery_line(zr - 0.3 * dm / GAL_OUT, dm)
+        line = gallery_line(zr - 0.35 * dm / GAL_OUT, dm)
         fr = T.polyline(line, lambda q, ln=line: _across_h(ln, q), lambda q: UP)
-        p.board(fr, T.length_of(fr, 60), (d1 - d0) + 0.03, 0.09, "MI_Hub_HullTarDark", nseed(), seg=0.8, wear=0.9)
-    fl = gallery_line(zr - 0.42, GAL_OUT + 0.38)
+        p.board(fr, T.length_of(fr, 80), (d1 - d0) + 0.03, 0.09, "MI_Hub_HullTarDark", nseed(), seg=0.8, wear=0.9)
+    fl = gallery_line(zr - 0.5, GAL_OUT + 0.48)
     fr = T.polyline(fl, lambda q, ln=fl: _across_h(ln, q), lambda q: UP)
-    p.beam(fr, T.length_of(fr, 60), 0.36, 0.16, "MI_Hub_Ochre", nseed(), seg=0.8, wear=1.0)
+    p.beam(fr, T.length_of(fr, 80), 0.42, 0.18, "MI_Hub_Ochre", nseed(), seg=0.8, wear=1.0)
+    # The galleries' ends at GAL_X1: a carved end board from the lower floor up to the roof, each side.
+    for side in (-1, 1):
+        x = GAL_X1
+        for zf in GAL_LEVELS:
+            a = Vector((x, side * (hw(x, zf) + PT + 0.1), zf - 0.05))
+            b = Vector((x, side * (hw(x, zf) + PT + GAL_OUT), zf - 0.05))
+            p.beam(T.straight(a + UP * 0.5, b + UP * 0.5, UP, X), (b - a).length, 1.0, 0.12, "MI_Paint_Hull", nseed(), seg=1.0, wear=1.0)
+
+
+LAMPS = []
+
+
+def gallery_lamp(p, glass, hook):
+    """A lantern hanging from an iron bracket (hook above it): brass cage, warm glass; its light comes from hub_lamps.json."""
+    q = Vector(glass)
+    p.beam(T.straight(Vector(hook), Vector(hook) + (q - Vector(hook)).normalized() * 0.1, X, Y), 0.1, 0.05, 0.05, "MI_Metal_Iron", nseed())
+    p.lathe([(0.0, -0.3), (0.12, -0.3), (0.17, -0.22), (0.17, 0.2), (0.12, 0.26), (0.03, 0.34), (0.0, 0.36)], q, UP, "MI_Metal_Brass", sides=6, wear=0.8)
+    p.lathe([(0.15, -0.2), (0.155, 0.18)], q, UP, "MI_LanternGlass", sides=6, caps=False)
+    rope_pts = [Vector(hook), q + UP * 0.36]
+    p.round(T.straight(rope_pts[0], rope_pts[1], X, Y), (rope_pts[1] - rope_pts[0]).length, 0.02, "MI_Metal_Iron", nseed(), sides=5, wear=0.0)
+    LAMPS.append([round(q.x, 3), round(q.y, 3), round(q.z, 3)])
+
+
+def write_lamps(part):
+    """The lit lanterns of this part go into hub_lamps.json beside build_hub_inside.py's (hub_place.lanterns lights them)."""
+    data = {}
+    if os.path.exists(LAMPS_JSON):
+        with open(LAMPS_JSON, encoding="utf-8") as fh:
+            data = json.load(fh)
+    data[part] = list(LAMPS)
+    with open(LAMPS_JSON, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=1)
+    LAMPS.clear()
 
 
 def taffrail(p):
@@ -789,97 +839,7 @@ def build_stern():
     for cb in HUB["cables"]:
         if cb["id"] == "stern":
             cable(p, cb)
-    HH.export(p)
-
-
-# --- the quarter galleries ----------------------------------------------------------------------------------------------
-def gal_pt(x, d, z, side):
-    return Vector((x, side * (hw(x, z) + PT + d), z))
-
-
-def build_galleries():
-    """The quarter galleries (hub.galleries.quarter): enclosed bays standing out from the quarters over three storeys, on
-    brackets with a brass drop under them, windows on every face, a roof leaning back and a brass dome."""
-    p = T.Part("SM_Hub_Galleries")
-    g = QG
-    x0, x1, out, z0, z1 = g["x0"], g["x1"], g["out"], g["z0"], g["z1"]
-    outline = [(x0, 0.0), (x0 + 0.6, out), (x1 - 1.4, out), (x1, 0.0)]
-    tiers = [(z0 + 0.4, z0 + 2.75), (z0 + 3.4, z0 + 5.75), (z0 + 6.4, z1 - 0.3)]
-    for side in (1, -1):
-        faces = list(zip(outline[:-1], outline[1:]))
-        # The floor and its edge, brackets under it, the brass drop.
-        floor_pts = [gal_pt(x, d, z0 - 0.3, side) for x, d in outline]
-        p.polygon(floor_pts, "MI_Hub_HullTarDark", tone=0.3, facing=-UP)
-        for fa, fb in faces:
-            pa, pb = gal_pt(fa[0], fa[1] + 0.1, z0 - 0.15, side), gal_pt(fb[0], fb[1] + 0.1, z0 - 0.15, side)
-            t = (pb - pa).normalized()
-            n = t.cross(UP) if side > 0 else UP.cross(t)
-            p.sweep(T.straight(pa - t * 0.15, pb + t * 0.15, UP, n), (pb - pa).length + 0.3, HH.moulding_section(0.5, 0.32), "MI_Hub_Ochre", nseed(), seg=1.0)
-        for x in (x0 + 1.2, 0.5 * (x0 + x1), x1 - 1.6):
-            if abs(x - 5.0) < 1.0:
-                x += 1.4                                      # clear of the stern mooring's fairlead
-            a, b = gal_pt(x, 0.05, z0 - 2.4, side), gal_pt(x, out - 0.5, z0 - 0.35, side)
-            ctrl = gal_pt(x, 0.3, z0 - 0.5, side)
-            pts = [a * (1 - t) ** 2 + ctrl * 2 * t * (1 - t) + b * t * t for t in (j / 8 for j in range(9))]
-            p.beam(T.polyline(pts, X, None), T.length_of(T.polyline(pts, X)), 0.36, 0.34, "MI_Hub_HullTarDark", nseed(), seg=0.4, wear=1.0)
-        drop = gal_pt(0.5 * (x0 + x1) + 0.4, out * 0.5, z0 - 0.3, side)
-        p.lathe([(0.0, 0.0), (0.95, 0.0), (1.05, 0.25), (0.8, 0.6), (0.9, 1.0), (0.55, 1.6), (0.62, 2.0), (0.3, 2.6),
-                 (0.36, 2.9), (0.12, 3.3), (0.0, 3.6)], drop, -UP, "MI_Metal_Brass", sides=12, wear=1.0)
-        # The faces: oxblood boards between the windows, an ochre moulding at each storey, cream above; corner posts.
-        for (x, d) in outline[1:-1]:
-            a, b = gal_pt(x, d, z0, side), gal_pt(x, d, z1 + 0.4, side)
-            p.beam(T.straight(a, b, X, Vector((0.0, side, 0.0))), (b - a).length, 0.36, 0.36, "MI_Paint_Hull", nseed(), seg=1.0)
-        for fi, (fa, fb) in enumerate(faces):
-            P0, P1 = gal_pt(fa[0], fa[1], z0, side), gal_pt(fb[0], fb[1], z0, side)
-            t = (P1 - P0).normalized()
-            L = (P1 - P0).length
-            lean = gal_pt(fa[0], fa[1], z1 + 0.4, side) - P0
-            Hf = lean.length
-            a = lean.normalized()
-            n = t.cross(a)
-            if n.y * side < 0.0:
-                n = -n
-            F = (P0, t, a, n)
-            nwin = max(1, int(L / 2.2))
-            wins = []
-            for (tz0, tz1) in tiers:
-                for k in range(nwin):
-                    door = fi == 0 and tz0 < z0 + 6.0                     # the aft faces open onto the stern galleries
-                    wh = 0.5 * (tz1 - tz0) - (0.05 if door else 0.25)
-                    wins.append((L * (k + 0.5) / nwin, 0.5 * (tz0 + tz1) - z0 - (0.25 if door else 0.0), min(0.72, L / nwin * 0.5 - 0.3), wh, door))
-
-            def keep(u, v, wins=wins):
-                return all(not (abs(u - wu) < whw + 0.14 and wv - whh - 0.16 < v < wv + whh + 0.16) for wu, wv, whw, whh, _ in wins)
-            wall_boards(p, F, 0.02, L - 0.02, 0.0, Hf - 0.05, keep,
-                        mats=("MI_Paint_Hull", "MI_Paint_Hull", "MI_Paint_HullFaded", "MI_Paint_HullDark"))
-            for j, (wu, wv, whw, whh, door) in enumerate(wins):
-                window_unit(p, (HH.lpt(F, wu, wv, 0.0), t, a, n), whw, whh, 0.0, "glass" if door else ("glow" if (j + side) % 3 == 0 else "glass"),
-                            "MI_Paint_Cream", panes=(1, 3 if door else 2), hood=not door)
-            for zm, h, mat in ((z0 + 3.1, 0.45, "MI_Hub_Ochre"), (z0 + 6.1, 0.45, "MI_Hub_Ochre"), (z1 - 0.05, 0.5, "MI_Paint_Cream"), (z1 + 0.35, 0.4, "MI_Hub_Ochre")):
-                v = zm - z0
-                pa, pb = HH.lpt(F, -0.2, v, 0.15), HH.lpt(F, L + 0.2, v, 0.15)
-                p.sweep(T.straight(pa, pb, a, n), L + 0.4, HH.moulding_section(h, 0.3), mat, nseed(), seg=1.0)
-        # The roof leaning back to the hull, boarded, and the dome on top with its finial.
-        rows = 6
-        zr = z1 + 0.55
-        for k in range(rows):
-            t0, t1 = k / rows, (k + 1) / rows
-            za, zb = zr + 1.6 * t0, zr + 1.6 * t1
-            da, db = out * (1 - t0) + 0.25, out * (1 - t1) + 0.25
-            xa0 = x0 + 0.6 * (1 - t0) * 0.6
-            xa1 = x1 - 1.4 * (1 - t0) * 0.6
-            pa, pb = gal_pt(xa0, 0.5 * (da + db), 0.5 * (za + zb), side), gal_pt(xa1, 0.5 * (da + db), 0.5 * (za + zb), side)
-            acr = (gal_pt(0.5 * (xa0 + xa1), db, zb, side) - gal_pt(0.5 * (xa0 + xa1), da, za, side))
-            w = acr.length
-            acr.normalize()
-            nn = (pb - pa).normalized().cross(acr)
-            if nn.z < 0:
-                nn = -nn
-            p.board(T.straight(pa, pb, acr, nn), (pb - pa).length, w + 0.04, 0.1, "MI_Hub_HullTarDark", nseed(), seg=1.0, wear=0.9)
-        dome = gal_pt(0.5 * (x0 + x1) - 0.3, out * 0.45, zr + 0.4, side)
-        p.lathe([(0.0, 0.0), (1.2, 0.0), (1.2, 0.35), (1.08, 0.45), (1.02, 0.9), (0.86, 1.35), (0.6, 1.75), (0.3, 2.0), (0.0, 2.08)],
-                dome, UP, "MI_Metal_Brass", sides=16, wear=0.9)
-        p.lathe([(0.0, 0.0), (0.12, 0.0), (0.18, 0.2), (0.1, 0.4), (0.2, 0.6), (0.0, 0.85)], dome + UP * 2.05, UP, "MI_Metal_Brass", sides=8)
+    write_lamps("SM_Hub_Stern")
     HH.export(p)
 
 
@@ -935,16 +895,20 @@ def bulwark_inside(part, z, xa, xb):
         part.beam(T.polyline(pts, lambda q, s=side: Vector((0.0, s, 0.0)), UP), xb - xa, 0.3, 0.16, "MI_Hub_HullTarDark", nseed(), seg=1.0)
 
 
-def front(part, xf, z0, z1, facing, wins, doors=(), closed_doors=()):
+def front(part, xf, z0, z1, facing, wins, doors=(), closed_doors=(), cutout=None):
     """A castle's front across the deck at x xf from z0 to z1: boards, windows, door openings (framed, for the gates) and shut
-    doors; facing = +1 forward, -1 aft."""
+    doors; facing = +1 forward, -1 aft. cutout (y0, y1, z top): left to someone else below z top (D69: the Chandlery's front)."""
     half = lambda z: hw(xf, z) - 0.05                                                    # noqa: E731
-    F = (Vector((xf, 0.0, 0.0)), Y * facing * -1.0 if facing < 0 else Y, UP, X * facing)
+    # D69: facing aft, the plane runs along -y (so u = -y, as keep() and the windows read it; the old frame ran along +y and put
+    # every window and door at the other side's y, unseen while the forecastle's lists were symmetric).
+    F = (Vector((xf, 0.0, 0.0)), Y if facing > 0 else -Y, UP, X * facing)
     t = F[1]
 
     def keep(u, v):
         y = u if facing > 0 else -u
         if abs(y) > half(v):
+            return False
+        if cutout and cutout[0] < y < cutout[1] and v < cutout[2]:
             return False
         for wy, wz, ww, wh in wins:
             if abs(y - wy) < ww + 0.14 and wz - 0.2 < v < wz + wh + 0.2:
@@ -979,6 +943,8 @@ def front(part, xf, z0, z1, facing, wins, doors=(), closed_doors=()):
     for zb, h, mat in ((z0 + 0.3, 0.42, "MI_Hub_Ochre"), (z1 - 0.15, 0.3, "MI_Hub_Ochre")):
         gaps = sorted([((dy if facing > 0 else -dy) - dw * 0.5 - 0.3, (dy if facing > 0 else -dy) + dw * 0.5 + 0.3)
                        for dy, dw, dh in list(doors) + list(closed_doors) if zb < z0 + dh + 0.3])
+        if cutout and zb < cutout[2]:
+            gaps = sorted(gaps + [tuple(sorted(((cutout[0] if facing > 0 else -cutout[0]), (cutout[1] if facing > 0 else -cutout[1]))))])
         u0 = -half(zb) + 0.1
         segs = []
         for g0, g1 in gaps:
@@ -992,6 +958,23 @@ def front(part, xf, z0, z1, facing, wins, doors=(), closed_doors=()):
                 part.sweep(T.straight(pa, pb, UP, F[3]), s1 - s0, HH.moulding_section(h, 0.22), mat, nseed(), seg=1.0)
 
 
+def flights_at(gid):
+    return [g for g in H.grand_flights() if g["id"] == gid]
+
+
+def gaps(w, flights, pad=0.1):
+    """The balustrade's runs across a deck's forward edge (|y| < w), broken where grand flights arrive."""
+    cuts = sorted((g["y0"] - pad, g["y1"] + pad) for g in flights)
+    runs, y = [], -w
+    for a, b in cuts:
+        if a > y + 0.3:
+            runs.append((y, a))
+        y = max(y, b)
+    if w - y > 0.3:
+        runs.append((y, w))
+    return runs
+
+
 def build_castles():
     p = T.Part("SM_Hub_Castles")
     zp, zq, zf = Z["poop"], Z["sc2"], Z["fcTop"]
@@ -1003,32 +986,296 @@ def build_castles():
     bulwark_inside(p, zp, 1.2, POOP_X - 0.2)
     bulwark_inside(p, zq, POOP_X + 0.5, QD_X - 0.2)
     bulwark_inside(p, zf, FC_X + 0.5, fc_end - 2.0)
-    # Balustrades along the decks' open edges: the poop's over the quarterdeck, the quarterdeck's over the waist, the
-    # forecastle's over the waist.
-    for xb, zb in ((POOP_X - 0.15, zp), (QD_X - 0.15, zq), (FC_X + 0.25, zf)):
+    # Balustrades along the decks' open forward edges, open where the grand stairs arrive.
+    for xb, zb, fl in ((POOP_X - 0.15, zp, flights_at("poop")), (QD_X - 0.15, zq, flights_at("quarterdeck")), (FC_X + 0.25, zf, [])):
         w = hw(xb, zb) - 0.4
-        balustrade(p, (xb, -w), (xb, w), zb)
-    # The fronts: the poop's (over the quarterdeck), the quarterdeck's (over the waist, with the two door openings where the
-    # gates stand), the forecastle's (facing aft, two shut doors; the chained ladders at |y| 15 are the gates').
+        for y0, y1 in gaps(w, fl):
+            balustrade(p, (xb, y0), (xb, y1), zb)
+    # The fronts (D69: glazed in iron frames, "big rooms, glass, a bit more modern"): the poop's over the quarterdeck, the
+    # quarterdeck's over the waist (their doors where the gates stand); the forecastle's (facing aft, two shut doors; the
+    # chained ladders at |y| 15 are the gates').
+    glass_front(p, POOP_X + 0.02, zq, zp - 0.02, [(g["y"], 1.8, 2.6) for g in _plan_gates("sc2") if abs(g["x"] - POOP_X) < 0.5],
+                flights_at("poop"))
+    glass_front(p, QD_X + 0.02, Z["main"], zq - 0.02, [(g["y"], 1.8, 2.6) for g in _plan_gates("main") if abs(g["x"] - QD_X) < 0.5],
+                flights_at("quarterdeck"), great=True)
     win = lambda ys, zs, w=0.62, h=1.9: [(y, z, w, h) for y in ys for z in zs]                       # noqa: E731
-    front(p, POOP_X + 0.02, zq, zp - 0.02, 1, win((-12.5, -8.5, -4.0, 4.0, 8.5, 12.5), (zq + 0.75, Z["sc3"] + 0.75)),
-          closed_doors=[(0.0, 1.6, 2.4)])
-    gates = [(g["y"], g["w"], 2.6) for g in _plan_gates() if abs(g["x"] - QD_X) < 0.5]
-    front(p, QD_X + 0.02, Z["main"], zq - 0.02, 1, win((-15.5, -12.0, -3.0, 3.0, 12.0, 15.5), (Z["main"] + 0.75,)) +
-          win((-15.0, -11.0, -7.5, -3.0, 3.0, 7.5, 11.0, 15.0), (Z["sc1"] + 0.75,)), doors=gates)
-    front(p, FC_X - 0.02, Z["main"], zf - 0.02, -1, win((-11.5, -3.0, 3.0, 11.5), (Z["main"] + 0.75,)) +
-          win((-11.5, -7.0, -3.0, 3.0, 7.0, 11.5), (Z["fc1"] + 0.75,)), closed_doors=[(-6.5, 1.5, 2.3), (6.5, 1.5, 2.3)])
+    # D69: the Chandlery is built into the forecastle's front (build_hub_inside.build_chandlery makes its shopfront at the main
+    # deck); over the shop the front carries its board, no windows.
+    ch = HUB["chandlery"]
+    fc_doors = [(g["y"], 1.5, 2.3) for g in _plan_gates("main") if abs(g["x"] - FC_X) < 0.5]
+    front(p, FC_X - 0.02, Z["main"], zf - 0.02, -1, win((-11.5, -3.0), (Z["main"] + 0.75,)) +
+          win((-11.5, -7.0, -3.0), (Z["fc1"] + 0.75,)), closed_doors=fc_doors,                        # (the CHANDLER board over the shop)
+          cutout=(ch["y0"] - 0.25, ch["y1"] + 0.25, Z["main"] + next(pr for pr in H.space("chandlery")["props"] if pr["id"] == "sign")["z1"] + 0.2))
+    for g in H.grand_flights():
+        grand_stair(p, g)
     wheel(p)
+    write_lamps("SM_Hub_Castles")
     HH.export(p)
 
 
-def _plan_gates():
-    try:
-        import hub_plan as P
-        return P.plan("main").gates
-    except Exception as e:                                   # the plan is the main session's; fall back to the data's doors
-        print("SB_WARN no hub_plan gates:", e)
-        return [{"x": QD_X, "y": -7.5, "w": 2.0}, {"x": QD_X, "y": 7.5, "w": 2.0}]
+# --- D69: glazed fronts, grand stairs, the command hall ------------------------------------------------------------------------
+IRON = "MI_Metal_Iron"
+
+
+def iron_window(p, F, u, v0, w, h, lit=False, door=False, grid=(0.6, 0.62)):
+    """A tall window (or a glazed double door) on plane F (t along the wall, a up, n out) centred at u, from v0 up h: glass in a
+    slim iron grid inside a cream timber architrave, an ochre sill and a cornice over it."""
+    hw_ = 0.5 * w
+    glass = "MI_LanternGlass" if lit else "MI_Glass_Dark"
+    p.polygon([HH.lpt(F, u + a, v0 + b, -0.12) for a, b in ((-hw_, 0.0), (hw_, 0.0), (hw_, h), (-hw_, h))], glass, tone=0.5, facing=F[3])
+    # Iron: the frame, then the grid of bars.
+    for a in (-hw_ + 0.04, hw_ - 0.04):
+        HH.lbeam(p, F, u + a, v0, u + a, v0 + h, 0.08, 0.1, -0.12, IRON, wear=0.4)
+    for b in (0.04, h - 0.04):
+        HH.lbeam(p, F, u - hw_, v0 + b, u + hw_, v0 + b, 0.08, 0.1, -0.12, IRON, wear=0.4)
+    nv = max(1, int(round(w / grid[0])) - 1)
+    for k in range(1, nv + 1):
+        a = -hw_ + w * k / (nv + 1)
+        HH.lbeam(p, F, u + a, v0, u + a, v0 + h, 0.045 if not (door and k == (nv + 1) // 2) else 0.12, 0.07, -0.12, IRON, wear=0.3)
+    nh = max(1, int(round(h / grid[1])) - 1)
+    for k in range(1, nh + 1):
+        b = h * k / (nh + 1)
+        HH.lbeam(p, F, u - hw_, v0 + b, u + hw_, v0 + b, 0.045, 0.07, -0.12, IRON, wear=0.3)
+    # The architrave, the sill and a cornice.
+    for a in (-hw_ - 0.11, hw_ + 0.11):
+        HH.lbeam(p, F, u + a, v0 - 0.05, u + a, v0 + h + 0.1, 0.22, 0.16, 0.0, "MI_Paint_Cream", wear=0.8)
+    HH.lbeam(p, F, u - hw_ - 0.22, v0 + h + 0.12, u + hw_ + 0.22, v0 + h + 0.12, 0.26, 0.18, 0.0, "MI_Paint_Cream", wear=0.8)
+    if not door:
+        HH.lbeam(p, F, u - hw_ - 0.3, v0 - 0.1, u + hw_ + 0.3, v0 - 0.1, 0.2, 0.26, 0.02, "MI_Hub_Ochre", wear=1.0)
+    HH.lbeam(p, F, u - hw_ - 0.36, v0 + h + 0.36, u + hw_ + 0.36, v0 + h + 0.36, 0.16, 0.28, 0.04, "MI_Hub_Ochre", wear=1.0)
+    if door:
+        for sgn in (-1.0, 1.0):                                            # brass pulls on the meeting stiles
+            c = HH.lpt(F, u + sgn * 0.12, v0 + 1.05, 0.0)
+            p.beam(T.straight(c - F[2] * 0.25, c + F[2] * 0.25, F[1], F[3]), 0.5, 0.04, 0.05, "MI_Metal_Brass", nseed(), wear=0.6)
+        HH.lbeam(p, F, u - hw_ - 0.2, v0 - 0.02, u + hw_ + 0.2, v0 - 0.02, 0.06, 0.6, 0.15, "MI_Wood_TeakDark", wear=0.8)   # the threshold
+
+
+def glass_front(p, xf, z0, z1, doors, flights, great=False):
+    """A castle's front across the deck at x xf facing forward (D69): planked, two storeys of tall iron-framed windows between
+    oxblood pilasters with ochre capitals, glazed double doors where the gates stand, and on the quarterdeck's front a great
+    window over both storeys in its middle (the council's cabin). The flights along the bulwarks cover its ends."""
+    F = (Vector((xf, 0.0, 0.0)), Y, UP, X)
+    half = lambda z: hw(xf, z) - 0.05                                                    # noqa: E731
+    y_lim = min(min(abs(g["y0"]), abs(g["y1"])) for g in flights) - 0.5 if flights else half(z0) - 0.6
+    storeys = [z0, z0 + 3.0] if z1 - z0 > 4.0 else [z0]
+    rng = random.Random(int(xf * 13))
+    opens = []                                                                          # (u, v0, w, h, kind)
+    for dy, dw, dh in doors:
+        opens.append((dy, z0 + 0.02, 1.9, 2.55, "door"))
+    if great:
+        opens.append((0.0, z0 + 0.5, 4.2, (z1 - z0) - 1.1, "great"))
+    for zs in storeys:
+        y = 2.1 + 1.7 if great else 1.8
+        while y + 1.15 < y_lim:
+            for sgn in (-1.0, 1.0):
+                u = sgn * y
+                if any(abs(u - o[0]) < 1.25 + o[2] * 0.5 and o[1] < zs + 2.6 and o[1] + o[3] > zs + 0.5 for o in opens):
+                    continue
+                opens.append((u, zs + 0.55, 2.0, 2.05, "window"))
+            y += 3.3
+
+    def keep(u, v):
+        y = u
+        if abs(y) > half(v):
+            return False
+        for ou, ov, ow, oh, _ in opens:
+            if abs(y - ou) < ow * 0.5 + 0.12 and ov - 0.12 < v < ov + oh + 0.14:
+                return False
+        return True
+    wall_boards(p, F, -half(z0) - 0.1, half(z0) + 0.1, z0, z1, keep)
+    for ou, ov, ow, oh, kind in opens:
+        if kind == "door":
+            iron_window(p, F, ou, ov, ow, oh, lit=False, door=True, grid=(0.5, 0.65))
+        elif kind == "great":
+            iron_window(p, F, ou, ov, ow, oh, lit=rng.random() < 0.3, grid=(0.7, 0.75))
+        else:
+            iron_window(p, F, ou, ov, ow, oh, lit=rng.random() < 0.25)
+    # Pilasters between the openings, from the deck's band to the next, oxblood with ochre capitals and bases.
+    us = sorted({round(o[0], 2) for o in opens})
+    cols = [0.5 * (a + b) for a, b in zip(us[:-1], us[1:]) if b - a > 2.4]
+    if us:
+        cols += [us[0] - 1.6, us[-1] + 1.6]
+    for u in cols:
+        if abs(u) > y_lim + 0.3 or any(abs(u - o[0]) < o[2] * 0.5 + 0.3 for o in opens):
+            continue
+        Fp = (Vector((xf, u, z0)), Y, UP, X)
+        HH.lbeam(p, Fp, 0.0, 0.15, 0.0, z1 - z0 - 0.25, 0.42, 0.14, 0.0, "MI_Paint_Hull", wear=1.0)
+        HH.lbeam(p, Fp, 0.0, z1 - z0 - 0.55, 0.0, z1 - z0 - 0.2, 0.62, 0.2, 0.0, "MI_Hub_Ochre", wear=1.0)
+        HH.lbeam(p, Fp, 0.0, 0.0, 0.0, 0.32, 0.58, 0.18, 0.0, "MI_Hub_Ochre", wear=1.0)
+    # Bands: an ochre moulding at the floor between the storeys and under the deck above.
+    for zb, h in ((z0 + 0.3, 0.36), (z0 + 3.0, 0.3) if len(storeys) > 1 else (None, None), (z1 - 0.15, 0.3)):
+        if zb is None:
+            continue
+        gs = sorted((o[0] - o[2] * 0.5 - 0.25, o[0] + o[2] * 0.5 + 0.25) for o in opens if o[1] < zb + h * 0.5 < o[1] + o[3] + 0.4)
+        u0 = -half(zb) + 0.1
+        for g0, g1 in gs + [(half(zb) - 0.1, half(zb))]:
+            if g0 - u0 > 0.3:
+                pa, pb = HH.lpt(F, u0, zb, 0.0), HH.lpt(F, g0, zb, 0.0)
+                p.sweep(T.straight(pa, pb, UP, X), g0 - u0, HH.moulding_section(h, 0.22), "MI_Hub_Ochre", nseed(), seg=1.0)
+            u0 = max(u0, g1)
+
+
+def grand_stair(p, g):
+    """One grand flight along a bulwark (H.grand_flights): oak treads with rounded nosings over oxblood risers, a panelled
+    oxblood side under a moulded stringer towards the deck, a turned balustrade on it, a handrail on iron brackets along the
+    bulwark, a newel post with a lantern at the foot and at the top."""
+    x0, x1, z0, z1, n, rise, tread = g["x0"], g["x1"], g["z0"], g["z1"], g["n"], g["rise"], g["tread"]
+    side = g["side"]
+    y_in = g["y0"] if side > 0 else g["y1"]                                      # the side towards the deck's middle
+    y_out = g["y1"] if side > 0 else g["y0"]
+    ya, yb = sorted((y_in, y_out))
+    rng = random.Random(nseed())
+    # Steps: step k (from the foot) has its top at z0 + (k + 1) rise over x1 - (k + 1) tread .. x1 - k tread.
+    for k in range(n - 1):
+        zt = z0 + (k + 1) * rise
+        xa, xb = x1 - (k + 1) * tread, x1 - k * tread
+        p.board(T.straight((xa + 0.5 * tread, ya + 0.02, zt - 0.03), (xa + 0.5 * tread, yb - 0.02, zt - 0.03), X, UP), yb - ya - 0.04, tread + 0.04,
+                0.06, rng.choice(TEAK), nseed(), seg=0.8, wear=1.0, chamfer=0.02)
+        p.polygon([(xb, ya, zt - rise), (xb, yb, zt - rise), (xb, yb, zt - 0.06), (xb, ya, zt - 0.06)],
+                  rng.choice(("MI_Paint_Hull", "MI_Paint_HullDark")), tone=0.5, facing=(1.0, 0.0, 0.0))
+    # The open side: panels under a moulded stringer, the stringer, the balustrade on it.
+    def z_at(x):
+        return z0 + (x1 - x) / max(x1 - x0, 1e-6) * (z1 - z0)
+    face_n = Vector((0.0, -side, 0.0))
+    x = x1
+    while x > x0 + 0.05:
+        xe = max(x - 0.42, x0)
+        zt = z_at(xe) - 0.1
+        if zt - z0 > 0.15:
+            a, b = Vector((0.5 * (x + xe), y_in - side * 0.02, z0)), Vector((0.5 * (x + xe), y_in - side * 0.02, zt))
+            p.board(T.straight(a, b, X, face_n), zt - z0, x - xe - 0.02, 0.06, rng.choice(("MI_Paint_Hull", "MI_Paint_Hull", "MI_Paint_HullFaded")),
+                    nseed(), seg=0.8, wear=0.9)
+        x = xe
+    sa, sb = Vector((x1 + 0.05, y_in, z0 + 0.15)), Vector((x0, y_in, z1 + 0.05))
+    dv = (sb - sa).normalized()
+    p.sweep(T.straight(sa, sb, dv.cross(face_n).normalized() * -1.0, face_n), (sb - sa).length, HH.moulding_section(0.42, 0.24), "MI_Hub_Ochre",
+            nseed(), seg=0.8, wear=1.0)
+    p.beam(T.straight((x1, y_in, z0 + 0.12), (x0 + 0.5, y_in, z0 + 0.12), UP, face_n), x1 - x0 - 0.5, 0.24, 0.16, "MI_Hub_Ochre", nseed(), wear=1.0)
+    baluster_row(p, [(x1 - 0.2, y_in), (x0 + 0.15, y_in)], lambda q: z_at(q.x) + 0.12, height=1.0, posts=2.2)
+    # The handrail along the bulwark on iron brackets.
+    ra, rb = Vector((x1 - 0.2, y_out - side * 0.06, z_at(x1 - 0.2) + 0.92)), Vector((x0 + 0.2, y_out - side * 0.06, z_at(x0 + 0.2) + 0.92))
+    p.round(T.straight(ra, rb, Y, UP), (rb - ra).length, 0.035, "MI_Wood_Varnish", nseed(), sides=8, seg=2.0, wear=0.6)
+    for t in (0.1, 0.4, 0.7, 0.95):
+        q = ra.lerp(rb, t)
+        p.beam(T.straight(q + Y * side * 0.04, q + Y * side * 0.16 - UP * 0.05, UP, X), 0.13, 0.04, 0.04, IRON, nseed())
+    # Newel posts with lanterns: at the foot and at the top, on the open side.
+    for xp, zb in ((x1 + 0.2, z0), (x0 + 0.05, z1)):
+        c = Vector((xp, y_in, zb))
+        p.lathe([(0.2, 0.0), (0.2, 0.12), (0.15, 0.2), (0.17, 0.5), (0.13, 0.95), (0.16, 1.05), (0.22, 1.12), (0.22, 1.2), (0.0, 1.22)], c, UP,
+                "MI_Wood_Varnish", sides=10, wear=1.0)
+        q = c + UP * 1.22
+        p.lathe([(0.0, 0.0), (0.12, 0.0), (0.18, 0.06), (0.18, 0.12), (0.0, 0.14)], q, UP, "MI_Metal_Brass", sides=8)
+        lamp_c = q + UP * 0.5
+        p.lathe([(0.04, -0.36), (0.13, -0.3), (0.16, -0.24), (0.16, 0.2), (0.11, 0.26), (0.04, 0.36), (0.0, 0.4)], lamp_c, UP, "MI_Metal_Brass", sides=6, wear=0.8)
+        p.lathe([(0.14, -0.22), (0.145, 0.18)], lamp_c, UP, "MI_LanternGlass", sides=6, caps=False)
+        LAMPS.append([round(lamp_c.x, 3), round(lamp_c.y, 3), round(lamp_c.z, 3)])
+
+
+def build_command():
+    """The command hall on the poop (hub.command, D69): oak posts on a panelled plinth, glass between them in iron frames, a
+    moulded cornice, a hipped copper roof with standing seams and a glazed lantern along its ridge, glazed double doors at the
+    front's middle under a pediment."""
+    p = T.Part("SM_Hub_Command")
+    zp = Z["poop"]
+    x0, x1, hy, h, rh = CMD["x0"], CMD["x1"], CMD["half"], CMD["h"], CMD["roof"]
+    zt = zp + h
+    rng = random.Random(690)
+    walls = [((x1, -hy), (x1, hy), X), ((x1, hy), (x0, hy), Y), ((x0, hy), (x0, -hy), -X), ((x0, -hy), (x1, -hy), -Y)]
+    for (ax, ay), (bx, by), nrm in walls:
+        a, b = Vector((ax, ay, zp)), Vector((bx, by, zp))
+        L = (b - a).length
+        t = (b - a).normalized()
+        F = (a, t, UP, nrm)
+        front = nrm.x > 0.5
+        # The plinth: panelled oak, 0.6 m (open at the doors in the front's middle).
+        door_u = [L * 0.5 - 1.45, L * 0.5 + 1.45] if front else [L, L]
+        for ua, ub in ((0.0, door_u[0]), (door_u[1], L)):
+            if ub - ua > 0.2:
+                pa, pb = a + t * ua, a + t * ub
+                p.beam(T.straight(pa + UP * 0.3 + nrm * 0.05, pb + UP * 0.3 + nrm * 0.05, UP, nrm), ub - ua, 0.6, 0.22, "MI_Hub_HullTarDark", nseed(), wear=0.8)
+                HH.lbeam(p, F, ua, 0.62, ub, 0.62, 0.12, 0.3, 0.05, "MI_Hub_Ochre", wear=1.0)
+        # Posts about every 3.2 m, the glass between them.
+        nb = max(2, int(round(L / 3.2)))
+        for k in range(nb + 1):
+            u = L * k / nb
+            HH.lbeam(p, F, u, 0.0, u, h, 0.36, 0.36, 0.0, "MI_Wood_Varnish", wear=1.0)
+            HH.lbeam(p, F, u, h - 0.45, u, h - 0.1, 0.5, 0.44, 0.0, "MI_Hub_Ochre", wear=1.0)
+        for k in range(nb):
+            ua, ub = L * k / nb + 0.2, L * (k + 1) / nb - 0.2
+            um = 0.5 * (ua + ub)
+            if front and abs((a + t * um).y) < 1.7:
+                iron_window(p, F, um, 0.02, 2.4, 3.3, door=True, grid=(0.6, 0.7))       # the doors, from the deck
+                continue
+            iron_window(p, F, um, 0.72, ub - ua - 0.24, h - 1.3, lit=rng.random() < 0.3, grid=(0.65, 0.7))
+        # The cornice.
+        HH.lbeam(p, F, -0.3, h + 0.05, L + 0.3, h + 0.05, 0.36, 0.46, 0.0, "MI_Hub_Ochre", wear=1.0)
+        HH.lbeam(p, F, -0.35, h + 0.3, L + 0.35, h + 0.3, 0.18, 0.6, 0.02, "MI_Wood_Varnish", wear=1.0)
+    # A pediment over the doors.
+    c = Vector((x1 + 0.25, 0.0, zp + 0.02 + 3.3 + 0.55))
+    for sgn in (-1.0, 1.0):
+        a, b = c + Y * sgn * 2.0, c + UP * 0.7
+        p.beam(T.straight(a, b, X, (b - a).normalized().cross(X)), (b - a).length, 0.24, 0.22, "MI_Hub_Ochre", nseed(), wear=1.0)
+    p.lathe([(0.0, -0.06), (0.32, -0.06), (0.36, 0.0), (0.3, 0.06), (0.0, 0.08)], c + UP * 0.25 + X * 0.1, X, "MI_Metal_Brass", sides=16, wear=0.8)
+    # The hipped copper roof: four slopes from the eaves (0.6 m out) up to a ridge along y, standing seams, a fascia.
+    ex0, ex1, ey = x0 - 0.6, x1 + 0.6, hy + 0.6
+    ze = zt + 0.45
+    zr = ze + rh
+    ry = ey - (ex1 - ex0) * 0.5 + 0.6                                      # the ridge runs along y, the hips at its ends
+    corners = [Vector((ex1, -ey, ze)), Vector((ex1, ey, ze)), Vector((ex0, ey, ze)), Vector((ex0, -ey, ze))]
+    ridge_a, ridge_b = Vector((0.5 * (ex0 + ex1), -ry, zr)), Vector((0.5 * (ex0 + ex1), ry, zr))
+    slopes = [[corners[0], corners[1], ridge_b, ridge_a], [corners[1], corners[2], ridge_b], [corners[2], corners[3], ridge_a, ridge_b],
+              [corners[3], corners[0], ridge_a]]
+    for poly in slopes:
+        p.polygon(poly, "MI_Hub_Copper", tone=0.5, facing=(0.0, 0.0, 1.0))
+        p.polygon(list(reversed([q - UP * 0.08 for q in poly])), "MI_Hub_HullTarDark", tone=0.3, facing=(0.0, 0.0, -1.0))
+    # Standing seams down the long slopes (fore and aft), every 0.6 m.
+    for sgn, xe in ((1.0, ex1), (-1.0, ex0)):
+        y = -ey + 0.3
+        while y < ey - 0.3:
+            ytop = max(min(y, ry), -ry)
+            a = Vector((xe, y, ze + 0.02))
+            b = Vector((0.5 * (ex0 + ex1), ytop, zr + 0.02))
+            # where the seam meets the hip, stop it on the slope's plane (keep it simple: seams only where they reach the ridge)
+            if abs(y) <= ry + 0.01:
+                p.beam(T.straight(a, b, Y, (b - a).normalized().cross(Y) * -sgn), (b - a).length, 0.04, 0.05, "MI_Hub_Copper", nseed(), seg=2.0, wear=0.2)
+            y += 0.6
+    for a, b in ((corners[0], corners[1]), (corners[1], corners[2]), (corners[2], corners[3]), (corners[3], corners[0])):
+        d = (b - a).normalized()
+        p.beam(T.straight(a - UP * 0.12, b - UP * 0.12, UP, d.cross(UP)), (b - a).length, 0.28, 0.1, "MI_Hub_Copper", nseed(), wear=0.3)
+    for a, b in ((corners[0], ridge_a), (corners[3], ridge_a), (corners[1], ridge_b), (corners[2], ridge_b), (ridge_a, ridge_b)):
+        p.round(T.straight(a + UP * 0.05, b + UP * 0.05, X, UP), (b - a).length, 0.07, "MI_Hub_Copper", nseed(), sides=8, seg=2.0, wear=0.3)
+    # The lantern on the ridge: a glazed box with a little copper roof and a brass finial at each end.
+    lx0, lx1, ly = 0.5 * (ex0 + ex1) - 1.1, 0.5 * (ex0 + ex1) + 1.1, ry - 1.0
+    lz0, lz1 = zr - 0.2, zr + 1.0
+    for (ax, ay), (bx, by), nrm in (((lx1, -ly), (lx1, ly), X), ((lx0, ly), (lx0, -ly), -X), ((lx0, -ly), (lx1, -ly), -Y), ((lx1, ly), (lx0, ly), Y)):
+        a, b = Vector((ax, ay, lz0)), Vector((bx, by, lz0))
+        F = (a, (b - a).normalized(), UP, nrm)
+        L = (b - a).length
+        nb = max(1, int(round(L / 1.2)))
+        for k in range(nb):
+            iron_window(p, F, L * (k + 0.5) / nb, 0.1, L / nb - 0.2, lz1 - lz0 - 0.2, lit=True, grid=(0.5, 0.5))
+        for k in range(nb + 1):
+            HH.lbeam(p, F, L * k / nb, 0.0, L * k / nb, lz1 - lz0, 0.14, 0.14, 0.0, "MI_Wood_Varnish", wear=1.0)
+    lr = [Vector((lx1 + 0.25, -ly - 0.25, lz1)), Vector((lx1 + 0.25, ly + 0.25, lz1)), Vector((lx0 - 0.25, ly + 0.25, lz1)), Vector((lx0 - 0.25, -ly - 0.25, lz1))]
+    top_a, top_b = Vector((0.5 * (lx0 + lx1), -ly, lz1 + 0.55)), Vector((0.5 * (lx0 + lx1), ly, lz1 + 0.55))
+    for poly in ([lr[0], lr[1], top_b, top_a], [lr[1], lr[2], top_b], [lr[2], lr[3], top_a, top_b], [lr[3], lr[0], top_a]):
+        p.polygon(poly, "MI_Hub_Copper", tone=0.6, facing=(0.0, 0.0, 1.0))
+    for q in (top_a, top_b):
+        p.lathe([(0.0, 0.0), (0.1, 0.0), (0.14, 0.12), (0.07, 0.24), (0.11, 0.36), (0.0, 0.55)], q, UP, "MI_Metal_Brass", sides=8, wear=0.8)
+    # Inside, seen through the open doors and the lit panes: a dark floor-to-ceiling backing a little inside the glass.
+    for (ax, ay), (bx, by), nrm in walls:
+        a, b = Vector((ax, ay, zp)), Vector((bx, by, zp))
+        t = (b - a).normalized()
+        q0, q1 = a - nrm * 0.6, b - nrm * 0.6
+        p.polygon([q0, q1, q1 + UP * h, q0 + UP * h], "MI_Hub_Void", tone=0.1, facing=tuple(nrm))
+    p.polygon([Vector((x0 - 0.1, -hy - 0.1, zt - 0.01)), Vector((x1 + 0.1, -hy - 0.1, zt - 0.01)), Vector((x1 + 0.1, hy + 0.1, zt - 0.01)),
+               Vector((x0 - 0.1, hy + 0.1, zt - 0.01))], "MI_Hub_HullTarDark", tone=0.3, facing=(0.0, 0.0, -1.0))
+    HH.export(p)
+
+
+def _plan_gates(level="main"):
+    import hub_plan as P
+    return P.plan(level).gates
 
 
 def wheel(p):
@@ -1171,7 +1418,7 @@ def build_head():
     HH.export(p)
 
 
-BUILDERS = {"stern": build_stern, "galleries": build_galleries, "castles": build_castles, "head": build_head}
+BUILDERS = {"stern": build_stern, "castles": build_castles, "command": build_command, "head": build_head}
 
 if __name__ == "__main__":
     random.seed(62)

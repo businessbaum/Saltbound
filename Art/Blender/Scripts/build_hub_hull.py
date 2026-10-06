@@ -20,6 +20,12 @@ Meshes (pivot at the ship's x 80 on the waterline, bow to +X; /Game/Saltbound/Hu
   SM_Hub_HullWaistP  the waist's port side and the bottom's port half
   SM_Hub_HullBow     the forecastle's and the bow's sides up to the stem
 Writes Art/Generated/hub_outside.json: every port, window and lid on the sides (side, x, z, kind) for the rooms behind them.
+
+D69 (owner: "boring ... I don't say there can't be windows but only? Create reinforcements on the hull"): the rows differ - big
+gunports with ochre frames on the gun deck, tarred lids further apart on the upper and middle decks, round brass portholes on the
+lower and quay decks; heavy skids with iron bands over the wales every 12-16 m; carved rosettes along the main deck's band; an
+entry port amidships each side with batten steps down to the water and two man-ropes (cables, hub_ropes.json "hull_spans");
+iron-lipped scuppers along the deck line. The castles' windows behind the galleries are glazed doors.
 Run: Tools/Build-BlenderAsset.ps1 build_hub_hull
 """
 import json
@@ -65,6 +71,7 @@ COLOURS = {
     "MI_Paint_HullDark": (0.3, 0.07, 0.05),
     "MI_Wood_Teak": (0.5, 0.33, 0.17), "MI_Wood_TeakDark": (0.38, 0.24, 0.12), "MI_Wood_TeakLight": (0.6, 0.42, 0.22),
     "MI_Rope_Hemp": (0.55, 0.45, 0.28), "MI_Hub_Void": (0.01, 0.01, 0.01), "MI_Hub_RopeTar": (0.12, 0.1, 0.08),
+    "MI_Hub_Copper": (0.3, 0.55, 0.47),
 }
 
 
@@ -620,10 +627,17 @@ def wales(route, holes_by_side):
 JAMB = 0.2                          # frame timbers round an opening
 PORT = 1.0                          # outside.sides: lidded square ports of 1 m below the main deck
 WIN_W, WIN_H = 1.3, 2.0             # cream-framed windows above it
-PORT_ROWS = [(Z[k] + 1.0, (k in ("lower", "upper"))) for k in ("quay", "lower", "middle", "upper", "gun")]   # (sill z0, offset row)
+# D69: each deck its own row: (deck, sill over the deck, port size, pitch, first x, style). gun: big gunports, ochre-framed;
+# upper / middle: tarred lids twice as far apart; lower / quay: round brass portholes.
+PORT_ROWS = [("quay", 1.1, 0.62, 6.0, 9.0, "round"), ("lower", 1.1, 0.62, 6.0, 12.0, "round"), ("middle", 1.0, 0.9, 8.0, 10.0, "lid"),
+             ("upper", 1.0, 0.9, 8.0, 14.0, "lid"), ("gun", 0.9, 1.15, 4.0, 6.0, "gun")]
 WIN_ROWS = [Z[k] + 0.8 for k in ("main", "sc1", "sc2", "sc3")]
 CHANNELS = {m: (float(HUB["rig"]["channels"][m]), HUB["rig"]["shrouds"][m]) for m in HUB["rig"]["shrouds"]}   # length, deadeyes
-QG = HUB["galleries"]["quarter"]
+GAL_X1 = float(HUB["galleries"]["x1"])                 # D69: the galleries run along the sides aft of here
+GAL_ROWS = (Z["sc1"] + 0.8, Z["sc2"] + 0.8)            # their floors' window rows: glazed doors onto them
+# D69: the skids (vertical fenders over the wales, in pairs) and the entry port amidships (ship x).
+FENDERS = (21.0, 46.0, 56.5, 76.5, 116.0, 126.5)
+ENTRY_X = 85.5
 
 
 def mast_x(mid):
@@ -685,36 +699,48 @@ def fittings():
                 return False
         return True
 
+    def skid_clear(x, half):
+        return all(abs(x - f) > half + 0.75 for f in FENDERS) and abs(x - ENTRY_X) > half + 1.4
+
     def seam_clear(x, half, z0, z1):
         cuts = PARTS_X + (HUB["poopX"], HUB["qdX"], HUB["fcX"]) + (DOOR_X if door_band(z0 - 0.6, z1 + 0.6) or door_band(z0, z1) else ())
         return all(abs(x - c) > half + 0.45 for c in cuts)
 
     for side in (1, -1):
-        for zs, offset in PORT_ROWS:
-            x = 7.0 if offset else 6.0                          # offset rows 1 m along (the doors' seams fall between)
+        for deck_id, sill, size, pitch, x_first, style in PORT_ROWS:
+            zs = Z[deck_id] + sill
+            x = x_first
             while x < 158.0:
                 zl = line_z(zs, x)
-                ok = (x > corner_x(zl) + 4.0 and x + PORT * 0.5 < end_x(zl) - 3.0 and bow_turn(x, zl + 0.5, side) < 0.3
-                      and chain_clear(x, zl + PORT) and seam_clear(x, PORT * 0.5, zs, zs + PORT) and clear(side, x, zs, zs + PORT, 2.0)
-                      and line_z(zs + PORT, x) < top(x) - 1.0)
+                ok = (x > corner_x(zl) + 4.0 and x + size * 0.5 < end_x(zl) - 3.0 and bow_turn(x, zl + 0.5, side) < 0.3
+                      and chain_clear(x, zl + size) and seam_clear(x, size * 0.5, zs, zs + size) and clear(side, x, zs, zs + size, 2.0)
+                      and skid_clear(x, size * 0.5) and line_z(zs + size, x) < top(x) - 1.0)
                 if ok:
-                    on_door = door_leaf(x, zs, zs + PORT, side) is not None
+                    on_door = door_leaf(x, zs, zs + size, side) is not None
                     r = rng.random()
-                    kind = "shut" if (r < 0.68 or on_door) else ("open" if r < 0.86 else ("lit" if r < 0.92 else "patched"))
-                    out.append(dict(side=side, x0=x - PORT * 0.5, x1=x + PORT * 0.5, z0=zs, z1=zs + PORT, kind=kind))
-                x += 4.0
+                    if style == "round":
+                        kind = "round" if (r < 0.8 or on_door) else "round_lit"
+                    elif style == "gun":
+                        kind = "shut" if (r < 0.55 or on_door) else ("open" if r < 0.85 else ("lit" if r < 0.93 else "patched"))
+                    else:
+                        kind = "lid" if (r < 0.75 or on_door) else ("open" if r < 0.9 else "patched")
+                    out.append(dict(side=side, x0=x - size * 0.5, x1=x + size * 0.5, z0=zs, z1=zs + size, kind=kind))
+                x += pitch
         for zs in WIN_ROWS:
             x = 15.6
             while x < 158.0:
                 zl = line_z(zs, x)
                 castle = x < HUB["qdX"] or x > HUB["fcX"]
-                ok = (castle and line_z(zs + WIN_H, x) < top(x) - 0.9 and x + WIN_W * 0.5 < end_x(zl) - 2.5
-                      and bow_turn(x, zl + 1.0, side) < 0.35 and chain_clear(x, zl + WIN_H) and seam_clear(x, WIN_W * 0.5 + 0.4, zs, zs + WIN_H)
-                      and not (QG["x0"] - 1.4 < x < QG["x1"] + 1.4 and zs + WIN_H > QG["z0"] - 0.5))
+                gal = zs in GAL_ROWS and x < GAL_X1 + 0.5               # D69: onto a gallery: a glazed door, sill at the floor
+                z0, z1 = (zs - 0.65, zs + WIN_H + 0.2) if gal else (zs, zs + WIN_H)
+                ok = (castle and line_z(z1, x) < top(x) - 0.9 and x + WIN_W * 0.5 < end_x(zl) - 2.5
+                      and bow_turn(x, zl + 1.0, side) < 0.35 and chain_clear(x, zl + WIN_H) and seam_clear(x, WIN_W * 0.5 + 0.4, zs, zs + WIN_H))
                 if ok:
                     r = rng.random()
-                    kind = "glass" if r < 0.5 else ("glow" if r < 0.68 else "shutter")
-                    out.append(dict(side=side, x0=x - WIN_W * 0.5, x1=x + WIN_W * 0.5, z0=zs, z1=zs + WIN_H, kind=kind))
+                    kind = "glass" if (r < 0.5 or gal) else ("glow" if r < 0.68 else "shutter")
+                    if gal and r > 0.75:
+                        kind = "glow"
+                    out.append(dict(side=side, x0=x - WIN_W * 0.5, x1=x + WIN_W * 0.5, z0=z0, z1=z1, kind=kind))
                 x += 3.6
     # Strake-aligned holes for every opening with nothing in front of it (at the opening's middle).
     for f in out:
@@ -723,7 +749,7 @@ def fittings():
         zl0, zl1 = line_z(f["z0"], xc), line_z(f["z1"], xc)
         f["hz0"] = max([z for z in lz if z <= zl0 + 0.02] or [zl0])
         f["hz1"] = min([z for z in lz if z >= zl1 - 0.02] or [zl1])
-        f["hole"] = f["kind"] not in ("shut", "patched")
+        f["hole"] = f["kind"] not in ("shut", "patched", "lid", "round", "round_lit")
     return out
 
 
@@ -747,6 +773,19 @@ def fitting(part, f, F=None, rng=None):
     kind = f["kind"]
     window = kind in ("glass", "glow", "shutter")
     frame_mat = "MI_Paint_Cream" if window else ("MI_Hub_HullTarDark" if kind != "room" else "MI_Paint_CreamAged")
+    if kind in ("round", "round_lit"):
+        # D69: a round brass porthole on the planking: a heavy ring with bolts, the glass (dark, or lit from inside), a hood.
+        r = hw_
+        c = lpt(F, 0.0, 0.0, PLANK_T + 0.02)
+        part.lathe([(r + 0.12, 0.0), (r + 0.14, 0.05), (r + 0.1, 0.12), (r - 0.02, 0.12), (r - 0.04, 0.06), (r - 0.04, 0.0)], c, F[3], "MI_Metal_Brass",
+                   sides=18, caps=False, wear=0.9)
+        part.lathe([(0.0, 0.04), (r - 0.03, 0.04)], c, F[3], "MI_LanternGlass" if kind == "round_lit" else "MI_Glass_Dark", sides=18, caps=False)
+        for k in range(8):
+            a = 2.0 * math.pi * (k + 0.5) / 8
+            q = c + (F[1] * math.cos(a) + F[2] * math.sin(a)) * (r + 0.06)
+            part.lathe([(0.0, 0.0), (0.03, 0.0), (0.03, 0.13), (0.0, 0.15)], q, F[3], "MI_Metal_Brass", sides=6)
+        lbeam(part, F, -r - 0.2, r + 0.28, r + 0.2, r + 0.28, 0.1, 0.14, PLANK_T, "MI_Hub_HullTarDark", wear=0.8)
+        return
     if window and rng.random() < 0.3:
         frame_mat = "MI_Paint_CreamAged"
     d0 = PLANK_T - 0.02
@@ -790,6 +829,8 @@ def fitting(part, f, F=None, rng=None):
             part.polygon([lpt(F, u, v, -0.3) for u, v in ((-hw_, -hh), (-hw_, hh), (hw_, hh), (hw_, -hh))], mat, tone=0.1, facing=F[3])
     if kind == "shut":
         shut_lid(part, F, hw_, hh, rng)
+    if kind == "lid":
+        shut_lid(part, F, hw_, hh, rng, edge="MI_Hub_HullTarDark")
     if kind == "patched":
         # The lid is gone: boards nailed across the port, unpainted and newer.
         lbeam(part, F, -hw_ - 0.1, hh + 0.14, hw_ + 0.1, hh + 0.14, 0.16, 0.08, PLANK_T - 0.02, "MI_Hub_HullTarDark")
@@ -815,12 +856,14 @@ def fitting(part, f, F=None, rng=None):
                 lbeam(part, F, sgn * 0.05, -hh * 0.6, sgn * (hw_ - 0.05), -hh * 0.6, 0.12, 0.04, -0.04, "MI_Metal_Iron")
 
 
-def shut_lid(part, F, hw_, hh, rng):
-    """A port's lid shut in its frame (ochre-edged, so the rows read from afar): three boards, two hinge straps, a ring."""
+def shut_lid(part, F, hw_, hh, rng, edge=None):
+    """A port's lid shut in its frame: three boards, two hinge straps, a ring. The gunports' frames are ochre (they read from
+    afar); edge gives the frame's material otherwise (D69: tarred on the upper and middle decks)."""
+    side_mat, head_mat = (edge, edge) if edge else ("MI_Hub_OchreFaded", "MI_Hub_Ochre")
     for sgn in (-1.0, 1.0):
-        lbeam(part, F, sgn * (hw_ + 0.12), -hh - 0.22, sgn * (hw_ + 0.12), hh + 0.22, 0.14, 0.09, PLANK_T - 0.02, "MI_Hub_OchreFaded", wear=1.0)
-    lbeam(part, F, -hw_ - 0.2, hh + 0.14, hw_ + 0.2, hh + 0.14, 0.16, 0.1, PLANK_T - 0.02, "MI_Hub_Ochre")
-    lbeam(part, F, -hw_ - 0.2, -hh - 0.14, hw_ + 0.2, -hh - 0.14, 0.18, 0.12, PLANK_T - 0.02, "MI_Hub_Ochre")
+        lbeam(part, F, sgn * (hw_ + 0.12), -hh - 0.22, sgn * (hw_ + 0.12), hh + 0.22, 0.14, 0.09, PLANK_T - 0.02, side_mat, wear=1.0)
+    lbeam(part, F, -hw_ - 0.2, hh + 0.14, hw_ + 0.2, hh + 0.14, 0.16, 0.1, PLANK_T - 0.02, head_mat)
+    lbeam(part, F, -hw_ - 0.2, -hh - 0.14, hw_ + 0.2, -hh - 0.14, 0.18, 0.12, PLANK_T - 0.02, head_mat)
     for k in range(3):
         u = -hw_ + (2 * hw_) * (k + 0.5) / 3
         lbeam(part, F, u, -hh, u, hh, 2 * hw_ / 3 - 0.02, 0.1, PLANK_T - 0.02, rng.choice(("MI_Hub_HullTar", "MI_Hub_HullTar", "MI_Hub_HullTarFaded")))
@@ -859,8 +902,6 @@ def pilasters(route, fits):
             zu = min(zu, top(x) - 0.45)
             if zu - zl < 1.0 or x < corner_x(zl) + 1.0 or x > end_x(zu) - 2.0 or bow_turn(x, zl, side) > 0.4:
                 continue
-            if QG["x0"] - 0.8 < x < QG["x1"] + 0.8 and zu > QG["z0"]:
-                continue
             if any(abs(x - c) < 0.5 for c in (HUB["poopX"], HUB["qdX"], HUB["fcX"])) or (HUB["poopX"] < x < HUB["poopX"] + 0.9):
                 continue
             part = route(x, side)
@@ -873,11 +914,11 @@ def pilasters(route, fits):
             lbeam(part, F, 0.0, -hh, 0.0, -hh + 0.22, 0.56, 0.16, PLANK_T, "MI_Hub_Ochre", wear=1.0)
 
 
-FENDERS = (76.5, 120.5)              # skids over the wales where boats and cargo come alongside (between the ports' columns)
 
 
 def fenders(route):
-    """Pairs of upright skids over the wales from the waterline belt to the main deck's band, bolted through the wales."""
+    """Pairs of upright skids over the wales from the waterline belt to the main deck's band, bolted through the wales (D69: six
+    pairs a side, iron-banded at every wale; they break the rows and show the hull is strengthened where boats lie alongside)."""
     for side in (1, -1):
         for xc in FENDERS:
             for dx in (-0.32, 0.32):
@@ -899,7 +940,79 @@ def fenders(route):
                         continue
                     z = line_z(z0_, x)
                     F = hull_frame(x, z, side)
-                    lbeam(part, F, -0.17, 0.0, 0.17, 0.0, 0.1, 0.06, PLANK_T + 0.7, "MI_Metal_Iron", wear=0.5)
+                    lbeam(part, F, -0.2, 0.0, 0.2, 0.0, 0.16, 0.06, PLANK_T + 0.7, "MI_Metal_Iron", wear=0.5)
+                    for v in (-0.05, 0.05):
+                        part.lathe([(0.0, 0.0), (0.045, 0.0), (0.04, 0.03), (0.0, 0.04)], lpt(F, 0.0, v, PLANK_T + 0.76), F[3], "MI_Metal_Iron", sides=6)
+
+
+def rosettes(route):
+    """D69: carved rosettes along the main deck's broad band (an ochre flower on a dark boss, a brass button), every 3.2 m where
+    the band runs clear of the channels, the skids, the entry port and the castles' steps."""
+    for side in (1, -1):
+        x = 52.0
+        while x < 132.0:
+            ok = (all(not (channel_span(m)[0] - 1.2 < x < channel_span(m)[1] + 1.2) for m in CHANNELS) and all(abs(x - f) > 1.0 for f in FENDERS)
+                  and abs(x - ENTRY_X) > 2.2)
+            part = route(x, side)
+            if ok and part is not None and route.wanted(x - 1, x + 1):
+                F = hull_frame(x, line_z(Z["main"], x), side)
+                c = lpt(F, 0.0, 0.0, PLANK_T + 0.26)
+                part.lathe([(0.0, 0.0), (0.3, 0.0), (0.3, 0.05), (0.24, 0.1), (0.0, 0.12)], c, F[3], "MI_Hub_HullTarDark", sides=16, wear=0.8)
+                for k in range(8):
+                    a = 2.0 * math.pi * k / 8
+                    d = F[1] * math.cos(a) + F[2] * math.sin(a)
+                    q0, q1 = c + d * 0.06 + F[3] * 0.1, c + d * 0.27 + F[3] * 0.08
+                    part.beam(T.straight(q0, q1, d.cross(F[3]), F[3]), 0.22, 0.12, 0.07, "MI_Hub_Ochre", nseed(), seg=0.3, wear=1.0)
+                part.lathe([(0.0, 0.0), (0.07, 0.0), (0.08, 0.04), (0.0, 0.08)], c + F[3] * 0.12, F[3], "MI_Metal_Brass", sides=10)
+            x += 3.2
+
+
+def entry_ports(route):
+    """D69: an entry port amidships on each side (ENTRY_X): a carved hood over the rail between two posts with brass caps, batten
+    steps down the side to the waterline belt, and two man-ropes from the posts down beside the steps (real cables: hub_ropes.json
+    hull_spans)."""
+    spans = []
+    for side in (1, -1):
+        x = ENTRY_X
+        part = route(x, side)
+        if part is None or not route.wanted(x - 2, x + 2):
+            continue
+        zt = top(x)
+        for dx in (-0.75, 0.75):                                            # the posts, standing over the rail
+            F = hull_frame(x + dx, zt - 0.5, side)
+            lbeam(part, F, 0.0, -0.9, 0.0, 1.3, 0.24, 0.24, PLANK_T + 0.12, "MI_Wood_Varnish", wear=1.0)
+            part.lathe([(0.0, 0.0), (0.16, 0.0), (0.18, 0.08), (0.1, 0.18), (0.0, 0.24)], lpt(F, 0.0, 1.3, PLANK_T + 0.24), F[2], "MI_Metal_Brass", sides=10)
+        F = hull_frame(x, zt + 0.7, side)
+        lbeam(part, F, -1.0, 0.0, 1.0, 0.0, 0.2, 0.3, PLANK_T + 0.12, "MI_Hub_Ochre", wear=1.0)       # the hood's lintel
+        for sgn in (-1.0, 1.0):
+            lbeam(part, F, sgn * 0.95, 0.05, sgn * 0.35, 0.55, 0.18, 0.22, PLANK_T + 0.12, "MI_Hub_Ochre", wear=1.0)
+        part.lathe([(0.0, 0.0), (0.2, 0.0), (0.22, 0.05), (0.0, 0.08)], lpt(F, 0.0, 0.62, PLANK_T + 0.2), F[3], "MI_Metal_Brass", sides=12)
+        # Battens: steps down the side every 0.36 m, from under the rail to the waterline belt.
+        z = zt - 0.7
+        while z > 1.3:
+            F = hull_frame(x, z, side)
+            lbeam(part, F, -0.32, 0.0, 0.32, 0.0, 0.1, 0.12, PLANK_T, random.choice(("MI_Wood_TeakDark", "MI_Wood_Teak")), wear=1.0)
+            z -= 0.36
+        for dx in (-0.6, 0.6):
+            a = lpt(hull_frame(x + dx, zt + 0.75, side), 0.0, 0.0, PLANK_T + 0.3)
+            b = lpt(hull_frame(x + dx * 0.9, 1.5, side), 0.0, 0.0, PLANK_T + 0.35)
+            spans.append(dict(a=[round(v, 3) for v in a], b=[round(v, 3) for v in b], slack=1.03, width=0.045, wind=1.0, what="man-rope"))
+    return spans
+
+
+def scuppers(route):
+    """D69: scuppers along the deck line: iron-lipped holes just under the main deck's band, every 3.5 m (dark inside)."""
+    for side in (1, -1):
+        x = 51.0
+        while x < 132.0:
+            if all(abs(x - f) > 0.8 for f in FENDERS) and abs(x - ENTRY_X) > 1.2:
+                part = route(x, side)
+                if part is not None and route.wanted(x - 1, x + 1):
+                    F = hull_frame(x, line_z(Z["main"] - 0.7, x), side)
+                    c = lpt(F, 0.0, 0.0, PLANK_T)
+                    part.lathe([(0.12, 0.0), (0.16, 0.02), (0.15, 0.06), (0.1, 0.06)], c, F[3], "MI_Metal_Iron", sides=10, caps=False)
+                    part.lathe([(0.0, 0.01), (0.11, 0.01)], c, F[3], "MI_Hub_Void", sides=10, caps=False)
+            x += 3.5
 
 
 def channels(route):
@@ -1028,6 +1141,19 @@ def skin(route, fits):
     build_fittings(route, fits)
 
 
+def write_hull_ropes(spans):
+    """The man-ropes go into hub_ropes.json beside the rig's spans (hub_place.ropes makes cables of both)."""
+    path = os.path.join(H.ROOT, "Art", "Generated", "hub_ropes.json")
+    data = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    data["hull_spans"] = spans
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=1)
+    print("SB_HULL_ROPES", len(spans))
+
+
 def write_outside_json(fits):
     out = os.path.join(H.ROOT, "Art", "Generated", "hub_outside.json")
     rows = []
@@ -1057,8 +1183,11 @@ def build_sides():
     drifts(route)
     pilasters(route, fits)
     fenders(route)
+    rosettes(route)
+    scuppers(route)
+    write_hull_ropes(entry_ports(route))
     write_outside_json(fits)
-    print("SB_FITTINGS", {k: sum(1 for f in fits if f["kind"] == k) for k in ("room", "shut", "open", "lit", "patched", "glass", "glow", "shutter")})
+    print("SB_FITTINGS", {k: sum(1 for f in fits if f["kind"] == k) for k in ("room", "shut", "lid", "open", "lit", "patched", "round", "round_lit", "glass", "glow", "shutter")})
     print("SB_DOOR_LINES", DOOR_J, LINES[DOOR_J[0]], LINES[DOOR_J[1]], [round(line_z(LINES[j], x), 3) for j in DOOR_J for x in DOOR_X])
     for part in parts.values():
         export(part)
