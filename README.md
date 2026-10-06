@@ -14,8 +14,9 @@ save/load).
 
 The game beyond M5 is planned in the game concept ([Docs/Design/GameConcept.md](Docs/Design/GameConcept.md), D67,
 a proposal waiting for the owner's answers): a hand-made sea that opens through the boat, a story with an ending
-(about 10-15 hours), light tool-based danger from the sea and its creatures, boat damage, salt as the economy and
-diving to wrecks and ruins. Multiplayer, human enemies, survival meters, a procedural world and freeform
+(about 10-15 hours), light tool-based danger from the sea and its creatures and a measured night horror, boat
+damage, digging and salvaging materials for upgrades, the Old World's technology (the ruins are our own future),
+salt as the economy and diving to wrecks and ruins. Multiplayer, human enemies, survival meters, a procedural world and freeform
 shipbuilding stay out of scope. Future ideas: [Docs/Ideas.md](Docs/Ideas.md).
 
 Status and next steps: [Docs/Progress.md](Docs/Progress.md).

@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67).
+Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68).
 
 ## Milestone status
 
@@ -448,8 +448,8 @@ Developer console (`~`, non-shipping builds):
 - `BoardingRamp` in `L_DevTest` is not aligned. Template `LevelPrototyping` content is still in use for greyboxing.
 
 ## Next steps
-0. **The game concept (D67):** the owner's answers to `Docs/Design/GameConcept.md` (section 12), then M6, the first playable hour (its section 10.2): the prologue and the Spire, a running day and night,
-   the first people, the log, jobs and salt, three upgrades, boat damage and the squall, music by mood.
+0. **The game concept (D67, D68):** the owner's answers to the new questions in `Docs/Design/GameConcept.md` (section 12), then M6, the first playable hour (its section 10.2): the prologue with the buried canvas and the Spire,
+   a running day and night, the first people, the log, materials and digging, jobs and salt, three upgrades built from materials, boat damage and the squall, the first eerie night, music by mood.
 1. Owner review of M3 revision 2 (`Docs/Evidence/M3_rev2/`). Remaining checkpoint decisions: cabin
    concept, hull colour, sea state.
 2. Owner feedback on revision 3 (`Docs/Evidence/M3_rev3/`); then M4 sailing (wind subsystem is in place).

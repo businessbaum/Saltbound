@@ -1895,3 +1895,31 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **The README's scope changes:** light combat, an economy, diving to wrecks and ruins and the boat's damage are now planned;
   multiplayer, human enemies, survival meters, a procedural world and freeform shipbuilding stay out.
 - **Next:** the owner's answers to the concept's questions (its section 12), then M6, the first playable hour (its section 10.2).
+
+### D68 · The game concept, revision 2: the ancients are our own future; digging and materials; the night's horror (Provisional: the owner's answers adopted, the new questions wait for the owner)
+- **Owner (2026-10-06), on D67:** the story direction (the Gale as a shelter, the Cartographer who broke it) is fine; "a bit of
+  horror is good", especially at night on the sea; people as stylised figures behind counters with text on parchment ("YESS");
+  the first playable hour (M6) is a good next step; "also think about playable stuff. you can dig stuff up or you need to collect
+  stuff for upgrades"; and: **"The ancient civilisation turns out to be the old world, our current world in 50 years. There you will
+  be able to upgrade to futuristic technology."**
+- **Revision 2 of `Docs/Design/GameConcept.md`:**
+  - **The Old World:** the Tidewrights (the sailors' name) were the people of our world in the 2070s. The pale "stone" is their
+    composite, the turquoise lines their lights, the glyphs their worn writing, the islands their drowned coast. The Gale is their
+    shelter of weather engines (six stations; the Tidestones are their cores); the Hollowkeel's hidden keel is their ark, whose
+    autopilot still goes where the survivors gather (the follow rule of D63 as story). The game plays centuries later. The player
+    suspects before the story says it (a reveal ladder: made things, writing, a drowned coast, a time capsule dated 2075 at about
+    hour 5-6, the Cartographer's guilt at the midpoint, the ark's message at the end). The ruins' existing look (D47, D61) already
+    reads as weathered near-future design; no new style is needed.
+  - **Futuristic upgrades in three tiers** ("old wood, new light"): sail-age (the Shipwright), salvaged Old World machines rigged
+    into wood (a new person, the Tinker, in L18), restored Old World technology from the stations. Rules that keep the sail at the
+    centre: limited power (cells, solar film, the glow as the gauge), a weak motor as a helper, machines draw the Grey at night, one
+    capability per upgrade.
+  - **Collecting, digging, salvaging, building:** about 15 materials (sail-age and Old World, with Saltbound names that change to the
+    real ones), by ring; beachcombing refilled by storms, flotsam with the boat hook, about 40 hand-placed dig spots each with a sign
+    (never empty-handed; caches, treasure maps, about 10 Old World time capsules), scavenging rooms with the crowbar, salvage by
+    diving and the winch. Upgrades need a plan, materials and salt, and are fitted at the fitting berth. Cargo space is the pressure.
+    The prologue teaches digging (the Cartographer's buried spare canvas).
+  - **The night:** dread, not shock; sound first; light is safety and danger; harbours always safe; growing by act. The Grey: an Old
+    World warden machine overgrown to look like an animal, wild since the southern core was taken; never fought, calmed at the end.
+- **Next:** the owner's answers to the new questions (the concept's section 12: the gap, the Grey, how futuristic, the motor, the
+  writing, carrying big finds, material names), then M6.
