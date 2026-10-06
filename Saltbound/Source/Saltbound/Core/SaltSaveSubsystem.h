@@ -43,6 +43,8 @@ public:
 	// D73: the dig spots' stages (1 dug up, 2 emptied; missing = buried) and the tools the player owns (empty in older saves:
 	// the start's tools stay).
 	UPROPERTY() TMap<FName, int32> DigStages;
+	// FH1 (D77): the story's beats reached and when (day * 24 + hour).
+	UPROPERTY() TMap<FName, float> StoryBeats;
 	UPROPERTY() bool bHasOwnedTools = false;
 	UPROPERTY() TArray<FName> OwnedTools;
 	// D74: the boat's damage (holes and patches, water aboard, the sail's tears).
@@ -134,6 +136,17 @@ public:
 	void SetDigStage(FName SpotId, int32 Stage) { if (!SpotId.IsNone()) { DigStages.Add(SpotId, Stage); } }
 	void ClearDigStages() { DigStages.Reset(); }
 
+	/** FH1 (D77): the story's beats (the first hour's steps, World/SaltPrologue.h) and when each was reached (day * 24 + hour),
+	 *  saved with the game. */
+	bool HasBeat(FName Beat) const { return StoryBeats.Contains(Beat); }
+	float GetBeatTime(FName Beat) const { const float* T = StoryBeats.Find(Beat); return T ? *T : -1.f; }
+	const TMap<FName, float>& GetBeats() const { return StoryBeats; }
+	/** Records a beat the first time (later calls keep the first time) and tells OnStoryBeat. */
+	void SetBeat(FName Beat, float When);
+	void ClearBeats() { StoryBeats.Reset(); }
+	DECLARE_MULTICAST_DELEGATE_OneParam(FSaltStoryBeat, FName);
+	FSaltStoryBeat OnStoryBeat;
+
 	// The hub (D62), saved with the game -----------------------------------------------------------------------------
 	/** The salt purse: one number, not a satchel item; nothing spends it yet. */
 	int32 GetSalt() const { return Salt; }
@@ -187,4 +200,5 @@ private:
 	TSet<FName> Unlocked;
 	int32 Salt = 0;
 	TMap<FName, int32> DigStages;
+	TMap<FName, float> StoryBeats;
 };

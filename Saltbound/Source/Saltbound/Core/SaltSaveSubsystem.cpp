@@ -21,6 +21,7 @@
 #include "UObject/UObjectIterator.h"
 #include "World/SaltLightingRig.h"
 #include "World/SaltPickup.h"
+#include "World/SaltPrologue.h"
 #include "World/SaltWindSubsystem.h"
 
 namespace
@@ -153,6 +154,7 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 	Save->Collected = Collected.Array();
 	Save->FoundPlaces = Found.Array();
 	Save->DigStages = DigStages;
+	Save->StoryBeats = StoryBeats;
 	// The hub (D62).
 	Save->HubBerth = HubBerth;
 	Save->HubUnlocked = Unlocked.Array();
@@ -283,6 +285,7 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 	Collected = TSet<FName>(Save->Collected);
 	Found = TSet<FName>(Save->FoundPlaces);
 	DigStages = Save->DigStages;
+	StoryBeats = Save->StoryBeats;
 	HubBerth = Save->HubBerth;
 	Unlocked = TSet<FName>(Save->HubUnlocked);
 	Salt = Save->Salt;
@@ -431,6 +434,17 @@ bool USaltSaveSubsystem::RestoreNewVoyageSnapshot(UWorld* World)
 	return bLoaded;
 }
 
+void USaltSaveSubsystem::SetBeat(FName Beat, float When)
+{
+	if (Beat.IsNone() || StoryBeats.Contains(Beat))
+	{
+		return;
+	}
+	StoryBeats.Add(Beat, When);
+	UE_LOG(LogSaltbound, Display, TEXT("SB_STORY beat=%s at day %d %.2f h"), *Beat.ToString(), FMath::FloorToInt(When / 24.f), FMath::Fmod(When, 24.f));
+	OnStoryBeat.Broadcast(Beat);
+}
+
 bool USaltSaveSubsystem::StartNewVoyage(UWorld* World, int32 Index)
 {
 	if (!World || !bHasSnapshot)
@@ -439,6 +453,11 @@ bool USaltSaveSubsystem::StartNewVoyage(UWorld* World, int32 Index)
 	}
 	const bool bLoaded = RestoreNewVoyageSnapshot(World);
 	SetActiveVoyage(Index);
+	// FH1 (D77): a new voyage is the prologue: the castaway wakes on the wreck beach at dawn with nothing.
+	if (USaltPrologueSubsystem* Prologue = bLoaded ? World->GetSubsystem<USaltPrologueSubsystem>() : nullptr)
+	{
+		Prologue->Begin();
+	}
 	const bool bSaved = bLoaded && SaveGame(World, TEXT("new voyage"));
 	UE_LOG(LogSaltbound, Display, TEXT("SB_SAVE new_voyage=%d slot=%s loaded=%d"), bSaved ? 1 : 0, *Slot, bLoaded ? 1 : 0);
 	return bSaved;

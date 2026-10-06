@@ -962,6 +962,15 @@ void ASaltBoat::ToggleHold()
 
 void ASaltBoat::HandleSailRope(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
 {
+	// FH1 (D77): the prologue's ripped sail is not set until it has been mended.
+	if (bSailLocked && !bSailSet)
+	{
+		if (ASaltPlayerController* PC = Player ? Cast<ASaltPlayerController>(Player->GetController()) : nullptr)
+		{
+			PC->ShowNotice(SailLockedText);
+		}
+		return;
+	}
 	ToggleSail();
 }
 

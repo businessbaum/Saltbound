@@ -21,6 +21,8 @@
 #include "Player/SaltInputConfig.h"
 #include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerController.h"
+#include "Camera/PlayerCameraManager.h"
+#include "TimerManager.h"
 #include "Saltbound.h"
 
 namespace
@@ -379,6 +381,47 @@ void ASaltPlayerCharacter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResu
 			OutResult.Rotation = FQuat::Slerp(OutResult.Rotation.Quaternion(), Focus.GetRotation(), ViewFocusAlpha).Rotator();
 		}
 	}
+
+	// FH1 (D77): waking on the beach: lying on the back looking at the sky, sitting up, standing.
+	if (WakeSeconds > 0.f)
+	{
+		WakeT = FMath::Min(WakeT + DeltaTime, WakeSeconds);
+		const float U = WakeT / WakeSeconds;
+		const float SitUp = FMath::SmoothStep(0.25f, 0.7f, U);
+		const float Stand = FMath::SmoothStep(0.55f, 1.f, U);
+		OutResult.Location.Z -= (1.f - Stand) * 125.f + (1.f - SitUp) * 10.f;
+		OutResult.Rotation.Pitch += (1.f - SitUp) * 72.f;
+		OutResult.Rotation.Roll += (1.f - Stand) * 6.f * FMath::Sin(U * 5.f);
+	}
+}
+
+void ASaltPlayerCharacter::StartWakeUp(float Seconds)
+{
+	WakeT = 0.f;
+	WakeSeconds = FMath::Max(Seconds, 0.1f);
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (PC)
+	{
+		PC->SetIgnoreMoveInput(true);
+		PC->SetIgnoreLookInput(true);
+		if (PC->PlayerCameraManager)
+		{
+			PC->PlayerCameraManager->StartCameraFade(1.f, 0.f, WakeSeconds * 0.45f, FLinearColor::Black, false, false);
+		}
+	}
+	TWeakObjectPtr<ASaltPlayerCharacter> Self(this);
+	GetWorldTimerManager().SetTimer(WakeTimer, [Self]()
+	{
+		if (ASaltPlayerCharacter* P = Self.Get())
+		{
+			P->WakeSeconds = 0.f;
+			if (APlayerController* C = Cast<APlayerController>(P->GetController()))
+			{
+				C->ResetIgnoreMoveInput();
+				C->ResetIgnoreLookInput();
+			}
+		}
+	}, WakeSeconds, false);
 }
 
 void ASaltPlayerCharacter::FocusView(USceneComponent* Base, const FTransform& ViewInBase, float BlendTime)

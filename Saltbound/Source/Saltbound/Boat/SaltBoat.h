@@ -82,6 +82,9 @@ public:
 	/** Set the sail (let it fall: the boat sails) or take it in (rolled up under the yard: the boat slows down). */
 	void SetSailSet(bool bSet);
 	void ToggleSail() { SetSailSet(!bSailSet); }
+	/** FH1 (D77): the prologue keeps her ripped sail furled until it has been mended once; Why is what the rope says then. */
+	void SetSailLocked(bool bLocked, const FText& Why = FText()) { bSailLocked = bLocked; SailLockedText = Why; }
+	bool IsSailLocked() const { return bSailLocked; }
 	/** D59: how much sail to set, 0 (taken in) .. 1 (full): W / S at the helm move it; the sail follows at its set rate. */
 	void SetSailAmount(float Amount);
 	float GetSailTarget() const { return SailTarget; }
@@ -493,6 +496,8 @@ private:
 	// Controls and rig.
 	float RudderAngle = 0.f;                 // deg, + = bear away to starboard
 	bool bSailSet = false;
+	bool bSailLocked = false;                // FH1 (D77)
+	FText SailLockedText;
 	float SailTarget = 0.f;                  // D59: how much sail is wanted (0..1)
 	float Hoist = 0.f;                       // 0 taken in .. 1 set
 	float SailLean = 0.f;                    // D65: the cloth leans to leeward (-1 port .. 1 starboard, visual)

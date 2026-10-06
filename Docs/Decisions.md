@@ -2273,3 +2273,26 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   - **Salt** (the currency, D61) is drawn as a bar of rock salt bound with a fibre band: a smooth white block read as soap, a white
     block with a red stamp as a first-aid box.
 - **Questions for the owner:** the five on the page (the line's place, the plans, the log's key, the board, when upgrades are fitted).
+
+### D77 · The first hour, step by step (M6), and FH1: the castaway's start (Adopted: waiting for the owner's look)
+- **Owner (2026-10-06):** "So what is the status, what can the player already play and whats the designed journey? lets create it step
+  by step. First the first hour." Answers: wake on the wreck beach at dawn; the sail ripped, the cache's sailcloth needed to sail; the
+  Spire's light every night from dusk; simple stylised figures behind counters.
+- **The plan:** `Docs/Design/FirstHour.md`: what plays today, the journey, the first hour beat by beat for the world as it is (a day is
+  40 minutes, so dawn to dusk is the morning's learning, dusk calls the player out to the Spire, the night voyage, the Hollowkeel's
+  lights at the end), and seven build steps FH1-FH7, each playable on its own.
+- **FH1, the prologue's start** (`World/SaltPrologue.*`, `USaltPrologueSubsystem`):
+  - "New voyage" restores the world as built and then begins the prologue before it saves: the castaway wakes a few steps inland of
+    D71's wreck on the south-west beach (facing it) at 5:30 on day 1, out of black, the view rising from the sand over 6 s (lying,
+    sitting up, standing; `ASaltPlayerCharacter::StartWakeUp`).
+  - A castaway owns nothing: no tools, an empty satchel. Two pieces of driftwood, a rope coil and a glass float lie round the wreck
+    (spawned on the sand at the start of play, saved like the map's pickups). The Harbour Keeper gives the shovel and a lantern; the
+    Cartographer's sea chest aboard (a use on the chest of D52) their compass and spyglass (and the log, FH3).
+  - The Cartographer's boat is whole and dry with her sail ripped (D74's tear 2); the sail does not set until it has been mended once
+    (`ASaltBoat::SetSailLocked`; later tears let her limp home as before). The cache's two sailcloths mend it.
+  - **Story beats** in the save (`USaltSaveSubsystem::SetBeat`, with the day and hour each was reached, `OnStoryBeat`): Prologue,
+    Woke, Chest, Keeper, Cache, SailMended, CastOff. The log's notes (FH3) will be written from them.
+  - Play-in-editor, the tests and older saves are unchanged (the pier, the tools); `sb.Story.Prologue [nowake]` starts it anywhere,
+    `sb.Story.Beats [Beat]` prints or records beats.
+- **Tests:** `sb.Dev.RunPrologueTests` 7/7 (the start on the wreck beach at dawn with nothing, the four beach finds on the sand, the sail locked while ripped, the sea chest's compass and spyglass, the Keeper's shovel and lantern, the cache mending the sail so it sets, the beats saved and the lock restored on loading). The real New voyage path (`sb.Dev.MenuFlow`) runs the prologue and saves it; frames of the wake-up checked in play (lying under the palms, sitting up, standing on the beach facing the wreck). Unchanged: menus 22/22, dig 7/7, repair 8/8, save 6/6, inventory 43/44 (`SaveSignShows`, known).
+- **Next:** FH2, people v1 (the Harbour Keeper's figure and lines first).

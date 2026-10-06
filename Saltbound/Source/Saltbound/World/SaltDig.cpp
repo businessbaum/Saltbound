@@ -1,6 +1,7 @@
 // Saltbound - digging (D73, M6 step 2).
 
 #include "World/SaltDig.h"
+#include "World/SaltPrologue.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Core/SaltSaveSubsystem.h"
@@ -717,9 +718,18 @@ void USaltDigSubsystem::HandleKeeper(USaltInteractableComponent* Interactable, A
 		return;
 	}
 	Player->SetToolOwned(SaltDig::ShovelTool, true);
+	// FH1 (D77): and a lantern: the castaway has nothing, and the nights are long.
+	const bool bLantern = !Player->IsToolOwned(TEXT("Lantern"));
+	Player->SetToolOwned(TEXT("Lantern"), true);
+	if (USaltPrologueSubsystem* Prologue = GetWorld()->GetSubsystem<USaltPrologueSubsystem>())
+	{
+		Prologue->Reach(SaltStory::Keeper);
+	}
 	if (PC)
 	{
-		PC->ShowNotice(NSLOCTEXT("SaltDig", "KeeperShovel", "\"Take my shovel. The Cartographer never trusted a store; half of them is buried.\""));
+		PC->ShowNotice(bLantern
+			? NSLOCTEXT("SaltDig", "KeeperShovelLantern", "\"Take my shovel, and a lantern; the nights are long here. The Cartographer never trusted a store: half of them is buried.\"")
+			: NSLOCTEXT("SaltDig", "KeeperShovel", "\"Take my shovel. The Cartographer never trusted a store; half of them is buried.\""));
 	}
 	UE_LOG(LogSaltbound, Display, TEXT("SB_DIG shovel given by the keeper"));
 }

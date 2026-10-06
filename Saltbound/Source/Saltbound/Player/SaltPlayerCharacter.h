@@ -128,6 +128,10 @@ public:
 	TArray<FName> GetOwnedToolList() const { return OwnedTools.Array(); }
 	void SetOwnedTools(const TArray<FName>& Tools) { OwnedTools = TSet<FName>(Tools); if (!HeldTool.IsNone() && !OwnedTools.Contains(HeldTool)) { SetHeldTool(NAME_None); } }
 	void SetToolOwned(FName Tool, bool bOwned);
+	/** FH1 (D77): waking on the beach: out of black, the view rises from the sand over Seconds (lying, sitting up, standing);
+	 *  walking and looking come back at the end. */
+	void StartWakeUp(float Seconds);
+	bool IsWakingUp() const { return WakeSeconds > 0.f; }
 	/** Shows the held tool (compass, spyglass view, lantern). */
 	class USaltHeldToolsComponent* GetHeldTools() const { return HeldTools; }
 
@@ -216,6 +220,9 @@ protected:
 	TObjectPtr<USceneComponent> ViewAnchor;
 
 private:
+	float WakeT = 0.f;
+	float WakeSeconds = 0.f;
+	FTimerHandle WakeTimer;
 	/** The deck the player is on, at its controls or climbing (it moves the view), or null. */
 	const USceneComponent* GetDeck() const;
 
