@@ -459,11 +459,13 @@ def details(out):
     # wherever the grass covers (overlapping, each turned and scaled its own way), thinner patches at the grass's edge, none on
     # the footpath, in the places or where the litter takes over under the trees. Its own placer and seed.
     PL = Placer(72)
-    xs, ys = PL.candidates(0.82)
+    xs, ys = PL.candidates(0.72)                                # D78: denser (about 1.9 patches a square metre)
     G = surface(xs, ys, trunks)
     F = G["F"]
     g = G["g"]
-    ok = (g > 0.38) & (F["path"] > S.PATH_HALF + 0.45) & (G["earth"] < 0.35)
+    # The grass's own edge (and the sandy fingers in it) gets a fringe: sparser patches down to a thin cover.
+    ok = ((g > 0.28) | (PL.rng.uniform(0, 1, xs.shape) < (g - 0.12) / 0.16)) & (g > 0.12)
+    ok &= (F["path"] > S.PATH_HALF + 0.45) & (G["earth"] < 0.35)
     ok &= PL.rng.uniform(0, 1, xs.shape) > np.clip((G["lit"] - 0.3) / 0.4, 0, 1)
     for name, p in S.PLACES.items():
         if "clear" in p:
@@ -474,9 +476,31 @@ def details(out):
     pick = PL.rng.uniform(0, 1, xs.shape)
     for k in np.nonzero(ok)[0]:
         mesh = "SM_Grass_PatchEdge" if g[k] < 0.7 else ("SM_Grass_PatchA" if pick[k] < 0.6 else "SM_Grass_PatchB")
-        lawn[mesh].append([round(float(xs[k]) * 100, 1), round(float(ys[k]) * 100, 1), 0.0, round(float(PL.rng.uniform(0, 360)), 1), 0.0, 0.0,
+        # Combed with the wind (towards about 20 degrees, from the game's 200), the direction wandering slowly over the island.
+        yaw = 20.0 + 40.0 * S.vnoise(xs[k], ys[k], 9.0, 74) + PL.rng.normal(0.0, 22.0)
+        lawn[mesh].append([round(float(xs[k]) * 100, 1), round(float(ys[k]) * 100, 1), 0.0, round(float(yaw), 1), 0.0, 0.0,
                            round(float(PL.rng.uniform(0.85, 1.15)), 3), 0.0])
     det.update(lawn)
+    # D78 (owner: "real leaves for the braun part"): patches of fallen leaves over the litter (thick under the crowns, thinning
+    # out at their edges, where they lie on the grass), a few on the footpath where it passes under trees. Its own placer.
+    PF = Placer(73)
+    xs, ys = PF.candidates(0.9)
+    G = surface(xs, ys, trunks)
+    lit = G["lit"]
+    near = S.plant_relief(xs, ys, [t for t in trunks if "Tree" in t[0]])[1]
+    on_path = (G["earth"] > 0.4) & (near > 0.3)
+    leaves = {"SM_Litter_PatchA": [], "SM_Litter_PatchB": [], "SM_Litter_Sparse": []}
+    pick = PF.rng.uniform(0, 1, xs.shape)
+    for k in np.nonzero((lit > 0.15) | on_path)[0]:
+        if on_path[k] or lit[k] < 0.35:
+            if pick[k] > 0.75:
+                continue
+            mesh = "SM_Litter_Sparse"
+        else:
+            mesh = "SM_Litter_PatchA" if lit[k] > 0.6 else "SM_Litter_PatchB"
+        leaves[mesh].append([round(float(xs[k]) * 100, 1), round(float(ys[k]) * 100, 1), 0.0, round(float(PF.rng.uniform(0, 360)), 1), 0.0,
+                             0.0, round(float(PF.rng.uniform(0.85, 1.15)), 3), 0.0])
+    det.update(leaves)
     out["details"] = det
     print("SB_HOME details:", {k: len(v) for k, v in det.items()})
 

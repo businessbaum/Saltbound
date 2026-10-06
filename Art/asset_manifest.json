@@ -559,6 +559,28 @@
     "collision": "none",
     "nanite_shape": "preserve_area"
   },
+  "SM_Litter_PatchA": {
+    "fbx": "Vegetation/SM_Litter_PatchA.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area",
+    "_note": "D78 build_vegetation.py litter: fallen leaves lying on the forest floor (owner: real leaves for the brown parts), instanced over the litter; MI_IslLeaf_Litter."
+  },
+  "SM_Litter_PatchB": {
+    "fbx": "Vegetation/SM_Litter_PatchB.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
+  "SM_Litter_Sparse": {
+    "fbx": "Vegetation/SM_Litter_Sparse.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area"
+  },
   "SM_Palm_A": {
     "fbx": "Vegetation/SM_Palm_A.fbx",
     "dest": "/Game/Saltbound/Environment/Vegetation",

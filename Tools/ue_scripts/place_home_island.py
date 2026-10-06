@@ -26,7 +26,7 @@ FOLDER = "HomeIsland"
 OWNED = ("Home_Sand", "Home_Turf", "Home_Ground", "Island_Rock_", "Plants_", "SeaGrass_", "Detail_", "Place_", "Keeper_")
 
 # (cull start, cull end in cm (0 = never), casts shadows, collides) by the mesh's kind (D60; D71 adds the details).
-KINDS = {"Grass_Patch": (4500.0, 6000.0, False, False),
+KINDS = {"Grass_Patch": (5000.0, 7000.0, False, False), "Litter_": (4000.0, 5500.0, False, False),
          "Palm": (0.0, 0.0, True, True), "Tree": (0.0, 0.0, True, True), "Bush": (25000.0, 30000.0, True, False),
          "BigLeaf": (25000.0, 30000.0, True, False), "Fern": (12000.0, 15000.0, True, False),
          "GrassTuft": (6000.0, 8000.0, False, False), "Runner": (5000.0, 7000.0, False, False),
@@ -100,7 +100,12 @@ def place(eas=None):
                 print("SB_HOME_ISLAND skipped", name)
                 continue
             mesh_path = (PROPS if name.startswith("SM_Home_") else VEG) + name
-            scatter(eas, ("Plants_" if group == "plants" else "Detail_") + name[3:], mesh_path, rows, kind)
+            s = scatter(eas, ("Plants_" if group == "plants" else "Detail_") + name[3:], mesh_path, rows, kind)
+            # D78: the lawn's blades sway only within 25 m, the fallen leaves never (cheaper for Nanite's rasteriser).
+            wpo_off = {"Grass_Patch": 2500, "Litter_": 1}.get(kind)
+            if wpo_off:
+                s.get_component_by_class(unreal.HierarchicalInstancedStaticMeshComponent).set_editor_property(
+                    "world_position_offset_disable_distance", wpo_off)
             counts[name] = len(rows)
     for kind, rows in home.get("seagrass", {}).items():
         scatter(eas, "SeaGrass_" + kind, UW + "SM_SeaGrass_" + kind, rows, "GrassTuft", "/Game/Saltbound/Materials/Instances/MI_SeaGrass")

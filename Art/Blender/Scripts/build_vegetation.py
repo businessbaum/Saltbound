@@ -52,7 +52,7 @@ UP = Vector((0.0, 0.0, 1.0))
 MATS = {"MI_IslBark_Palm": (0.45, 0.36, 0.26), "MI_IslLeaf_Palm": (0.3, 0.55, 0.18), "MI_IslNut": (0.4, 0.4, 0.15),
         "MI_IslBark_Tree": (0.35, 0.27, 0.2), "MI_IslLeaf_Tree": (0.2, 0.45, 0.15), "MI_IslLeaf_Bush": (0.28, 0.52, 0.2),
         "MI_IslFlower": (0.85, 0.15, 0.2), "MI_IslGrass_Beach": (0.6, 0.62, 0.3), "MI_IslLeaf_Runner": (0.3, 0.5, 0.18),
-        "MI_IslGrass_Lawn": (0.3, 0.5, 0.15)}
+        "MI_IslGrass_Lawn": (0.3, 0.5, 0.15), "MI_IslLeaf_Litter": (0.45, 0.3, 0.15)}
 
 
 class Builder:
@@ -833,51 +833,56 @@ def runner(name, seed, length, flowers):
     return B.finish()
 
 
-def grass_patch(name, seed, clumps, h_range, blades=(4, 7), straw=0.08, seeds=0, size=1.0, slot="MI_IslGrass_Lawn",
-                width=(0.0045, 0.0075)):
-    """D71 (owner: "just create real visual grass small and a lot so it blends in. The grass design is important because you
-    will copy it a lot"): a square metre of short lawn grass, instanced densely over the island's grass (a reusable kit).
+def grass_patch(name, seed, groups, h_range, per_group=(1, 3), straw=0.06, seeds=0, size=1.0, slot="MI_IslGrass_Lawn",
+                width=(0.005, 0.008), flow=0.0):
+    """A square metre of meadow grass (D71's kit, D78's meadow), instanced densely over the island's grass.
 
-    Clumps of thin tapered blades rise from a tight root, lean out and curve over (a little twist), darker at the root (where the
-    ground's colour takes over) and lighter at the tip; now and then a straw blade or a seed stalk. Few triangles per blade
-    (four segments, one strip), so tens of thousands of patches stay cheap. Vertex colours as the plants (R root .. tip, G straw,
-    B one random value per clump, A how freely it moves: the tip most). UVs: a blade's U across it, V up it."""
+    Owner (D71): "just create real visual grass small and a lot so it blends in. The grass design is important because you will
+    copy it a lot"; (D78): "even denser grass ... change the green floor desing ... its horrible". D71's clumps fanned their
+    blades out from one point and read as stars from above. Here the blades stand evenly over the square (small groups of one
+    to three on a jittered grid), mostly upright, each leaning and curving over a little, the patch combed one way by the wind
+    (a wide spread round it), their heights rolling in soft waves across the patch: a carpet, no clumps. Combed along local +X
+    (`flow`): the placement turns every patch with the wind, so neighbours show no borders from above. Four rows a blade
+    (five triangles). Vertex colours as the plants (R root .. tip, G straw, B one random value per group, A how freely it moves:
+    the tip most). UVs: a blade's U across it, V up it."""
     B = Builder(name, [slot], seed)
     rng = B.rng
     half = size * 0.5
-    for c in range(clumps):
+    k = max(1, int(round(math.sqrt(groups))))
+    cell = size / k
+    wave = [(rng.uniform(2.0, 5.0), rng.uniform(0, 6.28), rng.uniform(0, 6.28)) for _ in range(3)]
+    for gi in range(k):
+        for gj in range(k):
+            gx = -half + (gi + rng.random()) * cell
+            gy = -half + (gj + rng.random()) * cell
+            roll = sum(math.sin(f * (gx * math.cos(a) + gy * math.sin(a)) * 2 * math.pi + p) for f, a, p in wave) / 3.0
+            gh = (h_range[0] + (h_range[1] - h_range[0]) * (0.5 + 0.5 * roll)) * rng.uniform(0.85, 1.15)
+            lean_dir = flow + rng.gauss(0.0, 0.75)
+            grnd = rng.random()
+            dry_group = rng.random() < straw
+            for bl in range(rng.randint(*per_group)):
+                base = Vector((gx + rng.uniform(-0.006, 0.006), gy + rng.uniform(-0.006, 0.006), -0.01))
+                a = lean_dir + rng.uniform(-0.35, 0.35)
+                out = Vector((math.cos(a), math.sin(a), 0.0))
+                h = gh * rng.uniform(0.8, 1.1)
+                lean = rng.uniform(0.12, 0.4)
+                w = rng.uniform(*width)
+                twist = rng.uniform(-0.5, 0.5)
+                dry = 1.0 if dry_group and rng.random() < 0.7 else min(1.0, max(0.0, rng.gauss(0.03, 0.05)))
+                side0 = out.cross(UP).normalized()
+                centre, acr, ws, cols = [], [], [], []
+                for s_, t in enumerate((0.0, 0.4, 0.75, 1.0)):
+                    p = base + UP * (h * (t - 0.35 * lean * t * t)) + out * (h * lean * t * t)
+                    ang = twist * t
+                    centre.append(p)
+                    acr.append(side0 * math.cos(ang) + out * math.sin(ang))
+                    ws.append(w * (1.0 - t ** 1.3) if t < 1.0 else 0.0)
+                    cols.append((0.1 + 0.9 * t ** 0.8, min(1.0, dry + max(0.0, t - 0.85) * 0.5), grnd, t * t))
+                strip(B, centre, acr, ws, slot, cols)
+    for k_ in range(seeds):
         cx, cy = rng.uniform(-half, half), rng.uniform(-half, half)
-        crnd = rng.random()
-        lean_dir = rng.uniform(0, 2 * math.pi)                    # a clump is combed a little one way
-        n = rng.randint(*blades)
-        ch = rng.uniform(*h_range)
-        for k in range(n):
-            a = rng.uniform(0, 2 * math.pi)
-            r0 = 0.02 * math.sqrt(rng.random())
-            base = Vector((cx + math.cos(a) * r0, cy + math.sin(a) * r0, -0.01))
-            out_a = a * 0.6 + lean_dir * 0.4 + rng.uniform(-0.5, 0.5)
-            out = Vector((math.cos(out_a), math.sin(out_a), 0.0))
-            h = ch * rng.uniform(0.65, 1.15)
-            lean = rng.uniform(0.15, 0.55)                        # how far over the tip goes (share of the height)
-            w = rng.uniform(*width)
-            twist = rng.uniform(-0.6, 0.6)
-            dry = 1.0 if rng.random() < straw else min(1.0, max(0.0, rng.gauss(0.05, 0.08)))
-            centre, acr, ws, cols = [], [], [], []
-            side0 = out.cross(UP).normalized()
-            for s in range(5):
-                t = s / 4
-                p = base + UP * (h * (t - 0.35 * lean * t * t)) + out * (h * lean * t * t)
-                ang = twist * t
-                side = side0 * math.cos(ang) + out * math.sin(ang)
-                centre.append(p)
-                acr.append(side)
-                ws.append(w * (1.0 - t ** 1.2) if s < 4 else 0.0)
-                cols.append((0.12 + 0.88 * t ** 0.8, min(1.0, dry + max(0.0, t - 0.85) * 0.6), crnd, t * t))
-            strip(B, centre, acr, ws, slot, cols)
-    for k in range(seeds):
-        cx, cy = rng.uniform(-half, half), rng.uniform(-half, half)
-        h = h_range[1] * rng.uniform(1.4, 1.9)
-        bend = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), 0.0)).normalized() * 0.05
+        h = h_range[1] * rng.uniform(1.5, 2.0)
+        bend = Vector((math.cos(flow), math.sin(flow), 0.0)) * rng.uniform(0.02, 0.06)
         stalk = resample(bezier(Vector((cx, cy, -0.01)), Vector((cx, cy, h * 0.5)), Vector((cx, cy, h * 0.85)) + bend * 0.5,
                                 Vector((cx, cy, h)) + bend, 6), 0.03)
         tube(B, stalk, lambda i, s, a_: 0.0025, 3, slot, lambda i, s, a_: (0.4 + 0.5 * s, 0.7, 0.5, s * s), cap_end=False, u_tiles=1)
@@ -888,6 +893,97 @@ def grass_patch(name, seed, clumps, h_range, blades=(4, 7), straw=0.08, seeds=0,
             d = (bend.normalized() * 0.3 + UP * 0.6 + Vector((rng.uniform(-0.5, 0.5), rng.uniform(-0.5, 0.5), 0.0))).normalized()
             normal = d.cross(Vector((1.0, 0.0, 0.0))).normalized()
             leaf(B, p, normal, d, 0.022, 0.008, slot, tone=(0.7, 1.0), dry=0.85, rnd=0.5, sway=(0.9, 1.0), fold=0.0, rows=2)
+    return B.finish()
+
+
+def fallen_leaf(B, c, ang, length, width, rng, slot, tone, age, rnd, fold=0.25, curl=0.15, tilt=(0.0, 0.0), shape="oval"):
+    """A leaf lying on the ground (D78): its midrib along `ang`, cupped (fold > 0: the edges up) or arched (fold < 0), the tip and
+    the stalk end curling up off the ground, tilted where it rests on others. shape: "oval", "long" (lanceolate), "heart"."""
+    along = Vector((math.cos(ang), math.sin(ang), 0.0))
+    across = Vector((-math.sin(ang), math.cos(ang), 0.0))
+    # Tilt: pitch along the leaf, roll across it (it rests on what lies under it).
+    pa, ra = tilt
+    up = (UP + along * math.tan(pa) + across * math.tan(ra)).normalized()
+    along = (along - up * along.dot(up)).normalized()
+    across = up.cross(along).normalized()
+    rows = 6
+    centre, acr, lift, ws, fs, cols, ecols = [], [], [], [], [], [], []
+    for r in range(rows + 1):
+        t = r / rows
+        u = t - 0.5
+        rise = curl * length * (max(t - 0.6, 0.0) / 0.4) ** 2 + 0.4 * curl * length * (max(0.25 - t, 0.0) / 0.25) ** 2
+        centre.append(c + along * (length * u) + up * (0.004 + rise))
+        acr.append(across)
+        lift.append(up)
+        if shape == "long":
+            prof = math.sin(math.pi * t ** 0.9) ** 1.2
+        elif shape == "heart":
+            prof = math.sin(math.pi * min(1.0, t ** 0.7 * 1.05)) * (1.0 - 0.25 * math.exp(-((t - 0.05) / 0.08) ** 2))
+        else:
+            prof = math.sin(math.pi * t ** 0.85)
+        ws.append(width * 0.5 * prof if 0 < r < rows else (0.004 if r == 0 else 0.0))
+        fs.append(fold)
+        tn = tone + 0.12 * (t - 0.5)
+        cols.append((tn, age, rnd, 0.0))
+        ecols.append((tn * 0.9, min(1.0, age + 0.08), rnd, 0.0))
+    fold_strip(B, centre, acr, lift, ws, fs, slot, cols, ecols)
+    # The stalk.
+    stalk_a = centre[0]
+    stalk_b = stalk_a - along * (length * 0.12) + up * 0.004
+    tube(B, [stalk_a, stalk_b], lambda i, s_, a_: 0.002, 3, slot, lambda i, s_, a_: (tone * 0.8, age, rnd, 0.0), cap_end=False, u_tiles=1)
+
+
+def litter_patch(name, seed, leaves, heaps, twigs=3, size=1.2):
+    """D78 (owner: "real leaves for the braun part"): a patch of fallen leaves lying on the forest floor, instanced over the
+    island's litter (D71 painted them flat into the ground texture). Leaves of three shapes and sizes (8-26 cm, as the island's
+    trees), most dry in browns and ochres, some yellowed or still green, cupped, arched or curling at the tip, gathered in a few
+    low heaps (each lying on the ones under it) and scattered between, with a few twigs. Pivot at the patch's middle on the
+    ground. Vertex colours as the plants: R tone (dark brown .. ochre), G age (fresh green .. dry), B a random value per leaf."""
+    B = Builder(name, ["MI_IslLeaf_Litter", "MI_IslBark_Tree"], seed)
+    rng = B.rng
+    half = size * 0.5
+    placed = []                                            # (x, y, radius, top z)
+    centres = [(rng.uniform(-half * 0.7, half * 0.7), rng.uniform(-half * 0.7, half * 0.7), rng.uniform(0.12, 0.25)) for _ in range(heaps)]
+    for k in range(leaves):
+        if centres and rng.random() < 0.45:
+            hx, hy, hr = centres[rng.randrange(len(centres))]
+            r_ = hr * math.sqrt(rng.random())
+            a_ = rng.uniform(0, 2 * math.pi)
+            x, y = hx + math.cos(a_) * r_, hy + math.sin(a_) * r_
+        else:
+            x, y = rng.uniform(-half, half), rng.uniform(-half, half)
+        shape = rng.choice(("oval", "oval", "long", "heart"))
+        L = {"oval": rng.uniform(0.1, 0.22), "long": rng.uniform(0.14, 0.26), "heart": rng.uniform(0.09, 0.18)}[shape]
+        W = L * {"oval": rng.uniform(0.45, 0.6), "long": rng.uniform(0.22, 0.32), "heart": rng.uniform(0.7, 0.85)}[shape]
+        # Rests on what lies under it: its height and a little tilt.
+        z = 0.0
+        n_under = 0
+        for px, py, pr, pz in placed:
+            if (px - x) ** 2 + (py - y) ** 2 < (pr + L * 0.35) ** 2:
+                z = max(z, pz)
+                n_under += 1
+        tilt = (rng.uniform(-0.12, 0.12) * min(n_under, 2), rng.uniform(-0.12, 0.12) * min(n_under, 2))
+        r = rng.random()
+        if r < 0.08:
+            age, tone = rng.uniform(0.0, 0.2), rng.uniform(0.4, 0.8)            # fallen green
+        elif r < 0.22:
+            age, tone = rng.uniform(0.55, 0.75), rng.uniform(0.75, 0.95)         # yellowing
+        else:
+            age, tone = rng.uniform(0.85, 1.0), rng.uniform(0.1, 0.75)           # dry: dark brown .. ochre
+        fold = rng.choice((rng.uniform(0.12, 0.35), rng.uniform(0.12, 0.35), rng.uniform(-0.25, -0.08)))
+        curl = rng.uniform(0.04, 0.2) * (1.3 if age > 0.8 else 1.0)
+        fallen_leaf(B, Vector((x, y, z)), rng.uniform(0, 2 * math.pi), L, W, rng, "MI_IslLeaf_Litter", tone, age, rng.random(),
+                    fold=fold, curl=curl, tilt=tilt, shape=shape)
+        placed.append((x, y, L * 0.4, z + 0.006 + abs(fold) * W * 0.25))
+    for k in range(twigs):
+        a = rng.uniform(0, 6.28)
+        d = Vector((math.cos(a), math.sin(a), 0.0))
+        L = rng.uniform(0.25, 0.6)
+        start = Vector((rng.uniform(-half, half) * 0.8, rng.uniform(-half, half) * 0.8, 0.012))
+        pts = bend_path(start, d, L, rng, step=0.05, wiggle=0.15)
+        for p in pts:
+            p.z = 0.01 + 0.02 * rng.random()
+        tube(B, pts, taper(0.01, 0.004), 5, "MI_IslBark_Tree", bark_colour(rng.random(), wood=0.2), u_tiles=1)
     return B.finish()
 
 
@@ -982,9 +1078,12 @@ BUILDERS = {
                       grass_tuft("SM_GrassTuft_B", 502, 26, (0.4, 0.75), 0.6, seeds=4)),
     "runner": lambda: (runner("SM_Runner_A", 601, 1.6, True), sb.reset_scene(), runner("SM_Runner_B", 602, 1.1, False)),
     "fallen": lambda: fallen_palm("SM_Home_FallenPalm", 701),
-    "lawn": lambda: (grass_patch("SM_Grass_PatchA", 801, 220, (0.07, 0.14)), sb.reset_scene(),
-                     grass_patch("SM_Grass_PatchB", 802, 200, (0.08, 0.16), straw=0.12, seeds=4), sb.reset_scene(),
-                     grass_patch("SM_Grass_PatchEdge", 803, 60, (0.06, 0.12), blades=(3, 6), straw=0.18)),
+    "lawn": lambda: (grass_patch("SM_Grass_PatchA", 801, 1225, (0.09, 0.17)), sb.reset_scene(),
+                     grass_patch("SM_Grass_PatchB", 802, 1156, (0.1, 0.19), straw=0.1, seeds=4), sb.reset_scene(),
+                     grass_patch("SM_Grass_PatchEdge", 803, 784, (0.07, 0.14), per_group=(1, 2), straw=0.12)),
+    "litter": lambda: (litter_patch("SM_Litter_PatchA", 811, 150, 5, twigs=3), sb.reset_scene(),
+                       litter_patch("SM_Litter_PatchB", 812, 80, 3, twigs=2), sb.reset_scene(),
+                       litter_patch("SM_Litter_Sparse", 813, 16, 0, twigs=1)),
 }
 
 if __name__ == "__main__":

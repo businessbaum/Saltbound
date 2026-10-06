@@ -47,6 +47,12 @@ SHOTS = {
     # The lawn (the owner: "real visual grass small and a lot so it blends in").
     "lawn_close": ((-33.0, 20.0, 1.65), (-36.5, 22.5, 0.0)),
     "lawn_field": ((-36.0, 0.0, 1.7), (-50.0, 10.0, 0.6)),
+    # D78: the owner's view (close, from above), the meadow at eye height, the forest floor's leaves close.
+    "grass_top": ((-40.0, 14.0, 0.9), (-40.3, 14.2, 0.0)),
+    "meadow_eye": ((-30.0, 30.0, 1.6), (-48.0, 22.0, 0.4)),
+    "meadow_far": ((-25.0, -10.0, 2.2), (-60.0, 20.0, 1.0)),
+    "litter_close": ((-41.0, -26.0, 1.4), (-43.3, -28.4, 0.0)),
+    "litter_top": ((-44.6, -27.0, 0.9), (-44.8, -27.2, 0.0)),
 }
 
 

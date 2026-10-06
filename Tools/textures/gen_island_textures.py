@@ -359,94 +359,62 @@ def sand():
 
 
 def grass():
-    """Island grass, tile 1.6 m (1 px ~ 0.8 mm): clumps of blades radiating from their middles (dark bases, light tips),
-    straw blades, small clover leaves and rare flowers; dark earth and old blades between the clumps."""
+    """Island grass under the lawn's blades (D78), tile 1.6 m (1 px ~ 0.8 mm). Owner: "change the green floor desing ... its
+    horrible" (D71's set had clumps of blades radiating from their middles: from above they read as neon stars or pine needles).
+    Now a calm thatch: thousands of fine blades lying combed along a slow flow (the wind's), dark old blades and a little earth
+    between them, broad soft patches of deeper and drier green. No clumps, no flowers, muted colours: the 3D lawn is the grass,
+    this is what shows between its blades and, far off, where the lawn ends."""
     rng = np.random.default_rng(7201)
     n = SIZE
-    soil = np.array([0.16, 0.2, 0.06])
-    c = Canvas(n, soil, 0.85)
+    soil = np.array([0.15, 0.16, 0.08])
+    c = Canvas(n, soil, 0.9)
     c.rgb = c.rgb * (0.85 + 0.3 * n01(spectral_noise(n, 4, 30, -1.5, seed=7202)))[..., None]
-    c.h += 1.0 * spectral_noise(n, 6, 40, -1.6, seed=7203)
-    # Broad patches: lusher, drier and sunnier areas change the clumps' colours.
+    c.h += 0.8 * spectral_noise(n, 6, 40, -1.6, seed=7203)
     lush = n01(spectral_noise(n, 1, 5, -2.0, seed=7204))
-    dry = crisp(n01(spectral_noise(n, 1, 6, -1.9, seed=7205)), 0.7, 0.1)
-    greens = [((0.12, 0.26, 0.05), (0.42, 0.62, 0.15)), ((0.15, 0.3, 0.06), (0.5, 0.68, 0.18)),
-              ((0.13, 0.27, 0.05), (0.36, 0.58, 0.13)), ((0.18, 0.32, 0.07), (0.6, 0.7, 0.22))]
-    straw = ((0.35, 0.3, 0.12), (0.72, 0.64, 0.34))
-    # Under layer: short old blades everywhere (so no bare gaps read as holes), then the clumps.
-    for _ in range(9000):
-        px, py = rng.uniform(0, n, 2)
-        g = greens[rng.integers(len(greens))]
-        b = tuple(np.asarray(g[0]) * 0.8)
-        t = tuple(np.asarray(g[1]) * 0.7)
-        c.stamp(px, py, sp_blade(rng, rng.uniform(25, 55), rng.uniform(4, 7), rng.uniform(0, 6.3), b, t, curve=rng.uniform(-0.2, 0.2),
-                                 rough=0.7, lift=0.4), mode="pile", settle=0.5)
-    centres = []
-    jit = np.random.default_rng(7206).uniform(0.0, 1.0, (16, 16, 2))
-    for cy in range(16):
-        for cx in range(16):
-            for k in range(rng.integers(2, 4)):
-                ox, oy = rng.normal(0, 0.28, 2)
-                centres.append(((cx + jit[cy, cx, 0] + ox) / 16 * n, (cy + jit[cy, cx, 1] + oy) / 16 * n))
-    rng.shuffle(centres)
-    for (mx, my) in centres:
-        lx, ly = int(my) % n, int(mx) % n
-        l_ = lush[lx, ly]
-        is_dry = dry[lx, ly] > 0.5 and rng.random() < 0.5
-        radius = rng.uniform(60, 120) * (0.8 + 0.4 * l_)
-        nb = int(rng.integers(26, 44))
-        g = greens[rng.integers(len(greens))]
-        lean = rng.uniform(0, 2 * np.pi)                    # a clump is combed one way (the wind, its weight)
-        spread = rng.uniform(0.6, 1.1)
-        for b in range(nb):
-            ang = lean + rng.normal(0.0, spread)
-            length = radius * rng.uniform(0.7, 1.3)
-            oa, off = rng.uniform(0, 2 * np.pi), rng.uniform(0, 0.22) * radius
-            bx = mx + math.cos(oa) * off + math.cos(ang) * length * 0.5
-            by = my + math.sin(oa) * off + math.sin(ang) * length * 0.5
-            col_b, col_t = (straw if (is_dry and rng.random() < 0.5) or rng.random() < 0.06 else g)
-            jitter = rng.uniform(0.85, 1.15)
-            c.stamp(bx, by, sp_blade(rng, length, rng.uniform(6.0, 11.0), ang, shade(col_b, jitter), shade(col_t, jitter),
-                                     curve=rng.uniform(-0.35, 0.35), rough=rng.uniform(0.45, 0.6), lift=1.2 + 0.6 * l_),
-                    mode="pile", settle=0.75)
-    # Clover leaves (three round leaflets) and a few flowers on top.
-    for _ in range(160):
-        px, py = rng.uniform(0, n, 2)
-        col = (0.2, 0.42, 0.1) if rng.random() < 0.7 else (0.28, 0.5, 0.14)
-        for j in range(3):
-            a0 = j * 2.094 + rng.uniform(-0.2, 0.2)
-            c.stamp(px + math.cos(a0) * 6, py + math.sin(a0) * 6,
-                    sp_leaf(rng, 13, 11, a0, col, curl=0.15, vein=0.05, rough=0.5), mode="pile", settle=0.9)
-    for _ in range(45):
-        px, py = rng.uniform(0, n, 2)
-        col = (0.95, 0.94, 0.88) if rng.random() < 0.6 else (0.98, 0.82, 0.25)
-        for j in range(5):
-            a0 = j * 1.2566
-            c.stamp(px + math.cos(a0) * 4, py + math.sin(a0) * 4, sp_leaf(rng, 8, 6, a0, col, curl=0.1, vein=0.0, rough=0.5),
-                    mode="pile", settle=0.95)
-        c.stamp(px, py, sp_pebble(rng, 2.4, 2.4, 0, (0.95, 0.75, 0.2), rough=0.5, height=0.4), mode="pile", settle=1.0)
-    rgb = c.rgb
-    c.rgb = rgb * (0.92 + 0.16 * lush)[..., None]
-    finish(c, "Grass", 0.55, height_norm=np.clip(c.h / max(np.percentile(c.h, 99.5), 1e-3), 0, 1))
+    dry = crisp(n01(spectral_noise(n, 1, 6, -1.9, seed=7205)), 0.68, 0.12)
+    flow = spectral_noise(n, 1, 4, -2.0, seed=7206) * 1.6 + 0.6           # the combing direction (radians), slowly wandering
+    greens = [((0.12, 0.2, 0.06), (0.3, 0.42, 0.13)), ((0.11, 0.19, 0.06), (0.27, 0.4, 0.12)),
+              ((0.13, 0.21, 0.07), (0.33, 0.44, 0.15)), ((0.1, 0.17, 0.06), (0.24, 0.35, 0.11))]
+    straw = ((0.2, 0.19, 0.09), (0.38, 0.36, 0.19))
+    old = ((0.14, 0.15, 0.07), (0.25, 0.26, 0.13))
+    # Three layers: old flattened blades, the thatch, a few fresher blades on top; each blade a thin dash along the flow.
+    for layer, (count, lmin, lmax, wmin, wmax, lift) in enumerate(((7000, 30, 70, 3.0, 5.0, 0.3), (16000, 25, 60, 2.5, 4.5, 0.6),
+                                                                    (5000, 20, 45, 2.2, 3.8, 0.9))):
+        for _ in range(count):
+            px, py = rng.uniform(0, n, 2)
+            iy, ix = int(py) % n, int(px) % n
+            ang = flow[iy, ix] + rng.normal(0.0, 0.35)
+            if layer == 0:
+                col_b, col_t = old
+            elif dry[iy, ix] > 0.5 and rng.random() < 0.15 or rng.random() < 0.03:
+                col_b, col_t = straw
+            else:
+                col_b, col_t = greens[rng.integers(len(greens))]
+            k = rng.uniform(0.85, 1.12) * (0.9 + 0.2 * lush[iy, ix])
+            c.stamp(px, py, sp_blade(rng, rng.uniform(lmin, lmax), rng.uniform(wmin, wmax), ang, shade(col_b, k), shade(col_t, k),
+                                     curve=rng.uniform(-0.15, 0.15), rough=0.75, lift=lift), mode="pile", settle=0.6)
+    c.rgb = c.rgb * (0.94 + 0.12 * lush)[..., None]
+    c.rough = np.clip(c.rough + 0.1, 0, 1)                                 # thatch is matte (no sheen between the blades)
+    finish(c, "Grass", 0.45, height_norm=np.clip(c.h / max(np.percentile(c.h, 99.5), 1e-3), 0, 1))
 
 
 def litter():
-    """The forest floor, tile 2 m: dark earth and moss, heaped leaves (fresh, yellowed, brown, rotting), twigs, roots,
-    pebbles and seed husks."""
+    """The forest floor under the 3D leaves (D78), tile 2 m: dark humus, moss, roots, twigs, small broken leaf fragments and
+    seed husks. Owner: "real leaves for the braun part" (D71 painted whole flat leaves here); the whole leaves are geometry now
+    (SM_Litter_*), this keeps only what is too small to model and, far off, the browns of the leaves."""
     rng = np.random.default_rng(7301)
     n = SIZE
-    earth = np.array([0.2, 0.15, 0.09])
+    earth = np.array([0.17, 0.12, 0.075])
     c = Canvas(n, earth, 0.92)
     soil = n01(spectral_noise(n, 3, 30, -1.6, seed=7302))
     c.rgb = c.rgb * (0.8 + 0.4 * soil)[..., None]
     c.h += 2.0 * spectral_noise(n, 3, 20, -1.8, seed=7303) + 0.4 * spectral_noise(n, 60, 300, -1.0, seed=7304)
-    moss = crisp(n01(spectral_noise(n, 2, 9, -1.9, seed=7305) + 0.3 * spectral_noise(n, 10, 50, -1.4, seed=7306)), 0.64, 0.05)
-    moss_col = np.array([0.22, 0.32, 0.08]) * (0.8 + 0.4 * n01(spectral_noise(n, 40, 200, -1.0, seed=7307)))[..., None]
+    moss = crisp(n01(spectral_noise(n, 2, 9, -1.9, seed=7305) + 0.3 * spectral_noise(n, 10, 50, -1.4, seed=7306)), 0.7, 0.05)
+    moss_col = np.array([0.18, 0.25, 0.08]) * (0.8 + 0.4 * n01(spectral_noise(n, 40, 200, -1.0, seed=7307)))[..., None]
     c.rgb = c.rgb * (1 - moss[..., None]) + moss_col * moss[..., None]
     c.h += moss * (1.5 + 0.8 * spectral_noise(n, 60, 250, -0.9, seed=7308))
     c.rough = c.rough * (1 - moss) + 0.8 * moss
-    # Roots first (under the leaves), then twigs, then leaves in layers (old dark ones first, fresh ones last).
-    root_col = (0.36, 0.27, 0.18)
+    root_col = (0.33, 0.25, 0.17)
     for _ in range(9):
         px, py = rng.uniform(0, n, 2)
         ang = rng.uniform(0, 6.3)
@@ -456,43 +424,31 @@ def litter():
             px += math.cos(ang) * 120
             py += math.sin(ang) * 120
             ang += rng.uniform(-0.5, 0.5)
-    leaf_cols = {"old": [(0.27, 0.18, 0.1), (0.32, 0.22, 0.12), (0.24, 0.17, 0.11)],
-                 "brown": [(0.45, 0.3, 0.15), (0.52, 0.35, 0.17), (0.4, 0.27, 0.14), (0.5, 0.4, 0.2)],
-                 "yellow": [(0.66, 0.52, 0.2), (0.7, 0.46, 0.17), (0.58, 0.5, 0.22)],
-                 "olive": [(0.36, 0.38, 0.16), (0.3, 0.34, 0.14)],
-                 "green": [(0.25, 0.4, 0.12), (0.3, 0.45, 0.14)]}
+    frag_cols = [(0.25, 0.17, 0.095), (0.29, 0.2, 0.105), (0.22, 0.155, 0.09), (0.33, 0.24, 0.12), (0.3, 0.23, 0.11), (0.24, 0.22, 0.11)]
     away = 1.0 - 0.85 * moss
-
-    def leaves(kind, count, size, decay, curl):
-        for (px, py) in scatter_points(rng, count, n, away):
-            col = leaf_cols[kind][rng.integers(len(leaf_cols[kind]))]
-            L = rng.uniform(*size)
-            c.stamp(px, py, sp_leaf(rng, L, L * rng.uniform(0.38, 0.55), rng.uniform(0, 6.3), shade(col, rng.uniform(0.85, 1.12)),
-                                    curl=curl, vein=0.15, rough=rng.uniform(0.55, 0.75), decay=decay, lobed=rng.random() < 0.2),
-                    mode="pile", settle=0.7)
-
-    leaves("old", 1100, (35, 70), 0.6, 0.15)
-    for _ in range(26):
-        px, py = rng.uniform(0, n, 2)
-        c.stamp(px, py, sp_twig(rng, rng.uniform(60, 220), rng.uniform(3, 6), rng.uniform(0, 6.3), shade((0.34, 0.27, 0.2), rng.uniform(0.8, 1.2)),
-                                bend=rng.uniform(0.02, 0.1), rough=0.8, fork=rng.random() < 0.5), mode="pile", settle=0.6)
-    leaves("brown", 650, (40, 80), 0.3, 0.3)
-    leaves("olive", 160, (40, 75), 0.2, 0.3)
-    leaves("yellow", 220, (40, 75), 0.15, 0.35)
-    for _ in range(12):
-        px, py = rng.uniform(0, n, 2)
-        c.stamp(px, py, sp_twig(rng, rng.uniform(40, 120), rng.uniform(2, 4), rng.uniform(0, 6.3), (0.42, 0.34, 0.25),
-                                bend=0.1, rough=0.8, fork=rng.random() < 0.4), mode="pile", settle=0.8)
-    leaves("green", 50, (40, 70), 0.0, 0.35)
-    peb_cols = [(0.42, 0.4, 0.36), (0.5, 0.47, 0.42), (0.36, 0.33, 0.3)]
+    # Broken leaf bits: small (6-22 px, 0.6-2 cm), torn, dense, under and between where the 3D leaves lie.
+    for (px, py) in scatter_points(rng, 7000, n, away):
+        col = frag_cols[rng.integers(len(frag_cols))]
+        L = rng.uniform(8, 26)
+        if rng.random() < 0.5:
+            spr = sp_shell_bit(rng, L * 0.4, rng.uniform(0, 6.3), shade(col, rng.uniform(0.85, 1.1)), rough=0.8)
+        else:                                               # torn slivers of leaves, long and thin
+            spr = sp_leaf(rng, L, L * rng.uniform(0.25, 0.4), rng.uniform(0, 6.3), shade(col, rng.uniform(0.85, 1.1)), curl=0.1,
+                          vein=0.05, rough=0.8, decay=0.3)
+        c.stamp(px, py, spr, mode="pile", settle=0.6)
     for _ in range(40):
+        px, py = rng.uniform(0, n, 2)
+        c.stamp(px, py, sp_twig(rng, rng.uniform(40, 200), rng.uniform(2, 5), rng.uniform(0, 6.3), shade((0.32, 0.25, 0.18), rng.uniform(0.8, 1.2)),
+                                bend=rng.uniform(0.02, 0.1), rough=0.85, fork=rng.random() < 0.5), mode="pile", settle=0.6)
+    peb_cols = [(0.42, 0.4, 0.36), (0.5, 0.47, 0.42), (0.36, 0.33, 0.3)]
+    for _ in range(30):
         px, py = rng.uniform(0, n, 2)
         rx = rng.uniform(5, 12)
         c.stamp(px, py, sp_pebble(rng, rx, rx * rng.uniform(0.6, 0.9), rng.uniform(0, 6.3), peb_cols[rng.integers(3)], rough=0.6),
                 mode="pile", settle=0.3)
-    for _ in range(30):                                     # husks and seed pods
+    for _ in range(40):                                     # husks and seed pods
         px, py = rng.uniform(0, n, 2)
-        c.stamp(px, py, sp_pebble(rng, rng.uniform(6, 10), rng.uniform(4, 6), rng.uniform(0, 6.3), (0.38, 0.24, 0.12), rough=0.5, height=0.7),
+        c.stamp(px, py, sp_pebble(rng, rng.uniform(5, 9), rng.uniform(3, 5), rng.uniform(0, 6.3), (0.34, 0.22, 0.11), rough=0.6, height=0.7),
                 mode="pile", settle=0.8)
     finish(c, "Litter", 0.6, height_norm=np.clip((c.h - np.percentile(c.h, 1)) / max(np.percentile(c.h, 99.5) - np.percentile(c.h, 1), 1e-3), 0, 1))
 
@@ -531,11 +487,10 @@ def earth():
         rx = rng.uniform(3, 7)
         c.stamp(px, py, sp_pebble(rng, rx, rx * rng.uniform(0.6, 0.95), rng.uniform(0, 6.3), stone_cols[rng.integers(5)], rough=0.6),
                 mode="pile", settle=0.5)
-    for _ in range(40):
+    for _ in range(160):                                    # D78: small broken leaf bits (whole leaves are geometry)
         px, py = rng.uniform(0, n, 2)
-        L = rng.uniform(35, 65)
-        col = [(0.45, 0.3, 0.15), (0.6, 0.46, 0.2), (0.32, 0.22, 0.12)][rng.integers(3)]
-        c.stamp(px, py, sp_leaf(rng, L, L * 0.45, rng.uniform(0, 6.3), col, curl=0.3, vein=0.15, rough=0.65, decay=0.4), mode="pile", settle=0.5)
+        col = [(0.45, 0.3, 0.15), (0.55, 0.42, 0.2), (0.32, 0.22, 0.12)][rng.integers(3)]
+        c.stamp(px, py, sp_shell_bit(rng, rng.uniform(4, 10), rng.uniform(0, 6.3), col, rough=0.75), mode="pile", settle=0.5)
     for _ in range(8):
         px, py = rng.uniform(0, n, 2)
         c.stamp(px, py, sp_twig(rng, rng.uniform(50, 140), rng.uniform(2.5, 4), rng.uniform(0, 6.3), (0.38, 0.3, 0.22), rough=0.8),

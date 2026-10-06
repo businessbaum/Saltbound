@@ -55,8 +55,9 @@ float3 M2 = Texture2DSample(MacroTex, MacroTexSampler, XY / BreakupScale + 0.37)
 // Away from the eye the painted detail is averaged a little sooner (a mip bias), so mid-distance grass does not shimmer.
 float Dist = length(P - CamPos);
 float MipB = DistBias * saturate((Dist - DistStart) / DistRange);
-// Under the lawn's blades (within their reach) the painted grass is a shade darker, the gaps between the blades.
-float Under = lerp(GrassUnder, 1.0, saturate((Dist - LawnFadeStart) / LawnFadeRange));
+// D78: under the lawn's blades the painted grass is the dark thatch between them; where the lawn ends (far off) it takes the
+// lawn's own colour, so the meadow carries on.
+float3 GrassT = lerp(GrassTint.rgb * GrassUnder, GrassFarTint.rgb, saturate((Dist - LawnFadeStart) / LawnFadeRange));
 
 // --- the sets (top projection, each its own tile size in cm) ---
 float2 uS = XY / SandScale, uG = XY / GrassScale, uL = XY / LitterScale, uE = XY / EarthScale, uF = XY / FloorScale;
@@ -118,7 +119,7 @@ a = saturate(((EO.b - H) * HeightGain + (2.0 * wE - 1.0) * (1.0 + s)) / (2.0 * s
 Alb = lerp(Alb, EA * EarthTint.rgb, a); Rough = lerp(Rough, EO.g, a); Nrm = lerp(Nrm, EN * EarthNormal, a); AOv = lerp(AOv, EO.r, a);
 H = lerp(H, EO.b, a);
 a = saturate(((GO.b - H) * HeightGain + (2.0 * wG - 1.0) * (1.0 + s)) / (2.0 * s) + 0.5);
-Alb = lerp(Alb, GA * GrassTint.rgb * Under, a); Rough = lerp(Rough, saturate(GO.g * GrassRough), a); Nrm = lerp(Nrm, GN * GrassNormal, a); AOv = lerp(AOv, GO.r, a);
+Alb = lerp(Alb, GA * GrassT, a); Rough = lerp(Rough, saturate(GO.g * GrassRough), a); Nrm = lerp(Nrm, GN * GrassNormal, a); AOv = lerp(AOv, GO.r, a);
 H = lerp(H, GO.b, a);
 float Grass = a;
 a = saturate(((LO.b - H) * HeightGain + (2.0 * wL - 1.0) * (1.0 + s)) / (2.0 * s) + 0.5);
@@ -153,8 +154,9 @@ PARAMS = {
     "SandScale": ("s", 200.0, "Scale"), "GrassScale": ("s", 160.0, "Scale"), "LitterScale": ("s", 200.0, "Scale"),
     "EarthScale": ("s", 200.0, "Scale"), "FloorScale": ("s", 550.0, "Scale"), "MacroScale": ("s", 1800.0, "Scale"),
     "BreakupScale": ("s", 420.0, "Scale"), "AntiTileScale": ("s", 4.3, "Scale"), "AntiTile": ("s", 0.45, "Scale"),
-    "SandMean": ("v", (0.552, 0.457, 0.312, 1), "Scale"), "GrassMean": ("v", (0.087, 0.156, 0.0144, 1), "Scale"),
-    "SandTint": ("v", (0.89, 0.94, 1.03, 1), "Colour"), "GrassTint": ("v", (0.73, 0.98, 0.78, 1), "Colour"),
+    "SandMean": ("v", (0.552, 0.457, 0.312, 1), "Scale"), "GrassMean": ("v", (0.0261, 0.0409, 0.0083, 1), "Scale"),
+    "SandTint": ("v", (0.89, 0.94, 1.03, 1), "Colour"), "GrassTint": ("v", (1.0, 1.05, 1.0, 1), "Colour"),
+    "GrassFarTint": ("v", (2.2, 3.0, 2.4, 1), "Colour"),
     "LitterTint": ("v", (0.62, 0.64, 0.6, 1), "Colour"), "EarthTint": ("v", (1.05, 1.12, 1.25, 1), "Colour"),
     "FloorTint": ("v", (1.46, 1.3, 0.99, 1), "Colour"), "FloorContrast": ("s", 0.6, "Colour"),
     "MacroAmount": ("s", 0.16, "Colour"), "ToneVar": ("s", 0.1, "Colour"), "TopLighten": ("s", 0.0, "Colour"),
@@ -168,7 +170,7 @@ PARAMS = {
     "LitterNormal": ("s", 1.0, "Surface"), "EarthNormal": ("s", 1.0, "Surface"), "FloorNormal": ("s", 0.5, "Surface"),
     "HeightSoft": ("s", 0.08, "Blend"), "HeightGain": ("s", 0.7, "Blend"), "Breakup": ("s", 0.45, "Blend"),
     "DistBias": ("s", 1.2, "Scale"), "DistStart": ("s", 600.0, "Scale"), "DistRange": ("s", 2500.0, "Scale"),
-    "GrassUnder": ("s", 0.86, "Lawn"), "GrassRough": ("s", 1.5, "Surface"), "LawnFadeStart": ("s", 3500.0, "Lawn"), "LawnFadeRange": ("s", 2500.0, "Lawn"),
+    "GrassUnder": ("s", 0.55, "Lawn"), "GrassRough": ("s", 1.5, "Surface"), "LawnFadeStart": ("s", 4500.0, "Lawn"), "LawnFadeRange": ("s", 2500.0, "Lawn"),
 }
 
 
@@ -183,6 +185,22 @@ def configure_textures():
             t.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_BC7)
             sb_ue.eal.save_loaded_asset(t)
             print("SB_GROUND_TEX BC7", path)
+
+
+def shared_sampler_code(code):
+    """D78: every texture sampled with the view's shared wrap sampler (the world group's filter and the view's mip bias), not
+    the texture's own: a custom node passes each texture object with its own sampler, and 17 of them broke the D3D11 / SM5
+    compile ("maximum ps_5_0 sampler register index (16) exceeded"). The unused samplers are stripped."""
+    for key in TEXTURES:
+        code = code.replace(key + "Sampler", "View.MaterialTextureBilinearWrapedSampler")
+    return code
+
+
+def make_mi_saved(name, folder, parent, **kw):
+    """sb_ue.make_mi, then saved even when the editor does not mark it dirty (D76: parameter changes otherwise stay in memory)."""
+    mi = sb_ue.make_mi(name, folder, parent, **kw)
+    sb_ue.eal.save_asset(mi.get_path_name().split(".")[0], only_if_is_dirty=False)
+    return mi
 
 
 def build_ground():
@@ -206,7 +224,8 @@ def build_ground():
     for i, (name, (kind, val, group)) in enumerate(PARAMS.items()):
         pn[name] = (sb_ue.vector_param if kind == "v" else sb_ue.scalar_param)(m, name, val, -1500, -600 + i * 60, group)
     inputs = ["P", "N", "VC", "VA", "UV1", "CamPos"] + list(TEXTURES) + list(PARAMS)
-    c = ssm.custom(m, -900, 200, "SB island ground", GROUND_CODE, inputs, F3, [("RoughOut", F1), ("AOOut", F1), ("NormalOut", F3)])
+    c = ssm.custom(m, -900, 200, "SB island ground", shared_sampler_code(GROUND_CODE), inputs, F3, [("RoughOut", F1), ("AOOut", F1),
+                                                                                                  ("NormalOut", F3)])
     sb_ue.connect(wp, "", c, "P")
     sb_ue.connect(wn, "", c, "N")
     sb_ue.connect(vc, "", c, "VC")
@@ -400,11 +419,19 @@ def plants():
         "DryLight": (0.9, 0.7, 0.62, 1)})
     # D71 lawn (owner: "real visual grass small and a lot so it blends in"): short blades in the ground's own greens, dark at the
     # root, lit at the tip, a little wind.
+    # D78 (owner: "even denser grass ... change the green floor desing ... its horrible"): a deeper, less yellow green, less light
+    # through the blades (they glowed neon against the sun), the ground's colour taken from its new thatch.
     lib["MI_IslGrass_Lawn"] = (leaf, "LeafPalm", {"BendHeight": 40.0, "BendAmount": 2.5, "BendSpeed": 1.0, "FlutterAmount": 1.2,
-                                                 "FlutterSpeed": 3.0, "NormalAmount": 0.4, "Roughness": 0.55, "Specular": 0.3,
-                                                 "GroundMatch": 1.0, "PartVar": 0.1, "InstVar": 0.06, "HueShift": 0.04}, {
-        "DarkColor": (0.04, 0.09, 0.012, 1), "LightColor": (0.12, 0.27, 0.024, 1), "DryDark": (0.1, 0.08, 0.025, 1),
-        "DryLight": (0.36, 0.3, 0.12, 1), "SubsurfaceColor": (0.25, 0.4, 0.06, 1)})
+                                                 "FlutterSpeed": 3.0, "NormalAmount": 0.4, "Roughness": 0.62, "Specular": 0.3,
+                                                 "GroundMatch": 0.6, "PartVar": 0.1, "InstVar": 0.06, "HueShift": 0.04}, {
+        "DarkColor": (0.022, 0.045, 0.011, 1), "LightColor": (0.085, 0.185, 0.04, 1), "DryDark": (0.09, 0.075, 0.03, 1),
+        "DryLight": (0.32, 0.27, 0.12, 1), "SubsurfaceColor": (0.07, 0.12, 0.025, 1), "GroundMean": (0.0261, 0.0409, 0.0083, 1)})
+    # D78 (owner: "real leaves for the braun part"): the fallen leaves (SM_Litter_*): dry browns to ochre, some yellowed or green,
+    # no wind, little light through them.
+    lib["MI_IslLeaf_Litter"] = (leaf, "LeafBroad", {"BendAmount": 0.0, "FlutterAmount": 0.0, "NormalAmount": 0.8, "Roughness": 0.72,
+                                                   "Specular": 0.3, "PartVar": 0.18, "InstVar": 0.08, "HueShift": 0.08}, {
+        "DarkColor": (0.03, 0.055, 0.012, 1), "LightColor": (0.09, 0.16, 0.03, 1), "DryDark": (0.05, 0.028, 0.013, 1),
+        "DryLight": (0.3, 0.165, 0.055, 1), "SubsurfaceColor": (0.1, 0.06, 0.02, 1)})
     lib["MI_IslPebble"] = (bark, "LeafBroad", {"BendAmount": 0.0, "FlutterAmount": 0.0, "DetailAmount": 0.15, "NormalAmount": 0.2,
                                              "Roughness": 0.55, "Specular": 0.4, "InstVar": 0.18, "PartVar": 0.2}, {
         "DarkColor": (0.07, 0.065, 0.06, 1), "LightColor": (0.32, 0.3, 0.27, 1), "DryDark": (0.07, 0.065, 0.06, 1),
@@ -419,7 +446,7 @@ def plants():
         "DarkColor": (0.02, 0.025, 0.006, 1), "LightColor": (0.1, 0.11, 0.025, 1), "DryDark": (0.05, 0.035, 0.015, 1),
         "DryLight": (0.22, 0.16, 0.07, 1), "SubsurfaceColor": (0.1, 0.12, 0.02, 1)})
     for name, (parent, texset, scalars, vectors) in lib.items():
-        sb_ue.make_mi(name, MI, parent, scalars=scalars, vectors=vectors, textures=tex_set(texset))
+        make_mi_saved(name, MI, parent, scalars=scalars, vectors=vectors, textures=tex_set(texset))
     print("SB_PLANT_MATERIALS_OK", mel.get_statistics(leaf).num_pixel_shader_instructions, mel.get_statistics(bark).num_pixel_shader_instructions)
 
 
@@ -520,7 +547,7 @@ def main():
     if "ground" in args:
         configure_textures()
         m = build_ground()
-        sb_ue.make_mi("MI_HomeGround", MI, m)
+        make_mi_saved("MI_HomeGround", MI, m)
         print("SB_GROUND_MATERIAL_OK", mel.get_statistics(m).num_pixel_shader_instructions)
     if "plants" in args:
         plants()
