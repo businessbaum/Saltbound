@@ -109,7 +109,7 @@ void USaltInputConfig::Build()
 	Inventory = MakeAction(this, TEXT("IA_Inventory"), EInputActionValueType::Boolean);
 	ToolWheel = MakeAction(this, TEXT("IA_ToolWheel"), EInputActionValueType::Boolean);
 	Tools.Reset();
-	for (int32 I = 1; I <= 5; ++I)
+	for (int32 I = 1; I <= 6; ++I)   // D73: six tools (the shovel)
 	{
 		Tools.Add(MakeAction(this, *FString::Printf(TEXT("IA_Tool%d"), I), EInputActionValueType::Boolean));
 	}
@@ -154,7 +154,7 @@ void USaltInputConfig::BuildMappings()
 	// D55: the tool wheel on Q (owner; Tab and I keep opening the satchel) and LB; keys 1 to 5 take a tool directly.
 	C->MapKey(ToolWheel, KeyOf(IdToolWheel));
 	C->MapKey(ToolWheel, EKeys::Gamepad_LeftShoulder);
-	const FKey Digits[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five };
+	const FKey Digits[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six };
 	for (int32 I = 0; I < Tools.Num(); ++I)
 	{
 		C->MapKey(Tools[I], Digits[I]);

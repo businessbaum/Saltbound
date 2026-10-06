@@ -11,6 +11,9 @@ const TArray<FSaltToolDef>& SaltTools::All()
 			TEXT("T_UI_Tool_Spyglass"), ESaltToolUse::Held, false },
 		{ TEXT("Lantern"), NSLOCTEXT("Saltbound", "ToolLantern", "Lantern"), NSLOCTEXT("Saltbound", "ToolLanternHint", "Light for the night"),
 			TEXT("T_UI_Tool_Lantern"), ESaltToolUse::Held, false },
+		// D73: the Harbour Keeper's shovel (the player gets it from him).
+		{ TEXT("Shovel"), NSLOCTEXT("Saltbound", "ToolShovel", "Shovel"), NSLOCTEXT("Saltbound", "ToolShovelHint", "Dig where something lies buried"),
+			TEXT("T_UI_Tool_Shovel"), ESaltToolUse::Held, false },
 		{ TEXT("Satchel"), NSLOCTEXT("Saltbound", "ToolSatchel", "Satchel"), NSLOCTEXT("Saltbound", "ToolSatchelHint", "Open the satchel"),
 			TEXT("T_UI_Tool_Satchel"), ESaltToolUse::Satchel, true },
 		{ TEXT("EmptyHands"), NSLOCTEXT("Saltbound", "ToolHands", "Empty hands"), NSLOCTEXT("Saltbound", "ToolHandsHint", "Put everything away"),

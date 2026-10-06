@@ -124,6 +124,9 @@ public:
 	void SetHeldTool(FName Tool);
 	/** Tools the player has (the compass, the spyglass and the lantern from the start, owner). */
 	bool IsToolOwned(FName Tool) const { return OwnedTools.Contains(Tool); }
+	/** D73: the tools owned (saved with the game). */
+	TArray<FName> GetOwnedToolList() const { return OwnedTools.Array(); }
+	void SetOwnedTools(const TArray<FName>& Tools) { OwnedTools = TSet<FName>(Tools); if (!HeldTool.IsNone() && !OwnedTools.Contains(HeldTool)) { SetHeldTool(NAME_None); } }
 	void SetToolOwned(FName Tool, bool bOwned);
 	/** Shows the held tool (compass, spyglass view, lantern). */
 	class USaltHeldToolsComponent* GetHeldTools() const { return HeldTools; }

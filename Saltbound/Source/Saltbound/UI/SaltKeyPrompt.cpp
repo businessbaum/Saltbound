@@ -15,7 +15,7 @@ namespace
 {
 	// As the HUD's prompt (UI_Design.md section 7): a 58 px scrap in a 120 px frame, 18 px to the text, the text's baseline
 	// 12 px under the key's centre (IM Fell English: its line's centre sits 0.271 em above the baseline).
-	constexpr float KeySize = 58.f;
+	constexpr float PromptKeySize = 58.f;
 	constexpr float KeyFrame = 120.f;
 	constexpr float KeyStep = 68.f;
 	constexpr float KeyGap = 18.f;
@@ -91,14 +91,14 @@ void USaltKeyPrompt::Layout()
 	}
 	Label->SetText(Action);
 	const float TextW = Label->MeasureWidth();
-	const float KeysW = Scraps.Num() > 0 ? KeySize + (Scraps.Num() - 1) * KeyStep : 0.f;
+	const float KeysW = Scraps.Num() > 0 ? PromptKeySize + (Scraps.Num() - 1) * KeyStep : 0.f;
 	RowWidth = KeysW + (Scraps.Num() > 0 ? KeyGap : 0.f) + TextW;
 	const float X0 = -RowWidth * 0.5f;
 	for (int32 I = 0; I < Scraps.Num(); ++I)
 	{
 		if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(Scraps[I]->Slot))
 		{
-			S->SetPosition(FVector2D(X0 + KeySize * 0.5f + I * KeyStep, 0.f));
+			S->SetPosition(FVector2D(X0 + PromptKeySize * 0.5f + I * KeyStep, 0.f));
 		}
 	}
 	if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(Label->Slot))

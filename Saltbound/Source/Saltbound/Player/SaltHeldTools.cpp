@@ -7,6 +7,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Interaction/SaltInteractableComponent.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Props/SaltSwingComponent.h"
 
@@ -15,11 +16,15 @@ namespace
 	const TCHAR* CompassMeshPath = TEXT("/Game/Saltbound/Props/Tools/SM_Tool_Compass.SM_Tool_Compass");
 	const TCHAR* NeedleMeshPath = TEXT("/Game/Saltbound/Props/Tools/SM_Tool_CompassNeedle.SM_Tool_CompassNeedle");
 	const TCHAR* LanternMeshPath = TEXT("/Game/Saltbound/Boat/SM_Boat_Lantern.SM_Boat_Lantern");
+	const TCHAR* ShovelMeshPath = TEXT("/Game/Saltbound/Props/Tools/SM_Tool_Shovel.SM_Tool_Shovel");
 
 	// Where the tools are held, in the camera's frame (cm: forward, right, up), and how far they sink when put away.
 	const FVector CompassAt(30.f, 12.f, -13.f);
 	const FRotator CompassTilt(55.f, -14.f, 0.f);   // the dial turned up towards the eye, its bow away
 	const FVector LanternAt(58.f, -30.f, -16.f);  // out at arm's length, low on the left: it lights the way, not the view
+	// D73: the shovel's grip low on the right, its blade down and ahead (the mesh runs along +X from the grip).
+	const FVector ShovelAt(26.f, 24.f, -30.f);
+	const FRotator ShovelTilt(-42.f, -12.f, 8.f);
 	constexpr float SinkDepth = 30.f;
 	constexpr float RaiseTime = 0.25f;
 	constexpr float SpyglassTime = 0.35f;
@@ -107,8 +112,13 @@ void USaltHeldToolsComponent::EnsureParts()
 	LanternLight->SetSoftSourceRadius(4.f);
 	LanternLight->SetCastShadows(true);
 	LanternLight->RegisterComponent();
+	// D73: the shovel, held low on the right.
+	ShovelHand = Hand(TEXT("ShovelHand"));
+	ShovelHand->SetRelativeRotation(ShovelTilt);
+	Shovel = MeshPart(TEXT("HeldShovel"), ShovelMeshPath, ShovelHand);
 	CompassHand->SetVisibility(false, true);
 	LanternHand->SetVisibility(false, true);
+	ShovelHand->SetVisibility(false, true);
 }
 
 void USaltHeldToolsComponent::SetTool(FName InTool)
@@ -193,6 +203,18 @@ void USaltHeldToolsComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	CompassHand->SetRelativeLocation(CompassAt - FVector(0.f, 0.f, SinkDepth * (1.f - Up)));
 	LanternHand->SetRelativeLocation(LanternAt - FVector(0.f, 0.f, SinkDepth * (1.f - Up)));
 	LanternHand->SetWorldRotation(FRotator::ZeroRotator);
+	// D73: the shovel; three strokes over a dig's hold (a thrust down and forward, back up).
+	const bool bShovel = Shown == TEXT("Shovel");
+	ShovelHand->SetVisibility(bShovel, true);
+	float Stroke = 0.f;
+	if (const ASaltPlayerCharacter* Holder = Cast<ASaltPlayerCharacter>(GetOwner()); bShovel && Holder && Holder->GetHoldTarget()
+		&& Holder->GetHoldTarget()->ComponentHasTag(TEXT("Dig")))
+	{
+		Stroke = FMath::Square(FMath::Sin(PI * 3.f * Holder->GetHoldProgress()));
+	}
+	DigStroke = FMath::FInterpTo(DigStroke, Stroke, DeltaTime, 22.f);
+	ShovelHand->SetRelativeLocation(ShovelAt + FVector(16.f, -4.f, -14.f) * DigStroke - FVector(0.f, 0.f, SinkDepth * (1.f - Up)));
+	ShovelHand->SetRelativeRotation(ShovelTilt + FRotator(-22.f, 0.f, 0.f) * DigStroke);
 	if (bCompass)
 	{
 		UpdateCompass(DeltaTime);

@@ -127,7 +127,7 @@ TSharedRef<SWidget> USaltToolWheelWidget::RebuildWidget()
 		{
 			T->SetVisibility(ESlateVisibility::HitTestInvisible);
 		}
-		// Along the bottom: Q "hold, aim, let go" . 1 - 5 "pick directly".
+		// Along the bottom: Q "hold, aim, let go" . 1 - 6 "pick directly" (D73: six tools).
 		UImage* Hints = WidgetTree->ConstructWidget<UImage>();
 		Hints->SetBrush(ImageBrush(Tex(TEXT("T_UI_WheelHints")), FVector2D(720.f, 90.f)));
 		Hints->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -157,7 +157,7 @@ void USaltToolWheelWidget::RefreshKeys()
 	if (!bPainted)
 	{
 		HintsLive = SaltMenu::KeycapHints(WidgetTree, { { { Key }, NSLOCTEXT("Saltbound", "WheelHintHold", "hold, aim, let go") },
-			{ { TEXT("1"), TEXT("-"), TEXT("5") }, NSLOCTEXT("Saltbound", "WheelHintPick", "pick directly") } });
+			{ { TEXT("1"), TEXT("-"), TEXT("6") }, NSLOCTEXT("Saltbound", "WheelHintPick", "pick directly") } });
 		At(Group, HintsLive, FVector2D(960.f, 995.f), FVector2D::ZeroVector, FVector2D(0.5f, 0.5f));
 	}
 }

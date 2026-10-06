@@ -241,6 +241,79 @@ def icon_glassfloat():
     finish_icon(img, "GlassFloat")
 
 
+# D73 (M6 step 2): the first materials, painted like the others (ink edge, broad flat colour, a few strokes of detail).
+def icon_canvas_bolt():
+    img = icon_canvas()
+    d = ImageDraw.Draw(img)
+    cloth = (222, 210, 182, 255)
+    shade = (186, 170, 140, 255)
+    for k, (x0, y0, x1, y1) in enumerate(((96, 300, 432, 380), (88, 238, 424, 318), (80, 176, 416, 256))):
+        d.rounded_rectangle((x0 - 10, y0 - 10, x1 + 10, y1 + 10), radius=34, fill=INK + (255,))
+        d.rounded_rectangle((x0, y0, x1, y1), radius=26, fill=cloth if k == 2 else shade)
+        d.line([(x0 + 30, y1 - 14), (x1 - 30, y1 - 14)], fill=(160, 144, 114, 255), width=5)
+    # Twine crosswise and its knot.
+    d.line([(256, 160), (256, 396)], fill=INK + (255,), width=22)
+    d.line([(256, 162), (256, 394)], fill=(196, 160, 104, 255), width=10)
+    d.line([(70, 210), (442, 340)], fill=INK + (255,), width=20)
+    d.line([(72, 211), (440, 339)], fill=(196, 160, 104, 255), width=9)
+    d.ellipse((232, 236, 280, 284), fill=INK + (255,))
+    d.ellipse((240, 244, 272, 276), fill=(196, 160, 104, 255))
+    finish_icon(img, "Canvas")
+
+
+def icon_iron_nails():
+    img = icon_canvas()
+    d = ImageDraw.Draw(img)
+    iron = (92, 90, 86, 255)
+    for (x0, y0, x1, y1) in ((150, 120, 330, 400), (210, 100, 400, 360), (110, 210, 380, 300)):
+        d.line([(x0, y0), (x1, y1)], fill=INK + (255,), width=40)
+        d.line([(x0, y0), (x1, y1)], fill=iron, width=22)
+        d.line([(x0 + 6, y0 + 2), (x1 - 6, y1 - 6)], fill=(150, 148, 140, 255), width=5)
+        d.ellipse((x0 - 34, y0 - 34, x0 + 34, y0 + 34), fill=INK + (255,))
+        d.ellipse((x0 - 24, y0 - 24, x0 + 24, y0 + 24), fill=iron)
+        d.ellipse((x0 - 14, y0 - 18, x0 + 4, y0 - 4), fill=(160, 158, 150, 255))
+        d.polygon([(x1 - 4, y1 - 14), (x1 + 26, y1 + 22), (x1 - 14, y1 + 2)], fill=INK + (255,))
+    finish_icon(img, "IronNails")
+
+
+def icon_tar():
+    img = icon_canvas()
+    d = ImageDraw.Draw(img)
+    wood = (88, 62, 44, 255)
+    body = [(126, 140), (386, 140), (406, 260), (386, 420), (126, 420), (106, 260)]
+    outline_poly(d, body, wood, width=16)
+    for x in (168, 214, 256, 298, 344):
+        d.line([(x, 150), (x + (x - 256) * 0.08, 262), (x, 410)], fill=(56, 38, 26, 255), width=5)
+    for y in (186, 374):
+        d.rounded_rectangle((100, y - 16, 412, y + 16), radius=10, fill=INK + (255,))
+        d.rounded_rectangle((108, y - 9, 404, y + 9), radius=7, fill=(110, 106, 98, 255))
+    # The black, glossy tar in the open head, a drip over the rim.
+    d.ellipse((120, 96, 392, 180), fill=INK + (255,))
+    d.ellipse((134, 106, 378, 170), fill=(26, 22, 20, 255))
+    d.ellipse((180, 118, 250, 136), fill=(120, 116, 110, 255))
+    d.polygon([(300, 160), (330, 160), (322, 236), (308, 236)], fill=(26, 22, 20, 255))
+    d.ellipse((302, 224, 328, 250), fill=(26, 22, 20, 255))
+    finish_icon(img, "Tar")
+
+
+def icon_pale_float():
+    img = icon_canvas()
+    d = ImageDraw.Draw(img)
+    d.ellipse((86, 116, 426, 456), fill=INK + (255,))
+    d.ellipse((102, 132, 410, 440), fill=(226, 218, 196, 255))
+    d.ellipse((150, 170, 270, 270), fill=(244, 240, 226, 255))
+    # The moulding seam, the eye on top and the moulded number.
+    d.arc((102, 236, 410, 336), 0, 180, fill=(170, 160, 136, 255), width=10)
+    d.ellipse((222, 40, 290, 108), outline=INK + (255,), width=26)
+    d.ellipse((226, 44, 286, 104), outline=(226, 218, 196, 255), width=12)
+    d.rectangle((236, 100, 276, 140), fill=INK + (255,))
+    d.rectangle((244, 104, 268, 136), fill=(226, 218, 196, 255))
+    d.text((236, 330), "17", fill=(150, 140, 118, 255), font=None)
+    d.line([(236, 340), (236, 384)], fill=(150, 140, 118, 255), width=9)
+    d.line([(262, 340), (292, 340), (270, 384)], fill=(150, 140, 118, 255), width=9)
+    finish_icon(img, "PaleFloat")
+
+
 # --- charts -------------------------------------------------------------------------------------------------------
 MAPS = {
     # name: (centre X m, centre Y m, size m, grid m)
@@ -397,6 +470,8 @@ BUILDERS = {
     "frame": frame, "parchment": parchment_tile, "slots": lambda: (slot(False), slot(True)),
     "tabs": lambda: (tab(False), tab(True)),
     "icons": lambda: (icon_driftwood(), icon_seashell(), icon_ropecoil(), icon_ancientshard(), icon_glassfloat()),
+    # D73: run "materials" alone to paint only these.
+    "materials": lambda: (icon_canvas_bolt(), icon_iron_nails(), icon_tar(), icon_pale_float()),
     "maps": lambda: [chart(n) for n in MAPS], "markers": lambda: (marker("Player"), marker("Boat")),
 }
 

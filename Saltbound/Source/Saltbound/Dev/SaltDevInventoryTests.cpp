@@ -651,12 +651,15 @@ namespace
 				return Cfg->DefaultContext->GetMappings().ContainsByPredicate([&](const FEnhancedActionKeyMapping& M) { return M.Action == Action && M.Key == Key; });
 			};
 			Report(TEXT("WheelOnQ"), Mapped(Cfg->ToolWheel, EKeys::Q) && Mapped(Cfg->ToolWheel, EKeys::Gamepad_LeftShoulder) && !Mapped(Cfg->ToolWheel, EKeys::Tab)
-				&& Mapped(Cfg->Inventory, EKeys::Tab) && Mapped(Cfg->Inventory, EKeys::I) && !Mapped(Cfg->Inventory, EKeys::M) && Cfg->Tools.Num() == 5
-				&& Mapped(Cfg->Tools[0], EKeys::One) && Mapped(Cfg->Tools[4], EKeys::Five), TEXT("Q / LB: wheel; Tab / I: satchel; 1..5: tools; no map key"));
+				&& Mapped(Cfg->Inventory, EKeys::Tab) && Mapped(Cfg->Inventory, EKeys::I) && !Mapped(Cfg->Inventory, EKeys::M) && Cfg->Tools.Num() == SaltTools::All().Num()
+				&& Mapped(Cfg->Tools[0], EKeys::One) && Mapped(Cfg->Tools[5], EKeys::Six), TEXT("Q / LB: wheel; Tab / I: satchel; 1..6: tools; no map key"));
+			// D73: six tools (the shovel fourth); the satchel and empty hands by their names.
+			const int32 SatchelSlot = SaltTools::IndexOf(TEXT("Satchel"));
+			const int32 HandsSlot = SaltTools::IndexOf(TEXT("EmptyHands"));
 			const FName OwnHeld = Player->GetHeldTool();
 			Player->SetHeldTool(NAME_None);
 			PC->OpenToolWheel();
-			const bool bOpened = PC->IsToolWheelOpen() && Wheel->IsOpen() && Wheel->GetSelected() == 4;
+			const bool bOpened = PC->IsToolWheelOpen() && Wheel->IsOpen() && Wheel->GetSelected() == HandsSlot;
 			PC->AimToolWheel(FVector2D(0.f, 60.f), false);          // the mouse up: the compass at the top
 			const int32 Up = Wheel->GetSelected();
 			PC->AimToolWheel(FVector2D(-300.f, -300.f), false);     // left and down: the satchel, lower left (126 degrees)
@@ -669,7 +672,7 @@ namespace
 			const int32 UpperRight = Wheel->GetSelected();
 			PC->CloseToolWheel(true);
 			const FName Taken = Player->GetHeldTool();
-			Report(TEXT("WheelByAngle"), bOpened && Up == 0 && LowerLeft == 3 && Dead == 3 && LowerRight == 2 && UpperRight == 1,
+			Report(TEXT("WheelByAngle"), bOpened && Up == 0 && LowerLeft == SatchelSlot && Dead == SatchelSlot && LowerRight == 2 && UpperRight == 1,
 				FString::Printf(TEXT("opened on empty hands=%d up=%d lower left=%d dead zone=%d lower right=%d upper right=%d"), bOpened ? 1 : 0, Up, LowerLeft,
 					Dead, LowerRight, UpperRight));
 			Report(TEXT("WheelTakesTool"), Taken == TEXT("Spyglass") && !PC->IsToolWheelOpen(), FString::Printf(TEXT("in hand=%s"), *Taken.ToString()));
@@ -680,9 +683,9 @@ namespace
 				FString::Printf(TEXT("open=%d menu=%d in hand=%s"), PC->IsToolWheelOpen() ? 1 : 0, PC->IsMenuOpen() ? 1 : 0, *Player->GetHeldTool().ToString()));
 			PC->SelectTool(2);
 			const FName Three = Player->GetHeldTool();
-			PC->SelectTool(4);
+			PC->SelectTool(HandsSlot);
 			const FName Five = Player->GetHeldTool();
-			PC->SelectTool(3);
+			PC->SelectTool(SatchelSlot);
 			const bool bSatchel = PC->IsSatchelOpen();
 			PC->SetSatchelOpen(false);
 			Report(TEXT("WheelKeys"), Three == TEXT("Lantern") && Five.IsNone() && bSatchel, FString::Printf(TEXT("3=%s 5=%s 4 opens the satchel=%d"),

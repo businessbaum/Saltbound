@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; the hub's harbour D70; M6 step 1, the day's clock D72).
+Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; the hub's harbour D70; M6 steps 1-3: the day's clock D72, digging D73, the ship repair system D74).
 
 ## Milestone status
 
@@ -240,6 +240,14 @@ for a higher screen percentage (for example 75 %) and more content.
   and ends at their eyes, the first time long, never skippable); casting off at a hub berth asks "Sail out?". Her inside is a level
   of its own (`L_HubInside`), streamed in near her. The command hall has a glass bridge on top, the ancient helm in it (locked).
   Try: `sb.Hub.Show 1`, sail at a door, or `sb.Hub.Passage arrive 0 1 long`; `sb.Dev.HubGoto dock|foredock|wellfoot`.
+- **D74 (M6 step 3, waiting for the owner's look):** the ship repair system: hard knocks spring planks (holes on the bulwark's inner
+  face, the sea spurting in), the water aboard weighs her down and shows over the deck, at 4 t she founders (towed home for now);
+  patch with driftwood and nails (hold E), bail with the bucket by the starboard gap (hold E), a sail torn by too much wind mended
+  with sailcloth at the mast. Try it: `sb.Boat.Hull hole 2 1 2`, `sb.Boat.Hull tear`, `sb.Dev.Give Driftwood 3`, `sb.Dev.Give IronNails 6`.
+- **D73 (M6 step 2, waiting for the owner's look):** materials (sailcloth, iron nails, tar, the pale float), the shovel (from the
+  Harbour Keeper at his place by the pier's beach; key 6), seven dig spots on the home island (mounds and stakes; dig with the shovel
+  in hand, hold E), digging anywhere on sand and earth for small finds. Try it: `sb.Dev.GiveTool Shovel`, then the mound two paces
+  seaward of the palm by the pier's beach.
 - **D72 (M6 step 1, waiting for the owner's look):** a running day and night (40 minutes, the night faster): the sun moves through
   Morning, Day, Evening, Dusk and Twilight into the Night, a moon lights the night sky, the sea and the clouds, stars come out
   (a sky dome that draws the atmosphere itself), lanterns light at dusk and go out in the morning (a lantern you doused stays out until
@@ -379,6 +387,8 @@ Developer console (`~`, non-shipping builds):
 - `sb.Lighting Day|Evening|Dusk|Night|Dawn|Morning|Twilight` (jumps the clock there and holds it, D72)
 - D72: `sb.Time` (print), `sb.Time <hour 0-24> [hold]`, `sb.Time run|hold`, `sb.Time day <n>`, `sb.Time.Scale <x>`, `sb.Sky.Dome 1|0`,
   `sb.Dev.RunClockTests`
+- D73: `sb.Dev.RunDigTests`, `sb.Dev.GiveTool <Tool> [0]`. D74: `sb.Dev.RunRepairTests`, `sb.Boat.Hull hole <x> <side> <size> | water <kg> | tear | repair | info | spots`,
+  `sb.Boat.Damage 0|1`
 - `sb.Region ShoresOfPlenty|AncientIsles|Wilds|DevilsRoar [blend s]`, `sb.Weather Clear|Cloudy|Overcast|Storm [blend s]`,
   `sb.SeaState Calm|Moderate|Rough|Storm [blend s]`, `sb.Env` (print the composed state)
 - `sb.SeaState Flat|Calm|Moderate|Rough|Storm [blend s]` (Flat = windless biome)
@@ -408,6 +418,10 @@ Developer console (`~`, non-shipping builds):
   input), `sb.Dev.WaterState` (logs `SB_WATER`: movement mode, immersion, surface, camera height above the water)
 
 ## Known issues and limitations
+- **The save sign's fade-in (inventory suite, `SaveSignShows`):** fails every run (opacity 0.66 at 0.3 s, 1.00 at 1.3 s; no
+  earlier result recorded, D66 did not run the suite). The save itself takes 1 ms and the frame after it 48 ms, and the fade-out check
+  passes on time, so about 0.17 s of the fade is lost right after the save; not found yet (the picture D66 takes with each save is the
+  first suspect). Not caused by D73/D74, which do not touch the HUD or the sign.
 - **Menus (D66):** the game has no sounds yet, so the Music, Sea and wind and Effects volumes have nothing to act on until sounds
   are added with their classes. The packaged game now opens on the first start (once) and the title; it was checked in a
   standalone run of the editor build, not yet in a packaged build. Open items: Next steps 8 and 9.

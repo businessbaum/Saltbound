@@ -319,7 +319,24 @@ part('T_UI_WheelMedallion', 240, 240, 1, c => medallion(c, 120, 120, 84, false))
 part('T_UI_WheelHalo', 360, 360, 1, c => { const g = c.createRadialGradient(180, 180, 84 * .6, 180, 180, 84 * 2.1); g.addColorStop(0, 'rgba(255,200,110,.55)'); g.addColorStop(1, 'rgba(255,170,70,0)'); c.fillStyle = g; c.beginPath(); c.arc(180, 180, 84 * 2.1, 0, TAU); c.fill(); });
 part('T_UI_WheelRim', 240, 240, 1, c => { c.save(); c.strokeStyle = 'rgba(255,226,150,.85)'; c.lineWidth = 2; c.shadowBlur = 14; c.shadowColor = 'rgba(255,200,100,.9)'; c.beginPath(); c.arc(120, 120, 85, 0, TAU); c.stroke(); c.restore(); });
 /* The tools painted for the medallions, at the selected size (scale 84 / 62 of their 100-unit box). Frame 180 x 180. */
-for (const [name, draw] of [['Compass', toolCompass], ['Spyglass', toolSpyglass], ['Chart', toolChart], ['Lantern', toolLantern], ['Satchel', toolSatchel], ['Hands', toolHand]]) {
+/* D73: the shovel, drawn as the design draws the spyglass and the lantern: lying across the medallion, an ash shaft with
+   a dark T-grip, an iron socket and a rounded iron blade with two rivets, a soft shadow under it. */
+function toolShovel(c) {
+  c.save(); c.rotate(-0.72); c.shadowBlur = 10; c.shadowColor = 'rgba(0,0,0,.7)'; c.shadowOffsetY = 6;
+  const sg = c.createLinearGradient(0, -5, 0, 5); sg.addColorStop(0, '#b08452'); sg.addColorStop(.45, '#8a5c32'); sg.addColorStop(1, '#4a2c16');
+  c.fillStyle = sg; c.fillRect(-46, -4.2, 70, 8.4);
+  const gg = c.createLinearGradient(-56, 0, -44, 0); gg.addColorStop(0, '#3a2210'); gg.addColorStop(1, '#6a4222');
+  c.fillStyle = gg; c.beginPath(); c.roundRect ? c.roundRect(-56, -15, 10, 30, 4) : c.rect(-56, -15, 10, 30); c.fill();
+  c.shadowBlur = 0;
+  const iron = (y0, y1) => { const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, '#6d6860'); g.addColorStop(.4, '#3a3732'); g.addColorStop(1, '#141210'); return g; };
+  c.fillStyle = iron(-6, 6); c.beginPath(); c.moveTo(20, -5); c.lineTo(34, -7); c.lineTo(34, 7); c.lineTo(20, 5); c.closePath(); c.fill();
+  c.fillStyle = iron(-17, 17); c.beginPath(); c.moveTo(32, -15); c.quadraticCurveTo(62, -16, 66, 0); c.quadraticCurveTo(62, 16, 32, 15); c.closePath(); c.fill();
+  c.strokeStyle = 'rgba(220,214,200,.45)'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(36, -11); c.quadraticCurveTo(56, -11, 60, -2); c.stroke();
+  c.fillStyle = '#a8a196'; [[25, -2.5], [29, 2.5]].forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 1.6, 0, TAU); c.fill(); });
+  c.strokeStyle = 'rgba(40,24,10,.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(-40, -1.5); c.lineTo(14, -1.5); c.stroke();
+  c.restore();
+}
+for (const [name, draw] of [['Compass', toolCompass], ['Spyglass', toolSpyglass], ['Chart', toolChart], ['Lantern', toolLantern], ['Shovel', toolShovel], ['Satchel', toolSatchel], ['Hands', toolHand]]) {
   part('T_UI_Tool_' + name, 180, 180, 2, c => { c.translate(90, 90); c.scale(84 / 62, 84 / 62); draw(c); });
 }
 /* The thin divider under the hint with its small turquoise diamond. Frame 240 x 20, centred. */
@@ -336,7 +353,7 @@ part('T_UI_WheelHints', 720, 90, 1, c => {
   const sh = { shadow: ['rgba(0,0,0,.9)', 8, 0, 2] }, y = 1000;
   let x = W / 2 - 290; x += keycap(c, 'Q', x, y - 30, 40) + 14;
   txt(c, 'hold, aim, let go', x, y, '400 26px Alegreya,Georgia,serif', '#efe4cb', sh); x += 230;
-  x += keycap(c, '1', x, y - 30, 40) + 6; txt(c, '–', x, y - 2, '400 26px Alegreya', '#efe4cb'); x += 20; x += keycap(c, '5', x, y - 30, 40) + 14;
+  x += keycap(c, '1', x, y - 30, 40) + 6; txt(c, '–', x, y - 2, '400 26px Alegreya', '#efe4cb'); x += 20; x += keycap(c, '6', x, y - 30, 40) + 14;  /* D73: six tools (the shovel) */
   txt(c, 'pick directly', x, y, '400 26px Alegreya,Georgia,serif', '#efe4cb', sh);
 });
 

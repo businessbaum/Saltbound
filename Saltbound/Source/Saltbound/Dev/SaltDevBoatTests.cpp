@@ -506,6 +506,11 @@ void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 	SavedWind = FVector(Wind->GetBaseFromDeg(), Wind->GetBaseSpeed(), Wind->GetGustiness());
 	SavedSeaState = Rig ? Rig->CurrentSeaState : NAME_None;
 	UE_LOG(LogSaltbound, Display, TEXT("SB_TEST BoatSuite START mass=%.0fkg"), Boat->GetMass());
+	// D74: the suite rams the pier and the beach on purpose; no holes while it runs.
+	if (IConsoleVariable* Damage = IConsoleManager::Get().FindConsoleVariable(TEXT("sb.Boat.Damage")))
+	{
+		Damage->Set(0, ECVF_SetByConsole);
+	}
 
 	auto SetWind = [this](float FromDeg, float SpeedMs)
 	{
@@ -1335,6 +1340,10 @@ void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 			Bt->ResetToStart();
 		}
 		ResetPlayer();
+		if (IConsoleVariable* Damage = IConsoleManager::Get().FindConsoleVariable(TEXT("sb.Boat.Damage")))
+		{
+			Damage->Set(1, ECVF_SetByConsole);
+		}
 		UE_LOG(LogSaltbound, Display, TEXT("SB_TEST BoatSuite DONE passed=%d failed=%d"), Passed, Failed);
 	}, nullptr, nullptr});
 

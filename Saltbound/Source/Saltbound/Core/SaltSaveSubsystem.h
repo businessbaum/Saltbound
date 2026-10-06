@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Boat/SaltBoat.h"
+#include "Boat/SaltHullDamage.h"
 #include "Core/SaltItems.h"
 #include "GameFramework/SaveGame.h"
 #include "Subsystems/GameInstanceSubsystem.h"
@@ -39,6 +40,15 @@ public:
 	// D72: the day's clock (hours 0..24; -1 in saves from before it, which keep only Preset) and the day of the voyage.
 	UPROPERTY() float TimeOfDay = -1.f;
 	UPROPERTY() int32 DayNumber = 1;
+	// D73: the dig spots' stages (1 dug up, 2 emptied; missing = buried) and the tools the player owns (empty in older saves:
+	// the start's tools stay).
+	UPROPERTY() TMap<FName, int32> DigStages;
+	UPROPERTY() bool bHasOwnedTools = false;
+	UPROPERTY() TArray<FName> OwnedTools;
+	// D74: the boat's damage (holes and patches, water aboard, the sail's tears).
+	UPROPERTY() TArray<FSaltHullHole> HullHoles;
+	UPROPERTY() float BilgeWaterKg = 0.f;
+	UPROPERTY() int32 SailTear = 0;
 
 	// D50: the satchel and the pickups already taken (by PickupId).
 	UPROPERTY() bool bHasInventory = false;
@@ -119,6 +129,11 @@ public:
 	void ClearFound() { Found.Reset(); }
 	bool AnyFound() const { return Found.Num() > 0; }
 
+	/** D73: how far each dig spot has come (0 buried, 1 dug up, 2 emptied), saved with the game. */
+	int32 GetDigStage(FName SpotId) const { const int32* S = DigStages.Find(SpotId); return S ? *S : 0; }
+	void SetDigStage(FName SpotId, int32 Stage) { if (!SpotId.IsNone()) { DigStages.Add(SpotId, Stage); } }
+	void ClearDigStages() { DigStages.Reset(); }
+
 	// The hub (D62), saved with the game -----------------------------------------------------------------------------
 	/** The salt purse: one number, not a satchel item; nothing spends it yet. */
 	int32 GetSalt() const { return Salt; }
@@ -171,4 +186,5 @@ private:
 	TSet<FName> Found;
 	TSet<FName> Unlocked;
 	int32 Salt = 0;
+	TMap<FName, int32> DigStages;
 };

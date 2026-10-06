@@ -100,6 +100,12 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 		Save->BoatHold = Boat->GetHold();
 		Save->bBoatSail = Boat->IsSailSet();
 		Save->BoatMooring = Boat->GetMooring();
+		if (const USaltHullDamageComponent* Damage = Boat->GetHullDamage())
+		{
+			Save->HullHoles = Damage->GetHoles();
+			Save->BilgeWaterKg = Damage->GetWaterKg();
+			Save->SailTear = Damage->GetSailTear();
+		}
 	}
 
 	APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
@@ -114,6 +120,8 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 			Save->bHasInventory = true;
 			Save->Inventory = Satchel->GetSlots();
 		}
+		Save->bHasOwnedTools = true;
+		Save->OwnedTools = Player->GetOwnedToolList();
 		Save->PlayerPitch = FRotator::NormalizeAxis(View.Pitch);
 		if (Boat)
 		{
@@ -144,6 +152,7 @@ bool USaltSaveSubsystem::SaveGame(UWorld* World, const TCHAR* Reason)
 	}
 	Save->Collected = Collected.Array();
 	Save->FoundPlaces = Found.Array();
+	Save->DigStages = DigStages;
 	// The hub (D62).
 	Save->HubBerth = HubBerth;
 	Save->HubUnlocked = Unlocked.Array();
@@ -228,6 +237,10 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 	if (Boat && Save->bHasBoat)
 	{
 		Boat->RestoreState(Save->BoatLocation, Save->BoatYaw, Save->BoatHold, Save->bBoatSail, Save->Version >= 5 ? Save->BoatMooring : FSaltMooring());
+		if (USaltHullDamageComponent* Damage = Boat->GetHullDamage())
+		{
+			Damage->RestoreState(Save->HullHoles, Save->BilgeWaterKg, Save->SailTear);
+		}
 	}
 
 	APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
@@ -249,6 +262,10 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 				Satchel->SetSlots(Save->Inventory);
 			}
 		}
+		if (Save->bHasOwnedTools)
+		{
+			Player->SetOwnedTools(Save->OwnedTools);
+		}
 	}
 	// The stores' contents.
 	for (TObjectIterator<USaltInventoryComponent> It; It; ++It)
@@ -265,6 +282,7 @@ bool USaltSaveSubsystem::LoadGame(UWorld* World)
 	// Pickups taken in that game stay gone; the others are back.
 	Collected = TSet<FName>(Save->Collected);
 	Found = TSet<FName>(Save->FoundPlaces);
+	DigStages = Save->DigStages;
 	HubBerth = Save->HubBerth;
 	Unlocked = TSet<FName>(Save->HubUnlocked);
 	Salt = Save->Salt;

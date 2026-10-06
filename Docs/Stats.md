@@ -91,6 +91,29 @@ The day's clock lives on the lighting rig (`World/SaltLightingRig.*`: `DayCycle`
 | Stars | brightness 6 cd/m2, tint (0.85, 0.92, 1.0) | `M_SB_Sky` parameters `StarBrightness`, `StarTint`; `MPC_Sky.StarAmount` follows the moon |
 | The new game | starts at the start look's hour (Day, 8.5 h) | `StartPreset` |
 
+## The ship repair system (D74)
+
+On the boat's `USaltHullDamageComponent` (`Boat/SaltHullDamage.h`, Repair category).
+
+| Stat | Value | What it does |
+|---|---|---|
+| A hole | a knock closing faster than 2 m/s; medium from 3.2, large from 4.5 m/s | `HoleSpeed`, `MediumSpeed`, `LargeSpeed`; one a knock (1.2 s), at most 8 |
+| Leaks | 2 / 6 / 15 l/s (small / medium / large) | `LeakLitresPerSecond` |
+| Founders | with 4 t of water aboard (the boat weighs 10.9 t) | `FounderKg`; over the deck from 45 % |
+| The water's drag | the drive loses up to a third at the brink | `GetDriveFactor` |
+| Patch | a 2 s hold: one driftwood, two iron nails | `PatchSeconds` |
+| Bail | a 1 s hold: 14 l | `BailSeconds`, `BucketLitres` |
+| The sail tears | more than 12 m/s of wind on more than 70 % sail for 8 s (faster in more wind) | `TearWind`, `SailTearShare`, `TearSeconds`; drive 100 / 78 / 55 / 20 % |
+| Mend | a 3 s hold at the mast's foot: one sailcloth a step; shreds need the Shipwright | `MendSeconds` |
+
+## Digging (D73)
+
+| Stat | Value | What it does |
+|---|---|---|
+| Dig | a 2.4 s hold with the shovel in hand (three strokes) | `SaltDig::HoldSeconds` |
+| Loose ground | one small find per 3 m cell; the last 12 holes stay | `SaltDig::GroundCellM`, `GroundHolesKept` |
+| Dig spots | 7 in the Inner Waters (`SaltDig::Spots`) | the table in `World/SaltDig.cpp` |
+
 ## Player
 
 | Stat | Value | What it does |
@@ -116,10 +139,14 @@ The day's clock lives on the lighting rig (`World/SaltLightingRig.*`: `DayCycle`
 | Coil of rope | 10 | Two in the satchel at the start |
 | Glass float | 10 | |
 | Ancient shard | 5 | "Hold it up to the light" (no use yet) |
+| Sailcloth (`Canvas`) | 10 | D73: mends the sail (one a step) |
+| Iron nails | 40 | D73: two a patch |
+| Keg of tar | 5 | D73: for upgrades (step 4) |
+| Pale float | 5 | D73: an Old World thing (the prologue's cache) |
 
 The satchel has 24 pockets.
 
 ## Tools
 
-Compass, spyglass (view narrows to 20 degrees in 0.35 s), lantern (2 100 K, 28 cd), satchel, empty hands. The player owns
-the compass, the spyglass and the lantern from the start.
+Compass, spyglass (view narrows to 20 degrees in 0.35 s), lantern (2 100 K, 28 cd), shovel (D73), satchel, empty hands. The player owns
+the compass, the spyglass and the lantern from the start; the Harbour Keeper gives the shovel.

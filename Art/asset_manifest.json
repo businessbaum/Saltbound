@@ -929,5 +929,117 @@
     "nanite": true,
     "collision": "none",
     "_note": "D63 the hoist's counterweight (build_hub_inside.py hoist): ASaltHubHoist moves it; pivot at its bottom centre"
+  },
+  "SM_Dig_Mound": {
+    "fbx": "Dig/SM_Dig_Mound.fbx",
+    "dest": "/Game/Saltbound/Props/Dig",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D73 build_dig.py: the sign of something buried: a low mound of sand; MI_HomeGround on the sand pieces, no collision (ASaltDigSpot)."
+  },
+  "SM_Dig_Hole": {
+    "fbx": "Dig/SM_Dig_Hole.fbx",
+    "dest": "/Game/Saltbound/Props/Dig",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D73 build_dig.py: what digging leaves: a rim of sand round a dark middle; scaled with the digging; MI_HomeGround on the sand pieces, no collision (ASaltDigSpot)."
+  },
+  "SM_Dig_Heap": {
+    "fbx": "Dig/SM_Dig_Heap.fbx",
+    "dest": "/Game/Saltbound/Props/Dig",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D73 build_dig.py: the heap of thrown sand beside a hole; MI_HomeGround on the sand pieces, no collision (ASaltDigSpot)."
+  },
+  "SM_Dig_Stake": {
+    "fbx": "Dig/SM_Dig_Stake.fbx",
+    "dest": "/Game/Saltbound/Props/Dig",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D73 build_dig.py: a sailor's stake with a rag, marking a cache; MI_HomeGround on the sand pieces, no collision (ASaltDigSpot)."
+  },
+  "SM_Dig_Bundle": {
+    "fbx": "Dig/SM_Dig_Bundle.fbx",
+    "dest": "/Game/Saltbound/Props/Dig",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D73 build_dig.py: the Cartographer's oilcloth bundle (a find); MI_HomeGround on the sand pieces, no collision (ASaltDigSpot)."
+  },
+  "SM_Dig_Box": {
+    "fbx": "Dig/SM_Dig_Box.fbx",
+    "dest": "/Game/Saltbound/Props/Dig",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D73 build_dig.py: a sailor's small planked box (a find); MI_HomeGround on the sand pieces, no collision (ASaltDigSpot)."
+  },
+  "SM_Tool_Shovel": {
+    "fbx": "Tools/SM_Tool_Shovel.fbx",
+    "dest": "/Game/Saltbound/Props/Tools",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D73 build_dig.py: the Harbour Keeper's shovel, held (USaltHeldToolsComponent); pivot at the grip, along +X."
+  },
+  "SM_Pickup_Canvas": {
+    "fbx": "Pickups/SM_Pickup_Canvas.fbx",
+    "dest": "/Game/Saltbound/Props/Pickups",
+    "nanite": false,
+    "collision": "none",
+    "_note": "Pickup (D73, build_pickups.py)."
+  },
+  "SM_Pickup_IronNails": {
+    "fbx": "Pickups/SM_Pickup_IronNails.fbx",
+    "dest": "/Game/Saltbound/Props/Pickups",
+    "nanite": false,
+    "collision": "none",
+    "_note": "Pickup (D73, build_pickups.py)."
+  },
+  "SM_Pickup_Tar": {
+    "fbx": "Pickups/SM_Pickup_Tar.fbx",
+    "dest": "/Game/Saltbound/Props/Pickups",
+    "nanite": false,
+    "collision": "none",
+    "_note": "Pickup (D73, build_pickups.py)."
+  },
+  "SM_Pickup_PaleFloat": {
+    "fbx": "Pickups/SM_Pickup_PaleFloat.fbx",
+    "dest": "/Game/Saltbound/Props/Pickups",
+    "nanite": false,
+    "collision": "none",
+    "_note": "Pickup (D73, build_pickups.py)."
+  },
+  "SM_Hull_Hole": {
+    "fbx": "Boat/SM_Hull_Hole.fbx",
+    "dest": "/Game/Saltbound/Props/Repair",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D74 build_repair.py: sprung planking on the bulwark's inner face (a hole of the ship repair system); USaltHullDamageComponent places it."
+  },
+  "SM_Hull_Patch": {
+    "fbx": "Boat/SM_Hull_Patch.fbx",
+    "dest": "/Game/Saltbound/Props/Repair",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D74 build_repair.py: a fresh board nailed over a hole; USaltHullDamageComponent places it."
+  },
+  "SM_Water_Spurt": {
+    "fbx": "Boat/SM_Water_Spurt.fbx",
+    "dest": "/Game/Saltbound/Props/Repair",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D74 build_repair.py: the sea spurting in at a hole (MI_WaterSpurt, set by setup_repair_materials.py); USaltHullDamageComponent places it."
+  },
+  "SM_Boat_Bucket": {
+    "fbx": "Boat/SM_Boat_Bucket.fbx",
+    "dest": "/Game/Saltbound/Props/Repair",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D74 build_repair.py: the bailing bucket on deck; USaltHullDamageComponent places it."
+  },
+  "SM_Boat_BilgeWater": {
+    "fbx": "Boat/SM_Boat_BilgeWater.fbx",
+    "dest": "/Game/Saltbound/Props/Repair",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D74 build_repair.py: the water over the deck when she is low (the deck's outline inside the bulwarks); USaltHullDamageComponent places it."
   }
 }

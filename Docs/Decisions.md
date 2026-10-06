@@ -2097,3 +2097,87 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   lantern kept); `sb.Dev.RunSaveTests` 6/6 (new: `LoadTime`, 22.40 h on day 4, running); `sb.Dev.RunMenuTests` 22/22.
 - **Open:** the night's look is a first pass for the owner (how dark, how blue, the stars' size and number); the underwater view at
   night has not been looked at; no moon phases; nothing sleeps yet (the bunk and the Inn come with the cutter and the hub's zones).
+
+### D73 · M6 step 2: materials, digging and the Harbour Keeper's shovel (Adopted: waiting for the owner's look)
+- **Owner (2026-10-06):** "you can dig stuff up or you need to collect stuff for upgrades"; "on the start island is an helper NPC, he
+  will give out a shovel".
+- **Materials** (`Core/SaltItems.cpp`): Sailcloth (`Canvas`, 10 a stack), Iron nails (40), Keg of tar (5) and the Pale float (5, the
+  first Old World thing: "a number is pressed into it: 17", the concept's reveal ladder); driftwood is the timber. Pickup meshes
+  (`build_pickups.py`) and painted icons (`gen_ui.py materials`) in the existing style.
+- **The shovel** (`Core/SaltTools.cpp`, sixth on the wheel, key 6; the wheel's hint now says 1 - 6): held low on the right, blade down;
+  it strokes three times while E is held on a dig (`USaltHeldToolsComponent`). Its medallion is drawn like the design's spyglass and
+  lantern (`ui_parts.js toolShovel`). The Harbour Keeper hands it out: E at the island's `ASaltHubPoint` "keeper" (D71's place by the
+  pier's beach) until the people come (step 5); `sb.Dev.GiveTool Shovel`.
+- **Dig spots** (`World/SaltDig.*`): a table in code (like the places and the stats), placed at the start of play by
+  `USaltDigSubsystem` on the islands' ground (a trace finds it; nothing is added to the map). Seven in the Inner Waters: the
+  Cartographer's canvas two paces seaward of the palm by the pier's beach (the prologue's cache: two sailcloth and the pale float,
+  a note), the lagoon islet's cay, four lagoon beaches, the west hill's top (salt 15-60 in some, a scratched ring of seven marks in
+  one). Each shows its sign (a mound of loose sand, or a sailor's stake with a rag). Without a shovel E says "Something is buried
+  here"; with it owned a press takes it in hand; in hand E is a 2.4 s hold, three strokes, the hole and the heap grow, the find (an
+  oilcloth bundle or a planked box) rises out of the hole; E takes its contents into the satchel (what does not fit stays). Saved
+  by id (0 buried, 1 dug up, 2 emptied).
+- **Loose ground:** with the shovel in hand anywhere on the islands' sand and earth (their ground and collision meshes, not rock,
+  wood or a deck; level enough and above the water) a dig volume follows the look; digging leaves a hole and a heap (the last 12
+  stay) and turns up something small, never nothing (a shell, two nails, driftwood, a coil of rope), once per 3 m cell.
+- **The ground hides what is under it:** the hole is a rim of thrown sand round a dark, damp middle (the island's own ground
+  material, MI_HomeGround, with its vertex code: earth in the hole); the find rises from below the surface.
+- **Laid on the ground (seen in play):** a spot set level on the collision's point stood off the sculpted sand (its rim lifted, a shadow
+  under it); spots and the loose ground's holes now follow the ground's slope and sit 5 cm into it (`SaltDig::SinkCm`).
+- **Save:** the dig stages and the tools owned (older saves keep the start's tools).
+- **Tests:** `sb.Dev.RunDigTests` 7/7 (seven spots placed, a spot needs the shovel, the Keeper gives it, it is taken in hand, dug up and emptied, loose ground, the stages saved).
+- **Open:** the owner's look at the dig art, the shovel in hand and the icons; Ruin Isle has no spots yet (its ground is placed by
+  the old map script); the keeper's figure comes with the people (step 5); digging makes no sound yet.
+
+### D74 · M6 step 3: the ship repair system (Adopted: waiting for the owner's look)
+- **Owner (2026-10-06):** "Make an ship repair system" (the concept's 5.5).
+- **`USaltHullDamageComponent`** on the boat (`Boat/SaltHullDamage.*`), the boat itself changed only at its edges: a knock signal
+  after its contacts are found (the fastest touching contact closing this frame), the bilge water's weight in its forces, and a
+  `SailCondition` on the sail's drive.
+- **Holes:** a knock faster than 2 m/s against anything solid springs a plank where she was hit (faster than 3.2 m/s a medium, 4.5 m/s
+  a large hole), one per knock (1.2 s), at most 8, on the bulwark's inner face above the deck: broken strakes punched inward round a
+  dark gap, splinters, the sea spurting in (a white-water spout, `MI_WaterSpurt`, breathing with the sea). They leak 2, 6, 15 litres
+  a second.
+- **Where a hole goes:** the nearest clear spot to the knock on that side: never in the boarding gaps, 0.55 m apart, and never behind
+  a fitting (seen in play: the first hole landed on the pin rail and cut through its coils; `IsHoleSpotFree` traces her meshes'
+  triangles across the hole's width up to the pin rails' height). Her bulwarks are crowded (pin rails, the chest, benches, the bucket,
+  the ends curving in): clear room is starboard 2.1-2.8 m and port -0.8 m (`sb.Boat.Hull spots` maps it). With none left on that side
+  a knock opens the nearest hole wider; only when none can widen does a hole go behind a fitting.
+- **The water aboard** weighs her down (she sits lower, slower: the drive loses up to a third at the brink), past 45 % it shows over
+  the deck boards (`MI_DeckWater`, rising to 18 cm), at 4 t she founders: for now she is towed home to her mooring with her holes
+  patched (the wreck and the floating stores of the concept's 5.4 come later).
+- **Mending at sea:** a patch is a 2 s hold at the hole with a piece of driftwood and two iron nails (the board stays nailed over it,
+  a fresh piece of the boat's history); the bucket stands against the starboard bulwark aft of the gap, a 1 s hold bails a
+  bucketful (14 l); the sail tears with more than 12 m/s of wind on more than 70 % of sail for 8 s (a tear, a rip, shreds: 78, 55, 20 %
+  of the drive), a 3 s hold at the mast's foot with sailcloth mends a step; shreds need the Shipwright. Without the materials a press
+  says what is missing.
+- **The Shipwright's repair** (`RepairAll`): as new; it comes to the Slip with step 4.
+- **Save:** holes and patches, the water, the tears. `sb.Boat.Damage 0` turns knocks off (the boat suite does while it rams the pier).
+- **Commands:** `sb.Boat.Hull hole <x> <side> <size> | water <kg> | tear | repair | info | spots`, `sb.Dev.RunRepairTests`.
+- **Tests:** `sb.Dev.RunRepairTests` 8/8 (knocks, the leak and the water's weight, a patch, bailing, the sail torn and mended, the Shipwright's repair, holes clear of fittings, the save). With D72-D74 in: clock 6/6, save 6/6, menus 22/22, boat 47/47 on the third of three runs (`BoatBellRope` and `StandOnSailingBoat` each failed once in the other two and passed in the rest; knocks are off in that suite), inventory 43/44 (`SaveSignShows`, Progress: known issues).
+- **Open:** the owner's look (the hole, the patch, the spout, the bucket, the water on deck); no sounds yet (the concept's "seen and
+  heard"); soft ground (a sandy beach) holes her like rock; the founder is a plain reset, not yet the wreck and the tow. Question for
+  the owner: holes in her bottom boards (where a rock really holes a boat, and the deck is clear) instead of the crowded bulwarks.
+
+### D75 · M6 steps 4-6 on paper: a person's line, the Shipwright's plans, the log, the job board (Proposal: waiting for the owner)
+- **Why:** steps 4 to 6 of M6 (the concept's 10.2) put new screens in front of the player; the owner approves UI from designs drawn in
+  the house style before it is built (D55).
+- **`Docs/Design/UI/UI_FirstHour.html`** (contact sheet `UI_FirstHour.jpg`, screens `FirstHour/screen_*.jpg`). The first version, laid
+  out in CSS, "looked like from a different game" (owner): the screens are now drawn on 1920 x 1080 canvases with the approved pages'
+  own kit, pulled verbatim from `UI_Satchel.html` and `UI_Prompts.html` (stitched leather and brass, torn parchment and key scraps,
+  wood with iron, wax seals, ink) by `Tools/design/make_first_hour.py`; the screens are `Tools/design/first_hour_screens.js`. Every
+  part is a thing from the boat or the harbour, so the parts can be cut out for the game like the satchel's (D55).
+  - **A person speaks:** A, a torn half sheet low in the middle with the speaker's wax seal, the name in small capitals and the line in
+    ink; choices on key scraps 1-3, E the plain answer; the world keeps running; a murmur per line (recommended). B, a small scrap
+    tacked beside the speaker on a twine (for calls in passing).
+  - **The Shipwright's plans:** a framed plank board at the Slip under a burnt name board: the plans as slips (done ones struck through
+    and sealed, locked ones greyed with a lock), the chosen one pinned large with an ink drawing of the work and what it does, what it
+    takes on a stitched leather roll of pressed rings (have / need, red when short), its salt; "have it fitted" at the fitting berth
+    (recommended).
+  - **The log:** a leather-bound book with brass corners, ribbon and strap; the Cartographer's pages in their hand with sketches, your
+    notes written by the game with pasted-in finds (a charcoal rubbing of the Spire's stone, "ERTH 17": the first quiet hint of the Old
+    World, and the pale float's number again); leather tabs (Pages, Notes, Words, Places, Plans); key L (recommended).
+  - **The job board:** handwritten slips on iron nails in the Tally House with small ink sketches, kind and pay; the one looked at lifts
+    in warm light; taken ones get the Purser's wax seal; a chalk slate for the pay hatch (recommended).
+  - **Salt** (the currency, D61) is drawn as a bar of rock salt bound with a fibre band: a smooth white block read as soap, a white
+    block with a red stamp as a first-aid box.
+- **Questions for the owner:** the five on the page (the line's place, the plans, the log's key, the board, when upgrades are fitted).

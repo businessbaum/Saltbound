@@ -3,6 +3,7 @@
 #include "Boat/SaltBoat.h"
 #include "Hub/SaltHubPassage.h"
 
+#include "Boat/SaltHullDamage.h"
 #include "Boat/SaltHullShape.h"
 #include "CableComponent.h"
 #include "Components/PointLightComponent.h"
@@ -193,6 +194,7 @@ ASaltBoat::ASaltBoat()
 	Hull->SetMobility(EComponentMobility::Movable);
 	Hull->SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
 	SetRootComponent(Hull);
+	HullDamage = CreateDefaultSubobject<USaltHullDamageComponent>(TEXT("HullDamage"));
 
 	auto Part = [this](FName Name, USceneComponent* Parent)
 	{
@@ -1227,6 +1229,30 @@ void ASaltBoat::Tick(float DeltaSeconds)
 	UpdateControls(Dt);
 	SampleWater(Dt);
 	FindContacts();
+	// D74: the hardest knock this frame (a contact touching and closing), for the hull damage.
+	if (OnHullKnock.IsBound())
+	{
+		float Fastest = 0.f;
+		FVector Where = FVector::ZeroVector;
+		for (const FContact& C : Contacts)
+		{
+			const FVector P = BodyToWorld(C.BodyPoint);
+			if (FVector::DotProduct(C.PlanePoint - P, C.Normal) < -0.02)
+			{
+				continue;
+			}
+			const float Closing = (float)-FVector::DotProduct(PointVelocity(P), C.Normal);
+			if (Closing > Fastest)
+			{
+				Fastest = Closing;
+				Where = C.BodyPoint;
+			}
+		}
+		if (Fastest > 0.f)
+		{
+			OnHullKnock.Broadcast(Where, Fastest);
+		}
+	}
 
 	const FVector OldX = X;
 	const FQuat OldQ = Q;
@@ -1423,7 +1449,8 @@ void ASaltBoat::FindContacts()
 void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 {
 	using namespace SaltHull;
-	FVector F(0.0, 0.0, -Mass * Gravity);
+	// D74: the water in her bilge weighs her down.
+	FVector F(0.0, 0.0, -(Mass + BilgeWaterKg) * Gravity);
 	FVector T = FVector::ZeroVector;
 	KickBuoyancy = KickDamping = 0.0;
 	auto AddForceAt = [&](const FVector& Force, const FVector& At)
@@ -1547,8 +1574,9 @@ void ASaltBoat::Step(float H, const FVector2D& WindWorld)
 		const double AngleFactor = Floor + (1.0 - Floor) * FMath::Pow(Astern, Shape);
 		const double SpeedFactor = FMath::Clamp(AirWorld.Size() / 7.0, 0.3, 1.5);
 		const double Shade = FMath::Lerp(1.0, SpeedFactor, (double)WindInfluence) * (1.0 - AnchorHold);
-		const double Fx = SailThrust * Hoist * AngleFactor * Shade;
-		const double Fy = SailThrust * Hoist * Shade * SailHeel * FMath::Clamp(Apparent.Y / AppSpeed, -1.0, 1.0);
+		// D74: a torn sail drives less, and a boat low in the water drags (SailCondition, from the hull damage).
+		const double Fx = SailThrust * Hoist * AngleFactor * Shade * SailCondition;
+		const double Fy = SailThrust * Hoist * Shade * SailHeel * SailCondition * FMath::Clamp(Apparent.Y / AppSpeed, -1.0, 1.0);
 		AddForceAtNoTurn(Q.RotateVector(FVector(Fx, Fy, 0.0)), BodyToWorld(CE));
 		SailDrive = (float)Fx;
 		SailDriveFactor = (float)AngleFactor;

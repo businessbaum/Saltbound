@@ -18,6 +18,7 @@ class USaltInventoryComponent;
 class UStaticMeshComponent;
 class USaltInteractableComponent;
 class USaltStationComponent;
+class USaltHullDamageComponent;
 class ASaltPlayerCharacter;
 
 /** What holds the boat in place. */
@@ -134,6 +135,17 @@ public:
 	float GetRudderAngleDeg() const { return RudderAngle; }
 	/** D65: the share of the full drive the set sail gives at the apparent wind's angle now (1 astern .. the floor ahead). */
 	float GetSailDriveFactor() const { return SailDriveFactor; }
+	/** The wind where she is (world XY, m/s). */
+	FVector2D GetTrueWind() const { return LastTrueWind; }
+
+	// D74: the ship repair system (Boat/SaltHullDamage). A hard knock: where on the hull (body metres) and how fast it closed (m/s).
+	DECLARE_MULTICAST_DELEGATE_TwoParams(FSaltHullKnock, const FVector& /*BodyPointM*/, float /*ClosingSpeed*/);
+	FSaltHullKnock OnHullKnock;
+	/** Water in her bilge (kg): it weighs her down. Set by the hull damage. */
+	float BilgeWaterKg = 0.f;
+	/** What is left of the sail's drive (a torn sail, a boat low in the water), 0..1. Set by the hull damage. */
+	float SailCondition = 1.f;
+	USaltHullDamageComponent* GetHullDamage() const { return HullDamage; }
 	/** Deepest penetration of the collision capsules into static geometry this frame (cm). */
 	float GetContactDepth() const { return MaxContactDepth * 100.f; }
 	int32 GetContactCount() const { return Contacts.Num(); }
@@ -185,6 +197,8 @@ public:
 
 	// Components ---------------------------------------------------------------
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<UStaticMeshComponent> Hull;
+	/** D74: holes, water aboard, the sail's tears, and the means to mend them. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USaltHullDamageComponent> HullDamage;
 	/** D65: the yard, slung across the mast's front and fixed square to the boat; the square sail hangs from it (both are
 	 *  built in the yard's frame, SaltHullShape.h YardX / YardHeight). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components") TObjectPtr<USceneComponent> YardPivot;

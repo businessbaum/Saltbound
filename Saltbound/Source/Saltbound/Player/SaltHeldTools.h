@@ -17,7 +17,8 @@ class UStaticMeshComponent;
  *  - the compass low on the right, tilted towards the eye, its needle swinging to world north (+X) and settling;
  *  - the spyglass: the view narrows to 20 degrees in 0.35 s (the HUD draws the round vignette and brass rim; mouse
  *    sensitivity follows the field of view);
- *  - the lantern hanging from the left hand, swinging as the player moves, a warm light (2100 K) inside.
+ *  - the lantern hanging from the left hand, swinging as the player moves, a warm light (2100 K) inside;
+ *  - D73: the shovel low on the right, blade down and forward; while E is held on a dig it strokes three times.
  * A tool rises into view in 0.25 s and sinks out of it when put away. Meshes load on first use (never in constructors).
  */
 UCLASS(ClassGroup = (Saltbound))
@@ -65,6 +66,8 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> Lantern;
 	UPROPERTY(Transient) TObjectPtr<UPointLightComponent> LanternLight;
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> LanternGlass;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> ShovelHand;
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> Shovel;
 
 	FName Tool;
 	bool bSuppressed = false;
@@ -76,4 +79,6 @@ private:
 	float NeedleRate = 0.f;
 	float Flicker = 0.f;
 	float BaseFOV = 80.f;
+	/** D73: how far into a stroke the shovel is (0 resting .. 1 thrust in). */
+	float DigStroke = 0.f;
 };
