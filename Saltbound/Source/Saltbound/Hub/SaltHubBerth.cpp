@@ -23,6 +23,15 @@ TArray<FSaltCalmZone> ASaltHubBerth::GetWorldCalmZones() const
 	return Out;
 }
 
+FSaltShelterBox ASaltHubBerth::GetWorldShelter() const
+{
+	FSaltShelterBox Out = Shelter;
+	const FVector W = GetActorTransform().TransformPosition(FVector(Shelter.Center.X, Shelter.Center.Y, 0.0));
+	Out.Center = FVector2D(W.X, W.Y);
+	Out.Yaw = (float)GetActorRotation().Yaw + Shelter.Yaw;
+	return Out;
+}
+
 FVector ASaltHubBerth::ShipToWorld(const FVector& ShipM) const
 {
 	return GetActorTransform().TransformPosition(FVector((ShipM.X - PivotX) * 100.0, ShipM.Y * 100.0, ShipM.Z * 100.0));

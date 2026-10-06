@@ -271,6 +271,14 @@ private:
 	FSaltSeaStatePreset ComposeSeaState(float* OutZoneWeightSum) const;
 	void PushEnvironment(const FSaltLightingPreset& P, const FSaltRegionPreset& R, const FSaltWeatherPreset& W, const FSaltSeaStatePreset& S);
 	void InitLayersIfNeeded();
+	/** D69: how far the camera is inside an ASaltInteriorZone (0..1), and that zone's fog start and density scale. */
+	float ComposeInterior(float& OutFogStartCm, float& OutDensityScale) const;
+	/** Sets the fog from the last pushed outdoor values and the camera's interior weight. */
+	void ApplyInteriorFog();
+
+	float BaseFogDensity = 0.f;
+	float BaseFogStartCm = 0.f;
+	float LastInteriorWeight = -1.f;
 
 	FLayer<FSaltRegionPreset> RegionLayer;
 	FLayer<FSaltWeatherPreset> WeatherLayer;

@@ -25,6 +25,7 @@ import hub_plan as PL  # noqa: E402  (pure Python: the rooms and the gates, D64)
 importlib.reload(PL)
 
 BLK = "/Game/Saltbound/Hub/Blockout/"
+MI_DIR = "/Game/Saltbound/Materials/Instances/"
 ART_DIR = "/Game/Saltbound/Hub/Art/"
 GEN_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "Art", "Generated")
 LEVELS_UP = sorted(H.LEVELS, key=H.level_z)
@@ -38,15 +39,29 @@ BLK_PARTS = (["ShellStern", "ShellWaistS", "ShellWaistP", "ShellBow", "Dock"] + 
              + ["Stairs", "Gates", "Props", "Masts", "Markers"])
 # Under the art the blockout only collides; its gates are ASaltHubGate's blockers, its markers are for the plain review.
 BLK_SKIP_UNDER_ART = {"Gates", "Markers"}
+# D69: the hidden shell and decks still cast shadows (bCastHiddenShadow). They are watertight, the art's boards are not: the
+# sun came in through the planking's seams and the hull's art (the hall's water and walls in sunlight, slits of light along the
+# ceilings). The stairs, props and masts stay shadowless (the art's own shapes cast theirs).
+BLK_HIDDEN_SHADOW = ("Shell", "Deck_", "Dock")
 # Calm zones (prompt section 4; not in the data): round the ship within 120 m (full by 300 m), in the water hall. Measured in the
 # Storm sea (D61, hub_checks.water): the prompt's 30 % and 10 % let the sea reach +1.56 m under the hull and +0.51 m in the
 # basin; 20 % and 7 % keep it under +1.2 m and +0.4 m. (inner cm, outer cm, the sea's share left)
 SHIP_ZONE = (12000.0, 30000.0, 0.2)
 HALL_ZONE = (2500.0, 4000.0, 0.07)
-LANTERN_CD = 60.0          # a lantern below decks (the game's ASaltLantern is 28 cd)
-# How far a lantern reaches (cm): 60 cd is under 1 lux beyond 8 m. With 16 m each of the Well's 14 lanterns lit the whole shaft,
-# and their shadows cost 4 ms at the Keelgate in the packaged build (D63).
-LANTERN_RADIUS = 1000.0
+# D69 (owner: "the light from the lanterns are not good. Create strong and warm lightsources"): 60 cd at 2100 K made thin, pale
+# pools that the daylight in the doorways and the Well washed out. Now 240 cd at 1900 K (an oil flame), a little flicker
+# (ASaltHubRopes), and soft shadows from a 4 cm flame.
+LANTERN_CD = 240.0
+LANTERN_K = 1900.0
+# How far a lantern reaches (cm): with 16 m each of the Well's 14 lanterns lit the whole shaft, and their shadows cost 4 ms at
+# the Keelgate in the packaged build (D63). 240 cd still gives 2 lux at 11 m, where the window fades it out.
+LANTERN_RADIUS = 1100.0
+# D69: inside the hull the sea's haze stays outside (ASaltInteriorZone; ship metres x0, x1, y0, y1, z0, z1): the fog starts beyond
+# the ship's length and is half as dense. The hold up to the gun deck, the sterncastle's storeys, the forecastle's.
+INTERIOR_ZONES = {"Hull": (-2.0, 162.0, -21.0, 21.0, -6.0, 16.3), "Sterncastle": (-2.0, 48.0, -20.0, 20.0, 16.3, 28.4),
+                  "Forecastle": (134.0, 162.0, -20.0, 20.0, 16.3, 22.4)}
+# D69: her water hall is sheltered (no sun or sky glow in its water's volume): a box round its water, fading over its last 1.2 m.
+SHELTER_EDGE = 120.0
 INTERIOR_MIN_EV = 3.0      # how far the eye opens up below decks (the Day preset stops at EV 11, Dusk at 5)
 INTERIOR_MAX_EV = 7.5      # and how far it may close there (the shaft's daylight and the doorways would black the rooms out)
 # The enclosed spaces (ship metres x0, x1, y0, y1, z0, z1): each gets its own exposure range (D64: the Water Hall is a hall now,
@@ -131,6 +146,25 @@ def calm_zones(local=True, berth=None):
     return out
 
 
+def shelter_box(local=True, berth=None):
+    """Her water hall's water (dock.water along x, the hull's inside across) as a SaltShelterBox: in her frame (the berth
+    actor's, cm) or in the world."""
+    wx0, wx1 = water_x()
+    # Under the quays and up the slipway too (the water's edge at the quays' faces must be fully sheltered: the box fades
+    # over its last SHELTER_EDGE), out to the hull's outer face across.
+    wx0, wx1 = wx0 - 2.5, max(wx1 + 2.5, float(H.HUB["ramp"]["x1"]))
+    xc = 0.5 * (wx0 + wx1)
+    half_y = H.half_width(xc, 0.0) + 0.3
+    c = H.to_unreal(xc, 0.0, 0.0) if local else H.ship_to_world(xc, 0.0, 0.0, berth)
+    b = unreal.SaltShelterBox()
+    b.set_editor_property("center", unreal.Vector2D(c[0], c[1]))
+    b.set_editor_property("half_extent", unreal.Vector2D((wx1 - wx0) * 50.0, half_y * 100.0))
+    b.set_editor_property("yaw", 0.0 if local else (berth or H.berth_world())[1])
+    b.set_editor_property("edge_cm", SHELTER_EDGE)
+    b.set_editor_property("amount", 1.0)
+    return b
+
+
 HUB_LEVEL = "/Game/Saltbound/Maps/L_Hub"
 
 
@@ -143,6 +177,7 @@ def berth_and_ship(eas, folder="HubShip"):
     b.set_editor_property("berth_id", bid)
     b.set_editor_property("default", True)
     b.set_editor_property("calm_zones", calm_zones(local=True))
+    b.set_editor_property("shelter", shelter_box(local=True))
     s = p.spawn(unreal.SaltHubShip, (bx, by, bz), 0.0, "HubShip")
     s.set_editor_property("hub_level", unreal.load_asset(HUB_LEVEL))
     return b, s
@@ -160,6 +195,8 @@ def blockout(p, under_art):
             continue
         n += 1
         a.set_editor_property("tags", ["HubBlk_" + part])                  # the hub tests tell props from ceilings by these
+        if under_art and part.startswith(BLK_HIDDEN_SHADOW):
+            a.static_mesh_component.set_editor_property("cast_hidden_shadow", True)
         if part == "Markers":
             a.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
             a.static_mesh_component.set_editor_property("cast_shadow", False)
@@ -251,14 +288,51 @@ def lanterns(p):
     lamps = lantern_spots()
     for k, (x, y, z) in enumerate(lamps):
         lamp = p.spawn(unreal.PointLight, p.world(x, y, z), 0.0, "Lantern_%02d" % k, "Lanterns")
+        lamp.set_editor_property("tags", ["HubLantern"])                     # ASaltHubRopes flickers them
         lc = lamp.get_component_by_class(unreal.PointLightComponent)
         lc.set_editor_property("intensity_units", unreal.LightUnits.CANDELAS)
         lc.set_editor_property("intensity", LANTERN_CD)
         lc.set_editor_property("use_temperature", True)
-        lc.set_editor_property("temperature", 2100.0)
+        lc.set_editor_property("temperature", LANTERN_K)
         lc.set_editor_property("attenuation_radius", LANTERN_RADIUS)
+        lc.set_editor_property("source_radius", 4.0)
         lc.set_mobility(unreal.ComponentMobility.MOVABLE)
     return len(lamps)
+
+
+def interiors(p):
+    """D69: the enclosed spaces' fog (ASaltInteriorZone): while the camera is inside, the sea's haze stays outside."""
+    n = 0
+    for name, (x0, x1, y0, y1, z0, z1) in INTERIOR_ZONES.items():
+        a = p.spawn(unreal.SaltInteriorZone, p.world(0.5 * (x0 + x1), 0.5 * (y0 + y1), 0.5 * (z0 + z1)), 0.0, "Interior_" + name, "Exposure")
+        a.set_editor_property("extent", unreal.Vector((x1 - x0) * 50.0, (y1 - y0) * 50.0, (z1 - z0) * 50.0))
+        a.set_editor_property("fog_start_cm", 16500.0)
+        a.set_editor_property("fog_density_scale", 0.5)
+        a.set_editor_property("blend_cm", 250.0)
+        n += 1
+    return n
+
+
+def ropes(p):
+    """D69 (owner: "loose ends and no physics in the ropes"): the running rigging that hangs (build_hub_rig.py writes the spans
+    to hub_ropes.json, ship metres): real cables in ASaltHubRopes at her pivot, blown aft (she lies head to wind)."""
+    data = _generated("hub_ropes.json")
+    if not data or not hasattr(unreal, "SaltHubRopes"):
+        return 0
+    a = p.spawn(unreal.SaltHubRopes, p.world(H.PIVOT_X, 0.0, 0.0), 0.0, "HubRopes", "Art")
+    spans = []
+    for r in data["spans"]:
+        sp = unreal.SaltRopeSpan()
+        sp.set_editor_property("start", unreal.Vector(*H.to_unreal(*r["a"])))
+        sp.set_editor_property("end", unreal.Vector(*H.to_unreal(*r["b"])))
+        sp.set_editor_property("slack", float(r["slack"]))
+        sp.set_editor_property("width", float(r["width"]) * 100.0)
+        sp.set_editor_property("material", 1 if r.get("tar") else 0)
+        sp.set_editor_property("wind", float(r.get("wind", 1.0)))
+        spans.append(sp)
+    a.set_editor_property("spans", spans)
+    a.set_editor_property("materials", [unreal.load_asset(MI_DIR + "MI_Rope_Hemp"), unreal.load_asset(MI_DIR + "MI_Hub_RopeTar")])
+    return len(spans)
 
 
 def exposure(p):
@@ -276,6 +350,10 @@ def exposure(p):
         ps.set_editor_property("auto_exposure_min_brightness", INTERIOR_MIN_EV)
         ps.set_editor_property("override_auto_exposure_max_brightness", True)
         ps.set_editor_property("auto_exposure_max_brightness", INTERIOR_MAX_EV)
+        # D69: screen traces back on inside (the rig turns them off for the open sea's waves, D23): the hall's flat water
+        # mirrors the walls and doors it sees on screen, where ray tracing alone missed thin boards and showed the sky.
+        ps.set_editor_property("override_lumen_reflections_screen_traces", True)
+        ps.set_editor_property("lumen_reflections_screen_traces", True)
         v.set_editor_property("settings", ps)
         n += 1
     return n
@@ -504,4 +582,7 @@ def everything(p, under_art=True):
                        "test_data": 1 if test_data(p) else 0})
     counts["lanterns"] = lanterns(p)
     counts["exposure"] = exposure(p)
+    counts["interiors"] = interiors(p)
+    if under_art:
+        counts["ropes"] = ropes(p)
     return counts

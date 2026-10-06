@@ -52,6 +52,34 @@ struct FSaltCalmZone
 	float MinFactor = 0.25f;
 };
 
+/**
+ * D69: water under a roof (the hub's water hall). The sky light reaches the water's volume as if it were open to the sky
+ * (the water's in-scattering is not occluded), so sheltered water glows; inside this box (world XY, turned by Yaw) the
+ * material scales its in-scattering and crest light down, fading over EdgeCm at the box's sides.
+ */
+USTRUCT(BlueprintType)
+struct FSaltShelterBox
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelter")
+	FVector2D Center = FVector2D::ZeroVector;
+
+	/** Half the box's size along its own X and Y (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelter")
+	FVector2D HalfExtent = FVector2D::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelter", meta = (Units = "deg"))
+	float Yaw = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelter", meta = (Units = "cm", ClampMin = "1"))
+	float EdgeCm = 150.f;
+
+	/** 1 = fully sheltered inside the box. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shelter", meta = (ClampMin = "0", ClampMax = "1"))
+	float Amount = 1.f;
+};
+
 /** Result of a water surface query. */
 USTRUCT(BlueprintType)
 struct FSaltWaterSample

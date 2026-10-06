@@ -306,6 +306,12 @@ void ASaltHubShip::SetCalmZones(ASaltHubBerth* Berth)
 			AddedZones.Add(Z);
 		}
 	}
+	// D69: her water hall is sheltered (no sky glow in its water) while she lies here.
+	Ocean->Shelter = Berth ? Berth->GetWorldShelter() : FSaltShelterBox();
+	if (!Berth)
+	{
+		Ocean->Shelter.Amount = 0.f;
+	}
 	Ocean->RebuildWaveField();
 }
 

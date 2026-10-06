@@ -74,6 +74,7 @@ rig = spawn(unreal.SaltLightingRig, (0, 0, 300), label="LightingRig")
 
 ocean = spawn(unreal.SaltOcean, (0, 0, 0), label="Ocean")
 ocean.set_editor_property("calm_zones", hub_place.calm_zones(local=False, berth=((BX, BY, BZ), YAW, BERTH_ID)))
+ocean.set_editor_property("shelter", hub_place.shelter_box(local=False, berth=((BX, BY, BZ), YAW, BERTH_ID)))
 print("SB_HUB_ZONES ship", [round(c) for c in world(H.PIVOT_X, 0, 0)[:2]], "hall", [round(c) for c in world(0.5 * sum(hub_place.water_x()), 0, 0)[:2]])
 # The far floor, 60 m down under her (the visual test map's floor; it is not under her whole hull there).
 floor = spawn(unreal.StaticMeshActor, (BX, BY, -6000), label="Seabed")

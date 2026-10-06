@@ -28,7 +28,11 @@ public:
 	/** Her calm zones while she lies here; centres in this actor's frame (cm). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") TArray<FSaltCalmZone> CalmZones;
 
+	/** D69: her water hall, a box in this actor's frame (centre and half extents, cm): the ocean shelters the water there. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FSaltShelterBox Shelter;
+
 	TArray<FSaltCalmZone> GetWorldCalmZones() const;
+	FSaltShelterBox GetWorldShelter() const;
 	/** A point of the ship's frame (metres: x from the stern face, y starboard, z up) in the world (cm) at this berth. */
 	FVector ShipToWorld(const FVector& ShipM) const;
 	float ShipYawToWorld(float FaceDeg) const { return (float)GetActorRotation().Yaw + FaceDeg; }

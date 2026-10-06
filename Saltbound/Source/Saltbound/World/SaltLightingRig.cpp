@@ -21,6 +21,7 @@
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "Ocean/SaltOcean.h"
+#include "World/SaltInteriorZone.h"
 #include "Boat/SaltBoat.h"
 #include "Props/SaltLantern.h"
 #include "Saltbound.h"
@@ -576,6 +577,53 @@ void ASaltLightingRig::Tick(float DeltaSeconds)
 	{
 		ApplyEnvironment();
 	}
+	else
+	{
+		ApplyInteriorFog();
+	}
+}
+
+float ASaltLightingRig::ComposeInterior(float& OutFogStartCm, float& OutDensityScale) const
+{
+	OutFogStartCm = BaseFogStartCm;
+	OutDensityScale = 1.f;
+	const UWorld* World = GetWorld();
+	if (!World || World->ViewLocationsRenderedLastFrame.Num() == 0)
+	{
+		return 0.f;
+	}
+	const FVector View = World->ViewLocationsRenderedLastFrame[0];
+	float Best = 0.f;
+	for (TActorIterator<ASaltInteriorZone> It(World); It; ++It)
+	{
+		const float Wt = It->WeightAt(View);
+		if (Wt > Best)
+		{
+			Best = Wt;
+			OutFogStartCm = FMath::Lerp(BaseFogStartCm, FMath::Max(It->FogStartCm, BaseFogStartCm), Wt);
+			OutDensityScale = FMath::Lerp(1.f, It->FogDensityScale, Wt);
+		}
+	}
+	return Best;
+}
+
+void ASaltLightingRig::ApplyInteriorFog()
+{
+	if (!Fog || !Fog->GetComponent())
+	{
+		return;
+	}
+	float Start = BaseFogStartCm;
+	float Scale = 1.f;
+	const float Wt = ComposeInterior(Start, Scale);
+	if (LastInteriorWeight >= 0.f && FMath::Abs(Wt - LastInteriorWeight) < 0.002f)
+	{
+		return;
+	}
+	LastInteriorWeight = Wt;
+	UExponentialHeightFogComponent* F = Fog->GetComponent();
+	F->SetFogDensity(BaseFogDensity * Scale);
+	F->SetStartDistance(Start);
 }
 
 void ASaltLightingRig::EnsureClouds()
@@ -695,11 +743,13 @@ void ASaltLightingRig::PushEnvironment(const FSaltLightingPreset& P, const FSalt
 	if (Fog && Fog->GetComponent())
 	{
 		UExponentialHeightFogComponent* F = Fog->GetComponent();
-		F->SetFogDensity(P.FogDensity * R.FogDensityMul * W.FogDensityMul);
+		BaseFogDensity = P.FogDensity * R.FogDensityMul * W.FogDensityMul;
+		BaseFogStartCm = P.FogStartDistance;
 		F->SetFogHeightFalloff(P.FogHeightFalloff);
 		F->SetFogInscatteringColor(Mul(P.FogInscattering, R.FogTint));
 		F->SetDirectionalInscatteringColor(Mul(P.FogDirectionalInscattering, R.FogDirectionalTint));
-		F->SetStartDistance(P.FogStartDistance);
+		LastInteriorWeight = -1.f;
+		ApplyInteriorFog();
 	}
 	if (CloudMID)
 	{

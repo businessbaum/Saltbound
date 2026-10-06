@@ -61,6 +61,15 @@ WAKE_PARAMS = ["BoatPos", "BoatAxisX", "BoatWake", "BoatWakeExtent"]
 # Its trail (D45): 16 stern positions, two per vector, and how fast the boat went there (SaltBoatWake.ush).
 TRAIL_PARAMS = ["BoatTrailP%d" % i for i in range(8)] + ["BoatTrailS%d" % i for i in range(4)]
 PS_EXTRA = ["RippleOffsets", "LookCrest"]
+# D69: water under a roof (the hub's water hall, ASaltOcean::Shelter): ShelterA = (centre xy, half extents), ShelterB = (its
+# axis cos, sin, the fading edge cm, amount). The sky light reaches the water's volume unoccluded, so sheltered water glowed.
+SHELTER_PARAMS = ["ShelterA", "ShelterB"]
+SHELTER_CODE = """
+float2 D = WorldPos.xy - ShelterA.xy;
+float2 L = float2(dot(D, ShelterB.xy), dot(D, float2(-ShelterB.y, ShelterB.x)));
+float2 E = ShelterA.zw - abs(L);
+return saturate(min(E.x, E.y) / max(ShelterB.z, 1.0)) * ShelterB.w;
+"""
 
 
 def cascade_default(i):
@@ -80,6 +89,7 @@ MPC_DEFAULTS = {
     "BoatWake": (0, 0, 1, 0),
     "LookCrest": (0.1, 0.95, 0.9, 1),
     "UnderwaterFog": (0.12, 1.0, 0.3, 0.3), "UnderwaterSky": (0.25, 0.06, 0.3, 0.6), "UnderwaterColor": (0.12, 0.48, 0.62, 1.0),
+    "ShelterA": (0, 0, 0, 0), "ShelterB": (1, 0, 150, 0),
 }
 
 
@@ -87,7 +97,8 @@ MPC_DEFAULTS = {
 def make_mpc():
     mpc = sb_ue.get_or_create_asset("MPC_Ocean", DIR, unreal.MaterialParameterCollection, unreal.MaterialParameterCollectionFactoryNew())
     names = (WAVE_PARAMS + PHASE_PARAMS + PREV_PARAMS + CALM_PARAMS + ["Chop", "Globals", "RippleOffsets"]
-             + CASCADE_PARAMS + LOOK_PARAMS + UNDER_PARAMS + BOAT_PARAMS + ["BoatWake", "BoatWakeExtent"] + TRAIL_PARAMS)
+             + CASCADE_PARAMS + LOOK_PARAMS + UNDER_PARAMS + BOAT_PARAMS + ["BoatWake", "BoatWakeExtent"] + TRAIL_PARAMS
+             + SHELTER_PARAMS)
     # Keep existing entries: each has an ID that materials reference. Recreated entries get new IDs and every
     # material not rebuilt in the same run fails to compile ("invalid parameter") and renders the default material.
     existing = {str(p.get_editor_property("parameter_name")): p for p in mpc.get_editor_property("vector_parameters")}
@@ -676,7 +687,18 @@ def make_material(mpc, ush, rts):
     foam_color = sb_ue.vector_param(m, "FoamColor", (0.82, 0.9, 0.92, 1), -300, 1050, "Foam")
     sb_ue.to_prop(foam_color, "", unreal.MaterialProperty.MP_BASE_COLOR)
     sb_ue.to_prop(ps, "RoughOut", unreal.MaterialProperty.MP_ROUGHNESS)
-    sb_ue.to_prop(ps, "EmissiveOut", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    # D69: sheltered water (the hub's hall) keeps no crest light and little in-scattering (it read as a glowing cyan floor).
+    shelter_nodes = {n: mpc_param(m, mpc, n, -1200, 1900 + i * 60) for i, n in enumerate(SHELTER_PARAMS)}
+    shelter = custom(m, -700, 1900, "Sheltered water (D69)", SHELTER_CODE, ["WorldPos"] + SHELTER_PARAMS, F1)
+    link(wp_ps, "", shelter, "WorldPos")
+    for n in SHELTER_PARAMS:
+        link(shelter_nodes[n], "", shelter, n)
+    open_sky = sb_ue.expr(m, unreal.MaterialExpressionOneMinus, -450, 1900)
+    link(shelter, "", open_sky, "")
+    emissive = sb_ue.expr(m, unreal.MaterialExpressionMultiply, -300, 1000)
+    link(ps, "EmissiveOut", emissive, "A")
+    link(open_sky, "", emissive, "B")
+    sb_ue.to_prop(emissive, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     sb_ue.to_prop(ps, "SpecularOut", unreal.MaterialProperty.MP_SPECULAR)
     boat = {n: mpc_param(m, mpc, n, -1200, 1500 + i * 60) for i, n in enumerate(BOAT_PARAMS)}
     mask = custom(m, -700, 1500, "Boat hull cut-out (D42)", BOAT_MASK_CODE, ["WorldPos"] + BOAT_PARAMS, F1)
@@ -696,10 +718,20 @@ def make_material(mpc, ush, rts):
     # scattering albedo). 0.009 (D30, owner: the ground must read as under water, not through glass): about 4 m
     # visibility in blue, turquoise shallows, blue beyond ~6 m depth.
     clarity = sb_ue.scalar_param(m, "VolumeScale", 0.009, -600, 1200, "Volume")
+    shelter_scatter = sb_ue.scalar_param(m, "ShelterScattering", 0.0, -600, 1950, "Volume")
+    scatter_k = sb_ue.expr(m, unreal.MaterialExpressionLinearInterpolate, -400, 1950)
+    sb_ue.connect(sb_ue.expr(m, unreal.MaterialExpressionConstant, -600, 2000, r=1.0), "", scatter_k, "A")
+    link(shelter_scatter, "", scatter_k, "B")
+    link(shelter, "", scatter_k, "Alpha")
     for look, pin in (("LookScattering", "ScatteringCoefficients"), ("LookAbsorption", "AbsorptionCoefficients")):
         mul = sb_ue.expr(m, unreal.MaterialExpressionMultiply, -200, 1200 if pin.startswith("S") else 1260)
         link(nodes[look], "", mul, "A")
         link(clarity, "", mul, "B")
+        if pin.startswith("S"):
+            mul2 = sb_ue.expr(m, unreal.MaterialExpressionMultiply, -100, 1200)
+            link(mul, "", mul2, "A")
+            link(scatter_k, "", mul2, "B")
+            mul = mul2
         link(mul, "", slw, pin)
     link(phase_g, "", slw, "PhaseG")
     link(behind, "", slw, "ColorScaleBehindWater")

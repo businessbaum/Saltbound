@@ -27,6 +27,7 @@ berths = 0
 for a in eas.get_all_level_actors():
     if isinstance(a, unreal.SaltHubBerth):
         a.set_editor_property("calm_zones", hub_place.calm_zones(local=True))
+        a.set_editor_property("shelter", hub_place.shelter_box(local=True))
         berths += 1
 les.save_current_level()
 
