@@ -81,6 +81,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub")
 	bool bWatch = true;
 
+	/** D70: which pair this is (hub.doors.stations: 0 aft, 1 fore), the docking station its passages moor at, and the boat's
+	 *  pose there (local cm, her heading as its yaw). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") int32 Station = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FName MooringId;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FTransform DockPose;
+	/** D70: a boat carrying the player that heads into the open doorway from within this (cm) starts the arrival. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub", meta = (Units = "cm")) float ArrivalReachCm = 2200.f;
+
 	UFUNCTION(BlueprintCallable, Category = "Hub") bool Open();
 	UFUNCTION(BlueprintCallable, Category = "Hub") bool Close();
 	UFUNCTION(BlueprintCallable, Category = "Hub") bool Toggle();

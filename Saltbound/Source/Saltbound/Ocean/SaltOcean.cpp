@@ -33,8 +33,8 @@ namespace SaltOceanParams
 	static const FName Chop(TEXT("Chop"));
 	static const FName Globals(TEXT("Globals"));
 	static const FName Ripples(TEXT("RippleOffsets"));
-	static const FName ShelterA(TEXT("ShelterA"));
-	static const FName ShelterB(TEXT("ShelterB"));
+	static const FName ShelterA[3] = { TEXT("ShelterA"), TEXT("ShelterA1"), TEXT("ShelterA2") };
+	static const FName ShelterB[3] = { TEXT("ShelterB"), TEXT("ShelterB1"), TEXT("ShelterB2") };
 	static const FName Cascade[SaltOceanFFT::NumCascades] = { TEXT("Cascade0"), TEXT("Cascade1"), TEXT("Cascade2") };
 }
 
@@ -372,12 +372,16 @@ void ASaltOcean::PushParameters()
 	}
 	Inst->SetVectorParameterValue(SaltOceanParams::CalmMin, FLinearColor(Field.CalmMin[0], Field.CalmMin[1], Field.CalmMin[2], Field.CalmMin[3]));
 	Inst->SetVectorParameterValue(SaltOceanParams::CalmMin2, FLinearColor(Field.CalmMin[4], Field.CalmMin[5], Field.CalmMin[6], Field.CalmMin[7]));
-	// D69: the sheltered box (centre, half extents; its axis, edge, amount); no box = zero extents (nothing sheltered).
-	const float ShelterYaw = FMath::DegreesToRadians(Shelter.Yaw);
-	Inst->SetVectorParameterValue(SaltOceanParams::ShelterA, FLinearColor((float)Shelter.Center.X, (float)Shelter.Center.Y,
-		(float)Shelter.HalfExtent.X, (float)Shelter.HalfExtent.Y));
-	Inst->SetVectorParameterValue(SaltOceanParams::ShelterB, FLinearColor(FMath::Cos(ShelterYaw), FMath::Sin(ShelterYaw),
-		FMath::Max(Shelter.EdgeCm, 1.f), Shelter.Amount));
+	// D69, D70: the sheltered boxes (centre, half extents; their axis, edge, amount); no box = zero extents (nothing sheltered).
+	for (int32 k = 0; k < MaxShelters; ++k)
+	{
+		const FSaltShelterBox Box = Shelters.IsValidIndex(k) ? Shelters[k] : FSaltShelterBox();
+		const float ShelterYaw = FMath::DegreesToRadians(Box.Yaw);
+		Inst->SetVectorParameterValue(SaltOceanParams::ShelterA[k], FLinearColor((float)Box.Center.X, (float)Box.Center.Y,
+			Shelters.IsValidIndex(k) ? (float)Box.HalfExtent.X : 0.f, Shelters.IsValidIndex(k) ? (float)Box.HalfExtent.Y : 0.f));
+		Inst->SetVectorParameterValue(SaltOceanParams::ShelterB[k], FLinearColor(FMath::Cos(ShelterYaw), FMath::Sin(ShelterYaw),
+			FMath::Max(Box.EdgeCm, 1.f), Shelters.IsValidIndex(k) ? Box.Amount : 0.f));
+	}
 	// Chop patches (x: factor in calm patches, y: 2pi/patch size, z: swell count) and w: swell height
 	// (sum of swell amplitudes, cm) so the material can normalise crest masks for any sea state.
 	// W: typical crest height of the whole sea (swells + half the wind-sea significant height).

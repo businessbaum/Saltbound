@@ -4,6 +4,8 @@
 
 #include "Boat/SaltBoat.h"
 #include "Components/StaticMeshComponent.h"
+#include "Hub/SaltHubPassage.h"
+#include "Hub/SaltHubShip.h"
 #include "Core/SaltContent.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
@@ -324,6 +326,32 @@ void ASaltHubDoors::Watch(float Seconds)
 		if (FMath::Abs(L.X) < SaltHubDoorsLocal::DoorwayHalfX && FMath::Abs(L.Y) > SaltHubDoorsLocal::DoorwayInY && Dist < WatchOpenCm)
 		{
 			bInDoorway = true;
+		}
+	}
+	// D70: the harbour must be there before the doors show it (her inside streams in as the player comes near).
+	if (bWanted && !ASaltHubShip::IsInsideReady(GetWorld()))
+	{
+		bWanted = false;
+	}
+	// D70: a boat carrying the player that heads into the open doorway: the arrival takes over.
+	if (Amount > 0.3f && ASaltHubShip::IsInsideReady(GetWorld()))
+	{
+		ASaltHubPassage* Passage = ASaltHubPassage::Get(GetWorld());
+		for (TActorIterator<ASaltBoat> It(GetWorld()); It && Passage && !Passage->IsRunning(); ++It)
+		{
+			if (It->IsScripted())
+			{
+				continue;
+			}
+			const FVector L = Frame.InverseTransformPosition(It->GetActorLocation());
+			const FVector V = Frame.InverseTransformVector(It->GetVelocity());
+			const float Side = L.Y >= 0.0 ? 1.f : -1.f;
+			const bool bMouth = FMath::Abs(L.X) < SaltHubDoorsLocal::DoorwayHalfX && FMath::Abs(L.Y) > HullHalfCm - 200.f
+				&& FMath::Abs(L.Y) < HullHalfCm + ArrivalReachCm;
+			if (bMouth && -Side * V.Y > SaltHubDoorsLocal::LeavingSpeed)
+			{
+				Passage->StartArrival(this, *It, (int32)Side);
+			}
 		}
 	}
 	if (bWanted)

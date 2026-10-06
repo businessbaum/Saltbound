@@ -58,6 +58,27 @@ public:
 
 	/** Moves her to a berth regardless of the rule (tests). */
 	void PlaceAt(ASaltHubBerth* Berth);
+
+	/** D70: everything inside her (L_HubInside: the decks and rooms, the harbour, its lights, gates and moorings), streamed in at
+	 *  her berth apart from her outside (L_Hub): loaded while the player is near her, shown before her doors open, out again
+	 *  when they sail away; never while the player or a boat is in her or a passage runs. None: one level holds all of her. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") TSoftObjectPtr<UWorld> InsideLevel;
+	/** Loaded (not shown) within this of her hull (m), shown within InsideShowM, unloaded beyond InsideUnloadM. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub", meta = (Units = "m")) float InsideLoadM = 300.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub", meta = (Units = "m")) float InsideShowM = 140.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub", meta = (Units = "m")) float InsideUnloadM = 450.f;
+	/** Her inside is loaded and shown (with no separate inside: her level is). */
+	bool IsInsideVisible() const;
+	/** The harbour is there to sail into: the world's hub ship shows her inside (or there is no hub ship). */
+	static bool IsInsideReady(const UWorld* World);
+	/** Load and show her inside now and keep it until the player is away again (bBlock: before this returns). */
+	void RequireInside(bool bBlock);
+	/** A passage runs: her inside stays whatever the distance. */
+	void SetInsideHeld(bool bHeld);
+	ULevelStreamingDynamic* GetInsideInstance() const { return Inside; }
+	/** How far a world point is from her hull's footprint (m; 0 within it), and whether it is in her. */
+	double DistanceToHullM(const FVector& World) const;
+	bool IsInHull(const FVector& World) const;
 	/** Her level as streamed in (null while she is not shown). */
 	ULevelStreamingDynamic* GetInstance() const { return Instance; }
 
@@ -73,6 +94,9 @@ private:
 	bool PlayerView(FVector& OutLocation, FVector& OutForward) const;
 	bool BoatMooredToHer() const;
 	void HandleGameLoaded();
+	void UpdateInside(bool bBlock);
+	void UnloadInside();
+	void ApplyShelters();
 
 	UPROPERTY(Transient) TObjectPtr<ULevelStreamingDynamic> Instance;
 	FName BerthId;
@@ -83,4 +107,11 @@ private:
 	int32 InstanceCount = 0;
 	TArray<FSaltCalmZone> AddedZones;
 	FDelegateHandle LoadedHandle;
+	UPROPERTY(Transient) TObjectPtr<ULevelStreamingDynamic> Inside;
+	bool bInsideHeld = false;
+	bool bInsideForced = false;
+	/** The player has been near her since her inside was required (it is let go once they leave again). */
+	bool bForcedNear = false;
+	bool bShelterOn = false;
+	float InsideClock = 0.f;
 };

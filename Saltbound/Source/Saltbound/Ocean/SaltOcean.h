@@ -92,9 +92,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves")
 	TArray<FSaltCalmZone> CalmZones;
 
-	/** D69: water under a roof (the hub's water hall): no sky glow in its volume. One box (MPC ShelterA / ShelterB). */
+	/** D69, D70: water under a roof (the hub's harbour: its canal and its basins): no sky glow in its volume. Up to MaxShelters
+	 *  boxes (MPC ShelterA / ShelterB, ShelterA1 / ShelterB1, ShelterA2 / ShelterB2). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Waves")
-	FSaltShelterBox Shelter;
+	TArray<FSaltShelterBox> Shelters;
+	static constexpr int32 MaxShelters = 3;
 
 	// Wind sea (FFT, see SaltOceanFFT.h) ---------------------------------------
 	/** Simulated wind sea on top of the Gerstner swells. Off = swells only (e.g. windless flat water). */

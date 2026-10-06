@@ -32,6 +32,24 @@ FSaltShelterBox ASaltHubBerth::GetWorldShelter() const
 	return Out;
 }
 
+TArray<FSaltShelterBox> ASaltHubBerth::GetWorldShelters() const
+{
+	TArray<FSaltShelterBox> Out;
+	const FTransform T = GetActorTransform();
+	for (FSaltShelterBox B : Shelters)
+	{
+		const FVector W = T.TransformPosition(FVector(B.Center.X, B.Center.Y, 0.0));
+		B.Center = FVector2D(W.X, W.Y);
+		B.Yaw = (float)GetActorRotation().Yaw + B.Yaw;
+		Out.Add(B);
+	}
+	if (Out.Num() == 0)
+	{
+		Out.Add(GetWorldShelter());
+	}
+	return Out;
+}
+
 FVector ASaltHubBerth::ShipToWorld(const FVector& ShipM) const
 {
 	return GetActorTransform().TransformPosition(FVector((ShipM.X - PivotX) * 100.0, ShipM.Y * 100.0, ShipM.Z * 100.0));

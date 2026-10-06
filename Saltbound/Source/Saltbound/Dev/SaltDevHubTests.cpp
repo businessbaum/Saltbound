@@ -11,6 +11,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Core/SaltSaveSubsystem.h"
+#include "Engine/Engine.h"
 #include "Engine/LevelStreamingDynamic.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
@@ -22,6 +23,7 @@
 #include "Hub/SaltHubGate.h"
 #include "Hub/SaltHubHoist.h"
 #include "Hub/SaltHubLadder.h"
+#include "Hub/SaltHubPassage.h"
 #include "Hub/SaltHubPoint.h"
 #include "Hub/SaltHubShip.h"
 #include "Hub/SaltHubTestData.h"
@@ -42,7 +44,7 @@ namespace
 	FAutoConsoleCommandWithWorldAndArgs CmdRunHubTests(
 		TEXT("sb.Dev.RunHubTests"),
 		TEXT("The hub ship's tests (needs her level: L_VisualTest with her berth, or L_HubReview): sb.Dev.RunHubTests [part] with part one of ")
-		TEXT("placed, sealow, nolowfloor, headroom, route, gates, boatdock, slipway, hoist, follow, save, ladder."),
+		TEXT("placed, sealow, nolowfloor, headroom, route, gates, boatdock, passage, hoist, follow, save, ladder."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			if (USaltDevTestSubsystem* T = World ? World->GetSubsystem<USaltDevTestSubsystem>() : nullptr)
@@ -313,6 +315,7 @@ void USaltDevTestSubsystem::RunHubSuite(const FString& Only)
 		{
 			Ship->SetShowOverride(1);
 			W->BlockTillLevelStreamingCompleted();
+			Ship->RequireInside(true);                                        // D70: her inside streams apart
 			S->HomeBerth = Ship->GetBerthId();
 		}
 		for (TActorIterator<ASaltHubTestData> It(W); It; ++It)
@@ -890,36 +893,62 @@ void USaltDevTestSubsystem::RunHubSuite(const FString& Only)
 		}
 	}, DockRun(false), nullptr});
 
-	// HubSlipway: a boat driven up the slipway runs aground softly and lies still ------------------------------------------
-	Steps.Add({TEXT("HubSlipway"), 20.f, [S, PlaceBoat]()
+	// HubPassage (D70): the harbour's passages as the player meets them: in through the aft doors from starboard (the short one),
+	// out again by the same doors, in through the fore doors from port (the long one). Each ends moored at its docking station (or
+	// out at sea under way and under sail), with the player's view and hands given back.
+	auto RunPassage = [this, S, EndStep]()
 	{
-		S->Max1 = 0.f;
-		if (const ASaltHubTestData* D = S->Data.Get())
+		return [this, S, EndStep](float Dt)
 		{
-			PlaceBoat(D->SlipStart, 0.f, 2.5f, false);
-		}
-	}, [S](float)
+			S->T += Dt;
+			const ASaltHubPassage* P = ASaltHubPassage::Get(GetWorld());
+			if (S->T > 1.5f && P && !P->IsRunning())
+			{
+				EndStep();
+			}
+		};
+	};
+	auto PassageDone = [this, S](const TCHAR* Name, bool bArrival, FName Expect, float MinS, float MaxS)
 	{
-		if (const ASaltBoat* B = S->Boat.Get())
+		return [this, S, Name, bArrival, Expect, MinS, MaxS]()
 		{
-			S->Max1 = FMath::Max(S->Max1, B->GetContactDepth());
-		}
-	}, [this, S, BoatLocal]()
+			ASaltHubPassage* P = ASaltHubPassage::Get(GetWorld());
+			const ASaltBoat* B = S->Boat.Get();
+			APlayerController* PC = GetWorld()->GetFirstPlayerController();
+			const bool bView = PC && PC->GetViewTarget() == PC->GetPawn();
+			const bool bHands = PC && !PC->IsMoveInputIgnored() && !PC->IsLookInputIgnored();
+			const float Secs = P ? P->GetDuration() : -1.f;
+			bool bOk = P && !P->IsRunning() && B && bView && bHands && Secs >= MinS && Secs <= MaxS;
+			FString Where;
+			if (bArrival)
+			{
+				bOk = bOk && B->GetHold() == ESaltBoatHold::Moored && B->GetMooring().Id == Expect;
+			}
+			else if (B)
+			{
+				const ASaltHubShip* Ship = S->Ship.Get();
+				const double Out = Ship ? Ship->DistanceToHullM(B->GetActorLocation()) : 0.0;
+				bOk = bOk && B->GetHold() == ESaltBoatHold::Free && Out > 8.0 && B->GetVelocity().Size2D() > 150.0 && B->IsSailSet() && !B->IsScripted();
+				Where = FString::Printf(TEXT(" out=%.1fm speed=%.1fm/s"), Out, B->GetVelocity().Size2D() / 100.0);
+			}
+			Report(Name, bOk, FString::Printf(TEXT("%s view=%d hands=%d hold=%d mooring=%s%s"), P ? *P->Describe() : TEXT("-"), bView ? 1 : 0,
+				bHands ? 1 : 0, B ? (int32)B->GetHold() : -1, B ? *B->GetMooring().Id.ToString() : TEXT("-"), *Where));
+		};
+	};
+	auto Command = [this, S](const TCHAR* Cmd)
 	{
-		const ASaltBoat* B = S->Boat.Get();
-		const ASaltHubTestData* D = S->Data.Get();
-		if (!B || !D)
+		return [this, S, Cmd]()
 		{
-			Report(TEXT("HubSlipway"), false, TEXT("no boat or data"));
-			return;
-		}
-		const FVector L = BoatLocal();
-		const float Speed = (float)B->GetVelocity().Size2D() / 100.f;
-		const bool bOn = L.X > D->Slipway.Min.X - 800.0 && L.X < D->Slipway.Max.X && FMath::Abs(L.Y) < D->Slipway.Max.Y + 200.0;
-		Report(TEXT("HubSlipway"), Speed < 0.3f && S->Max1 < 12.f && B->GetContactCount() > 0 && FMath::Abs(B->GetHeelDeg()) < 10.f && bOn, FString::Printf(
-			TEXT("finalSpeed=%.2fm/s maxPenetration=%.1fcm contacts=%d heel=%.1fdeg at=(%.1f, %.1f) slipway x %.0f..%.0f"), Speed, S->Max1,
-			B->GetContactCount(), B->GetHeelDeg(), L.X / 100.0 + 80.0, L.Y / 100.0, D->Slipway.Min.X / 100.0 + 80.0, D->Slipway.Max.X / 100.0 + 80.0));
-	}});
+			S->T = 0.f;
+			GEngine->Exec(GetWorld(), Cmd);
+		};
+	};
+	Steps.Add({TEXT("HubPassageIn"), 45.f, Command(TEXT("sb.Hub.Passage arrive 0 1 short")), RunPassage(),
+		PassageDone(TEXT("HubPassageIn"), true, TEXT("HubFitting"), 8.f, 20.f)});
+	Steps.Add({TEXT("HubPassageOut"), 45.f, Command(TEXT("sb.Hub.Passage depart short")), RunPassage(),
+		PassageDone(TEXT("HubPassageOut"), false, NAME_None, 8.f, 22.f)});
+	Steps.Add({TEXT("HubPassageFore"), 70.f, Command(TEXT("sb.Hub.Passage arrive 1 -1 long")), RunPassage(),
+		PassageDone(TEXT("HubPassageFore"), true, TEXT("HubDockFore"), 16.f, 45.f)});
 
 	// HubHoist: E rides it to each stop in time; the player stays inside the cage; no stepping out between stops -------------
 	auto InCage = [this, S]()

@@ -30,9 +30,13 @@ public:
 
 	/** D69: her water hall, a box in this actor's frame (centre and half extents, cm): the ocean shelters the water there. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") FSaltShelterBox Shelter;
+	/** D70: her harbour's water (the canal, the basins), boxes in this actor's frame; when set they replace Shelter. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hub") TArray<FSaltShelterBox> Shelters;
 
 	TArray<FSaltCalmZone> GetWorldCalmZones() const;
 	FSaltShelterBox GetWorldShelter() const;
+	/** Shelters (or Shelter alone) in the world. */
+	TArray<FSaltShelterBox> GetWorldShelters() const;
 	/** A point of the ship's frame (metres: x from the stern face, y starboard, z up) in the world (cm) at this berth. */
 	FVector ShipToWorld(const FVector& ShipM) const;
 	float ShipYawToWorld(float FaceDeg) const { return (float)GetActorRotation().Yaw + FaceDeg; }

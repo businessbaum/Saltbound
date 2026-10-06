@@ -92,6 +92,176 @@ void ASaltHubShip::Tick(float DeltaSeconds)
 		Accumulated = 0.f;
 		Evaluate();
 	}
+	// D70: her inside follows the player's distance more often than she follows the player.
+	InsideClock += DeltaSeconds;
+	if (InsideClock >= 0.25f)
+	{
+		InsideClock = 0.f;
+		UpdateInside(false);
+	}
+}
+
+// --- her inside (D70) ---------------------------------------------------------------------------------------------------------
+namespace SaltHubInsideLocal
+{
+	/** Her hull's footprint about her pivot (cm): x 0..160 m of the ship's frame, 20 m either side, keel to poop. */
+	constexpr double HalfLength = 8000.0;
+	constexpr double HalfBeam = 2000.0;
+	constexpr double Bottom = -700.0;
+	constexpr double Top = 3600.0;
+	/** Shown within InsideShowM, hidden again beyond this much more (no flicker at the edge). */
+	constexpr double ShowHysteresisM = 40.0;
+}
+
+double ASaltHubShip::DistanceToHullM(const FVector& World) const
+{
+	const ASaltHubBerth* Berth = GetBerth();
+	if (!Berth)
+	{
+		return 1.0e9;
+	}
+	const FVector L = Berth->GetActorTransform().InverseTransformPosition(World);
+	const double Dx = FMath::Max(FMath::Abs(L.X) - SaltHubInsideLocal::HalfLength, 0.0);
+	const double Dy = FMath::Max(FMath::Abs(L.Y) - SaltHubInsideLocal::HalfBeam, 0.0);
+	return FMath::Sqrt(Dx * Dx + Dy * Dy) * 0.01;
+}
+
+bool ASaltHubShip::IsInHull(const FVector& World) const
+{
+	const ASaltHubBerth* Berth = GetBerth();
+	if (!Berth)
+	{
+		return false;
+	}
+	const FVector L = Berth->GetActorTransform().InverseTransformPosition(World);
+	return FMath::Abs(L.X) < SaltHubInsideLocal::HalfLength && FMath::Abs(L.Y) < SaltHubInsideLocal::HalfBeam && L.Z > SaltHubInsideLocal::Bottom
+		&& L.Z < SaltHubInsideLocal::Top;
+}
+
+bool ASaltHubShip::IsInsideVisible() const
+{
+	if (InsideLevel.IsNull())
+	{
+		return IsLoaded();
+	}
+	return IsLoaded() && Inside && Inside->IsLevelLoaded() && Inside->IsLevelVisible();
+}
+
+bool ASaltHubShip::IsInsideReady(const UWorld* World)
+{
+	const ASaltHubShip* Ship = World ? Find(World) : nullptr;
+	return !Ship || Ship->IsInsideVisible();
+}
+
+void ASaltHubShip::RequireInside(bool bBlock)
+{
+	if (!bShown)
+	{
+		Evaluate();
+	}
+	bInsideForced = true;
+	UpdateInside(bBlock);
+}
+
+void ASaltHubShip::SetInsideHeld(bool bHeld)
+{
+	bInsideHeld = bHeld;
+	UpdateInside(false);
+}
+
+void ASaltHubShip::UpdateInside(bool bBlock)
+{
+	ASaltHubBerth* Berth = GetBerth();
+	if (InsideLevel.IsNull() || !bShown || !Berth)
+	{
+		UnloadInside();
+		ApplyShelters();
+		return;
+	}
+	// The player and every boat: how near her, and whether in her.
+	double Nearest = 1.0e9;
+	bool bIn = false;
+	if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	{
+		if (const APawn* Pawn = PC->GetPawn())
+		{
+			Nearest = FMath::Min(Nearest, DistanceToHullM(Pawn->GetActorLocation()));
+			bIn |= IsInHull(Pawn->GetActorLocation());
+		}
+	}
+	for (TActorIterator<ASaltBoat> It(GetWorld()); It; ++It)
+	{
+		Nearest = FMath::Min(Nearest, DistanceToHullM(It->GetActorLocation()));
+		bIn |= IsInHull(It->GetActorLocation());
+	}
+	// Required (a loaded game, a test, a goto): kept until the player has come near her and gone away again.
+	bForcedNear |= bInsideForced && (bIn || Nearest < InsideShowM);
+	if (bInsideForced && bForcedNear && !bIn && Nearest > InsideShowM + SaltHubInsideLocal::ShowHysteresisM)
+	{
+		bInsideForced = bForcedNear = false;
+	}
+	const bool bKeep = bInsideHeld || bInsideForced || bIn;
+	const bool bShownNow = Inside && Inside->GetShouldBeVisibleFlag();
+	const bool bShow = bKeep || Nearest < InsideShowM + (bShownNow ? SaltHubInsideLocal::ShowHysteresisM : 0.0);
+	const bool bLoad = bShow || Nearest < (Inside ? InsideUnloadM : InsideLoadM);
+	if (!bLoad)
+	{
+		UnloadInside();
+		ApplyShelters();
+		return;
+	}
+	if (!Inside)
+	{
+		bool bOk = false;
+		const FString Name = FString::Printf(TEXT("L_HubInside_%s_%d"), *BerthId.ToString(), ++InstanceCount);
+		Inside = ULevelStreamingDynamic::LoadLevelInstanceBySoftObjectPtr(this, InsideLevel, Berth->GetActorLocation(), Berth->GetActorRotation(), bOk, Name);
+		if (!bOk)
+		{
+			UE_LOG(LogSaltbound, Warning, TEXT("SB_HUB inside could not be loaded (%s)"), *InsideLevel.ToString());
+			Inside = nullptr;
+			return;
+		}
+		UE_LOG(LogSaltbound, Display, TEXT("SB_HUB inside loading (%.0f m from her)"), Nearest);
+	}
+	if (Inside->GetShouldBeVisibleFlag() != bShow)
+	{
+		Inside->SetShouldBeVisible(bShow);
+		UE_LOG(LogSaltbound, Display, TEXT("SB_HUB inside %s (%.0f m from her)"), bShow ? TEXT("shown") : TEXT("hidden"), Nearest);
+	}
+	if (bBlock)
+	{
+		GetWorld()->BlockTillLevelStreamingCompleted();
+	}
+	ApplyShelters();
+}
+
+void ASaltHubShip::UnloadInside()
+{
+	if (Inside)
+	{
+		Inside->SetShouldBeLoaded(false);
+		Inside->SetShouldBeVisible(false);
+		Inside->SetIsRequestingUnloadAndRemoval(true);
+		Inside = nullptr;
+		UE_LOG(LogSaltbound, Display, TEXT("SB_HUB inside unloaded"));
+	}
+}
+
+void ASaltHubShip::ApplyShelters()
+{
+	// Her harbour's water is sheltered while her inside is shown (with it hidden the doors are shut and nothing shows it).
+	const bool bOn = IsInsideVisible();
+	if (bOn == bShelterOn)
+	{
+		return;
+	}
+	bShelterOn = bOn;
+	for (TActorIterator<ASaltOcean> It(GetWorld()); It; ++It)
+	{
+		const ASaltHubBerth* Berth = GetBerth();
+		It->Shelters = bOn && Berth ? Berth->GetWorldShelters() : TArray<FSaltShelterBox>();
+		break;
+	}
 }
 
 void ASaltHubShip::HandleGameLoaded()
@@ -112,6 +282,20 @@ void ASaltHubShip::HandleGameLoaded()
 		}
 	}
 	Evaluate();
+	// D70: loaded in her (moored in her harbour, or standing in her): her inside is there before the first frame.
+	bool bInHer = false;
+	for (TActorIterator<ASaltBoat> It(GetWorld()); It; ++It)
+	{
+		bInHer |= It->GetHold() == ESaltBoatHold::Moored && It->GetMooring().Id.ToString().StartsWith(TEXT("Hub"));
+	}
+	if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	{
+		bInHer |= PC->GetPawn() && IsInHull(PC->GetPawn()->GetActorLocation());
+	}
+	if (bInHer && bShown)
+	{
+		RequireInside(true);
+	}
 }
 
 bool ASaltHubShip::PlayerView(FVector& OutLocation, FVector& OutForward) const
@@ -261,6 +445,8 @@ void ASaltHubShip::PlaceAt(ASaltHubBerth* Berth)
 
 void ASaltHubShip::Unload()
 {
+	UnloadInside();
+	bInsideForced = bForcedNear = false;
 	if (Instance)
 	{
 		Instance->SetShouldBeLoaded(false);
@@ -306,12 +492,9 @@ void ASaltHubShip::SetCalmZones(ASaltHubBerth* Berth)
 			AddedZones.Add(Z);
 		}
 	}
-	// D69: her water hall is sheltered (no sky glow in its water) while she lies here.
-	Ocean->Shelter = Berth ? Berth->GetWorldShelter() : FSaltShelterBox();
-	if (!Berth)
-	{
-		Ocean->Shelter.Amount = 0.f;
-	}
+	// D69, D70: her harbour's water is sheltered while her inside is shown (ApplyShelters).
+	bShelterOn = !IsInsideVisible();
+	ApplyShelters();
 	Ocean->RebuildWaveField();
 }
 
@@ -325,15 +508,17 @@ namespace SaltHubCommands
 		FVector ShipM;
 		float Face;
 	};
-	// Where each space is entered (ship metres, the data's frame; face: 0 bow, 90 starboard). D64: the Water Hall from its aft quay,
-	// the Slip from the forward quay, the Tally House where the dock stair arrives, the Well's lower gallery, the Keelgate chamber,
-	// the main deck's waist, the Chandlery's door (D69: in the forecastle's front), the quarterdeck (D69: up the grand stairs).
+	// Where each space is entered (ship metres, the data's frame; face: 0 bow, 90 starboard). D70: the harbour on the starboard quay
+	// at the aft docking station, the fore docking station, the Slip from the quay, the Tally House where the dock stair arrives,
+	// the Well's lower gallery and its foot on the quay, the main deck's waist, the Chandlery's door (D69: in the forecastle's
+	// front), the quarterdeck (D69: up the grand stairs).
 	const FGoto Places[] = {
-		{ TEXT("dock"), FVector(27.5, 0.0, 1.5), 0.f },
-		{ TEXT("slip"), FVector(49.0, 9.5, 1.5), 30.f },
-		{ TEXT("tally"), FVector(57.2, 15.5, 4.5), 0.f },
+		{ TEXT("dock"), FVector(46.0, 7.75, 1.5), 0.f },
+		{ TEXT("foredock"), FVector(119.0, 7.75, 1.5), 0.f },
+		{ TEXT("slip"), FVector(53.0, 8.0, 1.5), 80.f },
+		{ TEXT("tally"), FVector(54.5, 17.6, 4.5), 0.f },
 		{ TEXT("well"), FVector(74.5, 7.0, 4.5), 0.f },
-		{ TEXT("keelgate"), FVector(76.0, 2.0, 1.5), -20.f },
+		{ TEXT("wellfoot"), FVector(86.5, 7.6, 1.5), 180.f },
 		{ TEXT("main"), FVector(60.0, 0.0, 16.5), 0.f },
 		{ TEXT("chandlery"), FVector(131.0, 5.75, 16.5), 0.f },
 		{ TEXT("quarterdeck"), FVector(40.0, 6.0, 22.5), 180.f },
@@ -394,9 +579,10 @@ namespace SaltHubCommands
 		{
 			const ASaltHubShip* Ship = ASaltHubShip::Find(World);
 			const USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(World);
-			UE_LOG(LogSaltbound, Display, TEXT("SB_HUB info berth=%s target=%s shown=%d loaded=%d salt=%d unlocked=%d"),
+			UE_LOG(LogSaltbound, Display, TEXT("SB_HUB info berth=%s target=%s shown=%d loaded=%d inside=%d salt=%d unlocked=%d"),
 				Ship ? *Ship->GetBerthId().ToString() : TEXT("-"), Ship ? *Ship->GetTargetBerthId().ToString() : TEXT("-"),
-				Ship && Ship->IsShown() ? 1 : 0, Ship && Ship->IsLoaded() ? 1 : 0, Saves ? Saves->GetSalt() : 0, Saves ? Saves->GetUnlocked().Num() : 0);
+				Ship && Ship->IsShown() ? 1 : 0, Ship && Ship->IsLoaded() ? 1 : 0, Ship && Ship->IsInsideVisible() ? 1 : 0,
+				Saves ? Saves->GetSalt() : 0, Saves ? Saves->GetUnlocked().Num() : 0);
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdSalt(
@@ -414,7 +600,7 @@ namespace SaltHubCommands
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdGoto(
-		TEXT("sb.Dev.HubGoto"), TEXT("sb.Dev.HubGoto <dock|slip|tally|well|keelgate|main|chandlery|quarterdeck|poop>: to a space of the hub (shows her)."),
+		TEXT("sb.Dev.HubGoto"), TEXT("sb.Dev.HubGoto <dock|foredock|slip|tally|well|wellfoot|main|chandlery|quarterdeck|poop>: to a space of the hub (shows her and her inside)."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			ASaltHubShip* Ship = ASaltHubShip::Find(World);
@@ -435,7 +621,8 @@ namespace SaltHubCommands
 			{
 				Ship->SetShowOverride(1);
 			}
-			World->BlockTillLevelStreamingCompleted();                         // her decks are there to stand on
+			World->BlockTillLevelStreamingCompleted();
+			Ship->RequireInside(true);                                        // her decks are there to stand on
 			for (const FGoto& G : Places)
 			{
 				if (Args[0].Equals(G.Name, ESearchCase::IgnoreCase))
