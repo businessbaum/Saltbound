@@ -11,7 +11,9 @@
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Hub/SaltHubBerth.h"
+#include "Hub/SaltHubDoors.h"
 #include "Kismet/GameplayStatics.h"
+#include "UObject/UObjectIterator.h"
 #include "Ocean/SaltOcean.h"
 #include "Player/SaltPlayerCharacter.h"
 #include "Saltbound.h"
@@ -534,6 +536,83 @@ namespace SaltHubCommands
 				Ship->SetShowOverride(Args.Num() ? FCString::Atoi(*Args[0]) : 1);
 				UE_LOG(LogSaltbound, Display, TEXT("SB_HUB show=%d berth=%s"), Ship->IsShown() ? 1 : 0, *Ship->GetBerthId().ToString());
 			}
+		}));
+
+	// D76 (owner: "Create a command to let the hub appear instantly to make testing easier").
+	FAutoConsoleCommandWithWorldAndArgs CmdAppear(
+		TEXT("sb.Hub.Appear"),
+		TEXT("sb.Hub.Appear [door|dock|show]: the hub ship at once, for testing: shown now where she lies (no landfall needed), her ")
+		TEXT("inside loaded. door (the default): your boat with you aboard 60 m off her aft starboard doors, bow on, at rest: set ")
+		TEXT("sail and steer in for the arrival. dock: moored at the fitting berth in her harbour, you on the quay beside the boat. ")
+		TEXT("show: only shown."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			ASaltHubShip* Ship = ASaltHubShip::Find(World);
+			APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+			ASaltPlayerCharacter* Player = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr;
+			if (!Ship)
+			{
+				UE_LOG(LogSaltbound, Warning, TEXT("SB_HUB appear: no hub ship in this world"));
+				return;
+			}
+			Ship->SetShowOverride(1);
+			World->BlockTillLevelStreamingCompleted();
+			Ship->RequireInside(true);
+			const FString How = Args.Num() ? Args[0].ToLower() : TEXT("door");
+			ASaltHubBerth* Berth = Ship->GetBerth();
+			ASaltBoat* Boat = nullptr;
+			for (TActorIterator<ASaltBoat> It(World); It; ++It)
+			{
+				Boat = *It;
+				break;
+			}
+			if (How == TEXT("show") || !Berth || !Boat || !Player)
+			{
+				UE_LOG(LogSaltbound, Display, TEXT("SB_HUB appear %s shown=%d inside=%d"), *How, Ship->IsShown() ? 1 : 0, Ship->IsInsideVisible() ? 1 : 0);
+				return;
+			}
+			if (How == TEXT("dock"))
+			{
+				// Moored at the fitting berth (the aft docking station); the player on the quay beside her, facing her.
+				for (TObjectIterator<USaltMooringPointComponent> It; It; ++It)
+				{
+					if (It->GetWorld() == World && It->MooringId == TEXT("HubFitting"))
+					{
+						Boat->MoorAt(It->GetMooring());
+						// 3 m forward along the quay from her gangway, looking back at her.
+						const FVector Quay = It->GetComponentLocation() + It->GetComponentRotation().RotateVector(FVector(300.0, It->Reach + 150.0 * FMath::Sign(It->Reach), It->PierHeight + 5.0));
+						const float Face = (float)(Boat->GetActorLocation() - Quay).Rotation().Yaw;
+						Player->TeleportFeetTo(Quay, Face);
+						PC->SetControlRotation(FRotator(-10.f, Face, 0.f));
+						break;
+					}
+				}
+			}
+			else
+			{
+				// Off the aft station's starboard doors, bow on, at rest; the player on her deck looking at the doors.
+				ASaltHubDoors* Doors = nullptr;
+				for (TActorIterator<ASaltHubDoors> It(World); It; ++It)
+				{
+					if (!Doors || It->Station == 0)
+					{
+						Doors = *It;
+					}
+				}
+				if (Doors)
+				{
+					const FTransform F(FRotator(0.f, Doors->GetActorRotation().Yaw, 0.f), Doors->GetActorLocation());
+					const FVector At = F.TransformPosition(FVector(0.0, Doors->HullHalfCm + 6000.0, 0.0));
+					const float Heading = (float)F.Rotator().Yaw - 90.f;
+					Boat->SetHold(ESaltBoatHold::Free);
+					Boat->PlaceAt(At, Heading, 0.f);
+					Boat->SetSailSet(false);
+					Player->TeleportFeetTo(Boat->GetActorLocation() + FVector(0.0, 0.0, 110.0), Heading);
+					PC->SetControlRotation(FRotator(-4.f, Heading, 0.f));
+				}
+			}
+			UE_LOG(LogSaltbound, Display, TEXT("SB_HUB appear %s shown=%d inside=%d boat=(%.0f, %.0f)"), *How, Ship->IsShown() ? 1 : 0,
+				Ship->IsInsideVisible() ? 1 : 0, Boat->GetActorLocation().X, Boat->GetActorLocation().Y);
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdBerth(

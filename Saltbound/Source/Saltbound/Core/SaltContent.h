@@ -30,6 +30,8 @@ namespace SaltContent
 	inline const TCHAR* SkyCollection = TEXT("/Game/Saltbound/Environment/Sky/MPC_Sky.MPC_Sky");
 	/** Rope material for the boat's physics ropes (cable components). */
 	inline const TCHAR* RopeMaterial = TEXT("/Game/Saltbound/Materials/Instances/MI_Rope_Hemp.MI_Rope_Hemp");
+	/** D76: the skinned seagull (build_birds.py); ASaltBirds poses its bones. */
+	inline const TCHAR* GullMesh = TEXT("/Game/Saltbound/Environment/Birds/SK_Gull.SK_Gull");
 	/** Seagull parts (Art/Blender/Scripts/build_birds.py): Body, WingL, WingR. */
 	inline FString BirdMesh(const TCHAR* Part)
 	{

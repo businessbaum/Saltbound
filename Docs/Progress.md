@@ -250,6 +250,11 @@ for a higher screen percentage (for example 75 %) and more content.
   the pier's beach with its counter, smoking chimney, nets and lanterns, the Keeper's spot and `Keeper_Point` ("Talk to the Harbour
   Keeper"). Scripts: `place_home_island.py` (the island's actors), `setup_island_materials.py`, `build_home_props.py`,
   `gen_island_textures.py`; views: `Tools/island_shots.py`.
+- **D76 (seagulls and the hub at once, waiting for the owner's look):** the gulls are a skinned herring gull (`SK_Gull`: hooked beak
+  with the red spot, eyes, a fanned tail, tapered wings with the black tip wedge and white mirror) whose bones are posed every
+  frame: a wingbeat with the hand trailing the arm and the wing folding on the upstroke, the crooked glide, banking with the tail
+  twisting into the turn, the head level and glancing about. `sb.Hub.Appear` (your boat 60 m off her doors), `sb.Hub.Appear dock`
+  (on the quay in her harbour), `sb.Hub.Appear show`; watch a gull with `sb.Dev.BirdCam 0` and `sb.Birds.Flap 1` plus `slomo 0.1`.
 - **D77 (the first hour, FH1, waiting for the owner's look):** the first hour planned beat by beat (`Docs/Design/FirstHour.md`) and
   built step by step. FH1: a new voyage starts as a castaway on the wreck beach at dawn with nothing; the Keeper gives the shovel and a
   lantern, the sea chest the Cartographer's compass and spyglass; the ripped sail sets only after the cache's sailcloth has mended it;

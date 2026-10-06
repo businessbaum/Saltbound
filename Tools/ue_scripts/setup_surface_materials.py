@@ -731,9 +731,9 @@ def main():
                               scalars={"TexNormalize": 1.0, "NormalStrength": 0.0, "RoughScale": 0.0, "RoughOffset": 0.06, "WearStrength": 0.0, "GrimeAmount": 0.0},
                               textures={"BaseTexture": "/Engine/EngineResources/WhiteSquareTexture"}),
         "MI_Canvas": dict(vectors={"Tint": (0.53, 0.5, 0.43, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.5, "RoughScale": 1.6, "WearStrength": 0.0, "UVScale": 1.0}, textures=canvas_textures()),
-        # Seagulls (ambient birds): plain, calm surfaces, no wear.
+        # Seagulls (ambient birds): plain, calm surfaces, no wear. D76: the grey darker, the mantle against the white.
         "MI_Bird_White": dict(vectors={"Tint": (0.62, 0.62, 0.6, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.2, "RoughScale": 1.3, "WearStrength": 0.0, "GrimeAmount": 0.0, "VarAmount": 0.0}, textures=paint_textures()),
-        "MI_Bird_Grey": dict(vectors={"Tint": (0.24, 0.27, 0.3, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.2, "RoughScale": 1.3, "WearStrength": 0.0, "GrimeAmount": 0.0, "VarAmount": 0.0}, textures=paint_textures()),
+        "MI_Bird_Grey": dict(vectors={"Tint": (0.16, 0.18, 0.205, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.2, "RoughScale": 1.3, "WearStrength": 0.0, "GrimeAmount": 0.0, "VarAmount": 0.0}, textures=paint_textures()),
         "MI_Bird_Dark": dict(vectors={"Tint": (0.025, 0.025, 0.028, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.2, "RoughScale": 1.2, "WearStrength": 0.0, "GrimeAmount": 0.0, "VarAmount": 0.0}, textures=paint_textures()),
         "MI_Bird_Beak": dict(vectors={"Tint": (0.55, 0.38, 0.06, 1)}, scalars={"TexNormalize": 2.6, "NormalStrength": 0.2, "RoughScale": 1.0, "WearStrength": 0.0, "GrimeAmount": 0.0, "VarAmount": 0.0}, textures=paint_textures()),
         # Harbour: weathered, cooler

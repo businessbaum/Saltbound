@@ -12,6 +12,7 @@ Per entry:
                     displaced in the material (e.g. ocean tiles)
   nanite_shape      optional "preserve_area" (or "voxelize"): how Nanite simplifies at a distance; foliage of thin
                     leaves keeps its area instead of thinning away (D60: the palms' crowns vanished from afar)
+  type      "skeletal" for a skinned mesh with its skeleton (D76: the gull); no physics asset, no animations
 Material slots are matched by name to existing material instances anywhere under /Game/Saltbound.
 Unreal never creates materials from the FBX; missing ones fall back to MI_Placeholder.
 """
@@ -56,6 +57,57 @@ def make_pipeline(entry):
     return pipe
 
 
+def make_skeletal_pipeline(entry):
+    """D76: a skinned mesh and its skeleton (<name>_Skeleton), no physics asset, no animations."""
+    pipe = unreal.new_object(unreal.InterchangeGenericAssetsPipeline)
+    common = pipe.get_editor_property("common_meshes_properties")
+    common.set_editor_property("force_all_mesh_as_type", unreal.InterchangeForceMeshType.IFMT_SKELETAL_MESH)
+    common.set_editor_property("recompute_normals", False)
+    common.set_editor_property("recompute_tangents", True)
+    common.set_editor_property("use_mikk_t_space", True)
+    mesh = pipe.get_editor_property("mesh_pipeline")
+    mesh.set_editor_property("import_static_meshes", False)
+    mesh.set_editor_property("import_skeletal_meshes", True)
+    mesh.set_editor_property("create_physics_asset", False)
+    mat = pipe.get_editor_property("material_pipeline")
+    mat.set_editor_property("material_import", unreal.InterchangeMaterialImportOption.IMPORT_AS_MATERIAL_INSTANCES)
+    mat.set_editor_property("import_materials", False)
+    anim = pipe.get_editor_property("animation_pipeline")
+    anim.set_editor_property("import_animations", False)
+    return pipe
+
+
+def import_skeletal(name, entry, fbx):
+    dest = entry["dest"]
+    pipe = make_skeletal_pipeline(entry)
+    params = unreal.ImportAssetParameters()
+    params.set_editor_property("is_automated", True)
+    params.set_editor_property("replace_existing", True)
+    params.set_editor_property("override_pipelines", [unreal.SoftObjectPath(pipe.get_path_name())])
+    source = unreal.InterchangeManager.create_source_data(fbx)
+    unreal.InterchangeManager.get_interchange_manager_scripted().import_asset(dest, source, params)
+    asset_path = "%s/%s" % (dest, name)
+    sk = unreal.load_asset(asset_path)
+    if not isinstance(sk, unreal.SkeletalMesh):
+        found = [str(a) for a in unreal.EditorAssetLibrary.list_assets(dest, recursive=False)]
+        unreal.log_error("SB_IMPORT %s did not produce a skeletal mesh at %s (there: %s)" % (name, asset_path, found))
+        return False
+    mats = list(sk.get_editor_property("materials"))
+    for m in mats:
+        mi = find_material(str(m.get_editor_property("material_slot_name")))
+        if mi:
+            m.set_editor_property("material_interface", mi)
+    sk.set_editor_property("materials", mats)
+    unreal.EditorAssetLibrary.save_asset(asset_path, only_if_is_dirty=False)
+    b = sk.get_bounds()
+    slots = [str(m.get_editor_property("material_slot_name")) + "->" +
+             (m.get_editor_property("material_interface").get_name() if m.get_editor_property("material_interface") else "None") for m in mats]
+    print("SB_IMPORTED %s skeletal box_extent_cm=(%.1f, %.1f, %.1f) origin=(%.1f, %.1f, %.1f) skeleton=%s slots=%s" % (
+        name, b.box_extent.x, b.box_extent.y, b.box_extent.z, b.origin.x, b.origin.y, b.origin.z,
+        sk.get_editor_property("skeleton").get_name() if sk.get_editor_property("skeleton") else None, slots))
+    return True
+
+
 def find_material(slot_name):
     reg = unreal.AssetRegistryHelpers.get_asset_registry()
     flt = unreal.ARFilter(package_paths=[MATERIAL_ROOT], recursive_paths=True)
@@ -70,6 +122,8 @@ def import_entry(name, entry):
     if not os.path.exists(fbx):
         unreal.log_error("SB_IMPORT missing export for %s: %s" % (name, fbx))
         return False
+    if entry.get("type") == "skeletal":
+        return import_skeletal(name, entry, fbx)
     dest = entry["dest"]
     pipe = make_pipeline(entry)
     params = unreal.ImportAssetParameters()

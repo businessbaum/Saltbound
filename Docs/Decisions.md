@@ -2274,6 +2274,48 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     block with a red stamp as a first-aid box.
 - **Questions for the owner:** the five on the page (the line's place, the plans, the log's key, the board, when upgrades are fitted).
 
+### D76 · Detailed seagulls with a real wingbeat, and the hub at once for testing (Adopted: waiting for the owner's look)
+- **Owner (2026-10-06):** "1. Create a command to let the hub appear instantly to make testing easier. 2. fix the birds. I want
+  detailed birds with good animation when flying" (with a screenshot of D39's gull: a box body with two flat wings hinged on it).
+- **The gull is one skinned mesh** (`SK_Gull`, `build_birds.py`, 4 950 faces, 0.62 m bill to tail, 1.42 m across, a herring gull)
+  on a small skeleton: spine; neck and head; tail; for each wing the arm (from the shoulder), the forearm (from the elbow) and the
+  hand (from the wrist). The body and head are one smooth loft (a plump breast, a steep forehead); a hooked yellow beak with the red
+  spot on the lower mandible; pale eyes with a black pupil; a fan of seven tail feathers; pink feet tucked under the tail. The wing
+  is shaped as a gull's: a thick rounded leading edge tapering to a pointed hand, grey above and white below, a white trailing edge
+  along the secondaries, the hand's primaries cut apart at the trailing edge, a black wedge at the tip with white tips and a white
+  mirror. The mantle is a shade darker than D39's (`MI_Bird_Grey` 0.16 / 0.18 / 0.205) so the wings read grey against the white
+  body from above; new instances `MI_Bird_Red`, `MI_Bird_Leg`, `MI_Bird_Iris` (`setup_bird_materials.py`, which also marks
+  `M_SB_Surface` for skeletal meshes). Imported through Interchange as a skeletal mesh (`import_assets.py`, `"type": "skeletal"`;
+  no physics asset, no animations). D39's `SM_Gull_*` parts stay as assets but are no longer used.
+- **The flight is posed in code** (`ASaltBirds`, 24 poseable meshes, `Count` 9 as before; no animation asset): every frame each
+  bone's turn is composed about its joint in component space and written back as bone-local transforms. Each gull keeps D39's
+  path (wide circles round a drifting centre, rising and sinking) and alternates long glides (4-10 s) with bursts of flapping
+  (1.2-3.2 s, longer when climbing), blended over a few tenths of a second, about 2.9 beats a second (each bird a little faster or
+  slower):
+  - *the wingbeat:* the arm sweeps through about 60 degrees and the hand trails it, so a wave runs out along the wing; the wing
+    folds back at the elbow and the wrist on the upstroke and spreads on the downstroke; the leading edge dips as it pushes; the
+    body bobs up on each downstroke and pitches a little with it;
+  - *the glide:* the gull's crooked wing (the arm raised, the hand swept back and drooping) with small trimming movements;
+  - *turns:* the body banks into the turn (from speed and radius), the tail twists into it and fans out; the head stays level
+    (counter-rolled) and looks where the bird goes; now and then it glances about and down at the water.
+- **The hub at once:** `sb.Hub.Appear [door|dock|show]` shows the hub ship where she lies (no landfall needed) and loads her inside
+  (held until the player has been near and left again, as the tests' `RequireInside`).
+  - `door` (the default): your boat, you aboard, 60 m off her aft starboard doors, bow on, at rest and the sail taken in: set sail
+    and steer in, and the arrival plays (the first one long, D70).
+  - `dock`: the boat moored at the fitting berth in her harbour, you on the quay 3 m along from the gangway, facing the boat.
+  - `show`: only shown and loaded.
+- **Development:** `sb.Dev.BirdCam <bird|off> [distance cm] [yaw] [pitch]` follows a gull of the flock nearest the player;
+  `sb.Birds.Flap -1|0|1` (as they fly, gliding only, flapping only); with `slomo 0.06` the wingbeat can be studied frame by frame.
+  `Tools/bird_shot.py` takes such frames in PIE as a contact sheet.
+- **Tests (short runs):** the game target compiles; in PIE the rig resolves (`SB_BIRDS rig`, both wings found on their sides), gulls
+  over the open sea and over the home island glide, flap and bank (frames in slow motion from behind, from the side and from above);
+  `sb.Hub.Appear` and `sb.Hub.Appear dock` each place the boat and the player as described with the hub shown and her inside
+  loaded (`SB_HUB appear door shown=1 inside=1`, `... dock shown=1 inside=1`). Performance was not measured on its own (nine
+  meshes of 4 950 faces with 10 bones each).
+- **Evidence:** `Docs/Evidence/D76/D76_birds_sheet.jpg` (the wingbeat in slow motion from two gulls, the model, the two places
+  `sb.Hub.Appear` puts you).
+- **Open:** gulls never land, call or come close to the player (they keep D39's heights); no gulls over the hub yet.
+
 ### D77 · The first hour, step by step (M6), and FH1: the castaway's start (Adopted: waiting for the owner's look)
 - **Owner (2026-10-06):** "So what is the status, what can the player already play and whats the designed journey? lets create it step
   by step. First the first hour." Answers: wake on the wreck beach at dawn; the sail ripped, the cache's sailcloth needed to sail; the
