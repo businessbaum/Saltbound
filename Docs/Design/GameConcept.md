@@ -1,4 +1,4 @@
-# Saltbound: the game concept (proposal, revision 2)
+# Saltbound: the game concept (proposal, revision 3)
 
 Owner (2026-10-06): develop a concept for what the game is about and what the player can do. "Besides a good story it is above
 all about an exciting experience that does not get boring." Inspiration from other games is allowed; it can include a combat
@@ -23,6 +23,15 @@ do they progress, how do we hook them?
 | People | **Yes:** stylised figures mostly behind counters, text on parchment, murmurs instead of voices. |
 | Next step | The first playable hour (M6) is good. **Also think about playable things:** digging things up, collecting things for upgrades. |
 | **The ancients** | **They are the Old World: our own world about fifty years from now.** Through them the player upgrades to futuristic technology. |
+
+**Round 3 (on revision 2, 2026-10-06):**
+
+| Question | Answer |
+|---|---|
+| The gap | **About 300 years** after the Old World. |
+| The Grey | **An Old World warden machine**, overgrown until it looks like an animal. |
+| How futuristic | **Salvaged machines rigged into wooden boats**; the ark is the only true Old World ship. |
+| The motor | **A real alternative to the sail** (6.1: the sail charges what the motor spends). |
 
 Everything else is a proposal. Names (the Tidewrights, Tidestones, the Gale, the Grey, the Cartographer, material names...) are
 working names. Open questions are at the end (section 12, recommendation first).
@@ -100,8 +109,8 @@ steer). Its depth comes from the sea, the weather and the route, not from more r
 - No human enemies, no ship-to-ship cannon fights, no multiplayer.
 - No hunger, thirst or health bars, no levels or experience points, no grinding.
 - No job that sends you on the same trip twice; no material you must farm in the same spot.
-- **No technology that makes sailing pointless.** The Old World's machines need power, do one thing each, and draw the Grey at
-  night (6.1).
+- **No technology that makes the sail pointless.** The motor is a real alternative (owner, round 3), but it runs on limited power,
+  it is loud to the Grey and to the wildlife, and the sail charges its cells: a good voyage uses both (6.1).
 - No markers floating in the world. Directions come in sailor's words ("two cables south of Gull Rock, where the reef breaks"),
   on the chart and by the compass. An optional assist in Settings shows a bearing pin for players who want it.
 - No procedural world. Every island, wreck and dig spot is placed by hand.
@@ -142,9 +151,9 @@ The sea opens in rings, and the boat decides how far the player can go.
 - **The Storm Waters are always on the southern horizon** (they are already 3 km south of the cove, D30): a dark wall the player
   sees from the first hour and cannot enter. They are a promise and a threat at once.
 - **Distances.** At 8 kn (the first boat, D59) a kilometre takes about four minutes. No leg of the main path should be longer than
-  about 12 minutes without something on the way, so the Outer Isles move closer than their placeholder silhouettes (question 11).
+  about 12 minutes without something on the way, so the Outer Isles move closer than their placeholder silhouettes (question 7).
 - **Region names.** The code still uses Sea of Thieves' names as placeholders (`ShoresOfPlenty`, `AncientIsles`, `Wilds`,
-  `DevilsRoar`, D25). They should become ours: Inner Waters, the Outer Isles, the Mistreach, the Storm Waters (question 12).
+  `DevilsRoar`, D25). They should become ours: Inner Waters, the Outer Isles, the Mistreach, the Storm Waters (question 8).
 
 ### 3.3 The truth: the Old World
 - **The Tidewrights were us.** They were the people of our own world about fifty years from now (the 2070s). The pale "stone"
@@ -155,7 +164,7 @@ The sea opens in rings, and the boat decides how far the player can go.
   **Tidestones** are their cores.
 - **The Hollowkeel was their ark.** Her autopilot still follows its last order, "be where the survivors gather". That is why she
   is always already in the harbour you sail to, and why she only moves when nobody is near.
-- **The game plays centuries later** (the gap is question 1). The Old World has become myth; its things are "Tidewright stone"
+- **The game plays about 300 years later** (owner, round 3). The Old World has become myth; its things are "Tidewright stone"
   and luck charms; people sail wooden boats again. Outside the Gale people live a hard sail-age life on a wild sea. The Gale still
   rescues their wrecked crews, but it lets nobody out: it was never opened.
 - **The Cartographer came from outside** and wanted to go home. They learned to read the Old World's writing, found the southern
@@ -187,7 +196,7 @@ Players will recognise our world before the story says it. That is the point: su
 | Midpoint, hour 8-9 | The Cartographer's last pages | They broke the Gale |
 | Act III | The ark's recorded message in the Deep | Why the Gale exists; the choice |
 
-**Old World writing** (question 5): worn letters and pictograms early, which the player learns to read through the log; plain
+**Old World writing** (question 1): worn letters and pictograms early, which the player learns to read through the log; plain
 text only from the time capsules on. Saltbound names for Old World things change in the log when the player learns what they are
 (a "spark jar" becomes "a battery cell, made 2074").
 
@@ -238,7 +247,7 @@ behind counters, hatches and desks, few animations, text on parchment, murmurs i
 ### 4.1 The verbs
 | Verb | How | Exists? |
 |---|---|---|
-| **Sail** | Set and trim the sail, steer, anchor, moor, row out of a calm (the oars); later the motor for short runs | Yes (rowing and motor new) |
+| **Sail** | Set and trim the sail, steer, anchor, moor, row out of a calm (the oars); later the motor | Yes (rowing and motor new) |
 | **Navigate** | Compass, spyglass, the mast chart, landmarks, the shard's pull; later the lead line, the map table, beacons, sonar | Partly |
 | **Explore on foot** | Walk, jump, climb ladders; later the grapnel for cliffs | Partly |
 | **Swim and dive** | As now; a breath limit, the diving helmet and later a rebreather are new | Partly |
@@ -332,7 +341,7 @@ Owner (round 2): "a bit of horror is good", especially at night on the sea. The 
   The Grey appears in Act II, in deep water only. Act III has the storm.
 
 **The Grey**
-- **What it is** (question 2): an Old World warden machine the size of a whale, built to keep the sheltered sea clear. Centuries of
+- **What it is** (owner, round 3): an Old World warden machine the size of a whale, built to keep the sheltered sea clear. Centuries of
   barnacles and weed make it look like an animal; the player should believe it is one until late in Act II. Since the southern
   core was taken it runs wild: at night it hunts light, noise and anything that carries current.
 - **Its tells, in order:** the sea goes flat and the birds fall silent; the lantern flickers (its field); a low tone through the
@@ -364,10 +373,27 @@ Turquoise stays reserved for the Old World (UI_Design); on the boat it now means
 **Rules that keep the sailing at the centre:**
 1. **Power is limited.** Old World machines run on cells. Cells charge from solar film by day and run down at night; the cells'
    glow is the gauge (no HUD bar). More cells and film are upgrades.
-2. **The motor is a helper:** slow (about 3 kn), draining; for calms, harbours, tight places and escapes. The sail stays the way
-   to travel.
+2. **Sail and motor are two ways to travel** (owner, round 3: the motor is a real alternative), each with its own costs (below).
 3. **Machines are loud to the Grey** (5.5).
 4. **Every upgrade adds a capability** (something new to do or reach), not just a bigger number.
+
+**Sail and motor**
+- **When:** the first salvaged motor comes in Act II (about hour 6), after the player has sailed for hours: the sail is learned and
+  loved first.
+- **On the boat:** a hum-heart in a wooden mount at the stern with a small propeller, its cells in a chest by the mast, a throttle
+  lever beside the helm (W / S at the helm still trim the sail; the lever is its own station or a second pair of keys).
+- **What the motor does better:** straight into the wind and through calms (the square sail is weak upwind, D65); exact in
+  harbours, among reefs and through the Hollowkeel's doors; no sail to tear in a squall; it holds the bow to the seas in the storm.
+- **What the sail does better:** it never runs out and costs nothing; it is silent (the Grey, whales and fish, the wardens); with a
+  fresh breeze behind it is faster; and **it charges the cells** while she sails (the propeller turns as a generator), as the solar
+  film does by day.
+- **The motor's costs:** power (the first motor about 5 kn for about 3 km a charge; a dead cell far out is a real danger), noise and
+  current (it draws the Grey at night and drives fish and whales away), and wear (a hard grounding bends the propeller: a repair
+  with Old World parts).
+- **Both at once:** motor-sailing is the fastest way into the wind and empties the cells quickest.
+- **So a good voyage uses both:** sail when the wind serves and to fill the cells; motor against the wind, in calms, in tight places
+  and to get away. Upgrades make the motor stronger (about 8 kn) and the bank bigger (more cells, better film, then the restored
+  current drive), so late in the game the player really chooses how to travel, but never without thinking of power and the dark.
 
 ### 6.2 Boats
 | Boat | How you get it | Waters | What it adds |
@@ -657,7 +683,7 @@ greets them with a line from the Cartographer's log.
 |---|---|
 | The README's premise: atmospheric first-person sailing and exploration; a mysterious sea of islands, ruins and a lost civilisation; the boat is transport, home, storage and workspace and grows | Made concrete: the Old World, the Gale, the stations; the boat carries stores, repairs, upgrades, machines and trophies |
 | The owner's answers (rounds 1 and 2) | Light tool-based danger (5), a hand-made sea in rings with a story and an ending (3, 7), only boat and sea pressure (5.4), about 13 hours (8.4); the night horror (5.5); people behind counters (3.7); digging and materials for upgrades (6.3); the ancients as our world in fifty years and futuristic upgrades (3.3, 6.1) |
-| Simple sailing (D41, D65) | Kept: depth from weather, sea and route; the motor is only a helper (6.1) |
+| Simple sailing (D41, D65) | Kept: depth from weather, sea and route. The motor (a real alternative, owner) comes after hours of sailing, and the sail charges it, so both stay worth using (6.1) |
 | Charts belong to the boats (D57) | Kept: the mast chart and the map table; nothing in the satchel |
 | The hand-crafted look (D16, D38) with futuristic technology | The Old World's look already exists (pale, seamless, turquoise lines). On the boat its parts are rigged into wood with rope and iron, each made for its purpose (D53). Turquoise stays the Old World's colour, now meaning power |
 | Everything already built has a job | Section 1 |
@@ -666,9 +692,9 @@ greets them with a line from the Cartographer's log.
 **Risks, and the answer to each:**
 | Risk | Answer |
 |---|---|
-| An empty sea between places | Sea events (7.4), the sight rule (7.3), shorter legs (3.2, question 11), current lanes later |
+| An empty sea between places | Sea events (7.4), the sight rule (7.3), shorter legs (3.2, question 7), current lanes later |
 | Jobs and collecting become a chore | No repeats; materials by ring, not farmed in one place; digging never empty-handed; storms refill beaches |
-| Technology makes sailing pointless | Limited power, a weak motor, machines that draw the Grey, one capability per upgrade (6.1) |
+| Technology makes sailing pointless | The sail charges what the motor spends; limited power; machines that draw the Grey and scare wildlife; one capability per upgrade; the first hours are pure sailing (6.1) |
 | The twist is guessed too early | Wanted: the reveal ladder (3.4) turns suspicion into the hook and confirms it at hour 5-6 |
 | Navigation without markers frustrates | Sailor's directions, the shard's pull, beacons, the chart filling in, an optional bearing pin |
 | Too little tension | The night, the Grey, squalls, leaks; cargo at risk |
@@ -750,27 +776,20 @@ Each milestone ends with the owner playing it; the design of the next one change
 
 ## 12. Questions for the owner (recommendation first)
 
-**New with the Old World (round 2):**
-1. **The gap:** how long after the Old World does the game play? About **300 years** (its concrete and composites still stand, its
-   memory has become myth) · about 100 years (grandparents' stories; the technology much easier to read) · over 1 000 years.
-2. **The Grey:** an **Old World warden machine** overgrown until it looks like an animal (ties into the twist, makes every machine
-   on the boat a risk at night) · a real animal.
-3. **How futuristic at most:** **salvaged machines rigged into wooden boats**, on limited power, with the ark as the one true Old
-   World ship · a fully Old World boat of your own by the end (a motor yacht or a hydrofoil).
-4. **The motor:** **a weak helper on limited power** · none (sailing only) · a real alternative to the sail.
-5. **Old World writing:** **worn letters and signs the player learns to read, plain text from the time capsules on** · readable
-   from the start (the twist comes from the story, not the signs).
-6. **Carrying big finds:** **only by the winch and the hold** · also carried in both hands, slowly (needs a held-object view).
-7. **Material names:** **Saltbound names that change to the real names** once known ("spark jar" → battery cell) · real names from
-   the start.
+Still open; the recommendations stand as defaults until the owner says otherwise.
 
-**Still open from round 1 (the recommendations stand as defaults until you say otherwise):**
-8. **The player:** a silent castaway · a castaway with a few written replies · someone born in the Cove.
-9. **The Cartographer at the end:** alive in the storm's eye · only their last log and their wreck.
-10. **The ending:** one choice with two short final scenes · one fixed ending.
-11. **Distances:** move the Outer Isles closer (no main leg over about 12 minutes) · keep them and lean on events and current lanes.
-12. **Names:** keep the Tidewrights, Tidestones, the Gale, the Grey, the Saltbound, or give your own; and replace the Sea of Thieves
-    region names in the code (Shores of Plenty, Ancient Isles, Wilds, Devil's Roar) with ours (Inner Waters, the Outer Isles, the
-    Mistreach, the Storm Waters).
-13. **Navigation help:** no markers, an optional bearing pin in Settings · always show the goal.
-14. **Fishing:** a small calm activity · leave it out.
+1. **Old World writing:** **worn letters and signs the player learns to read, plain text from the time capsules on** · readable
+   from the start (the twist comes from the story, not the signs).
+2. **Carrying big finds:** **only by the winch and the hold** · also carried in both hands, slowly (needs a held-object view).
+3. **Material names:** **Saltbound names that change to the real names** once known ("spark jar" → battery cell) · real names from
+   the start.
+4. **The player:** **a silent castaway** · a castaway with a few written replies · someone born in the Cove.
+5. **The Cartographer at the end:** **alive in the storm's eye** · only their last log and their wreck.
+6. **The ending:** **one choice with two short final scenes** · one fixed ending.
+7. **Distances:** **move the Outer Isles closer** (no main leg over about 12 minutes) · keep them and lean on events, current
+   lanes and the motor.
+8. **Names:** keep the Tidewrights, Tidestones, the Gale, the Grey, the Saltbound, or give your own; and replace the Sea of Thieves
+   region names in the code (Shores of Plenty, Ancient Isles, Wilds, Devil's Roar) with ours (Inner Waters, the Outer Isles, the
+   Mistreach, the Storm Waters).
+9. **Navigation help:** **no markers, an optional bearing pin in Settings** · always show the goal.
+10. **Fishing:** **a small calm activity** · leave it out.

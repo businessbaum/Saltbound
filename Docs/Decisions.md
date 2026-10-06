@@ -1896,7 +1896,7 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   multiplayer, human enemies, survival meters, a procedural world and freeform shipbuilding stay out.
 - **Next:** the owner's answers to the concept's questions (its section 12), then M6, the first playable hour (its section 10.2).
 
-### D68 · The game concept, revision 2: the ancients are our own future; digging and materials; the night's horror (Provisional: the owner's answers adopted, the new questions wait for the owner)
+### D68 · The game concept, revisions 2 and 3: the ancients are our own future; digging and materials; the night's horror; sail and motor (Adopted: the owner's answers; the remaining questions keep their defaults)
 - **Owner (2026-10-06), on D67:** the story direction (the Gale as a shelter, the Cartographer who broke it) is fine; "a bit of
   horror is good", especially at night on the sea; people as stylised figures behind counters with text on parchment ("YESS");
   the first playable hour (M6) is a good next step; "also think about playable stuff. you can dig stuff up or you need to collect
@@ -1921,5 +1921,13 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
     The prologue teaches digging (the Cartographer's buried spare canvas).
   - **The night:** dread, not shock; sound first; light is safety and danger; harbours always safe; growing by act. The Grey: an Old
     World warden machine overgrown to look like an animal, wild since the southern core was taken; never fought, calmed at the end.
-- **Next:** the owner's answers to the new questions (the concept's section 12: the gap, the Grey, how futuristic, the motor, the
-  writing, carrying big finds, material names), then M6.
+- **The owner's answers on revision 2 (round 3, 2026-10-06):** the game plays **about 300 years** after the Old World; the Grey is
+  **an overgrown Old World warden machine**; the player's boats stay **wooden boats with salvaged machines rigged in** (the ark is the
+  only true Old World ship); the motor is **a real alternative to the sail**, not a weak helper (my recommendation was the helper).
+- **Revision 3 of the concept (the motor):** it comes in Act II (about hour 6), after hours of pure sailing. It beats the sail into
+  the wind, in calms, in tight places and in the storm; the sail is silent, never runs out, is faster before a fresh breeze and
+  **charges the cells** while sailing (the propeller as a generator), so what the sail fills the motor spends. The motor's costs:
+  power (the first one about 5 kn for about 3 km a charge), noise and current (the Grey, the wildlife), wear. Upgrades bring it to
+  about 8 kn with a bigger bank: late in the game the player chooses how to travel, never without thinking of power and the dark.
+- **Next:** M6, the first playable hour; the concept's remaining questions (section 12) keep their recommended defaults until the
+  owner says otherwise.
