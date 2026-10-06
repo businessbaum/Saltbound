@@ -1,0 +1,134 @@
+<style>
+/* --- M6 first-hour screens (D75): each screen is a 1920 x 1080 canvas render (Tools/design/first_hour_screens.js) --- */
+.frame img.shot{inset:0;width:100%;height:100%;display:block;object-fit:cover}
+.frame .label{left:1.4cqw;top:1.4cqw;font:500 1.05cqw/1.2 var(--f-ui);color:#f2e2bf;letter-spacing:.06em;text-shadow:0 .1cqw .3cqw #000,0 0 .8cqw rgba(0,0,0,.8)}
+.made{color:var(--muted);font-size:.95rem;max-width:80ch}
+</style>
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">Saltbound · M6 · ideas, not decided</p>
+  <h1>The first hour's new screens</h1>
+  <p class="lede">What M6 still needs on the screen, drawn over the game with the approved pages' own drawing kit (the satchel's
+  stitched leather and brass, the prompt's torn parchment and key scrap, the crate's wood and iron, wax seals and ink): the people's
+  lines, the Shipwright's plans (upgrades from materials and salt), the log, and the job board. Every part is a thing from the boat
+  or the harbour. The prompts of digging and repairs (D73, D74) already use the existing key scrap and its ink-soak hold, so they
+  are not drawn again. Recommendations are marked; the questions are at the end.</p>
+  <p class="made">Drawn at 1920 × 1080 like the approved designs (python Tools/design/make_first_hour.py), so the parts can be cut
+  out for the game the same way as the satchel's (Tools/textures/gen_ui_parts.py).</p>
+</header>
+
+<!-- 1. A person speaks ---------------------------------------------------------------------------------------------->
+<section>
+  <h2>1 · A person speaks</h2>
+  <div class="pair">
+    <div class="frame"><img class="shot" src="FirstHour/screen_speak.jpg" alt="A person's line low in the middle of the screen">
+      <div class="label">A · low in the middle, like the prompt</div></div>
+    <div class="notes"><span class="tag">Idea A <span class="rec">Recommended</span></span>
+      <ul>
+        <li>One torn half sheet low in the middle, where the prompt sits. The speaker's mark in red wax at its corner (the Harbour
+          Keeper's anchor; each person has their own), the name in small capitals over a quill rule, the line in ink.</li>
+        <li>No portrait: the person stands in the world in front of you (round 2: figures mostly behind counters, text on parchment,
+          murmurs instead of voices).</li>
+        <li>Choices are keys on small torn scraps, as the prompt's E: 1, 2, 3 for questions, and E always the plain answer that ends it.
+          The chosen one is underlined in ink and lit like warm paper. W / S and the mouse choose too.</li>
+        <li>The world keeps running (only Esc pauses, as with the satchel). Walking away ends it.</li>
+        <li>A murmur per line (a few syllables of the person's voice), not words.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pair">
+    <div class="frame"><img class="shot" src="FirstHour/screen_speakb.jpg" alt="A small scrap pinned beside the speaker">
+      <div class="label">B · pinned beside the speaker</div></div>
+    <div class="notes"><span class="tag">Idea B</span>
+      <ul>
+        <li>A small scrap beside the speaker, held by a brass tack and a twine to them, like the prompt on its object (D60): the line
+          belongs to a place in the world.</li>
+        <li>Good for short calls and passers-by ("Mind the reef"); long talks and choices are cramped.</li>
+        <li>Could be the form for lines people say while you pass, with A for talks you start.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 2. The Shipwright's plans --------------------------------------------------------------------------------------->
+<section>
+  <h2>2 · The Shipwright's plans</h2>
+  <div class="pair">
+    <div class="frame"><img class="shot" src="FirstHour/screen_plans.jpg" alt="The Shipwright's plan board at the Slip">
+      <div class="label">E at the Shipwright's board at the Slip</div></div>
+    <div class="notes"><span class="tag">The plan board <span class="rec">Recommended</span></span>
+      <ul>
+        <li>The Shipwright's board at the Slip (D64): a framed board of planks with iron corners and a burnt name board. The plans are
+          slips tacked down the left; the chosen one lifts off the wood in warm light.</li>
+        <li>The chosen plan pinned large in his hand: what it is, an ink drawing of the work (here her planks in section, the seams
+          payed with tar, the pot and brush, a scale bar) and what it does for her, in plain words.</li>
+        <li>What it takes lies on a stitched leather roll across the sheet's foot, its pockets pressed rings like the satchel's (D55):
+          the item, and what you have / what it needs on a brass-rimmed pill, red when short.</li>
+        <li>Salt is a bar of rock salt bound with a fibre band (the currency, D61), its count on the satchel's coin; the purse sits
+          bottom left. The materials come from the satchel and the boat's stores.</li>
+        <li>"Have it fitted": he takes what it needs; she must lie at the fitting berth, and the next time you come aboard it is on her
+          (the concept's 6.3).</li>
+        <li>Done plans are struck through and sealed in red wax; locked ones are greyed with a lock and say why on hover ("He wants to
+          see her in a rough sea first").</li>
+        <li>M6's three: reef points, tarred seams, a new sail (the sail-age tier). The Tinker's Old World plans use the same board later,
+          on darker paper with a turquoise rule. His dividers and pencil lie on the board.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 3. The log ------------------------------------------------------------------------------------------------------>
+<section>
+  <h2>3 · The log</h2>
+  <div class="pair">
+    <div class="frame"><img class="shot" src="FirstHour/screen_log.jpg" alt="The log, a leather-bound book open on two pages">
+      <div class="label">L · the log</div></div>
+    <div class="notes"><span class="tag">The log <span class="rec">Recommended</span></span>
+      <ul>
+        <li>A dark leather-bound book with stitched edges, brass corners, a ribbon marker and its strap and buckle lying open.</li>
+        <li>Left: the Cartographer's pages in their own slanted hand, with their sketches (the leaning palm, three paces seaward, the
+          red cross), a water ring, a torn corner.</li>
+        <li>Right: your notes write themselves: places, people, finds, clues, jobs (the concept's 3.6), each with a small inked mark and
+          the time of day from the clock (D72). Things you take, like the rubbing from the Spire's stone, are pasted in.</li>
+        <li>The rubbing is the first quiet hint of the Old World: block letters no one on the islands writes, and the 17 again (the
+          pale float's number).</li>
+        <li>Leather tabs: Pages (the Cartographer's, about 20), Notes, Words (the Old World's writing, rubbings and your guesses, 6.5),
+          Places, Plans (the ones you own).</li>
+        <li>Its own key (L) and a way in from the satchel; the world keeps running. The loading screen's "From an old log" lines (D66)
+          come from the pages found.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 4. The job board ------------------------------------------------------------------------------------------------>
+<section>
+  <h2>4 · The job board</h2>
+  <div class="pair">
+    <div class="frame"><img class="shot" src="FirstHour/screen_board.jpg" alt="The job board in the Tally House">
+      <div class="label">E at the board in the Tally House</div></div>
+    <div class="notes"><span class="tag">The board <span class="rec">Recommended</span></span>
+      <ul>
+        <li>The Tally House's board (D61) under its burnt name board: handwritten slips on iron nails, folded once, with what is left of
+          slips torn down and empty nail holes between them. The one looked at lifts off the wood in warm light.</li>
+        <li>Each slip says what, where in sailor's words, a small ink sketch, the kind (bring, deliver, survey, sighting, dig, salvage,
+          search) and the pay in salt.</li>
+        <li>Taken ones get the Purser's red wax seal and go into your log's notes; you hand in at the pay hatch (the chalk slate says so).</li>
+        <li>M6's three kinds: bring, survey, dig (the concept's 10.2). No job repeats a trip.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Questions</h2>
+  <div class="ideas">
+    <div class="idea"><b>1 · A person's line</b><span>A, low in the middle (recommended) · B, pinned beside the speaker · A for talks, B for passing calls.</span></div>
+    <div class="idea"><b>2 · The plans</b><span>The plan board at the Slip (recommended) · a simpler list at the Shipwright's counter.</span></div>
+    <div class="idea"><b>3 · The log's key</b><span>L (recommended) · J · only from the satchel.</span></div>
+    <div class="idea"><b>4 · The job board</b><span>Slips on the board (recommended) · a ledger the Purser hands you.</span></div>
+    <div class="idea"><b>5 · Fitting upgrades</b><span>At the fitting berth, ready the next time you come aboard (recommended) · at once, wherever she lies.</span></div>
+  </div>
+</section>
+</div>
