@@ -1,9 +1,10 @@
 """Frames from play (D79): starts PIE in the open map, runs a script of console commands, waits and shots, and writes each shot
 as the renderer drew it (sb.Dev.DumpFrames, no UI), so held tools, exposure, the underwater pass and the clock are as in the game.
 
-  python Tools/pie_shot.py <out_dir> "<step>; <step>; ..." [--sheet name.jpg] [--keep-pie] [--settle 2]
-  steps: a console command (sb.Lighting Day, sb.Dev.Camera ..., sb.Dev.Tool Spyglass, ...), "@wait <s>", "@shot <name>",
-         "@use 1|0" (the left mouse button pressed or let go, on the player).
+  python Tools/pie_shot.py <out_dir> "<step>; <step>; ..." [--sheet name.jpg] [--keep-pie] [--settle 0]
+  steps: a console command (sb.Lighting Day, sb.Dev.Camera ..., sb.Dev.Tool Spyglass, ...), "@wait <s>" (only for things that take
+         time in the game, not for the image: shots wait until it has settled), "@shot <name>" (settled), "@now <name>" (the next
+         frame as it is, for moments in motion), "@use 1|0" (the left mouse button pressed or let go, on the player).
 
 Take the editor lock first (python Tools/editor_lock.py take <owner> "<what>").
 """
@@ -16,6 +17,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(__file__))
+import pie_wait  # noqa: E402
 import run_pie_test as R  # noqa: E402
 import ue_exec  # noqa: E402
 
@@ -26,19 +28,20 @@ def frames():
     return set(glob.glob(os.path.join(SHOTS, "**", "MovieFrame*.png"), recursive=True))
 
 
-def shot(path):
+def shot(path, settled=True):
+    """A frame from play; settled (the default) dumps frames until the image has settled (exposure, Lumen, streaming:
+    pie_wait.settled_shot), else takes the next frame as it is (moments in motion)."""
+    if settled:
+        ok = pie_wait.settled_shot(path)
+        print("SB_SHOT" if ok else "SB_SHOT_FAIL", path)
+        return path if ok else None
     before = frames()
     R.pie_console("sb.Dev.DumpFrames 1")
-    new = set()
-    t0 = time.time()
-    while not new and time.time() - t0 < 20.0:
-        time.sleep(0.4)
-        new = frames() - before
+    new = pie_wait.new_frame(before)
     if not new:
         print("SB_SHOT_FAIL", path)
         return None
-    time.sleep(0.5)
-    shutil.move(sorted(new)[-1], path)
+    shutil.move(new, path)
     print("SB_SHOT", path)
     return path
 
@@ -72,7 +75,7 @@ def main():
     ap.add_argument("script")
     ap.add_argument("--sheet", default="")
     ap.add_argument("--keep-pie", action="store_true")
-    ap.add_argument("--settle", type=float, default=2.0)
+    ap.add_argument("--settle", type=float, default=0.0)
     ns = ap.parse_args()
     os.makedirs(ns.out_dir, exist_ok=True)
     R.start_pie()
@@ -82,8 +85,8 @@ def main():
         for step in [s.strip() for s in ns.script.split(";") if s.strip()]:
             if step.startswith("@wait"):
                 time.sleep(float(step.split()[1]))
-            elif step.startswith("@shot"):
-                p = shot(os.path.join(ns.out_dir, step.split()[1] + ".png"))
+            elif step.startswith("@shot") or step.startswith("@now"):
+                p = shot(os.path.join(ns.out_dir, step.split()[1] + ".png"), settled=step.startswith("@shot"))
                 if p:
                     paths.append(p)
             elif step.startswith("@use"):
