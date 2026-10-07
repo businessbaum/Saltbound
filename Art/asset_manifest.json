@@ -1373,51 +1373,12 @@
     "collision": "none",
     "_note": "D74 build_repair.py: the water over the deck when she is low (the deck's outline inside the bulwarks); USaltHullDamageComponent places it."
   },
-  "SM_Gale_Wall_A": {
-    "fbx": "Gale/SM_Gale_Wall_A.fbx",
-    "dest": "/Game/Saltbound/Environment/Sky/Gale",
-    "nanite": false,
-    "collision": "none",
-    "bounds_extension": [3000, 3000, 3000],
-    "_note": "D87 build_gale.py: a segment of the Gale's wall (ASaltGale rings 52 of them 9.5 km out); +x out of the sea (bounds: the boil's world position offset)"
-  },
-  "SM_Gale_Wall_B": {
-    "fbx": "Gale/SM_Gale_Wall_B.fbx",
-    "dest": "/Game/Saltbound/Environment/Sky/Gale",
-    "nanite": false,
-    "collision": "none",
-    "bounds_extension": [3000, 3000, 3000],
-    "_note": "D87 build_gale.py: a segment of the Gale's wall, with an anvil (bounds: the boil's world position offset)"
-  },
-  "SM_Gale_Wall_C": {
-    "fbx": "Gale/SM_Gale_Wall_C.fbx",
-    "dest": "/Game/Saltbound/Environment/Sky/Gale",
-    "nanite": false,
-    "collision": "none",
-    "bounds_extension": [3000, 3000, 3000],
-    "_note": "D87 build_gale.py: a segment of the Gale's wall (bounds: the boil's world position offset)"
-  },
-  "SM_Gale_Cell": {
-    "fbx": "Gale/SM_Gale_Cell.fbx",
-    "dest": "/Game/Saltbound/Environment/Sky/Gale",
-    "nanite": false,
-    "collision": "none",
-    "bounds_extension": [3000, 3000, 3000],
-    "_note": "D87 build_gale.py: a breakout's cumulonimbus; pivot on the sea under its middle (bounds: the boil's world position offset)"
-  },
   "SM_Gale_RainShaft": {
     "fbx": "Gale/SM_Gale_RainShaft.fbx",
     "dest": "/Game/Saltbound/Environment/Sky/Gale",
     "nanite": false,
     "collision": "none",
-    "_note": "D87 build_gale.py: unit open cylinder (1 m), the rain under a breakout and round the camera"
-  },
-  "SM_Gale_RainSheet": {
-    "fbx": "Gale/SM_Gale_RainSheet.fbx",
-    "dest": "/Game/Saltbound/Environment/Sky/Gale",
-    "nanite": false,
-    "collision": "none",
-    "_note": "D87 build_gale.py: unit sheet (1 m), the rain curtains at the wall's foot, facing -x"
+    "_note": "D87 build_gale.py: unit open cylinder (1 m), the rain round the camera"
   },
   "SM_Gale_Bolt_A": {
     "fbx": "Gale/SM_Gale_Bolt_A.fbx",
