@@ -17,6 +17,7 @@
       "point": "keeper",
       "entries": [
         { "if": ["!beat:Keeper"], "line": "keeper.first" },
+        { "if": ["beat:LetterDried", "!beat:KeeperLetter"], "line": "keeper.letter" },
         { "if": ["!beat:Cache", "!beat:SailMended"], "line": "keeper.cache" },
         { "if": ["!beat:SailMended"], "line": "keeper.mend" },
         { "if": ["!beat:CastOff"], "line": "keeper.ready" },
@@ -32,7 +33,38 @@
       "choices": [
         { "text": "Who was the Cartographer?", "next": "keeper.who" },
         { "text": "Her sail is ripped.", "next": "keeper.sail", "if": ["tear"] },
+        { "text": "I carry a letter. The sea got into it.", "next": "keeper.letter.wet", "if": ["beat:Letter", "!beat:LetterDried"] },
         { "text": "I’ll see to her.", "next": "keeper.gift", "plain": true }
+      ]
+    },
+    "keeper.letter.wet": {
+      "speaker": "Keeper",
+      "text": "“Then dry it before it falls apart. The fire pit up the path: the embers never quite go out. Bring it back when it can be read.”",
+      "choices": [
+        { "text": "And the boat?", "next": "keeper.gift", "plain": true }
+      ]
+    },
+    "keeper.letter.wet.again": {
+      "speaker": "Keeper",
+      "text": "“Still soaked? The fire pit up the path. Hold it close to the embers, not in them.”",
+      "choices": [
+        { "text": "I’ll dry it.", "next": "", "plain": true }
+      ]
+    },
+    "keeper.letter": {
+      "speaker": "Keeper",
+      "text": "“Let me see that. … Rowan. Nobody has said that name here in seven years. That’s the Cartographer’s own name, and Wren is the one they talked about every night at this counter. So you came in after them.”",
+      "choices": [
+        { "text": "Where did they go?", "next": "keeper.south" },
+        { "text": "I came to find them.", "next": "keeper.south", "plain": true }
+      ]
+    },
+    "keeper.south": {
+      "speaker": "Keeper",
+      "text": "“South. Into the storm, where the sky stays black at noon. The sea won’t let a boat through there. But they left a trail: their camp on the little islet past the Spire. They watched the storm from there for a year before they went.”",
+      "do": ["beat:KeeperLetter"],
+      "choices": [
+        { "text": "Then that’s where I start.", "next": "", "plain": true }
       ]
     },
     "keeper.who": {
@@ -62,6 +94,7 @@
       "speaker": "Keeper",
       "text": "“The leaning palm, three paces seaward. The Cartographer buried things the way other folk bury grudges: deep, and close to home.”",
       "choices": [
+        { "text": "I carry a letter. The sea got into it.", "next": "keeper.letter.wet.again", "if": ["beat:Letter", "!beat:LetterDried"] },
         { "text": "Who was the Cartographer?", "next": "keeper.who.again" },
         { "text": "I’ll dig.", "next": "", "plain": true }
       ]
@@ -77,6 +110,7 @@
       "speaker": "Keeper",
       "text": "“Sailcloth? Then sit at the mast’s foot and sew. A tear like that takes two patches; don’t skimp on the second.”",
       "choices": [
+        { "text": "I carry a letter. The sea got into it.", "next": "keeper.letter.wet.again", "if": ["beat:Letter", "!beat:LetterDried"] },
         { "text": "I’ll mend it.", "next": "", "plain": true }
       ]
     },
@@ -84,6 +118,7 @@
       "speaker": "Keeper",
       "text": "“She’ll sail. Take her round the lagoon first, and mind the reef by the Spire: she doesn’t like rocks.”",
       "choices": [
+        { "text": "I carry a letter. The sea got into it.", "next": "keeper.letter.wet.again", "if": ["beat:Letter", "!beat:LetterDried"] },
         { "text": "What is the Spire?", "next": "keeper.spire" },
         { "text": "I’ll be careful.", "next": "", "plain": true }
       ]

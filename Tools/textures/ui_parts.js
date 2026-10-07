@@ -399,3 +399,85 @@ part('T_UI_TalkChoiceGlow', 700, 52, 1, c => {
   const g = c.createLinearGradient(0, 0, 700, 0); g.addColorStop(0, 'rgba(255,236,190,0)'); g.addColorStop(.08, 'rgba(255,236,190,.55)'); g.addColorStop(1, 'rgba(255,236,190,0)');
   c.fillStyle = g; c.fillRect(0, 0, 700, 52);
 });
+
+/* ---------- D85: the letter in the castaway's pocket (for the Cartographer, from their sibling) ---------- */
+/* One portrait sheet, 820 x 1100 at 1080p (drawn at 1.5x): folded in three across and once down, the broken red seal at the top fold.
+   Wet: the paper dark and sodden, the ink run so only a few phrases (in braces) can be read, the name lost. Dried at a fire: pale
+   with tide lines where the water stood, every word legible (the run ones faded). The text is the letter's; change it here. */
+const LETTER = [
+  'Rowan,',
+  '',
+  '{They say letters thrown into the Gale come back as driftwood.} So I am sending this one with a person instead. Mother says that is worse.',
+  '',
+  '{Seven winters} now. The harbour still keeps your mooring; I tar the posts every spring so nobody takes it.',
+  '',
+  'I found your charts in the loft, the ones of the wall, with {the pale towers} drawn inside it. You were right: {there is a way in.} You were wrong to go alone.',
+  '',
+  'The one who carries this owes us nothing, and went anyway. Be kind to them. Show them the way home, {and come with them.}',
+  '',
+  'If you cannot, write back. The Gale gives back driftwood. I will read every piece.',
+  '',
+  '\u2014 Wren',
+];
+const LW = 820, LH = 1100;
+function letterSheet(c, wet) {
+  const R = rng(85), x0 = 0, y0 = 0;
+  /* the sheet: a little crooked, a torn corner at the bottom right */
+  const p = new Path2D(); p.moveTo(x0 + 6, y0 + 4); p.lineTo(x0 + LW - 4, y0 + 10); p.lineTo(x0 + LW - 10, y0 + LH - 70);
+  for (let k = 0; k <= 8; k++) p.lineTo(x0 + LW - 10 - k * 9 - R() * 6, y0 + LH - 70 + k * 7 + R() * 5);
+  p.lineTo(x0 + 8, y0 + LH - 6); p.closePath();
+  dropShadow(c, p, 30, 'rgba(0,0,0,.65)', 8, 18);
+  const paper = parchment(LW + 40, LH + 40, wet ? 41 : 42);
+  c.save(); c.clip(p); c.drawImage(paper, -20, -20);
+  if (wet) {
+    /* sodden: darker, greyer, blotched where it is wettest */
+    c.fillStyle = 'rgba(70,60,48,.42)'; c.fillRect(0, 0, LW, LH);
+    for (let i = 0; i < 9; i++) { const gx = R() * LW, gy = R() * LH, r = 120 + R() * 220, g = c.createRadialGradient(gx, gy, 10, gx, gy, r);
+      g.addColorStop(0, 'rgba(40,34,28,.32)'); g.addColorStop(1, 'rgba(40,34,28,0)'); c.fillStyle = g; c.fillRect(gx - r, gy - r, 2 * r, 2 * r); }
+  } else {
+    /* dried: water stains where it stood longest, near the edges: a faint brown fill, a darker ragged rim that breaks off */
+    const spots = [[.08, .9, 170], [.9, .78, 210], [.85, .08, 120], [.12, .2, 90], [.55, .97, 140]];
+    for (const [fx, fy, r0] of spots) { const gx = fx * LW, gy = fy * LH, pts = [];
+      for (let k = 0; k <= 72; k++) { const a = k / 72 * TAU, n = N1(Math.cos(a) * 2.2 + gx * .01, Math.sin(a) * 2.2 + gy * .01), rr = r0 * (.7 + .6 * n);
+        pts.push([gx + Math.cos(a) * rr, gy + Math.sin(a) * rr * .85]); }
+      c.save(); c.fillStyle = 'rgba(150,105,55,.07)'; c.beginPath(); pts.forEach(([a, b], k) => k ? c.lineTo(a, b) : c.moveTo(a, b)); c.fill(); c.restore();
+      c.save(); c.strokeStyle = 'rgba(118,76,34,.30)'; c.lineWidth = 1.8; c.filter = 'blur(.9px)'; c.lineCap = 'round';
+      for (let k = 0; k < 72; k++) { if (N1(k * .35 + gx, gy) < .42) continue; c.beginPath(); c.moveTo(...pts[k]); c.lineTo(...pts[k + 1]); c.stroke(); }
+      c.restore(); }
+    c.fillStyle = 'rgba(150,110,60,.08)'; c.fillRect(0, 0, LW, LH);
+  }
+  /* the folds: in three across, once down; each a shadow on one side and a light on the other */
+  const fold = (ax, ay, bx, by, nx, ny) => { [[-1, 'rgba(60,40,20,.28)', 5], [1, 'rgba(255,248,230,.32)', 3]].forEach(([s, col, w]) => {
+    c.save(); c.strokeStyle = col; c.lineWidth = w; c.filter = 'blur(2px)'; c.beginPath(); c.moveTo(ax + nx * s * 2, ay + ny * s * 2); c.lineTo(bx + nx * s * 2, by + ny * s * 2); c.stroke(); c.restore(); }); };
+  fold(0, LH / 3, LW, LH / 3 + 6, 0, 1); fold(0, 2 * LH / 3, LW, 2 * LH / 3 - 4, 0, 1); fold(LW / 2 + 4, 0, LW / 2 - 6, LH, 1, 0);
+  c.restore();
+  innerShadow(c, p, 26, wet ? 'rgba(40,30,20,.6)' : 'rgba(125,72,24,.5)'); innerShadow(c, p, 2.5, 'rgba(90,52,18,.6)');
+
+  /* the words: iron-gall ink, a slight slant, a wandering line */
+  const size = 33, lh = 49, left = 92, maxW = LW - 2 * left, font = `italic 400 ${size}px ${FL}`;
+  let y = 150, keep = false;
+  c.font = font;
+  for (const para of LETTER) {
+    if (!para) { y += lh * .45; continue; }
+    const words = []; for (const raw of para.split(' ')) { let w = raw; if (w.startsWith('{')) { keep = true; w = w.slice(1); }
+      const ends = w.endsWith('}'); if (ends) w = w.slice(0, -1); words.push([w, keep]); if (ends) keep = false; }
+    let line = [], lw = 0; const flush = () => { let x = left + (R() - .5) * 6;
+      for (const [w, k] of line) { const ww = c.measureText(w + ' ').width, yy = y + Math.sin(x * .013 + y) * 1.4;
+        const ink = 'rgba(34,28,40,.92)';
+        if (wet && !k) { /* run: blurred, faint, streaked downwards */
+          for (const [dy, a, b] of [[0, .26, 5.5], [6, .16, 7], [13, .1, 9]]) { c.save(); c.filter = `blur(${b}px)`; txt(c, w, x, yy + dy, font, `rgba(34,28,40,${a})`); c.restore(); }
+        } else if (!wet && !k) { /* dried after running: faded, a little soft */
+          c.save(); c.filter = 'blur(.9px)'; txt(c, w, x, yy, font, 'rgba(52,40,44,.62)'); c.restore();
+          c.save(); c.filter = 'blur(2.6px)'; txt(c, w, x, yy + 3, font, 'rgba(70,52,50,.12)'); c.restore();
+        } else { c.save(); c.filter = 'blur(.5px)'; txt(c, w, x, yy, font, ink); c.restore(); }
+        x += ww; }
+      line = []; lw = 0; y += lh; };
+    for (const [w, k] of words) { const ww = c.measureText(w + ' ').width; if (lw + ww > maxW && line.length) flush(); line.push([w, k]); lw += ww; }
+    flush();
+  }
+  /* the broken seal at the top fold: crumbs of red wax and the stain it left */
+  const sx = LW / 2 - 2, sy = 44; c.save(); c.fillStyle = 'rgba(120,30,20,.18)'; c.filter = 'blur(6px)'; c.beginPath(); c.ellipse(sx, sy, 46, 30, 0, 0, TAU); c.fill(); c.restore();
+  for (const [dx, dy, r] of [[-22, -6, 13], [14, 8, 10], [26, -12, 7], [-6, 16, 6]]) { waxSeal(c, sx + dx, sy + dy, r, '', 85 + dx); }
+}
+part('T_UI_Letter_Wet', LW, LH, 1.5, c => letterSheet(c, true));
+part('T_UI_Letter_Dry', LW, LH, 1.5, c => letterSheet(c, false));

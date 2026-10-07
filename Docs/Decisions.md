@@ -2532,3 +2532,27 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   to their tracks.
 - **Open:** the title screen plays what the world wants (Calm by day); no sea and wind sounds or effects yet (the other two volume groups
   still have nothing to act on).
+
+### D85 · The letter in the castaway's pocket: for the Cartographer, dried at the fire pit (Adopted: waiting for the owner's look)
+- **Owner (2026-10-07):** from the story kit, kept: the Gale as a sealing storm wall that is also the border, with storms breaking out of
+  it into the safe waters; the robotic whale (the Grey), met a few times early and fought at the end; "the letter in your pocket",
+  built on the start island, and it is **for the Cartographer**; the first islands: the Spire finished, the Cartographer's camp, the
+  weather mast.
+- **The story it makes:** the castaway came into the Gale on purpose, as a messenger. The letter is from Wren, the Cartographer's
+  sibling outside, to Rowan, the Cartographer's own name: seven winters gone, the charts of the wall "with the pale towers drawn inside
+  it" found in the loft, "you were right: there is a way in", and "the one who carries this owes us nothing, and went anyway... show them
+  the way home, and come with them." The player's goal from the first minutes: find the Cartographer (south, in the storm).
+- **In play** (`World/SaltPrologue.*`, `UI/SaltLetterWidget.*`):
+  - A new voyage puts the letter in the pocket (beat `Letter`); when the castaway has stood up: "Something stiff in your pocket: a letter,
+    soaked through. L reads it."
+  - **L** opens it over the blurred world (`T_UI_Letter_Wet`): the sea has run the ink, a few phrases hold, the name is lost; "A fire
+    would dry it." E, Esc or L put it away. L is its own input context under play's (the log takes the key in FH3).
+  - **The fire pit** by the footpath (-34, -41 m): a hold of 2.5 s, "Dry the letter by the embers", while it is wet. The letter dries
+    stiff and opens dried (`T_UI_Letter_Dry`, beat `LetterDried`): every word, the name first.
+  - **The Keeper** (Lines.json): in the first talk "I carry a letter. The sea got into it." sends you to the fire pit; once it is dry,
+    his talk opens on it: "Rowan. Nobody has said that name here in seven years..." and points south and to the Cartographer's camp
+    on the little islet past the Spire (beat `KeeperLetter`), the first step of the islands' trail.
+  - The pages are painted with the approved kit (`Tools/textures/ui_parts.js`, the letter's text is there); `sb.Story.Letter [dry|give]`.
+- **Tests:** Prologue 10/10 (new: LetterInPocket, DryAtTheFire, KeeperKnowsTheName), Talk 7/7; seen in play: the wet page with its line and the hints below, the dried page.
+- **Next:** the islands' plan (the Spire finished, the Cartographer's camp, the weather mast) on paper for the owner, then the Gale and
+  the whale.

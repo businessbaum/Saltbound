@@ -12,6 +12,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Player/SaltInventoryComponent.h"
 #include "Player/SaltPlayerCharacter.h"
+#include "Player/SaltPlayerController.h"
+#include "UI/SaltLetterWidget.h"
 #include "Saltbound.h"
 #include "World/SaltDig.h"
 #include "World/SaltLightingRig.h"
@@ -102,6 +104,20 @@ namespace
 			&& Player->IsToolOwned(TEXT("Spyglass")) && Saves->HasBeat(SaltStory::Chest), FString::Printf(TEXT("chest=%d compass=%d spyglass=%d beat=%d"),
 			Chest ? 1 : 0, Player->IsToolOwned(TEXT("Compass")) ? 1 : 0, Player->IsToolOwned(TEXT("Spyglass")) ? 1 : 0, Saves->HasBeat(SaltStory::Chest) ? 1 : 0));
 
+		// D85: the letter for the Cartographer in the pocket, wet: L shows it with the ink run; the fire pit's spot is open.
+		ASaltPlayerController* SaltPC = Cast<ASaltPlayerController>(PC);
+		USaltInteractableComponent* Fire = Prologue->GetFireSpot();
+		Prologue->ReadLetter();
+		USaltLetterWidget* Letter = SaltPC ? SaltPC->FindScreen<USaltLetterWidget>() : nullptr;
+		const bool bWetShown = Letter && !Letter->IsDry();
+		if (Letter)
+		{
+			SaltPC->PopScreen(Letter);
+		}
+		Report(TEXT("LetterInPocket"), Saves->HasBeat(SaltStory::Letter) && !Prologue->IsLetterDry() && bWetShown && Fire && Fire->bInteractionEnabled,
+			FString::Printf(TEXT("beat=%d dry=%d shownWet=%d fireSpot=%d enabled=%d"), Saves->HasBeat(SaltStory::Letter) ? 1 : 0,
+			Prologue->IsLetterDry() ? 1 : 0, bWetShown ? 1 : 0, Fire ? 1 : 0, Fire && Fire->bInteractionEnabled ? 1 : 0));
+
 		// The Harbour Keeper: his shovel and a lantern, the gift of his first talk (FH2, D81: answered plainly until he is done).
 		USaltTalkSubsystem* Talk = World->GetSubsystem<USaltTalkSubsystem>();
 		if (Talk)
@@ -120,6 +136,35 @@ namespace
 		Report(TEXT("KeeperShovelLantern"), Player->IsToolOwned(SaltDig::ShovelTool) && Player->IsToolOwned(TEXT("Lantern")) && Saves->HasBeat(SaltStory::Keeper),
 			FString::Printf(TEXT("shovel=%d lantern=%d beat=%d"), Player->IsToolOwned(SaltDig::ShovelTool) ? 1 : 0, Player->IsToolOwned(TEXT("Lantern")) ? 1 : 0,
 			Saves->HasBeat(SaltStory::Keeper) ? 1 : 0));
+
+		// D85: dried by the embers it reads (it opens dried), the spot closes; the Keeper knows the name and points to the camp.
+		if (Fire)
+		{
+			Fire->Interact(Player);
+		}
+		USaltLetterWidget* DryLetter = SaltPC ? SaltPC->FindScreen<USaltLetterWidget>() : nullptr;
+		const bool bDryShown = DryLetter && DryLetter->IsDry();
+		if (DryLetter)
+		{
+			SaltPC->PopScreen(DryLetter);
+		}
+		Report(TEXT("DryAtTheFire"), Saves->HasBeat(SaltStory::LetterDried) && bDryShown && Fire && !Fire->bInteractionEnabled, FString::Printf(
+			TEXT("dried=%d shownDry=%d spotClosed=%d"), Saves->HasBeat(SaltStory::LetterDried) ? 1 : 0, bDryShown ? 1 : 0, Fire && !Fire->bInteractionEnabled ? 1 : 0));
+		TArray<FString> Said;
+		if (Talk)
+		{
+			Talk->SetInstant(true);
+			Talk->Begin(TEXT("Keeper"), Player);
+			for (int32 Say = 0; Talk->IsTalking() && Say < 6; ++Say)
+			{
+				Said.Add(Talk->GetLineId().ToString());
+				Talk->Answer();
+			}
+			Talk->SetInstant(false);
+		}
+		const FString SaidLines = FString::Join(Said, TEXT(">"));
+		Report(TEXT("KeeperKnowsTheName"), SaidLines == TEXT("keeper.letter>keeper.south") && Saves->HasBeat(SaltStory::KeeperLetter), FString::Printf(
+			TEXT("lines=%s beat=%d"), *SaidLines, Saves->HasBeat(SaltStory::KeeperLetter) ? 1 : 0));
 
 		// The cache dug up, two sailcloths: the sail is mended twice, then it sets.
 		Saves->SetDigStage(SaltStory::CacheSpot, 2);

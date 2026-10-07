@@ -107,6 +107,12 @@ Sound and music come when there are sounds to use (the music folders are empty).
 3. **The Spire's light:** from the first dusk, every night; the rubbing can only be taken at night.
 4. **People in v1:** simple stylised figures behind their counters.
 
+**The owner's direction (2026-10-07, D85):** the castaway is a messenger: a letter in the pocket for the Cartographer (Rowan) from
+their sibling Wren, soaked; dried at the fire pit it reads, and the Keeper knows the name and points south and to the Cartographer's
+camp past the Spire. The first islands: the Spire finished, the Cartographer's camp, the weather mast. The Gale is a real storm wall
+round the sea (the border) whose storms break out into the safe waters; the robotic whale (the Grey) is met a few times early and
+fought at the end.
+
 A castaway owns nothing: the Keeper gives the shovel and a lantern, the Cartographer's sea chest their compass and spyglass (and the
 log, FH3). Play-in-editor and the tests still start on the pier with the tools; the prologue runs on "New voyage" and with
 `sb.Story.Prologue`.

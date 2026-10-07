@@ -24,6 +24,14 @@ namespace SaltStory
 	inline const FName Cache = TEXT("Cache");               // the buried canvas dug up
 	inline const FName SailMended = TEXT("SailMended");     // the ripped sail mended: she sails
 	inline const FName CastOff = TEXT("CastOff");           // under sail, away from the pier
+	/** D85: the letter for the Cartographer in the castaway's pocket (from the start), dried at the fire pit, its name known to the
+	 *  Keeper (Lines.json records that one). */
+	inline const FName Letter = TEXT("Letter");
+	inline const FName LetterDried = TEXT("LetterDried");
+	inline const FName KeeperLetter = TEXT("KeeperLetter");
+	/** The island's fire pit (island_shape.py PLACES), where the letter dries (m). */
+	constexpr double FirePitXM = -34.0;
+	constexpr double FirePitYM = -41.0;
 
 	/** Where the castaway wakes: a few steps inland of the wreck on the south-west beach (m), facing it (degrees). */
 	constexpr double WakeXM = -62.0;
@@ -60,6 +68,14 @@ public:
 	/** The sea chest aboard: the Cartographer's compass and spyglass (FH3: the log). */
 	UFUNCTION() void HandleChest(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	USaltInteractableComponent* GetChest() const { return Chest; }
+	/** D85: the letter (the castaway carries it from the start; dry once it has been by the fire). */
+	bool HasLetter() const;
+	bool IsLetterDry() const;
+	/** Opens the letter (L): wet, the ink has run; dried, it all reads. */
+	void ReadLetter();
+	/** The fire pit's use: hold E to dry the letter by the embers. */
+	UFUNCTION() void HandleDryLetter(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
+	USaltInteractableComponent* GetFireSpot() const { return FireSpot; }
 	/** The castaway's spot on the ground (cm). */
 	FVector GetWakeSpot() const;
 	/** The clock now as day * 24 + hour. */
@@ -69,8 +85,17 @@ private:
 	void PlaceBeachFinds();
 	void AttachChest();
 	void ApplyState();
+	void PlaceFireSpot();
+	void BindLetterKey();
+	void HandleLetterKey();
 
 	UPROPERTY(Transient) TObjectPtr<USaltInteractableComponent> Chest;
+	UPROPERTY(Transient) TObjectPtr<USaltInteractableComponent> FireSpot;
+	UPROPERTY(Transient) TObjectPtr<class UInputMappingContext> LetterContext;
+	UPROPERTY(Transient) TObjectPtr<class UInputAction> LetterAction;
+	TWeakObjectPtr<UObject> LetterInput;
+	/** The note about the letter comes when the castaway has stood up. */
+	float LetterNoticeIn = 0.f;
 	FDelegateHandle LoadedHandle;
 	float CheckIn = 0.f;
 	bool bStarted = false;

@@ -68,7 +68,7 @@ namespace
 			Talk->GetCalls().Num()));
 
 		// The castaway's first talk: the Keeper's hand-over opens it; the sheet shows his name and the line written out word by word;
-		// the answers (1 who, 2 the sail, E the plain one) come when the words are done.
+		// the answers (1 who, 2 the sail, 3 the wet letter, E the plain one) come when the words are done.
 		Prologue->Begin(false);
 		Digs->HandleKeeper(nullptr, Player);
 		USaltTalkWidget* W = Talk->GetWidget();
@@ -80,7 +80,7 @@ namespace
 		}
 		Report(TEXT("KeeperFirstTalk"), Talk->IsTalking() && Talk->GetSpeakerId() == TEXT("Keeper") && Talk->GetLineId() == TEXT("keeper.first")
 			&& W && W->IsShowingLine() && bWritingAtFirst && W->GetWrittenText() == Full && Full.Contains(TEXT("Cartographer"))
-			&& Keys(Talk) == TEXT("12E") && W->GetChoiceCount() == 3 && !Player->IsToolOwned(SaltDig::ShovelTool), FString::Printf(
+			&& Keys(Talk) == TEXT("123E") && W->GetChoiceCount() == 4 && !Player->IsToolOwned(SaltDig::ShovelTool), FString::Printf(
 			TEXT("line=%s sheet=%d writing=%d written=%d/%d keys=%s rows=%d shovelYet=%d"), *Talk->GetLineId().ToString(), W && W->IsShowingLine() ? 1 : 0,
 			bWritingAtFirst ? 1 : 0, W ? W->GetWrittenText().Len() : 0, Full.Len(), *Keys(Talk), W ? W->GetChoiceCount() : 0,
 			Player->IsToolOwned(SaltDig::ShovelTool) ? 1 : 0));

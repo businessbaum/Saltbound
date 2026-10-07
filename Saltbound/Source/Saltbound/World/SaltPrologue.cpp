@@ -19,6 +19,12 @@
 #include "World/SaltDig.h"
 #include "World/SaltLightingRig.h"
 #include "World/SaltPickup.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "Engine/LocalPlayer.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
+#include "UI/SaltLetterWidget.h"
 
 namespace
 {
@@ -89,6 +95,28 @@ namespace
 			}
 		}));
 
+	FAutoConsoleCommandWithWorldAndArgs CmdLetter(
+		TEXT("sb.Story.Letter"),
+		TEXT("D85: read the letter in the castaway's pocket (as L); 'dry' dries it at the fire pit first, 'give' puts it in the pocket."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			USaltPrologueSubsystem* P = World ? World->GetSubsystem<USaltPrologueSubsystem>() : nullptr;
+			if (!P)
+			{
+				return;
+			}
+			if (Args.Num() > 0 && (Args[0] == TEXT("give") || Args[0] == TEXT("dry")))
+			{
+				P->Reach(SaltStory::Letter);
+			}
+			if (Args.Num() > 0 && Args[0] == TEXT("dry"))
+			{
+				P->HandleDryLetter(nullptr, nullptr);
+				return;
+			}
+			P->ReadLetter();
+		}));
+
 	FAutoConsoleCommandWithWorldAndArgs CmdBeats(
 		TEXT("sb.Story.Beats"),
 		TEXT("FH1 (D77): print the story's beats reached (sb.Story.Beats <Beat> records one now)."),
@@ -134,6 +162,7 @@ void USaltPrologueSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	bStarted = true;
 	PlaceBeachFinds();
 	AttachChest();
+	PlaceFireSpot();
 	if (USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(&InWorld))
 	{
 		LoadedHandle = Saves->OnGameLoaded.AddUObject(this, &USaltPrologueSubsystem::ApplyState);
@@ -262,6 +291,9 @@ void USaltPrologueSubsystem::Begin(bool bWakeUp)
 	}
 	Reach(SaltStory::Prologue);
 	Reach(SaltStory::Woke);
+	// D85: and a letter in the pocket, soaked through; the note about it once the castaway stands.
+	Reach(SaltStory::Letter);
+	LetterNoticeIn = bWakeUp ? 6.5f : 0.f;
 	ApplyState();
 	UE_LOG(LogSaltbound, Display, TEXT("SB_STORY prologue at=(%.0f, %.0f, %.0f) wake=%d"), Spot.X, Spot.Y, Spot.Z, bWakeUp ? 1 : 0);
 }
@@ -277,6 +309,110 @@ void USaltPrologueSubsystem::ApplyState()
 	// Until the ripped sail has been mended once, it is not set (later tears let her limp home, D74).
 	Boat->SetSailLocked(Saves->HasBeat(SaltStory::Prologue) && !Saves->HasBeat(SaltStory::SailMended),
 		NSLOCTEXT("SaltStory", "SailRipped", "The sail is ripped. Mend it at the mast's foot: it takes sailcloth."));
+	// D85: the fire pit dries the letter while it is wet.
+	if (FireSpot)
+	{
+		FireSpot->bInteractionEnabled = Saves->HasBeat(SaltStory::Letter) && !Saves->HasBeat(SaltStory::LetterDried);
+	}
+}
+
+bool USaltPrologueSubsystem::HasLetter() const
+{
+	const USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(GetWorld());
+	return Saves && Saves->HasBeat(SaltStory::Letter);
+}
+
+bool USaltPrologueSubsystem::IsLetterDry() const
+{
+	const USaltSaveSubsystem* Saves = USaltSaveSubsystem::Get(GetWorld());
+	return Saves && Saves->HasBeat(SaltStory::LetterDried);
+}
+
+void USaltPrologueSubsystem::ReadLetter()
+{
+	ASaltPlayerController* PC = FirstController(GetWorld());
+	if (!PC || !HasLetter() || PC->FindScreen<USaltLetterWidget>() || PC->IsMenuOpen() || PC->IsTitleOpen())
+	{
+		return;
+	}
+	USaltLetterWidget* W = CreateWidget<USaltLetterWidget>(PC, USaltLetterWidget::StaticClass());
+	W->SetDry(IsLetterDry());
+	PC->PushScreen(W);
+	UE_LOG(LogSaltbound, Display, TEXT("SB_STORY letter read dry=%d"), IsLetterDry() ? 1 : 0);
+}
+
+void USaltPrologueSubsystem::PlaceFireSpot()
+{
+	// The fire pit by the footpath (D71): its embers never quite go out. A hold there dries the letter.
+	UWorld* World = GetWorld();
+	FVector At(SaltStory::FirePitXM * 100.0, SaltStory::FirePitYM * 100.0, 200.0);
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(SaltFirePit), true);
+	if (World->LineTraceSingleByChannel(Hit, At + FVector(0.0, 0.0, 3000.0), At - FVector(0.0, 0.0, 3000.0), ECC_Visibility, Params))
+	{
+		At = Hit.ImpactPoint;
+	}
+	FActorSpawnParameters P;
+	P.Name = TEXT("SaltLetterFire");
+	AActor* A = World->SpawnActor<AActor>(AActor::StaticClass(), FTransform(At), P);
+	if (!A)
+	{
+		return;
+	}
+	USaltInteractableComponent* C = NewObject<USaltInteractableComponent>(A, TEXT("LetterFire"));
+	A->SetRootComponent(C);
+	C->SetBoxExtent(FVector(120.f, 120.f, 70.f));
+	C->SetWorldLocation(At + FVector(0.0, 0.0, 60.0));
+	C->PromptText = NSLOCTEXT("SaltStory", "DryLetter", "Dry the letter by the embers");
+	C->HoldTime = 2.5f;
+	C->PromptOffset = FVector(0.f, 0.f, 40.f);
+	C->OnInteract.AddDynamic(this, &USaltPrologueSubsystem::HandleDryLetter);
+	C->RegisterComponent();
+	FireSpot = C;
+}
+
+void USaltPrologueSubsystem::HandleDryLetter(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
+{
+	if (!HasLetter() || IsLetterDry())
+	{
+		return;
+	}
+	Reach(SaltStory::LetterDried);
+	ApplyState();
+	if (ASaltPlayerController* PC = FirstController(GetWorld()))
+	{
+		PC->ShowNotice(NSLOCTEXT("SaltStory", "LetterDry", "The letter dries stiff and brown, and the folds come apart. It can be read now."));
+	}
+	ReadLetter();
+}
+
+void USaltPrologueSubsystem::BindLetterKey()
+{
+	// L reads the letter (FH3: the log, with the letter in it). Its own mapping context under play's, so it never takes a key
+	// from anything else.
+	ASaltPlayerController* PC = FirstController(GetWorld());
+	UEnhancedInputComponent* Input = PC ? Cast<UEnhancedInputComponent>(PC->InputComponent) : nullptr;
+	ULocalPlayer* LP = PC ? PC->GetLocalPlayer() : nullptr;
+	UEnhancedInputLocalPlayerSubsystem* EI = LP ? LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+	if (!Input || !EI || LetterInput.Get() == Input)
+	{
+		return;
+	}
+	if (!LetterContext)
+	{
+		LetterContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Story"));
+		LetterAction = NewObject<UInputAction>(this, TEXT("IA_ReadLetter"));
+		LetterAction->ValueType = EInputActionValueType::Boolean;
+		LetterContext->MapKey(LetterAction, EKeys::L);
+	}
+	Input->BindAction(LetterAction, ETriggerEvent::Started, this, &USaltPrologueSubsystem::HandleLetterKey);
+	EI->AddMappingContext(LetterContext, -1);
+	LetterInput = Input;
+}
+
+void USaltPrologueSubsystem::HandleLetterKey()
+{
+	ReadLetter();
 }
 
 void USaltPrologueSubsystem::UpdateBeats()
@@ -321,6 +457,16 @@ void USaltPrologueSubsystem::Tick(float DeltaTime)
 	{
 		CheckIn = 0.5f;
 		UpdateBeats();
+		BindLetterKey();
+	}
+	if (LetterNoticeIn > 0.f)
+	{
+		LetterNoticeIn -= DeltaTime;
+		ASaltPlayerController* PC = LetterNoticeIn <= 0.f ? FirstController(GetWorld()) : nullptr;
+		if (PC && HasLetter() && !IsLetterDry())
+		{
+			PC->ShowNotice(NSLOCTEXT("SaltStory", "LetterFound", "Something stiff in your pocket: a letter, soaked through. L reads it."));
+		}
 	}
 }
 
