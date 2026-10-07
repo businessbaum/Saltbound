@@ -14,7 +14,8 @@ as that step is done and the map is saved. Blender headless builds, host Python,
 
 Rules (the managing session, 2026-10-07): sessions do not message each other; this tool is the only coordination.
 Do non-editor work while waiting instead of polling. Never hold the lock while writing code, building in Blender or
-writing docs. When someone is queued, give the lock back within about 15 minutes and queue again for the next step.
+writing docs. Test efficiently (owner): prepare scripts, C++ and assets before queuing, run all checks of a hold in one
+script, test only what the change touches, never debug while holding, and aim for holds under 10 minutes.
 
 Everything lives under Saltbound/Saved (not in git). The lock is a directory (mkdir is atomic).
 """
@@ -35,7 +36,7 @@ DECISIONS = os.path.join(ROOT, "Docs", "Decisions.md")
 
 QUEUE_STALE_S = 180.0   # a waiter whose wait call ended this long ago has left the queue
 POLL_S = 5.0
-FAIR_HOLD_MIN = 15.0
+FAIR_HOLD_MIN = 10.0
 
 
 def read_json(path):
@@ -160,6 +161,7 @@ def report_taken(owner, waited=None):
     if waited is not None:
         msg += " after %.0f s" % waited
     print(msg)
+    print("  one prepared script, only the checks your change needs, no debugging while holding; aim for < %.0f min" % FAIR_HOLD_MIN)
     others = [e for e in queued() if e["owner"] != owner]
     if others:
         print("  waiting: %s - give it back within %.0f min, then queue again" % (describe_queue(others), FAIR_HOLD_MIN))
