@@ -5,7 +5,7 @@ Usage:
   python Tools/ue_exec.py path/to/script.py [--arg value ...]   (script args are exposed as sys.argv inside UE)
 Requires bRemoteExecution=True in Saltbound/Config/DefaultEngine.ini (already set).
 """
-import argparse, json, os, sys, time
+import argparse, atexit, json, os, sys, time
 
 ENGINE = os.environ.get("SALTBOUND_ENGINE", r"C:\Program Files\Epic Games\UE_5.8")
 sys.path.insert(0, os.path.join(ENGINE, r"Engine\Plugins\Experimental\PythonScriptPlugin\Content\Python"))
@@ -30,12 +30,33 @@ def connect(timeout=30.0):
     raise SystemExit("No Unreal Editor remote execution node found (is the editor running?)")
 
 
+_conn = None
+
+
+def close():
+    global _conn
+    if _conn is not None:
+        try:
+            _conn.stop()
+        except Exception:
+            pass
+        _conn = None
+
+
 def run(code, mode=rex.MODE_EXEC_FILE, timeout=30.0):
-    re = connect(timeout)
+    """One connection per process, kept open between calls: finding the node and connecting costs 0.3-1 s each time,
+    and PIE scripts send dozens of console commands. A dead connection is replaced before sending, never after."""
+    global _conn
+    if _conn is not None and not _conn.has_command_connection():
+        close()
+    if _conn is None:
+        _conn = connect(timeout)
+        atexit.register(close)
     try:
-        return re.run_command(code, unattended=True, exec_mode=mode)
-    finally:
-        re.stop()
+        return _conn.run_command(code, unattended=True, exec_mode=mode)
+    except Exception:
+        close()
+        raise
 
 
 def main():

@@ -73,7 +73,7 @@ def main():
             t0 = time.time()
             done = False
             while time.time() - t0 < ns.timeout and not done:
-                time.sleep(1.0)
+                time.sleep(0.1)
                 text = read_from(offset)
                 done = ns.done in text
             lines = [l.split("SB_TEST", 1)[1].strip() for l in read_from(offset).splitlines() if "SB_TEST" in l]
