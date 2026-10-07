@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; the hub's harbour D70; M6 steps 1-3: the day's clock D72, digging D73, the ship repair system D74; session 9: the hub's light D82; the owner's review D79, hands and tools D80, the Harbour Keeper's figure D83, music D84, the meadow D86).
+Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; the hub's harbour D70; M6 steps 1-3: the day's clock D72, digging D73, the ship repair system D74; session 9: the hub's light D82; the owner's review D79, hands and tools D80, the Harbour Keeper's figure D83, music D84, the meadow D86, FH5 the light under the water D88).
 
 ## Milestone status
 
@@ -269,6 +269,9 @@ for a higher screen percentage (for example 75 %) and more content.
   Shovel`. Evidence: `Docs/Evidence/D80/`.
 - **D83 (the Harbour Keeper's figure, waiting for the owner's look):** an old salt behind his counter (cap, beard, pipe, waistcoat), who
   breathes, looks at you when you come near and gestures while he talks (D81's lines). Evidence: `Docs/Evidence/D83/`.
+- **D88 (FH5, the light under the water, waiting for the owner's look):** on the first night at sea after casting off, something long
+  and glowing passes under the boat 8 m down, lights her hull from below and is gone. Try it: `sb.Hub.Appear`, `sb.Lighting Night`,
+  `sb.Event.SeaLight`.
 - **D86 (the meadow, waiting for the owner's look):** daisies, buttercups and violets in drifts over the meadow; the bare squares in
   the lawn are gone (its patches wider, worn-earth holes filled, round thin patches only at the grass's edges).
 - **D84 (music, waiting for the owner's listen):** the owner's four tracks by mood: calm by day, the dark one from dusk, the drama one in a

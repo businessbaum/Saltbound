@@ -2572,3 +2572,21 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Kept:** every earlier place (the JSON diffed before trusting it). Evidence: `Docs/Evidence/D86/D86_meadow.jpg`.
 - **Open:** performance with the wider patches and the flowers not measured on its own (the blade count is the same, the overdraw a little
   higher).
+
+### D88 · FH5, the light under the water (Adopted: waiting for the owner's look)
+- **Why:** the first hour's night sail home (FirstHour.md 0:37): "Home by lantern light. Halfway, a light under the water, there and
+  gone." The first measured touch of the night's horror and of the Old World, never explained.
+- **What passes:** `SM_SeaLight` (`build_sea_events.py`), an 11 m body, a round nose, thickest a third back, a long tail, four raised bands
+  (the Old World's lines), on `MI_SeaGlow` (`setup_sea_events.py`: unlit, the Old World's turquoise, brightest where it faces the eye and
+  fading to its outline); a light of its own (1 300 cd, 26 m) that catches the hull and the bulwark from below.
+- **The pass** (`ASaltSeaLight`, 11 s): from 32 m out on one side and 16 m deep, up to 8 m under the keel a little ahead of the boat, and
+  away on the other side, sinking to 22 m; it brightens as it comes up, breathes slowly and is gone as it sinks; it never touches her.
+  Through the dark water it reads as a deep blue glow (at 260 its glow burnt white into a cut-out; at 45 it was a solid blue thing near
+  the surface).
+- **When** (`USaltSeaEventsSubsystem`): once, after the story's CastOff beat, on the first night at sea: the boat under way (over 1.5 kn, not
+  moored or anchored), full night, at least 300 m from her home mooring, the player aboard. Saved as the beat SeaLight.
+- **Commands:** `sb.Event.SeaLight [record]` passes it under the boat now; `sb.Event.SeaLight why` says what holds it back.
+- **Tests (in play):** forced passes seen from beside the boat and from her deck at night; the automatic one came after CastOff at night
+  away from home and recorded its beat once. Evidence: `Docs/Evidence/D88/D88_sea_light.jpg`.
+- **Open:** no sound yet (a low hum or a creak of the hull would sell it); FH4 (the Spire at night) is not built, so the light comes on
+  any first night at sea after casting off.
