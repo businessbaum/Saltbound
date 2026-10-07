@@ -31,6 +31,10 @@ public:
 
 	/** Sets the mean wind. Gustiness scales speed variation (0 = steady); shifts scale with it too. */
 	void SetBaseWind(float FromDeg, float SpeedCmPerSecond, float InGustiness);
+	/** D87: a storm over the viewer (the Gale's wall or a breakout), 0 none .. 1 full: the wind turns toward FromDeg and rises to
+	 *  StormSpeed (cm/s), gustier. */
+	void SetStorm(float Amount, float FromDeg, float StormSpeedCmPerSecond);
+	float GetStorm() const { return StormAmount; }
 	float GetBaseFromDeg() const { return BaseFromDeg; }
 	float GetBaseSpeed() const { return BaseSpeed; }
 	float GetGustiness() const { return Gustiness; }
@@ -48,4 +52,7 @@ private:
 	double Time = 0.0;
 	float CurrentFromDeg = 200.f;
 	float CurrentSpeed = 700.f;
+	float StormAmount = 0.f;
+	float StormFromDeg = 0.f;
+	float StormSpeed = 1600.f;
 };

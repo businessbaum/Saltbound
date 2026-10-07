@@ -49,6 +49,21 @@ void USaltWindSubsystem::Evaluate()
 	const double Shift = 0.7 * FMath::Sin(TwoPi * Time / 61.0 + 0.4) + 0.3 * FMath::Sin(TwoPi * Time / 17.0 + 0.5);
 	CurrentSpeed = FMath::Max(0.f, BaseSpeed * (1.f + Gustiness * (float)Gust));
 	CurrentFromDeg = BaseFromDeg + ShiftDeg * Gustiness * (float)Shift;
+	// D87: a storm over the viewer: harder, gustier, turned toward its own direction.
+	if (StormAmount > 0.f)
+	{
+		const float StormNow = StormSpeed * (1.f + 0.35f * (float)Gust);
+		CurrentSpeed = FMath::Lerp(CurrentSpeed, StormNow, StormAmount);
+		CurrentFromDeg = CurrentFromDeg + FMath::FindDeltaAngleDegrees(CurrentFromDeg, StormFromDeg + 12.f * (float)Shift) * StormAmount;
+	}
+}
+
+void USaltWindSubsystem::SetStorm(float Amount, float FromDeg, float StormSpeedCmPerSecond)
+{
+	StormAmount = FMath::Clamp(Amount, 0.f, 1.f);
+	StormFromDeg = FRotator::NormalizeAxis(FromDeg);
+	StormSpeed = FMath::Max(0.f, StormSpeedCmPerSecond);
+	Evaluate();
 }
 
 void USaltWindSubsystem::SetBaseWind(float FromDeg, float SpeedCmPerSecond, float InGustiness)

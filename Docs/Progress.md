@@ -280,6 +280,10 @@ for a higher screen percentage (for example 75 %) and more content.
   bias (-1) at every hour (the rooms went black at night), the lanterns at 2 800 K (1 900 K turned the golden wood orange-red) with a
   12 cm source, and the lanterns' own parts cast no shadow (the dark disc under each lantern and the stripes round it). A/B sheets in
   play: `Tools/hub_light_ab.py`.
+- **D87 (the Gale v1, the wall's look still open):** the storm round the sea plays: sailing out, the sky closes, the sea grows to Storm,
+  the wind rises against you and rain falls; inside the wall the planks spring, past 9.8 km the Gale wrecks the boat and gives you back
+  on the wreck beach; breakouts drift in from the wall every 8-15 minutes with their own weather. The wall itself is not visible yet
+  (three looks tried, none kept: Decisions D87). Try: `sb.Gale near 220 3`, `sb.Gale here`, sail south-west for 9 km.
 - **D85 (the letter, waiting for the owner's look):** the castaway wakes with a letter in the pocket, for the Cartographer from their
   sibling Wren: soaked, the ink run. L reads it; drying it at the fire pit by the footpath (hold E) makes it readable, and the Keeper
   knows the name (Rowan) and points south, to the Cartographer's camp past the Spire. Try it: New voyage, L, the fire pit, the Keeper;
@@ -442,6 +446,8 @@ Developer console (`~`, non-shipping builds):
 - `sb.Lighting Day|Evening|Dusk|Night|Dawn|Morning|Twilight` (jumps the clock there and holds it, D72)
 - D72: `sb.Time` (print), `sb.Time <hour 0-24> [hold]`, `sb.Time run|hold`, `sb.Time day <n>`, `sb.Time.Scale <x>`, `sb.Sky.Dome 1|0`,
   `sb.Dev.RunClockTests`
+- D87: `sb.Gale` (print), `sb.Gale breakout [bearing deg] [km]`, `sb.Gale near [bearing] [km]`, `sb.Gale here [young]`, `sb.Gale clear`,
+  `sb.Gale strike`, `sb.Gale wreck`, `sb.Gale look ...` (the wall's fog and clouds, tuning), `sb.Dev.RunGaleTests`
 - D85: `sb.Story.Letter` (read it), `sb.Story.Letter dry` (dry it at the fire pit), `sb.Story.Letter give`
 - D81: `sb.Talk <Speaker>` (talk to them), `sb.Talk answer | choose <1-3> | end | call <CallId>`, `sb.Talk.Reload` (read Lines.json again,
   print its problems), `sb.Dev.RunTalkTests`

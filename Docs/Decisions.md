@@ -2598,3 +2598,35 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   away from home and recorded its beat once. Evidence: `Docs/Evidence/D88/D88_sea_light.jpg`.
 - **Open:** no sound yet (a low hum or a creak of the hull would sell it); FH4 (the Spire at night) is not built, so the light comes on
   any first night at sea after casting off.
+
+### D87 · The Gale v1: the storm round the sea, breakouts, the wreck at the edge (Adopted: the systems; the wall's look still open)
+- **Owner (2026-10-07):** "the Gale ... ALSO functions as a border. ... a giant storm wall with heavy wind, gigantic waves, lightning etc;
+  sometimes parts of this giant circle shaped gale are breaking out of it into the safe zone ... these will create storm areas in the
+  player world"; then "BUILD IT" for the plan in `Docs/Design/Islands.md`; on the first wall: "no pillars just a big wall of a storm";
+  then "the gale wall needs to be very natural and seamless with the clouds and the weather ... fog, clouds and the storm form a natural
+  wall with no edges".
+- **What plays** (`World/SaltGale.*`, `USaltGaleSubsystem`, tests `sb.Dev.RunGaleTests` 7/7):
+  - **How stormy where:** 0 inside 7.5 km of the cove, rising to 1 at 9.6 km (the wall), and round each breakout. The viewer's storm
+    drives the rig: the weather goes Cloudy / Overcast / Storm (and back to what it was), the sea follows through sea-state zones (one
+    kept on the ring nearest the viewer, one per breakout), the wind rises to about 20 m/s, gustier and turned (blowing in from the wall,
+    round a breakout's heart; `USaltWindSubsystem::SetStorm`), rain falls round the camera, bolts strike near the viewer.
+  - **The edge:** inside the wall's face (9 km) the sea springs the boat's planks (D74's holes, faster the deeper); past 9.8 km for two
+    seconds the Gale wrecks her: the screen goes dark, the boat is found at her mooring, the castaway wakes on the wreck beach (beat
+    `GaleWreck`).
+  - **Breakouts:** every 8-15 minutes (the first after 6-10) a storm tears loose from the wall, most often from the south-west where the
+    relays fail (Islands.md), and drifts in at 6-10 kn for 18-30 minutes, gathering for a minute and fading over two; one that reaches the
+    cove dies away. `sb.Gale breakout [bearing] [km]`, `sb.Gale near [bearing] [km]`, `sb.Gale here [young]`, `sb.Gale clear`,
+    `sb.Gale strike`, `sb.Gale wreck`, `sb.Gale` (print).
+- **The wall's look, three tries (none kept):**
+  1. Cloud meshes (metaballs in Blender, 52 segments on the ring, masked, lit): from the cove a ring of pale pillars and mushroom heads
+     (owner: no pillars); rebuilt as one continuous wall, but the sea's haze (D49) hides anything 3 km away, so it was a faint band.
+  2. The same as translucent, self-lit, fog-free meshes with a capped haze of their own: a dark wall all round, but mesh edges and seams
+     between segments (owner: no edges).
+  3. The sky's own volumetric clouds turned to the engine's storm clouds along the ring (`setup_gale_sky.py`: the engine's cloud material
+     has `StormClouds` with lightning built in; made a function of position) with local fog volumes for the foot: the whole sky went
+     overcast (the mask was probably full everywhere: check what space a volume material's world position is in), and the fog volumes
+     read as a flat orange-brown band in the morning sun. Reverted: the sky is the D21 sky again; the fog ring is built but off
+     (`FSaltGaleLook`, `sb.Gale look <fog density> <grey> <height km> <cloud storm> <coverage boost> <tops km> [falloff]`).
+- **Next for the look:** the third way is the right direction (the wall made of the sky's clouds and the fog). Fix the cloud mask's space
+  (print the world position the cloud material sees), keep the storm to the ring; give the fog's foot texture or replace it by the
+  clouds reaching lower (the cloud layer starts at 5 km); judge from the cove at dawn, noon and dusk.
