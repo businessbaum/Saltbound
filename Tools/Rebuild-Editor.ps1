@@ -15,7 +15,9 @@ if ($editor) {
 
 & $BuildBat SaltboundEditor Win64 Development "-Project=$ProjectFile" -WaitMutex -NoHotReloadFromIDE
 $code = $LASTEXITCODE
-if ($code -ne 0) { Write-Error "Build failed ($code)"; exit $code }
+# Session 9: other sessions share this editor. A failed build (often someone else's half-written code in the shared tree) must not
+# leave it down: relaunch it on the last good binaries, then report the failure.
+if ($code -ne 0) { Write-Output "Build failed ($code): relaunching the editor on the last good build." }
 
 if (-not $NoLaunch) {
     Start-Process -FilePath $EditorExe -ArgumentList @("`"$ProjectFile`"")
@@ -27,4 +29,5 @@ if (-not $NoLaunch) {
     Start-Sleep -Seconds 5
     Write-Output 'Editor ready.'
 }
+if ($code -ne 0) { Write-Error "Build failed ($code)"; exit $code }
 exit 0
