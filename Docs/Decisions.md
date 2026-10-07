@@ -2556,3 +2556,19 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Tests:** Prologue 10/10 (new: LetterInPocket, DryAtTheFire, KeeperKnowsTheName), Talk 7/7; seen in play: the wet page with its line and the hints below, the dried page.
 - **Next:** the islands' plan (the Spire finished, the Cartographer's camp, the weather mast) on paper for the owner, then the Gale and
   the whale.
+
+### D86 · Flowers in the meadow, and no bare squares in it (Adopted: waiting for the owner's look)
+- **Why:** D78 left the meadow without flowers and with bare sandy spots; the owner's screenshot of D78 showed tan squares in the lawn.
+- **The flowers** (`build_vegetation.py meadow`): `SM_Meadow_Daisy`, `_Buttercup`, `_Violet`, patches of 10-12 flowers on stems of 21-33 cm
+  (above the lawn's 9-19 cm), two small leaves at each foot; a daisy is a yellow middle in a ring of 12-15 white rays, a buttercup five
+  round cupped petals, a violet a small star. Their stems take the plants' fresh colours and the heads the dry ones (the middle DryDark,
+  the petals DryLight), so each kind is one instance on the grass master (`MI_IslMeadow_*`). 1 224 patches in drifts over the open
+  meadow (a grove noise; each kind keeps to its own drifts), culled from 35-50 m. Their own placer and seed.
+- **The bare squares** were gaps between the lawn's patches: a 0.72 m jittered grid of turned 1 m squares left 4.5 % of the meadow
+  uncovered, and the darker floor under the lawn showed through in square holes. The patches are now a quarter wider than tall (the
+  blades' height unchanged): `home_island.json`'s rows carry an eighth value, the scale upwards, read by `place_home_island.py`. Worn-earth
+  holes inside the meadow (ruts, bare tussocks, the litter's thinned edge, away from the footpath) get full patches (2 690); the thin edge
+  patches are used only at the grass's real edges and have a round, ragged footprint (the square ones read as tiles on the sand).
+- **Kept:** every earlier place (the JSON diffed before trusting it). Evidence: `Docs/Evidence/D86/D86_meadow.jpg`.
+- **Open:** performance with the wider patches and the flowers not measured on its own (the blade count is the same, the overdraw a little
+  higher).
