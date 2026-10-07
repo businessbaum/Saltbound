@@ -244,10 +244,11 @@ public:
 	float LanternSunElevation = 6.f;
 
 	/** The sun and the moon turn once they have moved this many degrees (each turn re-renders the cached shadows of the virtual
-	 *  shadow maps). D79: 0, they turn every frame (owner: "the sun seems to tick ... You can see this in the shadows"; D72's
-	 *  0.2 degrees was a step every 1.3 s). */
+	 *  shadow maps). D79: the owner saw D72's 0.2 degree steps (one every 1.3 s) tick in the shadows; every frame cost 1-3 ms of GPU
+	 *  (the shadows re-rendered each frame). 0.02 degrees: a step about every 0.13 s at the day's rate, a 10 m palm's shadow edge moving
+	 *  3.5 mm a step (not to be seen). */
 	UPROPERTY(EditAnywhere, Category = "Time", meta = (Units = "deg"))
-	float SunStepDegrees = 0.f;
+	float SunStepDegrees = 0.02f;
 
 	/** The moon: a second atmosphere light (index 1) the rig owns. It rises at MoonRiseHour in the east-south-east, crosses
 	 *  the south and sets at MoonSetHour in the west-south-west; it takes over as the sun sinks below -2 degrees. */

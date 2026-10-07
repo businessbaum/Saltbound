@@ -2469,6 +2469,14 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   1/1, swim 5/5, movement 10/10 (L_DevTest), inventory 43/44 (`SaveSignShows`, known), dig 7/7. The cost of turning the sun every
   frame (its cached virtual shadow pages re-rendered) is not measured on its own yet.
 
+- **Addendum (later in session 9), the sun's steps and the frame time:** turning the sun every frame cost 1-3 ms of GPU (in play,
+  meadow: 64.7 fps held, 53.2 fps with the clock running fast; the virtual shadow maps re-render on every turn). The sun and the moon now
+  turn in steps of 0.02 degrees (`SunStepDegrees`): a step about every 0.13 s at the day's rate, a 10 m palm's shadow edge moving
+  3.5 mm (not to be seen); the running clock then cost nothing measurable (79.7 fps against 72.3 held, within the runs' noise). Where
+  the meadow view's frame goes now (in play in the editor, 2038 x 1222 at 75 %, hiding one thing after another): the Gale's wall (D87)
+  about 1 ms, the lawn with its flowers about 1.7 ms, the fallen leaves 0.75 ms, the birds and the Keeper 0.4 ms (108.7 fps with all
+  of them hidden). D78 measured 93-100 fps for the island before the Gale and D86; a packaged benchmark with the editor closed is due.
+
 ### D80 · Hands that hold every tool, a real spyglass and a real spade, the left mouse button uses what is in hand (Adopted: waiting for the owner's look)
 - **Owner (2026-10-07):** "Hands and left click: Complete everything, as for now there are no hands"; "Create a real spyglass, only using
   on left click"; "Create a real shovel, create the digging animation when digging in. again when the shovel is in your hands you use left
