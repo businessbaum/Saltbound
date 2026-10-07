@@ -52,7 +52,8 @@ UP = Vector((0.0, 0.0, 1.0))
 MATS = {"MI_IslBark_Palm": (0.45, 0.36, 0.26), "MI_IslLeaf_Palm": (0.3, 0.55, 0.18), "MI_IslNut": (0.4, 0.4, 0.15),
         "MI_IslBark_Tree": (0.35, 0.27, 0.2), "MI_IslLeaf_Tree": (0.2, 0.45, 0.15), "MI_IslLeaf_Bush": (0.28, 0.52, 0.2),
         "MI_IslFlower": (0.85, 0.15, 0.2), "MI_IslGrass_Beach": (0.6, 0.62, 0.3), "MI_IslLeaf_Runner": (0.3, 0.5, 0.18),
-        "MI_IslGrass_Lawn": (0.3, 0.5, 0.15), "MI_IslLeaf_Litter": (0.45, 0.3, 0.15)}
+        "MI_IslGrass_Lawn": (0.3, 0.5, 0.15), "MI_IslLeaf_Litter": (0.45, 0.3, 0.15),
+        "MI_IslMeadow_Daisy": (0.95, 0.93, 0.85), "MI_IslMeadow_Buttercup": (0.95, 0.8, 0.15), "MI_IslMeadow_Violet": (0.5, 0.4, 0.8)}
 
 
 class Builder:
@@ -834,7 +835,7 @@ def runner(name, seed, length, flowers):
 
 
 def grass_patch(name, seed, groups, h_range, per_group=(1, 3), straw=0.06, seeds=0, size=1.0, slot="MI_IslGrass_Lawn",
-                width=(0.005, 0.008), flow=0.0):
+                width=(0.005, 0.008), flow=0.0, round_=False):
     """A square metre of meadow grass (D71's kit, D78's meadow), instanced densely over the island's grass.
 
     Owner (D71): "just create real visual grass small and a lot so it blends in. The grass design is important because you will
@@ -855,6 +856,13 @@ def grass_patch(name, seed, groups, h_range, per_group=(1, 3), straw=0.06, seeds
         for gj in range(k):
             gx = -half + (gi + rng.random()) * cell
             gy = -half + (gj + rng.random()) * cell
+            if round_:
+                # D86: a round, ragged footprint thinning out to its rim (a square of thin grass showed as a tile on the sand and
+                # as a darker square in the meadow).
+                rr = math.hypot(gx, gy) / half
+                ragged = 0.82 + 0.12 * math.sin(5.0 * math.atan2(gy, gx) + seed) + 0.06 * math.sin(11.0 * math.atan2(gy, gx))
+                if rng.random() > max(0.0, min(1.0, (ragged - rr) / 0.35)):
+                    continue
             roll = sum(math.sin(f * (gx * math.cos(a) + gy * math.sin(a)) * 2 * math.pi + p) for f, a, p in wave) / 3.0
             gh = (h_range[0] + (h_range[1] - h_range[0]) * (0.5 + 0.5 * roll)) * rng.uniform(0.85, 1.15)
             lean_dir = flow + rng.gauss(0.0, 0.75)
@@ -1062,6 +1070,73 @@ def fallen_palm(name, seed, length=11.0):
     return B.finish()
 
 
+def meadow_flowers(name, seed, count, kind, size=0.55):
+    """D86: a small patch of meadow flowers standing a little above the lawn (owner, D78: the meadow "has no flowers"; D60's painted
+    ones went with the calm floor). Each a thin curving stem with two small leaves at its foot and a head: "daisy" a yellow
+    middle in a ring of narrow white rays, "buttercup" five round cupped petals round a darker middle, "violet" five small
+    petals in a star. Vertex colours as the plants: the stem and leaves fresh (G 0, R root .. tip), the head dry (G 1): R 0 its
+    middle (DryDark), R 1 its petals (DryLight), so one material instance per kind gives its colours."""
+    slot = {"daisy": "MI_IslMeadow_Daisy", "buttercup": "MI_IslMeadow_Buttercup", "violet": "MI_IslMeadow_Violet"}[kind]
+    B = Builder(name, [slot], seed)
+    rng = B.rng
+    half = size * 0.5
+    for f in range(count):
+        cx, cy = rng.uniform(-half, half), rng.uniform(-half, half)
+        h = rng.uniform(0.24, 0.33) if kind == "daisy" else rng.uniform(0.21, 0.29)   # above the lawn's 9-19 cm
+        lean = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), 0.0)).normalized() * rng.uniform(0.02, 0.06)
+        base = Vector((cx, cy, -0.01))
+        stem = resample(bezier(base, base + UP * h * 0.4, base + UP * h * 0.8 + lean * 0.5, base + UP * h + lean, 8), 0.02)
+        rnd = rng.random()
+        tube(B, stem, lambda i, s_, a_: 0.003, 3, slot, lambda i, s_, a_, r=rnd: (0.25 + 0.45 * s_, 0.0, r, s_ * s_), cap_end=False,
+             u_tiles=1)
+        for j in range(2):
+            a = rng.uniform(0, 2 * math.pi)
+            d = Vector((math.cos(a), math.sin(a), 0.55)).normalized()
+            leaf(B, base + UP * 0.012, d.cross(UP).cross(d).normalized(), d, rng.uniform(0.04, 0.06), 0.014, slot, tone=(0.2, 0.55),
+                 dry=0.0, rnd=rnd, sway=(0.0, 0.3), droop=0.3, fold=0.2, rows=3)
+        tip = stem[-1]
+        # The head faces up and a little the way the stem leans.
+        n = (UP + lean * 4.0).normalized()
+        t1 = n.cross(Vector((0.31, 0.77, 0.12))).normalized()
+        t2 = n.cross(t1)
+        middle = B.bm.verts.new(tip + n * (0.006 if kind == "daisy" else 0.004))
+        if kind == "daisy":
+            r_in, r_out, rays = 0.012, rng.uniform(0.04, 0.047), rng.randint(12, 15)
+            ring = [B.bm.verts.new(tip + (t1 * math.cos(2 * math.pi * k / 10) + t2 * math.sin(2 * math.pi * k / 10)) * r_in + n * 0.003)
+                    for k in range(10)]
+            for k in range(10):
+                B.face([middle, ring[k], ring[(k + 1) % 10]], [(0.5, 0.5), (0.0, 1.0), (1.0, 1.0)],
+                       [(0.0, 1.0, rnd, 0.6)] * 3, slot)
+            for k in range(rays):
+                a = 2 * math.pi * (k + rng.uniform(-0.2, 0.2)) / rays
+                w = math.pi / rays * 0.55
+                droop = rng.uniform(0.0, 0.006)
+                p0 = tip + (t1 * math.cos(a - w) + t2 * math.sin(a - w)) * r_in + n * 0.002
+                p1 = tip + (t1 * math.cos(a + w) + t2 * math.sin(a + w)) * r_in + n * 0.002
+                p2 = tip + (t1 * math.cos(a + w * 0.6) + t2 * math.sin(a + w * 0.6)) * r_out - n * droop
+                p3 = tip + (t1 * math.cos(a - w * 0.6) + t2 * math.sin(a - w * 0.6)) * r_out - n * droop
+                vs = [B.bm.verts.new(p) for p in (p0, p1, p2, p3)]
+                B.face(vs, [(0, 0), (1, 0), (1, 1), (0, 1)], [(0.85, 1.0, rnd, 0.7), (0.85, 1.0, rnd, 0.7), (1.0, 1.0, rnd, 0.8),
+                                                             (1.0, 1.0, rnd, 0.8)], slot)
+        else:
+            petals = 5
+            r_out = rng.uniform(0.03, 0.035) if kind == "buttercup" else rng.uniform(0.026, 0.03)
+            cup = 0.008 if kind == "buttercup" else 0.003
+            for k in range(petals):
+                a0 = 2 * math.pi * k / petals + rng.uniform(-0.08, 0.08)
+                span = 2 * math.pi / petals * (1.05 if kind == "buttercup" else 0.8)
+                shape = ((0.0, 0.3, 0.0), (0.25, 0.85, 0.5), (0.5, 1.0, 1.0), (0.75, 0.85, 0.5), (1.0, 0.3, 0.0)) if kind == "buttercup" \
+                    else ((0.15, 0.35, 0.0), (0.4, 0.9, 0.6), (0.5, 1.0, 1.0), (0.6, 0.9, 0.6), (0.85, 0.35, 0.0))
+                rim = []
+                for f_, rr, lift in shape:
+                    a = a0 + span * (f_ - 0.5)
+                    rim.append(B.bm.verts.new(tip + (t1 * math.cos(a) + t2 * math.sin(a)) * r_out * rr + n * (cup * lift + 0.002)))
+                for j in range(4):
+                    B.face([middle, rim[j], rim[j + 1]], [(0.5, 0.0), (j / 4.0, 1.0), ((j + 1) / 4.0, 1.0)],
+                           [(0.0, 1.0, rnd, 0.6), (0.92, 1.0, rnd, 0.8), (0.92, 1.0, rnd, 0.8)], slot)
+    return B.finish()
+
+
 BUILDERS = {
     "palm_a": lambda: palm("SM_Palm_A", 9.0, 2.2, 13, 101, 3.4),
     "palm_b": lambda: palm("SM_Palm_B", 7.0, 3.6, 12, 102, 3.1),
@@ -1080,10 +1155,14 @@ BUILDERS = {
     "fallen": lambda: fallen_palm("SM_Home_FallenPalm", 701),
     "lawn": lambda: (grass_patch("SM_Grass_PatchA", 801, 1225, (0.09, 0.17)), sb.reset_scene(),
                      grass_patch("SM_Grass_PatchB", 802, 1156, (0.1, 0.19), straw=0.1, seeds=4), sb.reset_scene(),
-                     grass_patch("SM_Grass_PatchEdge", 803, 784, (0.07, 0.14), per_group=(1, 2), straw=0.12)),
+                     grass_patch("SM_Grass_PatchEdge", 803, 1150, (0.07, 0.14), per_group=(1, 2), straw=0.12, round_=True)),
     "litter": lambda: (litter_patch("SM_Litter_PatchA", 811, 150, 5, twigs=3), sb.reset_scene(),
                        litter_patch("SM_Litter_PatchB", 812, 80, 3, twigs=2), sb.reset_scene(),
                        litter_patch("SM_Litter_Sparse", 813, 16, 0, twigs=1)),
+    # D86: the meadow's flowers.
+    "meadow": lambda: (meadow_flowers("SM_Meadow_Daisy", 821, 11, "daisy", size=0.7), sb.reset_scene(),
+                       meadow_flowers("SM_Meadow_Buttercup", 822, 10, "buttercup", size=0.7), sb.reset_scene(),
+                       meadow_flowers("SM_Meadow_Violet", 823, 12, "violet", size=0.6)),
 }
 
 if __name__ == "__main__":

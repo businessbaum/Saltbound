@@ -395,10 +395,19 @@ def tex_set(name):
 
 
 def plants(only=None):
-    """The island's plant masters and instances; only: a list of instance names to (re)make (their masters are rebuilt)."""
-    leaf = build_plant_master("M_SB_IslFoliage", True, "LeafBroad") if not only or any("Lawn" not in n for n in only) else         unreal.load_asset(MASTER + "/M_SB_IslFoliage")
-    bark = build_plant_master("M_SB_IslBark", False, "BarkTree") if not only or any("Lawn" not in n for n in only) else         unreal.load_asset(MASTER + "/M_SB_IslBark")
-    grass = build_plant_master("M_SB_IslGrass", True, "LeafPalm", grass=True)
+    """The island's plant masters and instances; only: a list of instance names to (re)make (their masters as they are, the grass
+    master again when the lawn is among them)."""
+    if only:
+        leaf = unreal.load_asset(MASTER + "/M_SB_IslFoliage")
+        bark = unreal.load_asset(MASTER + "/M_SB_IslBark")
+        if any("Lawn" in n for n in only):
+            grass = build_plant_master("M_SB_IslGrass", True, "LeafPalm", grass=True)
+        else:
+            grass = unreal.load_asset(MASTER + "/M_SB_IslGrass")
+    else:
+        leaf = build_plant_master("M_SB_IslFoliage", True, "LeafBroad")
+        bark = build_plant_master("M_SB_IslBark", False, "BarkTree")
+        grass = build_plant_master("M_SB_IslGrass", True, "LeafPalm", grass=True)
     # A plant's bark and leaves share its bend (BendHeight / Amount / Speed), so the crown stays on its trunk (D60's values).
     palm_wind = {"BendHeight": 900.0, "BendAmount": 32.0, "BendSpeed": 0.55}
     tree_wind = {"BendHeight": 900.0, "BendAmount": 12.0, "BendSpeed": 0.45}
@@ -458,6 +467,15 @@ def plants(only=None):
                                                   "UpNormal": 0.8, "RoughScale": 2.5}, {
         "DarkColor": (0.022, 0.045, 0.011, 1), "LightColor": (0.085, 0.185, 0.04, 1), "DryDark": (0.09, 0.075, 0.03, 1),
         "DryLight": (0.32, 0.27, 0.12, 1), "SubsurfaceColor": (0.07, 0.12, 0.025, 1), "GroundMean": (0.0261, 0.0409, 0.0083, 1)})
+    # D86: the meadow's flowers (SM_Meadow_*) on the grass master: their stems in the lawn's greens and lit like it (UpNormal), each
+    # head's middle from DryDark, its petals from DryLight; little light through them, matte.
+    meadow = {"BendHeight": 30.0, "BendAmount": 2.0, "BendSpeed": 1.0, "FlutterAmount": 1.5, "FlutterSpeed": 3.0, "NormalAmount": 0.3,
+              "Roughness": 0.85, "Specular": 0.1, "PartVar": 0.08, "InstVar": 0.06, "HueShift": 0.03, "DetailAmount": 0.3,
+              "UpNormal": 0.5, "RoughScale": 1.5}
+    stems = {"DarkColor": (0.03, 0.06, 0.015, 1), "LightColor": (0.09, 0.19, 0.04, 1), "SubsurfaceColor": (0.05, 0.08, 0.02, 1)}
+    lib["MI_IslMeadow_Daisy"] = (grass, "LeafPalm", dict(meadow), dict(stems, DryDark=(0.85, 0.55, 0.06, 1), DryLight=(0.92, 0.9, 0.84, 1)))
+    lib["MI_IslMeadow_Buttercup"] = (grass, "LeafPalm", dict(meadow), dict(stems, DryDark=(0.6, 0.32, 0.03, 1), DryLight=(0.95, 0.72, 0.08, 1)))
+    lib["MI_IslMeadow_Violet"] = (grass, "LeafPalm", dict(meadow), dict(stems, DryDark=(0.9, 0.75, 0.2, 1), DryLight=(0.36, 0.24, 0.62, 1)))
     # D78 (owner: "real leaves for the braun part"): the fallen leaves (SM_Litter_*): dry browns to ochre, some yellowed or green,
     # no wind, little light through them.
     lib["MI_IslLeaf_Litter"] = (leaf, "LeafBroad", {"BendAmount": 0.0, "FlutterAmount": 0.0, "NormalAmount": 0.8, "Roughness": 0.72,
@@ -587,6 +605,8 @@ def main():
         plants()
     elif "lawn" in args:
         plants(["MI_IslGrass_Lawn"])
+    elif "meadow" in args:
+        plants(["MI_IslMeadow_Daisy", "MI_IslMeadow_Buttercup", "MI_IslMeadow_Violet"])
     if "smoke" in args or "plants" in args:
         smoke()
     if "pool" in args or "plants" in args:

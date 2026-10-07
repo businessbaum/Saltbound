@@ -27,6 +27,7 @@ OWNED = ("Home_Sand", "Home_Turf", "Home_Ground", "Island_Rock_", "Plants_", "Se
 
 # (cull start, cull end in cm (0 = never), casts shadows, collides) by the mesh's kind (D60; D71 adds the details).
 KINDS = {"Grass_Patch": (5000.0, 7000.0, False, False), "Litter_": (4000.0, 5500.0, False, False),
+         "Meadow_": (3500.0, 5000.0, False, False),
          "Palm": (0.0, 0.0, True, True), "Tree": (0.0, 0.0, True, True), "Bush": (25000.0, 30000.0, True, False),
          "BigLeaf": (25000.0, 30000.0, True, False), "Fern": (12000.0, 15000.0, True, False),
          "GrassTuft": (6000.0, 8000.0, False, False), "Runner": (5000.0, 7000.0, False, False),
@@ -43,8 +44,10 @@ def load(name):
 
 
 def transforms(rows):
-    return [unreal.Transform(unreal.Vector(x, y, z), unreal.Rotator(roll=roll, pitch=pitch, yaw=yaw), unreal.Vector(sc, sc, sc))
-            for x, y, z, yaw, pitch, roll, sc in rows]
+    # D86: an eighth value is a scale of its own upwards (the lawn's patches are wider than tall).
+    return [unreal.Transform(unreal.Vector(r[0], r[1], r[2]), unreal.Rotator(roll=r[5], pitch=r[4], yaw=r[3]),
+                             unreal.Vector(r[6], r[6], r[7] if len(r) > 7 else r[6]))
+            for r in rows]
 
 
 def clear(eas):
@@ -102,7 +105,7 @@ def place(eas=None):
             mesh_path = (PROPS if name.startswith("SM_Home_") else VEG) + name
             s = scatter(eas, ("Plants_" if group == "plants" else "Detail_") + name[3:], mesh_path, rows, kind)
             # D78: the lawn's blades sway only within 25 m, the fallen leaves never (cheaper for Nanite's rasteriser).
-            wpo_off = {"Grass_Patch": 2500, "Litter_": 1}.get(kind)
+            wpo_off = {"Grass_Patch": 2500, "Litter_": 1, "Meadow_": 2500}.get(kind)
             if wpo_off:
                 s.get_component_by_class(unreal.HierarchicalInstancedStaticMeshComponent).set_editor_property(
                     "world_position_offset_disable_distance", wpo_off)

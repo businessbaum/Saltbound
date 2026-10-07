@@ -474,13 +474,73 @@ def details(out):
             ok &= ~((hl > l0 - 0.5) & (hl < l1 + 0.5) & (hr > r0 - 0.5) & (hr < r1_ + 0.5))
     lawn = {"SM_Grass_PatchA": [], "SM_Grass_PatchB": [], "SM_Grass_PatchEdge": []}
     pick = PL.rng.uniform(0, 1, xs.shape)
+    # D86: the thin edge patches only at the grass's real edges; inside the meadow (grass all round) the full ones (the thin ones
+    # showed the darker floor as squares there). The places are kept: only the mesh changes.
+    inner = np.mean([surface(xs + 2.5 * np.cos(a), ys + 2.5 * np.sin(a), trunks)["g"]
+                     for a in np.linspace(0.0, 2.0 * np.pi, 8, endpoint=False)], axis=0) > 0.62
     for k in np.nonzero(ok)[0]:
-        mesh = "SM_Grass_PatchEdge" if g[k] < 0.7 else ("SM_Grass_PatchA" if pick[k] < 0.6 else "SM_Grass_PatchB")
+        thin = g[k] < 0.7 and not inner[k]
+        mesh = "SM_Grass_PatchEdge" if thin else ("SM_Grass_PatchA" if pick[k] < 0.6 else "SM_Grass_PatchB")
         # Combed with the wind (towards about 20 degrees, from the game's 200), the direction wandering slowly over the island.
         yaw = 20.0 + 40.0 * S.vnoise(xs[k], ys[k], 9.0, 74) + PL.rng.normal(0.0, 22.0)
+        # D86: a quarter wider than tall (the 0.72 m jittered grid of turned squares left 4.5 % of the meadow uncovered: square holes
+        # where the darker floor showed); the blades' height as before. Rows: ..., scale across, sink, scale up.
+        sc = float(PL.rng.uniform(0.85, 1.15))
         lawn[mesh].append([round(float(xs[k]) * 100, 1), round(float(ys[k]) * 100, 1), 0.0, round(float(yaw), 1), 0.0, 0.0,
-                           round(float(PL.rng.uniform(0.85, 1.15)), 3), 0.0])
+                           round(sc * LAWN_WIDEN, 3), 0.0, round(sc, 3)])
     det.update(lawn)
+    # D86: the bare spots in the meadow's middle (the sand fingers far from its edges read as mange) get the thin patches too; the
+    # grass's own edges and the beaches keep D78's fringe. Its own placer and seed (every earlier place is kept).
+    PB = Placer(75)
+    xs, ys = PB.candidates(0.72)
+    G = surface(xs, ys, trunks)
+    F = G["F"]
+    g = G["g"]
+    around = np.mean([surface(xs + 2.5 * np.cos(a), ys + 2.5 * np.sin(a), trunks)["g"]
+                      for a in np.linspace(0.0, 2.0 * np.pi, 8, endpoint=False)], axis=0)
+    # (Seen in play: the holes the main pass leaves over worn earth (ruts, bare tussocks) and the thinned litter's edge show the
+    # darkened floor as square brown holes; they are filled too, away from the footpath.)
+    holes = (g <= 0.28) | (G["earth"] >= 0.35) | ((G["lit"] > 0.3) & (G["lit"] < 0.55))
+    ok = holes & (around > 0.62) & (F["path"] > S.PATH_HALF + 0.45) & (G["lit"] < 0.55)
+    for name, p in S.PLACES.items():
+        if "clear" in p:
+            hl, hr = S.place_local(xs, ys, name)
+            l0, l1, r0, r1_ = p["clear"]
+            ok &= ~((hl > l0 - 0.5) & (hl < l1 + 0.5) & (hr > r0 - 0.5) & (hr < r1_ + 0.5))
+    fill = 0
+    for k in np.nonzero(ok)[0]:
+        yaw = 20.0 + 40.0 * S.vnoise(xs[k], ys[k], 9.0, 74) + PB.rng.normal(0.0, 22.0)
+        sc = float(PB.rng.uniform(0.85, 1.15))
+        det["SM_Grass_PatchA"].append([round(float(xs[k]) * 100, 1), round(float(ys[k]) * 100, 1), 0.0, round(float(yaw), 1), 0.0,
+                                       0.0, round(sc * LAWN_WIDEN, 3), 0.0, round(sc, 3)])
+        fill += 1
+    # D86 (the meadow "has no flowers", D78's open point): small patches of daisies, buttercups and violets in the open meadow,
+    # in groups with open stretches between (a grove noise), each kind keeping to its own drifts.
+    PM = Placer(76)
+    xs, ys = PM.candidates(1.3)
+    G = surface(xs, ys, trunks)
+    F = G["F"]
+    g = G["g"]
+    group = S.vnoise(xs, ys, 7.0, 86)
+    kind = S.vnoise(xs, ys, 13.0, 87)
+    ok = (g > 0.75) & (F["path"] > S.PATH_HALF + 0.8) & (G["earth"] < 0.2) & (G["lit"] < 0.15)
+    ok &= PM.rng.uniform(0, 1, xs.shape) < 0.6 * np.clip((group - 0.2) / 0.35, 0.0, 1.0)
+    for name, p in S.PLACES.items():
+        if "clear" in p:
+            hl, hr = S.place_local(xs, ys, name)
+            l0, l1, r0, r1_ = p["clear"]
+            ok &= ~((hl > l0 - 1.0) & (hl < l1 + 1.0) & (hr > r0 - 1.0) & (hr < r1_ + 1.0))
+    flowers = {"SM_Meadow_Daisy": [], "SM_Meadow_Buttercup": [], "SM_Meadow_Violet": []}
+    for k in np.nonzero(ok)[0]:
+        x, y = float(xs[k]), float(ys[k])
+        if not PM.free(x, y, 0.45):
+            continue
+        PM.add(x, y, 0.45)
+        mesh = "SM_Meadow_Daisy" if kind[k] > -0.1 else ("SM_Meadow_Buttercup" if kind[k] > -0.55 else "SM_Meadow_Violet")
+        flowers[mesh].append([round(x * 100, 1), round(y * 100, 1), 0.0, round(float(PM.rng.uniform(0, 360)), 1), 0.0, 0.0,
+                              round(float(PM.rng.uniform(0.85, 1.2)), 3), 0.0])
+    det.update(flowers)
+    print("SB_HOME meadow: fill", fill, "flowers", {k: len(v) for k, v in flowers.items()})
     # D78 (owner: "real leaves for the braun part"): patches of fallen leaves over the litter (thick under the crowns, thinning
     # out at their edges, where they lie on the grass), a few on the footpath where it passes under trees. Its own placer.
     PF = Placer(73)
@@ -521,7 +581,7 @@ def lay_details(out, trunks):
         sy = -gx * np.sin(yaw) + gy * np.cos(yaw)
         pitch, roll = np.degrees(np.arctan(sx)), -np.degrees(np.arctan(sy))
         out["details"][mesh] = [[r[0], r[1], round(float(zz - r[7]) * 100.0, 1), r[3], round(float(p), 1), round(float(q), 1), r[6]]
-                                for r, zz, p, q in zip(rows, z, pitch, roll)]
+                                + r[8:9] for r, zz, p, q in zip(rows, z, pitch, roll)]
 
 
 def rez_plants(out):
@@ -570,6 +630,9 @@ def block_mask_cell(z, threshold, k):
 
 
 # --- where things stand -----------------------------------------------------------------------------------------
+LAWN_WIDEN = 1.25   # D86: the lawn's patches wider than tall (see details())
+
+
 class Placer:
     """Jittered candidates, kept by a density and a spacing to everything already placed (a spatial hash)."""
 

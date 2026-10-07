@@ -559,6 +559,30 @@
     "collision": "none",
     "nanite_shape": "preserve_area"
   },
+  "SM_Meadow_Daisy": {
+    "fbx": "Vegetation/SM_Meadow_Daisy.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area",
+    "_note": "D86 build_vegetation.py meadow: a small patch of daisies in the meadow (home_island.json details)."
+  },
+  "SM_Meadow_Buttercup": {
+    "fbx": "Vegetation/SM_Meadow_Buttercup.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area",
+    "_note": "D86 build_vegetation.py meadow: a small patch of buttercups in the meadow (home_island.json details)."
+  },
+  "SM_Meadow_Violet": {
+    "fbx": "Vegetation/SM_Meadow_Violet.fbx",
+    "dest": "/Game/Saltbound/Environment/Vegetation",
+    "nanite": true,
+    "collision": "none",
+    "nanite_shape": "preserve_area",
+    "_note": "D86 build_vegetation.py meadow: a small patch of violets in the meadow (home_island.json details)."
+  },
   "SM_Litter_PatchA": {
     "fbx": "Vegetation/SM_Litter_PatchA.fbx",
     "dest": "/Game/Saltbound/Environment/Vegetation",
