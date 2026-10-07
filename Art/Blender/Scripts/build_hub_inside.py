@@ -244,22 +244,26 @@ def rail(p, axis, line, a0, a1, z, height=B.RAIL_H):
         HE.balustrade(p, (a0, line), (a1, line), z, height=height, posts=1.6, mat="MI_Wood_Varnish", baluster="MI_Wood_TeakLight")
 
 
-def lantern(p, c, chain_to=None, r=0.2, s=1.0, lit=True):
+def lantern(p, c, chain_to=None, r=0.2, s=1.0, lit=True, shadow=None):
     """A hanging lantern: brass cage, glass, a ring on top, its chain or hook up to `chain_to`. c: its bottom; s: its height's
-    scale (0.7 under the 3 m decks' beams, D64); its ring's top at c + LANTERN_H(s). lit: it gets a light (hub_lamps.json)."""
+    scale (0.7 under the 3 m decks' beams, D64); its ring's top at c + LANTERN_H(s). lit: it gets a light (hub_lamps.json).
+    shadow: whether its parts cast shadows (D82: not when a light hangs inside it; by default only unlit lanterns do)."""
     def h(v):
         return v * s
+    brass, glass, iron = ("MI_Metal_Brass", "MI_LanternGlass", "MI_Metal_Iron")
     if lit:
         lamp(Vector(c) + UP * h(0.33))
-    p.lathe([(0.0, 0.0), (r * 0.8, 0.0), (r, h(0.08)), (r * 0.95, h(0.12)), (0.0, h(0.12))], c, UP, "MI_Metal_Brass", sides=8)
-    p.lathe([(r * 0.82, h(0.12)), (r * 0.88, h(0.4)), (r * 0.82, h(0.55)), (0.0, h(0.55))], c, UP, "MI_LanternGlass", sides=8, caps=False)
+    if not (shadow if shadow is not None else not lit):
+        brass, glass, iron = T.no_shadow(brass), T.no_shadow(glass), T.no_shadow(iron)
+    p.lathe([(0.0, 0.0), (r * 0.8, 0.0), (r, h(0.08)), (r * 0.95, h(0.12)), (0.0, h(0.12))], c, UP, brass, sides=8)
+    p.lathe([(r * 0.82, h(0.12)), (r * 0.88, h(0.4)), (r * 0.82, h(0.55)), (0.0, h(0.55))], c, UP, glass, sides=8, caps=False)
     for k in range(4):
         a = 2 * math.pi * k / 4 + 0.4
         d = Vector((math.cos(a), math.sin(a), 0.0))
-        p.beam(T.straight(c + d * r * 0.9 + UP * h(0.1), c + d * r * 0.9 + UP * h(0.58), d.cross(UP), d), h(0.48), 0.03, 0.03, "MI_Metal_Brass", nseed(),
+        p.beam(T.straight(c + d * r * 0.9 + UP * h(0.1), c + d * r * 0.9 + UP * h(0.58), d.cross(UP), d), h(0.48), 0.03, 0.03, brass, nseed(),
                seg=1.0)
-    p.lathe([(r, h(0.55)), (r * 1.05, h(0.6)), (r * 0.6, h(0.75)), (r * 0.2, h(0.82)), (0.0, h(0.84))], c, UP, "MI_Metal_Brass", sides=8)
-    p.beam(T.arc(c + UP * (h(0.84) + 0.06), X, UP, 0.06, 0.0, 2 * math.pi), 0.4, 0.02, 0.02, "MI_Metal_Iron", nseed(), seg=0.1)
+    p.lathe([(r, h(0.55)), (r * 1.05, h(0.6)), (r * 0.6, h(0.75)), (r * 0.2, h(0.82)), (0.0, h(0.84))], c, UP, brass, sides=8)
+    p.beam(T.arc(c + UP * (h(0.84) + 0.06), X, UP, 0.06, 0.0, 2 * math.pi), 0.4, 0.02, 0.02, iron, nseed(), seg=0.1)
     if chain_to is not None:
         a, b = c + UP * LANTERN_H(s), Vector(chain_to)
         L = (b - a).length
@@ -268,7 +272,7 @@ def lantern(p, c, chain_to=None, r=0.2, s=1.0, lit=True):
             q = a + (b - a) * (k * 0.12 / L)
             ax = X if k % 2 else Y
             p.beam(T.arc(q + (b - a).normalized() * 0.06, ax, (b - a).normalized(), 0.05, 0.0, 2 * math.pi), 0.33, 0.016, 0.016,
-                   "MI_Metal_Iron", nseed(), seg=0.08)
+                   iron, nseed(), seg=0.08)
             k += 1
 
 
@@ -1039,20 +1043,23 @@ def build_well():
     zr = Z["middle"] + 1.6
     c = Vector((84.0, 0.0, zr))
     hoop = 1.3
-    p.beam(T.arc(c, X, UP, hoop, 0.0, 2 * math.pi), 2 * math.pi * hoop, 0.08, 0.06, "MI_Metal_Iron", nseed(), seg=0.2)
+    # D82: its one light hangs inside the hoop, so the hoop, its six lanterns and their chains cast no shadow from it (six dark
+    # wedges ran across the shaft's walls).
+    iron = T.no_shadow("MI_Metal_Iron")
+    p.beam(T.arc(c, X, UP, hoop, 0.0, 2 * math.pi), 2 * math.pi * hoop, 0.08, 0.06, iron, nseed(), seg=0.2)
     for k in range(6):
         a = 2 * math.pi * k / 6
         d = Vector((math.cos(a), math.sin(a), 0.0))
-        lantern(p, c + d * hoop - UP * (0.05 + LANTERN_H(0.8)), chain_to=c + d * hoop, r=0.18, s=0.8, lit=False)
+        lantern(p, c + d * hoop - UP * (0.05 + LANTERN_H(0.8)), chain_to=c + d * hoop, r=0.18, s=0.8, lit=False, shadow=False)
         if k % 2 == 0:
-            lantern_chain(p, c + d * hoop, c + UP * 2.2)
+            lantern_chain(p, c + d * hoop, c + UP * 2.2, iron)
     lamp(c - UP * 0.4)
     top = Z["main"] + 7.5 - 1.0                                                  # under the brake drum at the apex (gantry note)
-    lantern_chain(p, c + UP * 2.2, Vector((84.0, 0.0, top)))
+    lantern_chain(p, c + UP * 2.2, Vector((84.0, 0.0, top)), iron)
     export(p)
 
 
-def lantern_chain(p, a, b):
+def lantern_chain(p, a, b, mat="MI_Metal_Iron"):
     """An iron chain from a to b."""
     a, b = Vector(a), Vector(b)
     L = (b - a).length
@@ -1060,7 +1067,7 @@ def lantern_chain(p, a, b):
     k = 0
     while k * 0.12 < L:
         q = a + (b - a) * (k * 0.12 / L)
-        p.beam(T.arc(q + d * 0.06, X if k % 2 else Y, d, 0.05, 0.0, 2 * math.pi), 0.33, 0.016, 0.016, "MI_Metal_Iron", nseed(), seg=0.08)
+        p.beam(T.arc(q + d * 0.06, X if k % 2 else Y, d, 0.05, 0.0, 2 * math.pi), 0.33, 0.016, 0.016, mat, nseed(), seg=0.08)
         k += 1
 
 

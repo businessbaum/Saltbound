@@ -19,7 +19,8 @@ choices are at the end.
 | **The Hollowkeel** (D61-D70) | The town-ship at her berth 420 m east of the cove: her side doors open as you come, the passage in is a cinematic, you moor in her harbour and walk her decks (the Slip, the Tally House, the Chandlery, the command hall); her zones are barred. She stays hidden until the first island is found. Nobody lives aboard yet. |
 | **Things** | The satchel and the boat's stores, pickups (driftwood, rope, glass floats, shells, the shard; now sailcloth, nails, tar, the pale float), the tool wheel (compass, spyglass, lantern, **shovel**). |
 | **New this session** | **Digging** (D73): the Keeper's shovel, seven dig spots, small finds anywhere on sand. **The ship repair system** (D74): holes from hard knocks, water aboard, patching, bailing, a torn sail mended with sailcloth. |
-| **Not yet** | People and their lines, the log, any story or goal, jobs and salt to earn, upgrades, sleeping, danger events (squalls, the night), sound and music. |
+| **People** (D81) | The Harbour Keeper speaks: his lines on a torn sheet, the player's answers, what he says following the story. |
+| **Not yet** | Other people, the log, any story or goal, jobs and salt to earn, upgrades, sleeping, danger events (squalls, the night), sound and music. |
 
 **In one sentence:** you can sail, swim, dig and repair in a beautiful sea, but nothing asks you to.
 
@@ -88,7 +89,7 @@ Each step is playable on its own and ends with tests; the owner can play after a
 | Step | What | Done when |
 |---|---|---|
 | **FH1 The prologue's start and story state** (done, D77) | Story flags in the save (the beats reached); a new voyage starts on the wreck beach at 5:30 with the sail ripped, no shovel and pickups by the wreck; the log's notes are written from these flags. | A new voyage plays from the beach to a mended sail; the flags survive save and load |
-| **FH2 People v1** | A figure behind a counter (simple, stylised), its lines on the parchment scrap (idea A), choices, a murmur; passing calls (idea B). The Harbour Keeper first. | The Keeper talks, gives the shovel, points to the boat |
+| **FH2 People v1** (lines done, D81; his figure: D82) | A figure behind a counter (simple, stylised), its lines on the parchment scrap (idea A), choices, a murmur; passing calls (idea B). The Harbour Keeper first. | The Keeper talks, gives the shovel, points to the boat |
 | **FH3 The log v1** | The sea chest opens the log: the Cartographer's pages, your notes, the tabs (D75's design). Page one with the palm sketch. | E at the chest shows page one; notes appear as beats happen; key L |
 | **FH4 The Spire at night** | The ring of light from dusk to dawn, the reef's gap and a landing, the climb, the top with the panel and the rubbing, and the Hollowkeel's reveal seen from it. | From the cove at dusk the ring shows; the climb works with collision; the rubbing writes the log; the town's lights appear |
 | **FH5 The light under the water** | The first sea event on the night sail home: a light passing under the boat, there and gone. | It happens once on the first night's way home, never in daylight |

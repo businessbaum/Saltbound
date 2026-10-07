@@ -31,7 +31,7 @@ COLOURS = {
 
 
 def material(name):
-    return sb.get_material(name, (*COLOURS.get(name, (0.5, 0.5, 0.5)), 1.0))
+    return sb.get_material(name, (*COLOURS.get(T.base_material(name), (0.5, 0.5, 0.5)), 1.0))
 
 
 SEED = [9100]

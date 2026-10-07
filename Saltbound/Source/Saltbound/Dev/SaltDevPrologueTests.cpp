@@ -17,6 +17,7 @@
 #include "World/SaltLightingRig.h"
 #include "World/SaltPickup.h"
 #include "World/SaltPrologue.h"
+#include "World/SaltTalk.h"
 
 #if !UE_BUILD_SHIPPING
 namespace
@@ -101,8 +102,21 @@ namespace
 			&& Player->IsToolOwned(TEXT("Spyglass")) && Saves->HasBeat(SaltStory::Chest), FString::Printf(TEXT("chest=%d compass=%d spyglass=%d beat=%d"),
 			Chest ? 1 : 0, Player->IsToolOwned(TEXT("Compass")) ? 1 : 0, Player->IsToolOwned(TEXT("Spyglass")) ? 1 : 0, Saves->HasBeat(SaltStory::Chest) ? 1 : 0));
 
-		// The Harbour Keeper: his shovel and a lantern.
+		// The Harbour Keeper: his shovel and a lantern, the gift of his first talk (FH2, D81: answered plainly until he is done).
+		USaltTalkSubsystem* Talk = World->GetSubsystem<USaltTalkSubsystem>();
+		if (Talk)
+		{
+			Talk->SetInstant(true);
+		}
 		Digs->HandleKeeper(nullptr, Player);
+		for (int32 Say = 0; Talk && Talk->IsTalking() && Say < 8; ++Say)
+		{
+			Talk->Answer();
+		}
+		if (Talk)
+		{
+			Talk->SetInstant(false);
+		}
 		Report(TEXT("KeeperShovelLantern"), Player->IsToolOwned(SaltDig::ShovelTool) && Player->IsToolOwned(TEXT("Lantern")) && Saves->HasBeat(SaltStory::Keeper),
 			FString::Printf(TEXT("shovel=%d lantern=%d beat=%d"), Player->IsToolOwned(SaltDig::ShovelTool) ? 1 : 0, Player->IsToolOwned(TEXT("Lantern")) ? 1 : 0,
 			Saves->HasBeat(SaltStory::Keeper) ? 1 : 0));

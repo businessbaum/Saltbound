@@ -545,11 +545,13 @@ LAMPS = []
 def gallery_lamp(p, glass, hook):
     """A lantern hanging from an iron bracket (hook above it): brass cage, warm glass; its light comes from hub_lamps.json."""
     q = Vector(glass)
-    p.beam(T.straight(Vector(hook), Vector(hook) + (q - Vector(hook)).normalized() * 0.1, X, Y), 0.1, 0.05, 0.05, "MI_Metal_Iron", nseed())
-    p.lathe([(0.0, -0.3), (0.12, -0.3), (0.17, -0.22), (0.17, 0.2), (0.12, 0.26), (0.03, 0.34), (0.0, 0.36)], q, UP, "MI_Metal_Brass", sides=6, wear=0.8)
-    p.lathe([(0.15, -0.2), (0.155, 0.18)], q, UP, "MI_LanternGlass", sides=6, caps=False)
+    # D82: its light is inside it, so its parts cast no shadow.
+    iron, brass = T.no_shadow("MI_Metal_Iron"), T.no_shadow("MI_Metal_Brass")
+    p.beam(T.straight(Vector(hook), Vector(hook) + (q - Vector(hook)).normalized() * 0.1, X, Y), 0.1, 0.05, 0.05, iron, nseed())
+    p.lathe([(0.0, -0.3), (0.12, -0.3), (0.17, -0.22), (0.17, 0.2), (0.12, 0.26), (0.03, 0.34), (0.0, 0.36)], q, UP, brass, sides=6, wear=0.8)
+    p.lathe([(0.15, -0.2), (0.155, 0.18)], q, UP, T.no_shadow("MI_LanternGlass"), sides=6, caps=False)
     rope_pts = [Vector(hook), q + UP * 0.36]
-    p.round(T.straight(rope_pts[0], rope_pts[1], X, Y), (rope_pts[1] - rope_pts[0]).length, 0.02, "MI_Metal_Iron", nseed(), sides=5, wear=0.0)
+    p.round(T.straight(rope_pts[0], rope_pts[1], X, Y), (rope_pts[1] - rope_pts[0]).length, 0.02, iron, nseed(), sides=5, wear=0.0)
     LAMPS.append([round(q.x, 3), round(q.y, 3), round(q.z, 3)])
 
 
@@ -1165,10 +1167,12 @@ def grand_stair(p, g):
         p.lathe([(0.2, 0.0), (0.2, 0.12), (0.15, 0.2), (0.17, 0.5), (0.13, 0.95), (0.16, 1.05), (0.22, 1.12), (0.22, 1.2), (0.0, 1.22)], c, UP,
                 "MI_Wood_Varnish", sides=10, wear=1.0)
         q = c + UP * 1.22
-        p.lathe([(0.0, 0.0), (0.12, 0.0), (0.18, 0.06), (0.18, 0.12), (0.0, 0.14)], q, UP, "MI_Metal_Brass", sides=8)
+        # D82: the lantern and its cup cast no shadow from its own light (the cup darkened a disc round the newel's foot).
+        brass = T.no_shadow("MI_Metal_Brass")
+        p.lathe([(0.0, 0.0), (0.12, 0.0), (0.18, 0.06), (0.18, 0.12), (0.0, 0.14)], q, UP, brass, sides=8)
         lamp_c = q + UP * 0.5
-        p.lathe([(0.04, -0.36), (0.13, -0.3), (0.16, -0.24), (0.16, 0.2), (0.11, 0.26), (0.04, 0.36), (0.0, 0.4)], lamp_c, UP, "MI_Metal_Brass", sides=6, wear=0.8)
-        p.lathe([(0.14, -0.22), (0.145, 0.18)], lamp_c, UP, "MI_LanternGlass", sides=6, caps=False)
+        p.lathe([(0.04, -0.36), (0.13, -0.3), (0.16, -0.24), (0.16, 0.2), (0.11, 0.26), (0.04, 0.36), (0.0, 0.4)], lamp_c, UP, brass, sides=6, wear=0.8)
+        p.lathe([(0.14, -0.22), (0.145, 0.18)], lamp_c, UP, T.no_shadow("MI_LanternGlass"), sides=6, caps=False)
         LAMPS.append([round(lamp_c.x, 3), round(lamp_c.y, 3), round(lamp_c.z, 3)])
 
 

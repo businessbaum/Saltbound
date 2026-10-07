@@ -15,6 +15,7 @@ Per entry:
   type      "skeletal" for a skinned mesh with its skeleton (D76: the gull); no physics asset, no animations
 Material slots are matched by name to existing material instances anywhere under /Game/Saltbound.
 Unreal never creates materials from the FBX; missing ones fall back to MI_Placeholder.
+A slot named <material>__noshadow (hub_timber.NO_SHADOW, D82) gets <material> and its section casts no shadow.
 """
 import json
 import os
@@ -27,6 +28,7 @@ MANIFEST = os.path.join(REPO_ROOT, "Art", "asset_manifest.json")
 EXPORT_ROOT = os.path.join(REPO_ROOT, "Art", "Export")
 MATERIAL_ROOT = "/Game/Saltbound"
 PLACEHOLDER = "/Game/Saltbound/Materials/Instances/MI_Placeholder"
+NO_SHADOW = "__noshadow"
 
 
 def make_pipeline(entry):
@@ -99,6 +101,10 @@ def import_skeletal(name, entry, fbx):
             m.set_editor_property("material_interface", mi)
     sk.set_editor_property("materials", mats)
     unreal.EditorAssetLibrary.save_asset(asset_path, only_if_is_dirty=False)
+    # D80: the skeleton is an asset of its own; unsaved, the mesh loads without it after a restart ("missing skeleton", a crash).
+    skel = sk.get_editor_property("skeleton")
+    if skel:
+        unreal.EditorAssetLibrary.save_asset(skel.get_path_name().split(".")[0], only_if_is_dirty=False)
     b = sk.get_bounds()
     slots = [str(m.get_editor_property("material_slot_name")) + "->" +
              (m.get_editor_property("material_interface").get_name() if m.get_editor_property("material_interface") else "None") for m in mats]
@@ -140,10 +146,14 @@ def import_entry(name, entry):
         unreal.log_error("SB_IMPORT %s did not produce a static mesh at %s" % (name, asset_path))
         return False
 
-    # Materials by slot name
+    # Materials by slot name; a slot named with NO_SHADOW gets the material without it and casts no shadow (below).
     mats = sm.get_editor_property("static_materials")
+    no_shadow = set()
     for i, slot in enumerate(mats):
         slot_name = str(slot.get_editor_property("material_slot_name"))
+        if slot_name.endswith(NO_SHADOW):
+            slot_name = slot_name[:-len(NO_SHADOW)]
+            no_shadow.add(i)
         mi = find_material(slot_name)
         if mi:
             sm.set_material(i, mi)
@@ -162,6 +172,17 @@ def import_entry(name, entry):
             nanite.set_editor_property("shape_preservation", want)
             sm.set_editor_property("nanite_settings", nanite)
             unreal.log("SB_IMPORT %s: Nanite shape preservation %s" % (name, shape))
+    # D82: the sections of NO_SHADOW slots cast no shadow (a lantern's own parts round its light); the others do, so a reimport
+    # never keeps an old choice. Each change rebuilds the mesh: only the sections that differ are set.
+    mesh_sub = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+    shadowless = 0
+    for section in range(sm.get_num_sections(0)):
+        off = mesh_sub.get_lod_material_slot(sm, 0, section) in no_shadow
+        if mesh_sub.is_section_cast_shadow_enabled(sm, 0, section) == off:
+            mesh_sub.enable_section_cast_shadow(sm, not off, 0, section)
+        shadowless += 1 if off else 0
+    if shadowless:
+        unreal.log("SB_IMPORT %s: %d sections cast no shadow" % (name, shadowless))
     # Collision complexity
     body = sm.get_editor_property("body_setup")
     if body:

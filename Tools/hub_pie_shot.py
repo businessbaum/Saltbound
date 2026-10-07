@@ -2,28 +2,21 @@
 ship's frame, each frame written by the renderer (sb.Dev.DumpFrames), so the doors, the exposure, the fog and the ropes are as
 in the game.
 
-  python Tools/hub_pie_shot.py <out.png> [--preset Day|Evening|Dusk] [--wait 3] x y z pitch yaw [x y z pitch yaw ...]
+  python Tools/hub_pie_shot.py <out.png> [--preset Day|Evening|Dusk] [--max 6] x y z pitch yaw [x y z pitch yaw ...]
   ship metres (x from the stern face, +y starboard, z up from the waterline); yaw in the ship's frame (0 = to the bow).
   Several poses write <out>_<k>.png and a two-column sheet <out>.
 """
 import argparse
-import glob
 import math
 import os
-import shutil
 import sys
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Art", "Blender", "Scripts"))
 sys.path.insert(0, os.path.dirname(__file__))
 import hub_layout as H  # noqa: E402
+import pie_wait as W  # noqa: E402
 import run_pie_test as R  # noqa: E402
 
-SHOTS = os.path.join(os.path.dirname(__file__), "..", "Saltbound", "Saved", "Screenshots")
-
-
-def frames():
-    return set(glob.glob(os.path.join(SHOTS, "**", "MovieFrame*.png"), recursive=True))
 
 
 def main():
@@ -31,7 +24,7 @@ def main():
     ap.add_argument("out")
     ap.add_argument("vals", nargs="+", type=float)
     ap.add_argument("--preset", default="Day")
-    ap.add_argument("--wait", type=float, default=3.5)
+    ap.add_argument("--max", type=float, default=6.0)
     ap.add_argument("--keep-pie", action="store_true")
     ns = ap.parse_args()
     poses = [ns.vals[k:k + 5] for k in range(0, len(ns.vals), 5)]
@@ -39,28 +32,14 @@ def main():
     R.start_pie()
     paths = []
     try:
-        time.sleep(2.0)
         R.pie_console("sb.Lighting " + ns.preset)
         R.pie_console("sb.Hub.Doors snapclosed")
         for k, (x, y, z, pitch, yaw) in enumerate(poses):
             wx, wy, wz = H.ship_to_world(x, y, z)
             R.pie_console("sb.Dev.Camera %.1f %.1f %.1f %.1f %.1f 80" % (wx, wy, wz, pitch, byaw + yaw))
-            time.sleep(ns.wait)
-            before = frames()
-            R.pie_console("sb.Dev.DumpFrames 1")
-            new = set()
-            t0 = time.time()
-            while not new and time.time() - t0 < 20.0:
-                time.sleep(0.5)
-                new = frames() - before
             path = ns.out if len(poses) == 1 else ns.out.replace(".png", "_%d.png" % k)
-            if new:
-                time.sleep(0.5)
-                shutil.move(sorted(new)[-1], path)
+            if W.settled_shot(path, max_s=ns.max):          # shoots until exposure, Lumen and streaming have settled
                 paths.append(path)
-                print("SB_SHOT", path)
-            else:
-                print("SB_SHOT_FAIL", k)
     finally:
         if not ns.keep_pie:
             R.stop_pie()

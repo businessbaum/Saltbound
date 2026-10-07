@@ -55,8 +55,12 @@ HALL_ZONE = (7500.0, 9000.0, 0.07)
 # D69 (owner: "the light from the lanterns are not good. Create strong and warm lightsources"): 60 cd at 2100 K made thin, pale
 # pools that the daylight in the doorways and the Well washed out. Now 240 cd at 1900 K (an oil flame), a little flicker
 # (ASaltHubRopes), and soft shadows from a 4 cm flame.
+# D82 (owner: "the light is often too red and the shadows look ugly"): 2800 K, warm but no longer red (1900 K turned the golden
+# wood orange-red by day); the light comes from the whole glass (12 cm), so the shadows' edges are soft. The lanterns' own parts
+# cast no shadow any more (hub_timber.NO_SHADOW): that was the dark disc under each lantern and the stripes round it.
 LANTERN_CD = 240.0
-LANTERN_K = 1900.0
+LANTERN_K = 2800.0
+LANTERN_SOURCE_CM = 12.0
 # How far a lantern reaches (cm): with 16 m each of the Well's 14 lanterns lit the whole shaft, and their shadows cost 4 ms at
 # the Keelgate in the packaged build (D63). 240 cd still gives 2 lux at 11 m, where the window fades it out.
 LANTERN_RADIUS = 1100.0
@@ -70,8 +74,10 @@ INTERIOR_ZONES = {"Hull": (-2.0, 162.0, -21.0, 21.0, -6.0, 16.3), "Sterncastle":
 # must be fully sheltered), the basins out to the hull's outer face.
 SHELTER_EDGE = 120.0
 SHELTER_UNDER = 2.5
-INTERIOR_MIN_EV = 3.0      # how far the eye opens up below decks (the Day preset stops at EV 11, Dusk at 5)
+INTERIOR_MIN_EV = 0.0      # how far the eye opens up below decks (the Day preset stops at EV 11, Dusk at 5; D82: was 3, so at
+                           # night the eye could not open below decks and the rooms went black: the "horror ship")
 INTERIOR_MAX_EV = 7.5      # and how far it may close there (the shaft's daylight and the doorways would black the rooms out)
+INTERIOR_BIAS = -1.0       # D82: one exposure bias below decks at every hour (the Night look's -1.6 darkened the lantern-lit rooms)
 # The enclosed spaces (ship metres x0, x1, y0, y1, z0, z1): each gets its own exposure range (D70: the harbour aft and forward
 # of the Well, shut by its doors).
 INTERIORS = {"HarbourAft": (9.0, 72.0, -20.0, 20.0, 1.5, 13.2), "HarbourFore": (96.0, 151.0, -20.0, 20.0, 1.5, 13.2),
@@ -370,7 +376,7 @@ def lanterns(p, parts=None):
         lc.set_editor_property("use_temperature", True)
         lc.set_editor_property("temperature", LANTERN_K)
         lc.set_editor_property("attenuation_radius", LANTERN_RADIUS)
-        lc.set_editor_property("source_radius", 4.0)
+        lc.set_editor_property("source_radius", LANTERN_SOURCE_CM)
         lc.set_mobility(unreal.ComponentMobility.MOVABLE)
     return len(lamps)
 
@@ -426,6 +432,8 @@ def exposure(p):
         ps.set_editor_property("auto_exposure_min_brightness", INTERIOR_MIN_EV)
         ps.set_editor_property("override_auto_exposure_max_brightness", True)
         ps.set_editor_property("auto_exposure_max_brightness", INTERIOR_MAX_EV)
+        ps.set_editor_property("override_auto_exposure_bias", True)
+        ps.set_editor_property("auto_exposure_bias", INTERIOR_BIAS)
         # D69: screen traces back on inside (the rig turns them off for the open sea's waves, D23): the hall's flat water
         # mirrors the walls and doors it sees on screen, where ray tracing alone missed thin boards and showed the sky.
         ps.set_editor_property("override_lumen_reflections_screen_traces", True)

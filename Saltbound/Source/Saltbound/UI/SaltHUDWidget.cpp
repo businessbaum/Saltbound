@@ -2,6 +2,7 @@
 // hint, notices.
 
 #include "UI/SaltHUDWidget.h"
+#include "World/SaltTalk.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
@@ -344,6 +345,11 @@ void USaltHUDWidget::TickPrompt(float DeltaSeconds)
 		{
 			Want = FText::GetEmpty();
 		}
+	}
+	// FH2 (D81): a person's line sits where the prompt does; the prompt waits while it shows.
+	if (const USaltTalkSubsystem* Talk = GetWorld() ? GetWorld()->GetSubsystem<USaltTalkSubsystem>() : nullptr; Talk && Talk->IsTalking())
+	{
+		Want = FText::GetEmpty();
 	}
 #if !UE_BUILD_SHIPPING
 	if (CVarDevHold.GetValueOnGameThread() >= 0.f)

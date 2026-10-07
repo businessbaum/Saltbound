@@ -258,6 +258,10 @@ for a higher screen percentage (for example 75 %) and more content.
   frame: a wingbeat with the hand trailing the arm and the wing folding on the upstroke, the crooked glide, banking with the tail
   twisting into the turn, the head level and glancing about. `sb.Hub.Appear` (your boat 60 m off her doors), `sb.Hub.Appear dock`
   (on the quay in her harbour), `sb.Hub.Appear show`; watch a gull with `sb.Dev.BirdCam 0` and `sb.Birds.Flap 1` plus `slomo 0.1`.
+- **D81 (the first hour, FH2, waiting for the owner's look):** people's lines: the Harbour Keeper speaks on a torn half sheet with his
+  wax mark, his words written out in ink, the answers on key scraps (1-3, E). What he says follows the story (the first meeting and his
+  gift of the shovel and a lantern, the cache, the mending, ready to sail, the morning after); he calls after you when you cast off. The
+  lines are data (`Content/Saltbound/Story/Lines.json`). Try it: New voyage, then E at the Keeper's counter, or `sb.Talk Keeper`.
 - **D77 (the first hour, FH1, waiting for the owner's look):** the first hour planned beat by beat (`Docs/Design/FirstHour.md`) and
   built step by step. FH1: a new voyage starts as a castaway on the wreck beach at dawn with nothing; the Keeper gives the shovel and a
   lantern, the sea chest the Cartographer's compass and spyglass; the ripped sail sets only after the cache's sailcloth has mended it;
@@ -403,12 +407,15 @@ the sail and cast off.
 | Satchel | Tab or I (arrows or the mouse choose a pocket, drag an item to another pocket, R turn the item, G drop one; Tab, I or Esc close) | Back |
 | Tool wheel | Hold Q, aim with the mouse, let go to take the tool; Esc cancels; 1 to 5 take a tool directly | Hold LB, aim with the right stick; B cancels |
 | On the boat | Steering oar (starboard quarter, E at its handle): A / D steer, W / S let the sail out or take it in. Pin rails by the shrouds: E lowers (sets) / raises the sail. Windlass on the foredeck: E casts off, moors, drops / raises the anchor. Bell rope: E rings the bell; lantern: E lights / douses it. Chart on the mast (aft, to starboard): E looks at it closely (E / Esc put it back). Ladders (both sides, midship): swim or walk into one (or E) to take hold, W / S climb, E lets go; off the bottom into the sea, over the top on board | |
+| Talking (D81: E at a person) | E finishes the line being written, then gives the plain answer; 1 / 2 / 3 the numbered ones; walk away to leave | X; d-pad up / right / down |
 | Store (barrel or crate on the boat, E at its lid) | Click moves the stack, Shift-click one; drag to a chosen slot on either side (Shift: one); arrows choose, Enter moves the stack; E / Esc close | D-pad, A (the stack), X (one), B close |
 
 Developer console (`~`, non-shipping builds):
 - `sb.Lighting Day|Evening|Dusk|Night|Dawn|Morning|Twilight` (jumps the clock there and holds it, D72)
 - D72: `sb.Time` (print), `sb.Time <hour 0-24> [hold]`, `sb.Time run|hold`, `sb.Time day <n>`, `sb.Time.Scale <x>`, `sb.Sky.Dome 1|0`,
   `sb.Dev.RunClockTests`
+- D81: `sb.Talk <Speaker>` (talk to them), `sb.Talk answer | choose <1-3> | end | call <CallId>`, `sb.Talk.Reload` (read Lines.json again,
+  print its problems), `sb.Dev.RunTalkTests`
 - D73: `sb.Dev.RunDigTests`, `sb.Dev.GiveTool <Tool> [0]`. D74: `sb.Dev.RunRepairTests`, `sb.Boat.Hull hole <x> <side> <size> | water <kg> | tear | repair | info | spots`,
   `sb.Boat.Damage 0|1`
 - `sb.Region ShoresOfPlenty|AncientIsles|Wilds|DevilsRoar [blend s]`, `sb.Weather Clear|Cloudy|Overcast|Storm [blend s]`,

@@ -25,6 +25,20 @@ import sb_blender as sb
 
 PIVOT_X = 80.0
 
+# D82: a lantern's light sits inside it, so its own parts must cast no shadow (the base threw a dark disc on the floor under
+# every lantern, the bars four stripes round it). Faces of a material named with this suffix go into a slot of their own;
+# import_assets.py assigns the material without the suffix and turns that section's shadow off.
+NO_SHADOW = "__noshadow"
+
+
+def no_shadow(mat):
+    return mat + NO_SHADOW
+
+
+def base_material(name):
+    """The material a slot stands for (without NO_SHADOW)."""
+    return name[:-len(NO_SHADOW)] if name.endswith(NO_SHADOW) else name
+
 
 class Wave:
     """Smooth 1D noise on s in [0, 1]: a few sines with random phases."""

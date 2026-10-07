@@ -367,3 +367,35 @@ part('T_UI_SpyglassMask', 1920, 1080, 0.5, c => {
   c.globalCompositeOperation = 'source-over';
   brassRing(c, 960, 540, 494, 474);
 });
+
+/* ---------- D81: a person speaks (FH2, Docs/Design/UI/UI_FirstHour.html, idea A; screen_speak.jpg) ---------- */
+/* The torn half sheet the line is written on: 960 wide (the design's), drawn 460 high in a 1000 x 500 frame (the paper at 20, 14
+   so its shadow fits). The widget draws it as a 9-slice (margins 0.06 across, 0.2 down) at the height its words need, growing
+   upwards from its foot at 1080p y 1036. Its own large parchment (the shared one is narrower than the sheet). */
+let PARCH_TALK = null;
+function talkPaper(c, x, y, w, h, seed, tear) {
+  if (!PARCH_TALK) PARCH_TALK = parchment(1100, 640, 6);
+  const keep = PARCH; PARCH = PARCH_TALK; scrap(c, x, y, w, h, { seed, rot: 0, tear }); PARCH = keep;
+}
+part('T_UI_TalkScrap', 1000, 500, 1, c => talkPaper(c, 20, 14, 960, 460, 21, 6));
+/* A call in passing (idea B): the small scrap beside the speaker, 500 x 200 in a 540 x 240 frame (the paper at 20, 14), also a
+   9-slice. */
+part('T_UI_CallScrap', 540, 240, 1, c => talkPaper(c, 20, 14, 500, 200, 44, 5));
+/* The speaker's mark in red wax (radius 34, as the design's), one per glyph: frame 100 x 100, the seal's centre in the middle. */
+for (const [name, glyph] of [['Anchor', 'anchor'], ['Wave', 'wave'], ['Island', 'island']]) {
+  part('T_UI_TalkSeal_' + name, 100, 100, 2, c => { waxSeal(c, 50, 50, 34, '', 21); sealGlyph(c, glyph, 50, 50, 34); });
+}
+/* The quill's ink rule under the speaker's name and the chosen answer: a 400 x 14 stroke (stretched to the words' width). */
+part('T_UI_QuillRule', 400, 14, 2, c => {
+  const R = rng(4);
+  [[1, 1.8, 0], [.4, 1.0, .7]].forEach(([a, lw, o]) => {
+    c.save(); c.globalAlpha = a; c.strokeStyle = 'rgba(58,38,22,.75)'; c.lineWidth = lw; c.lineCap = 'round'; c.beginPath();
+    for (let i = 0; i <= 40; i++) { const t = i / 40, x = 4 + 392 * t + (R() - .5) * .8 + o, y = 7 + Math.sin(t * 9 + 4) * 1.2 + (R() - .5) * .8 + o; i ? c.lineTo(x, y) : c.moveTo(x, y); }
+    c.stroke(); c.restore();
+  });
+});
+/* The warm wash behind the answer being chosen: 700 x 52, fading in over the first 8 % and out to the right. */
+part('T_UI_TalkChoiceGlow', 700, 52, 1, c => {
+  const g = c.createLinearGradient(0, 0, 700, 0); g.addColorStop(0, 'rgba(255,236,190,0)'); g.addColorStop(.08, 'rgba(255,236,190,.55)'); g.addColorStop(1, 'rgba(255,236,190,0)');
+  c.fillStyle = g; c.fillRect(0, 0, 700, 52);
+});

@@ -2,6 +2,7 @@
 
 #include "World/SaltDig.h"
 #include "World/SaltPrologue.h"
+#include "World/SaltTalk.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Core/SaltSaveSubsystem.h"
@@ -706,6 +707,12 @@ void USaltDigSubsystem::HandleKeeper(USaltInteractableComponent* Interactable, A
 {
 	ASaltPlayerController* PC = ControllerOf(Player);
 	if (!Player)
+	{
+		return;
+	}
+	// FH2 (D81): the Keeper speaks (World/SaltTalk.h, Content/Saltbound/Story/Lines.json); the shovel and the lantern are his first
+	// talk's gift. Without his lines (a broken file) he hands them over as before.
+	if (USaltTalkSubsystem* Talk = GetWorld()->GetSubsystem<USaltTalkSubsystem>(); Talk && Talk->Begin(TEXT("Keeper"), Player))
 	{
 		return;
 	}

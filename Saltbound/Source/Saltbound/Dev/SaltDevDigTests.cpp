@@ -10,6 +10,7 @@
 #include "Player/SaltPlayerCharacter.h"
 #include "Saltbound.h"
 #include "World/SaltDig.h"
+#include "World/SaltTalk.h"
 
 #if !UE_BUILD_SHIPPING
 namespace
@@ -67,7 +68,21 @@ namespace
 			FString::Printf(TEXT("stage=%d prompt='%s'"), Spot->GetStage(), *Spot->GetPrompt(Player).ToString()));
 
 		// The keeper hands it over (once).
+		// FH2 (D81): the shovel is the Keeper's first talk's gift: answer him plainly until he is done.
+		USaltTalkSubsystem* Talk = World->GetSubsystem<USaltTalkSubsystem>();
+		if (Talk)
+		{
+			Talk->SetInstant(true);
+		}
 		Dig->HandleKeeper(nullptr, Player);
+		for (int32 Say = 0; Talk && Talk->IsTalking() && Say < 8; ++Say)
+		{
+			Talk->Answer();
+		}
+		if (Talk)
+		{
+			Talk->SetInstant(false);
+		}
 		Report(TEXT("KeeperGivesShovel"), Player->IsToolOwned(SaltDig::ShovelTool), FString::Printf(TEXT("owned=%d"),
 			Player->IsToolOwned(SaltDig::ShovelTool) ? 1 : 0));
 

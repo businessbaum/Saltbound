@@ -2375,3 +2375,34 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
 - **Evidence:** `Docs/Evidence/D78/D78_grass_leaves_sheet.jpg` (D71 / D78 pairs: from above as in the owner's screenshot, at eye height,
   far, the forest floor); the D71 views in `Docs/Evidence/D78/before/`.
 - **Open:** sandy fingers inside the meadow are fringed but still bare; flowers in the meadow (none now) could come back as geometry.
+
+### D81 · FH2, people's lines: the Harbour Keeper speaks (Adopted: waiting for the owner's look)
+- **Why:** the first hour's second step (`Docs/Design/FirstHour.md`): the first face, his words, the player's answers, the gift of the
+  shovel and the lantern; before it, the Keeper's hand-over was one notice.
+- **The lines are data:** `Saltbound/Content/Saltbound/Story/Lines.json` (staged with the game as a file: `DirectoriesToAlwaysStageAsUFS`),
+  read by `USaltTalkSubsystem` (`World/SaltTalk.*`) at the start of play and again with `sb.Talk.Reload`, which prints what is wrong in it.
+  - A **speaker** has a name, a wax mark (Anchor, Wave, Island), the hub point that stands for them until they have a figure, and
+    **entries**: the first whose conditions hold is the line they open with, so what they say follows the story.
+  - A **line** has its words, what it does when shown (`beat:X`, `tool:X`, `item:X:N`) and up to three numbered answers plus the plain
+    one (E), each leading to a line or ending the talk, each with conditions (`beat:X`, `tool:X`, `item:X`, `tear`, `night`, `day:N`,
+    `!` negates): "Her sail is ripped" is only offered while it is.
+  - A **call** is a line called in passing on a beat when the player is near enough (the Keeper's "Mind the reef by the Spire" on
+    casting off, within 200 m).
+- **The Keeper's talk** (eleven lines): the first meeting ("Another one from the Gale..."; who the Cartographer was; the ripped sail; the
+  gift: the shovel, a lantern and the cache's hint, the leaning palm three paces seaward, which records the Keeper beat), then what he
+  says while the cache is still buried, while the sail is unmended, when she is ready to sail (and what the Spire is), the morning after
+  ("The light was burning on the Spire again last night"), and a word in passing otherwise. The Cartographer is "they" (the concept).
+- **On screen** (idea A of D75, `UI/SaltTalkWidget.*`, parts from the approved kit in `Tools/textures/ui_parts.js`): a torn half sheet
+  960 px wide low in the middle (its foot at 1080p y 1036, as high as its words need: a 9-slice of `T_UI_TalkScrap`), the speaker's mark
+  in red wax at its corner, the name in small capitals with a quill's rule under it, the line in ink written out a word at a time
+  (45 letters a second; E finishes it), then the answers on key scraps (1-3 in Alegreya Bold, E the player's Use key). A taken answer
+  shows the warm wash and the quill's rule for 0.2 s. The world keeps running; walking 4 m away, or the satchel or a store opening, ends
+  the talk; the HUD's prompt waits while a line shows. A call (idea B) is a small scrap pinned beside the speaker's head (to the
+  screen's side when they are behind the view) for a few seconds. No murmur yet (no sounds).
+- **Input:** while a line shows, the talk maps its own keys above play's (an Enhanced Input context at priority 100): the Use key and
+  the pad's X answer, 1-3 (and the d-pad) choose; so E does not use the counter again and 1-3 do not take tools.
+- **For the Keeper's figure (D82, the gameplay session):** `USaltTalkSubsystem::Begin("Keeper", Player, KeeperActor)`;
+  `USaltDigSubsystem::HandleKeeper` (the "keeper" point) opens the same talk until then, and hands the gifts over as before if the
+  lines cannot be read.
+- **Tests:** `sb.Dev.RunTalkTests` 7/7 (LinesLoad, KeeperFirstTalk, AnswersByKey, EntriesFollowTheStory, ConditionsHideAnswers, WalkingAwayEnds, UnknownSpeaker); Prologue 7/7 and Dig 7/7 with the shovel now taken through the Keeper's talk. Seen in play (`shot showui`): the sheet centred low with its seal, name and rule, the words written out, keys 1 and E; the call pinned to the side.
+- **Next:** FH3, the log (the sea chest opens it; the Cartographer's page one with the palm sketch; notes from the beats).

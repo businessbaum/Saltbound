@@ -1,0 +1,122 @@
+{
+  "about": [
+    "Saltbound - people's lines (FH2, D81). Read by USaltTalkSubsystem (World/SaltTalk.cpp) at the start of play; sb.Talk.Reload reads it again.",
+    "speakers: who speaks. name (shown in small capitals on the sheet), seal (the wax mark's glyph: Anchor, Wave, Island), point (the hub point",
+    "  that stands for them until they have an actor of their own), entries (the first whose conditions hold is the line they open with).",
+    "lines: id -> text, do (actions when the line is shown), choices (up to three numbered answers 1-3 and one plain answer E, each with",
+    "  next: the line it leads to, or empty to end the talk; if: conditions), next (for a line without choices: where E goes; empty ends).",
+    "calls: lines called in passing on the small scrap beside the speaker (idea B): on (a beat that starts it), near (cm, how close the",
+    "  player must be), seconds (how long it shows; 0 = by its length).",
+    "Conditions: beat:X, tool:X, item:X (in the satchel), tear (the boat's sail is torn), night, day:N (day N or later); ! in front negates.",
+    "Actions: beat:X (records a story beat), tool:X (gives a tool), item:X:N (puts N of X into the satchel)."
+  ],
+  "speakers": {
+    "Keeper": {
+      "name": "The Harbour Keeper",
+      "seal": "Anchor",
+      "point": "keeper",
+      "entries": [
+        { "if": ["!beat:Keeper"], "line": "keeper.first" },
+        { "if": ["!beat:Cache", "!beat:SailMended"], "line": "keeper.cache" },
+        { "if": ["!beat:SailMended"], "line": "keeper.mend" },
+        { "if": ["!beat:CastOff"], "line": "keeper.ready" },
+        { "if": ["day:2"], "line": "keeper.light" },
+        { "if": [], "line": "keeper.idle" }
+      ]
+    }
+  },
+  "lines": {
+    "keeper.first": {
+      "speaker": "Keeper",
+      "text": "“Another one from the Gale. Nobody leaves; you get used to it. That old boat at the pier was the Cartographer’s. Make her sail and she’s yours.”",
+      "choices": [
+        { "text": "Who was the Cartographer?", "next": "keeper.who" },
+        { "text": "Her sail is ripped.", "next": "keeper.sail", "if": ["tear"] },
+        { "text": "I’ll see to her.", "next": "keeper.gift", "plain": true }
+      ]
+    },
+    "keeper.who": {
+      "speaker": "Keeper",
+      "text": "“A castaway like you, years back. Best hand with a chart this sea has seen, and never stopped wanting to go home. Seven years ago they sailed south into the storm and didn’t come back. Left me the boat to mind.”",
+      "choices": [
+        { "text": "Her sail is ripped.", "next": "keeper.sail", "if": ["tear"] },
+        { "text": "I’ll see to her.", "next": "keeper.gift", "plain": true }
+      ]
+    },
+    "keeper.sail": {
+      "speaker": "Keeper",
+      "text": "“Then mend it. The Cartographer never trusted a store: half of what they owned is buried somewhere. Spare canvas too, I’d wager.”",
+      "choices": [
+        { "text": "Buried where?", "next": "keeper.gift", "plain": true }
+      ]
+    },
+    "keeper.gift": {
+      "speaker": "Keeper",
+      "text": "“Take my shovel, and a lantern; the nights are long here. They swore by the leaning palm on this beach: ‘three paces seaward and dig’. Their chest is still aboard, if you want their own word for it.”",
+      "do": ["tool:Shovel", "tool:Lantern", "beat:Keeper"],
+      "choices": [
+        { "text": "Thank you.", "next": "", "plain": true }
+      ]
+    },
+    "keeper.cache": {
+      "speaker": "Keeper",
+      "text": "“The leaning palm, three paces seaward. The Cartographer buried things the way other folk bury grudges: deep, and close to home.”",
+      "choices": [
+        { "text": "Who was the Cartographer?", "next": "keeper.who.again" },
+        { "text": "I’ll dig.", "next": "", "plain": true }
+      ]
+    },
+    "keeper.who.again": {
+      "speaker": "Keeper",
+      "text": "“A castaway like you, years back, who never stopped wanting to go home. Seven years ago they sailed south into the storm and didn’t come back.”",
+      "choices": [
+        { "text": "I’ll dig.", "next": "", "plain": true }
+      ]
+    },
+    "keeper.mend": {
+      "speaker": "Keeper",
+      "text": "“Sailcloth? Then sit at the mast’s foot and sew. A tear like that takes two patches; don’t skimp on the second.”",
+      "choices": [
+        { "text": "I’ll mend it.", "next": "", "plain": true }
+      ]
+    },
+    "keeper.ready": {
+      "speaker": "Keeper",
+      "text": "“She’ll sail. Take her round the lagoon first, and mind the reef by the Spire: she doesn’t like rocks.”",
+      "choices": [
+        { "text": "What is the Spire?", "next": "keeper.spire" },
+        { "text": "I’ll be careful.", "next": "", "plain": true }
+      ]
+    },
+    "keeper.spire": {
+      "speaker": "Keeper",
+      "text": "“The stack to the north-north-east with the broken tower on it. Older than anyone’s grandmother. Some nights there’s a light up there, and nobody to light it.”",
+      "choices": [
+        { "text": "I’ll be careful.", "next": "", "plain": true }
+      ]
+    },
+    "keeper.light": {
+      "speaker": "Keeper",
+      "text": "“Still here? The light was burning on the Spire again last night. The Cartographer used to watch it from this beach.”",
+      "choices": [
+        { "text": "Good day.", "next": "", "plain": true }
+      ]
+    },
+    "keeper.idle": {
+      "speaker": "Keeper",
+      "text": "“The tide waits for nobody. Good day for it, whatever it is.”",
+      "choices": [
+        { "text": "Good day.", "next": "", "plain": true }
+      ]
+    }
+  },
+  "calls": {
+    "keeper.castoff": {
+      "speaker": "Keeper",
+      "text": "“Mind the reef by the Spire. She doesn’t like rocks.”",
+      "on": "beat:CastOff",
+      "near": 20000,
+      "seconds": 0
+    }
+  }
+}
