@@ -11,6 +11,7 @@ as that step is done and the map is saved. Blender headless builds, host Python,
     python Tools/editor_lock.py status                     holder and queue
     python Tools/editor_lock.py decision <owner> "<topic>" claims the next free decision number (D79, D80, ...)
     python Tools/editor_lock.py break manager              frees a lock whose holder crashed (the managing session only)
+    python Tools/editor_lock.py done <owner>               before a shutdown: saved, committed, idle (taking the lock clears it)
 
 Rules (the managing session, 2026-10-07): sessions do not message each other; this tool is the only coordination.
 Do non-editor work while waiting instead of polling. Never hold the lock while writing code, building in Blender or
@@ -33,6 +34,7 @@ QUEUE = os.path.join(SAVED, "EditorQueue")
 CLAIMS = os.path.join(SAVED, "DecisionClaims.json")
 CLAIMS_LOCK = os.path.join(SAVED, "DecisionClaims.lock")
 DECISIONS = os.path.join(ROOT, "Docs", "Decisions.md")
+DONE = os.path.join(SAVED, "SessionsDone")
 
 QUEUE_STALE_S = 180.0   # a waiter whose wait call ended this long ago has left the queue
 POLL_S = 5.0
@@ -135,6 +137,10 @@ def take(owner, what):
         return False
     write_json(INFO, {"owner": owner, "what": what, "since": time.time()})
     dequeue(owner)
+    try:
+        os.remove(os.path.join(DONE, re.sub(r"[^A-Za-z0-9_-]", "_", owner) + ".json"))
+    except OSError:
+        pass
     return True
 
 
@@ -221,6 +227,15 @@ def main(argv):
         if claims:
             print("  decisions claimed: " + ", ".join("%s %s (%s)" % (k, v["owner"], v["topic"]) for k, v in
                                                       sorted(claims.items(), key=lambda kv: int(kv[0][1:]))))
+        done = sorted(os.listdir(DONE)) if os.path.isdir(DONE) else []
+        if done:
+            print("  done (saved, committed, idle): " + ", ".join(d[:-5] for d in done if d.endswith(".json")))
+        return 0
+    if cmd == "done" and len(argv) > 2:
+        # Before a shutdown: a session marks itself done once everything is saved and committed; taking the lock clears it.
+        os.makedirs(DONE, exist_ok=True)
+        write_json(os.path.join(DONE, re.sub(r"[^A-Za-z0-9_-]", "_", argv[2]) + ".json"), {"since": time.time()})
+        print("DONE " + argv[2])
         return 0
     if len(argv) < 3:
         print(__doc__)
