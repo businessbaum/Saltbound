@@ -30,6 +30,10 @@ namespace SaltContent
 	inline const TCHAR* SkyCollection = TEXT("/Game/Saltbound/Environment/Sky/MPC_Sky.MPC_Sky");
 	/** Rope material for the boat's physics ropes (cable components). */
 	inline const TCHAR* RopeMaterial = TEXT("/Game/Saltbound/Materials/Instances/MI_Rope_Hemp.MI_Rope_Hemp");
+	/** D80: the player's arms (build_arms.py); USaltArmsComponent poses their bones. */
+	inline const TCHAR* ArmsMesh = TEXT("/Game/Saltbound/Characters/SK_Arms.SK_Arms");
+	/** D83: the Harbour Keeper's figure (build_keeper.py); ASaltPerson poses its bones. */
+	inline const TCHAR* KeeperMesh = TEXT("/Game/Saltbound/Characters/SK_Keeper.SK_Keeper");
 	/** D76: the skinned seagull (build_birds.py); ASaltBirds poses its bones. */
 	inline const TCHAR* GullMesh = TEXT("/Game/Saltbound/Environment/Birds/SK_Gull.SK_Gull");
 	/** Seagull parts (Art/Blender/Scripts/build_birds.py): Body, WingL, WingR. */

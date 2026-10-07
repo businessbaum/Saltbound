@@ -1238,6 +1238,11 @@ void USaltDevTestSubsystem::RunHubSuite(const FString& Only)
 		}
 		S->T += Dt;
 		S->bFlag |= P->IsOnLadder();
+		// D79: only E takes hold of a ladder; press it every half second until the swimmer holds on.
+		if (!S->bFlag && !P->IsClimbing() && S->T > 0.4f && FMath::Fmod(S->T, 0.5f) < Dt)
+		{
+			P->DebugInteract();
+		}
 		const FVector Local = L->GetActorTransform().InverseTransformPosition(FeetOf(P));
 		if (S->bFlag && !P->IsOnLadder() && !P->IsSwimming() && FMath::Abs(Local.Z) < 30.0 && Local.Y < -20.0)
 		{

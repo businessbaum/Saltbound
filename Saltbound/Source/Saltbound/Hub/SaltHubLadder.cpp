@@ -10,8 +10,9 @@
 
 ASaltHubLadder::ASaltHubLadder()
 {
-	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.TickInterval = 0.05f;
+	// D79 (owner: "The only way to climb ladders is to press the interaction button"): D59's taking hold by swimming into
+	// the ladder is gone; only E takes hold, so nothing ticks.
+	PrimaryActorTick.bCanEverTick = false;
 	Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
 	Use = CreateDefaultSubobject<USaltInteractableComponent>(TEXT("Use"));
@@ -49,23 +50,4 @@ void ASaltHubLadder::HandleInteract(USaltInteractableComponent* Interactable, AS
 		return;
 	}
 	Player->MountLadder(GetLine(Player->GetCapsuleHalfHeightForClimb(), Player->GetCapsuleComponent()->GetScaledCapsuleRadius()), !Player->IsSwimming());
-}
-
-void ASaltHubLadder::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-	// As at the boat (D59): swimming at the ladder takes hold of it as E does.
-	APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
-	ASaltPlayerCharacter* Player = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr;
-	if (!Player || !Player->IsSwimming() || Player->IsOnLadder() || Player->IsClimbing() || Player->IsAtStation())
-	{
-		return;
-	}
-	const FTransform Xf = Root->GetComponentTransform();
-	const FVector Local = Xf.InverseTransformPosition(Player->GetActorLocation());
-	const FVector Push = Xf.InverseTransformVectorNoScale(Player->GetLastMovementInputVector());
-	if (FMath::Abs(Local.X) < 45.f && Local.Y > 0.f && Local.Y < 120.f && Local.Z > BottomZ - 60.f && Local.Z < 0.f && Push.Y < -0.3f)
-	{
-		HandleInteract(Use, Player);
-	}
 }

@@ -86,12 +86,13 @@ namespace
 		Report(TEXT("KeeperGivesShovel"), Player->IsToolOwned(SaltDig::ShovelTool), FString::Printf(TEXT("owned=%d"),
 			Player->IsToolOwned(SaltDig::ShovelTool) ? 1 : 0));
 
-		// A press takes the shovel in hand; then E is a hold that digs.
+		// A press takes the shovel in hand; then (D80) the left mouse button is a hold that digs (E no longer does).
 		Player->SetHeldTool(NAME_None);
 		Spot->Use_(Player);
 		Spot->Tick(0.02f);
-		Report(TEXT("TakesShovel"), Player->GetHeldTool() == SaltDig::ShovelTool && Spot->GetUse()->HoldTime > 1.f,
-			FString::Printf(TEXT("held=%s hold=%.1fs"), *Player->GetHeldTool().ToString(), Spot->GetUse()->HoldTime));
+		const bool bByUse = Spot->GetUse()->UsesHeldThing(Player);
+		Report(TEXT("TakesShovel"), Player->GetHeldTool() == SaltDig::ShovelTool && Spot->GetUse()->HoldTime > 1.f && bByUse,
+			FString::Printf(TEXT("held=%s hold=%.1fs left button=%d"), *Player->GetHeldTool().ToString(), Spot->GetUse()->HoldTime, bByUse ? 1 : 0));
 
 		// Dug up: the find lies in the hole; taking it fills the satchel (and the purse).
 		TArray<FSaltItemStack> Empty;

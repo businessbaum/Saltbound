@@ -50,7 +50,7 @@ struct FSaltPlayerStats
 {
 	// Walking (cm/s, cm/s2) --------------------------------------------------------------------------------------
 	float WalkSpeed = 250.f;
-	float SprintSpeed = 420.f;
+	float SprintSpeed = 600.f;        // D79 (owner: "Increase the player sprint speed"; was 420)
 	/** How fast the body gets up to speed and stops (higher = snappier). */
 	float Acceleration = 2800.f;
 	float Braking = 2600.f;
@@ -76,8 +76,11 @@ struct FSaltPlayerStats
 	float LadderMountSpeed = 320.f;
 	float LadderTopTime = 0.35f;
 
-	// The eyes ---------------------------------------------------------------------------------------------------
-	float EyeHeight = 120.f;          // cm above the feet
+	// The body and the eyes -------------------------------------------------------------------------------------
+	/** D79 (owner, at the Harbour Keeper's counter: "My charakter is still to small ... i cant even look over the desk"):
+	 *  D29's 1.6 m with the eyes at 1.5 m (D54 had 1.4 m and 1.3 m, D55 the eyes at 1.2 m). The counter is 1.15 m. */
+	float Height = 160.f;             // cm, the capsule
+	float EyeHeight = 150.f;          // cm above the feet
 	float InteractionRange = 220.f;   // cm
 };
 

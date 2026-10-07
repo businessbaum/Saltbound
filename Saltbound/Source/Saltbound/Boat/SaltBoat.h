@@ -443,8 +443,6 @@ private:
 	UFUNCTION() void HandleSailRope(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleWindlass(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleLadder(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
-	/** D59: the player takes hold of a ladder by moving into it (from the water, or at its head on deck). */
-	void TakeLaddersOnTouch();
 	UFUNCTION() void HandleStore(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleBell(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);
 	UFUNCTION() void HandleLantern(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player);

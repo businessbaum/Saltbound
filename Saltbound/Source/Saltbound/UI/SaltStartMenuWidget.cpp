@@ -3,6 +3,7 @@
 #include "UI/SaltStartMenuWidget.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/CanvasPanel.h"
 #include "Components/Image.h"
 #include "Core/SaltSaveSubsystem.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -73,10 +74,69 @@ void USaltStartMenuWidget::Refresh()
 	}
 }
 
+void USaltStartMenuWidget::BeginLeave()
+{
+	if (bLeaving)
+	{
+		return;
+	}
+	bLeaving = true;
+	LeaveT = 0.f;
+	if (ASaltPlayerController* PC = GetSaltController())
+	{
+		PC->SetShowMouseCursor(false);
+	}
+}
+
+void USaltStartMenuWidget::FinishLeave()
+{
+	if (!bLeaving)
+	{
+		return;
+	}
+	bLeaving = false;
+	if (ASaltPlayerController* PC = GetSaltController())
+	{
+		PC->PopScreen(this);
+	}
+}
+
+void USaltStartMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (!bLeaving)
+	{
+		return;
+	}
+	LeaveT += InDeltaTime;
+	const float Lines = FMath::Clamp(LeaveT / 0.35f, 0.f, 1.f);
+	if (Contents)
+	{
+		Contents->SetRenderOpacity(1.f - Lines);
+		Contents->SetRenderTranslation(FVector2D(-40.f * Lines * Lines, 0.f));
+	}
+	if (Backdrop)
+	{
+		Backdrop->SetRenderOpacity(1.f - FMath::SmoothStep(0.f, 1.f, LeaveT / LeaveSeconds));
+	}
+	if (LeaveT >= LeaveSeconds)
+	{
+		FinishLeave();
+	}
+}
+
+void USaltStartMenuWidget::Navigate(int32 Dx, int32 Dy)
+{
+	if (!bLeaving)
+	{
+		Super::Navigate(Dx, Dy);
+	}
+}
+
 void USaltStartMenuWidget::ItemUsed(int32 Index)
 {
 	ASaltPlayerController* PC = GetSaltController();
-	if (!PC)
+	if (!PC || bLeaving)
 	{
 		return;
 	}

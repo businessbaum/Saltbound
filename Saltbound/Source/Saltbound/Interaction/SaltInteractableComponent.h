@@ -46,6 +46,12 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Interaction")
 	FSaltInteractSignature OnInteract;
 
+	/** D80: the things in hand it is used with (left mouse button, not E), e.g. Shovel. Empty: E uses it. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction")
+	TArray<FName> UseWith;
+
+	/** D80: whether it is used now with what the player holds (the left mouse button) rather than with E. */
+	virtual bool UsesHeldThing(const ASaltPlayerCharacter* Player) const;
 	virtual bool CanInteract(const ASaltPlayerCharacter* Player) const;
 	virtual FText GetPromptText(const ASaltPlayerCharacter* Player) const;
 	virtual void Interact(ASaltPlayerCharacter* Player);

@@ -1230,7 +1230,54 @@
     "dest": "/Game/Saltbound/Props/Tools",
     "nanite": false,
     "collision": "none",
-    "_note": "D73 build_dig.py: the Harbour Keeper's shovel, held (USaltHeldToolsComponent); pivot at the grip, along +X."
+    "_note": "D80 build_tools.py (D73's was build_dig.py): the Harbour Keeper's spade, held (USaltHeldToolsComponent); pivot at the D-handle's crossbar, along +X to the tip (1.13 m), +Z the blade's face."
+  },
+  "SM_Tool_ShovelLoad": {
+    "fbx": "Tools/SM_Tool_ShovelLoad.fbx",
+    "dest": "/Game/Saltbound/Props/Tools",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D80 build_tools.py: a spadeful of sand on the blade's face, in the shovel's frame (shown while digging)."
+  },
+  "SM_Tool_SpyglassDraw1": {
+    "fbx": "Tools/SM_Tool_SpyglassDraw1.fbx",
+    "dest": "/Game/Saltbound/Props/Tools",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D80 build_tools.py: the spyglass's widest drawtube; pivot at its rear end, along +X."
+  },
+  "SM_Tool_SpyglassDraw2": {
+    "fbx": "Tools/SM_Tool_SpyglassDraw2.fbx",
+    "dest": "/Game/Saltbound/Props/Tools",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D80 build_tools.py: the spyglass's middle drawtube; pivot at its rear end, along +X."
+  },
+  "SM_Tool_SpyglassDraw3": {
+    "fbx": "Tools/SM_Tool_SpyglassDraw3.fbx",
+    "dest": "/Game/Saltbound/Props/Tools",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D80 build_tools.py: the spyglass's thinnest drawtube with the eyecup; pivot at its rear end (the eye end), along +X."
+  },
+  "SM_Tool_Spyglass": {
+    "fbx": "Tools/SM_Tool_Spyglass.fbx",
+    "dest": "/Game/Saltbound/Props/Tools",
+    "nanite": false,
+    "collision": "none",
+    "_note": "D80 build_tools.py: the spyglass's barrel (USaltHeldToolsComponent slides the drawtubes out of it); pivot at its rear face, along +X to the objective."
+  },
+  "SK_Arms": {
+    "fbx": "Characters/SK_Arms.fbx",
+    "dest": "/Game/Saltbound/Characters",
+    "type": "skeletal",
+    "_note": "D80 the player's arms (build_arms.py): skinned on 39 bones (arms_root; for each side upperarm, lowerarm, lowerarm_twist, hand, five fingers of three); USaltArmsComponent poses them every frame"
+  },
+  "SK_Keeper": {
+    "fbx": "Characters/SK_Keeper.fbx",
+    "dest": "/Game/Saltbound/Characters",
+    "type": "skeletal",
+    "_note": "D83 the Harbour Keeper (build_keeper.py): skinned on 44 bones (root, pelvis, spine_01, spine_02, neck, head; the arms and fingers of sb_hand); ASaltPerson poses them every frame"
   },
   "SM_Pickup_Canvas": {
     "fbx": "Pickups/SM_Pickup_Canvas.fbx",

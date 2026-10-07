@@ -6,6 +6,7 @@ UCX collision hulls as red wireframes, so both the shape and its collision can b
 
   Tools/Build-BlenderAsset.ps1 is not needed; run Blender directly:
   blender -b --factory-startup -P Tools/preview_blend.py -- <file.blend> <out.png> <view> [<view> ...] [--ucx]
+      [--with=<other.blend>@x,y,z ...]   (more assets at an offset, Unreal metres)
   a view is  x,y,z,dist,az,el  (target in Unreal metres: +Y = starboard; dist in m; az/el in degrees, az 0 = from +X)
   Several views are tiled into one sheet (2 columns).
 """
@@ -18,9 +19,20 @@ from mathutils import Vector
 args = sys.argv[sys.argv.index("--") + 1:]
 blend, out = args[0], args[1]
 show_ucx = "--ucx" in args
-views = [tuple(float(v) for v in a.split(",")) for a in args[2:] if a != "--ucx"]
+# D80: --with <file.blend>@x,y,z adds another asset's objects at an offset (Unreal metres), e.g. a spyglass's drawtubes.
+extra = [a[len("--with="):] for a in args if a.startswith("--with=")]
+views = [tuple(float(v) for v in a.split(",")) for a in args[2:] if a != "--ucx" and not a.startswith("--with=")]
 bpy.ops.wm.open_mainfile(filepath=blend)
 scene = bpy.context.scene
+for spec in extra:
+    path, at = spec.split("@")
+    off = [float(v) for v in at.split(",")]
+    with bpy.data.libraries.load(path) as (src, dst):
+        dst.objects = [n for n in src.objects if not n.startswith("UCX_")]
+    for o in dst.objects:
+        if o is not None:
+            scene.collection.objects.link(o)
+            o.location = (o.location[0] + off[0], o.location[1] - off[1], o.location[2] + off[2])
 
 wire = bpy.data.materials.new("ucx_wire")
 wire.diffuse_color = (1.0, 0.1, 0.05, 1.0)
@@ -38,6 +50,7 @@ for o in list(scene.objects):
 cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
 scene.collection.objects.link(cam)
 cam.data.lens = 40
+cam.data.clip_start = 0.005   # D80: close-ups of small parts (the default 10 cm cut into them)
 scene.camera = cam
 scene.render.engine = "BLENDER_WORKBENCH"
 shading = scene.display.shading

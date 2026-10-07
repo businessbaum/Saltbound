@@ -16,6 +16,7 @@
 #include "InputActionValue.h"
 #include "Interaction/SaltInteractableComponent.h"
 #include "Interaction/SaltStationComponent.h"
+#include "Player/SaltArmsComponent.h"
 #include "Player/SaltCharacterMovementComponent.h"
 #include "Player/SaltHeldTools.h"
 #include "Player/SaltInputConfig.h"
@@ -62,9 +63,8 @@ namespace
 		TEXT("Draw interaction focus probe hits."),
 		ECVF_Cheat);
 
-	// 1.4 m and slimmer (owner, D54: too big for the boat; earlier 1.76 m, 1.6 m and 1.5 m with a 68 cm wide capsule).
+	// Slim (D54); the height is the stats table's (D79: 1.6 m again; D54 had 1.4 m, earlier 1.76 m, 1.6 m and 1.5 m).
 	constexpr float CapsuleRadius = 26.f;
-	constexpr float CapsuleHalfHeight = 70.f;
 }
 
 ASaltPlayerCharacter::ASaltPlayerCharacter(const FObjectInitializer& ObjectInitializer)
@@ -74,11 +74,13 @@ ASaltPlayerCharacter::ASaltPlayerCharacter(const FObjectInitializer& ObjectIniti
 	// The tools the player starts with (D55, owner).
 	OwnedTools = { TEXT("Compass"), TEXT("Spyglass"), TEXT("Lantern") };
 
+	const float CapsuleHalfHeight = SaltStats::Player().Height * 0.5f;
 	GetCapsuleComponent()->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Inventory = CreateDefaultSubobject<USaltInventoryComponent>(TEXT("Inventory"));
 	HeldTools = CreateDefaultSubobject<USaltHeldToolsComponent>(TEXT("HeldTools"));
+	Arms = CreateDefaultSubobject<USaltArmsComponent>(TEXT("Arms"));
 	Camera->SetupAttachment(GetCapsuleComponent());
 	Camera->SetRelativeLocation(FVector(0.f, 0.f, EyeHeight - CapsuleHalfHeight));
 	Camera->bUsePawnControlRotation = true;
@@ -195,6 +197,8 @@ void ASaltPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 	Input->BindAction(Cfg->Dive, ETriggerEvent::Completed, this, &ASaltPlayerCharacter::HandleDiveCompleted);
 	Input->BindAction(Cfg->Interact, ETriggerEvent::Started, this, &ASaltPlayerCharacter::HandleInteract);
 	Input->BindAction(Cfg->Interact, ETriggerEvent::Completed, this, &ASaltPlayerCharacter::HandleInteractReleased);
+	Input->BindAction(Cfg->UseHeld, ETriggerEvent::Started, this, &ASaltPlayerCharacter::HandleUseStarted);
+	Input->BindAction(Cfg->UseHeld, ETriggerEvent::Completed, this, &ASaltPlayerCharacter::HandleUseCompleted);
 }
 
 void ASaltPlayerCharacter::Tick(float DeltaSeconds)
@@ -364,6 +368,21 @@ void ASaltPlayerCharacter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResu
 	const FVector WantUp = FMath::Lerp(FVector::UpVector, DeckUp, TiltShare).GetSafeNormal();
 	ViewUp = DeltaTime > 0.f ? FMath::Lerp(ViewUp, WantUp, 1.f - FMath::Exp(-DeltaTime / 0.08f)).GetSafeNormal() : WantUp;
 	OutResult.Rotation = (FQuat::FindBetweenNormals(FVector::UpVector, ViewUp) * OutResult.Rotation.Quaternion()).Rotator();
+
+	// D80: digging, the body bends into each stroke (the hands, hanging from the view, come along).
+	if (HeldTools)
+	{
+		float Down = 0.f;
+		float Pitch = 0.f;
+		HeldTools->GetViewLean(Down, Pitch);
+		if (Down != 0.f || Pitch != 0.f)
+		{
+			OutResult.Location.Z -= Down;
+			FRotator R = OutResult.Rotation;
+			R.Pitch = FMath::Clamp(R.Pitch + Pitch, -89.f, 89.f);
+			OutResult.Rotation = R;
+		}
+	}
 
 	// The held tools hang from the view as it is seen.
 	if (ViewAnchor)
@@ -811,13 +830,15 @@ void ASaltPlayerCharacter::HandleInteract()
 	}
 	if (USaltInteractableComponent* Focus = FocusedInteractable.Get())
 	{
-		if (Focus->CanInteract(this))
+		// D80: what is used with the thing in hand takes the left mouse button, not E.
+		if (Focus->CanInteract(this) && !Focus->UsesHeldThing(this))
 		{
 			if (Focus->IsHold())
 			{
 				// A hold: the ink fills while the key stays down (TickHold); the action runs when it is full.
 				HoldTarget = Focus;
 				bInteractHeld = true;
+				bHoldByUse = false;
 				return;
 			}
 			Focus->Interact(this);
@@ -827,7 +848,57 @@ void ASaltPlayerCharacter::HandleInteract()
 
 void ASaltPlayerCharacter::HandleInteractReleased()
 {
-	bInteractHeld = false;
+	if (!bHoldByUse)
+	{
+		bInteractHeld = false;
+	}
+}
+
+void ASaltPlayerCharacter::HandleUseStarted()
+{
+	// D80 (owner: "Every object now will first be taken into your hand. with left klick can you use it"): the left mouse button
+	// uses what is in hand: on what is used with it (a dig with the shovel), else the tool's own use (the spyglass to the eye,
+	// the compass close, the lantern lifted, a stroke of the shovel).
+	if (bClimbing || bOnLadder || ActiveStation || bViewFocus)
+	{
+		return;
+	}
+	USaltInteractableComponent* Focus = FocusedInteractable.Get();
+	if (Focus && Focus->UsesHeldThing(this) && Focus->CanInteract(this))
+	{
+		if (Focus->IsHold())
+		{
+			HoldTarget = Focus;
+			bInteractHeld = true;
+			bHoldByUse = true;
+			return;
+		}
+		Focus->Interact(this);
+		return;
+	}
+	if (HeldTools)
+	{
+		HeldTools->SetUsing(true);
+	}
+}
+
+void ASaltPlayerCharacter::HandleUseCompleted()
+{
+	if (bHoldByUse)
+	{
+		bInteractHeld = false;
+		bHoldByUse = false;
+	}
+	if (HeldTools)
+	{
+		HeldTools->SetUsing(false);
+	}
+}
+
+bool ASaltPlayerCharacter::IsPromptForUse() const
+{
+	const USaltInteractableComponent* Focus = FocusedInteractable.Get();
+	return Focus && !bOnLadder && !ActiveStation && Focus->UsesHeldThing(this);
 }
 
 void ASaltPlayerCharacter::TickHold(float DeltaSeconds)
@@ -848,6 +919,7 @@ void ASaltPlayerCharacter::TickHold(float DeltaSeconds)
 			HoldProgress = 0.f;
 			HoldTarget = nullptr;
 			bInteractHeld = false;
+			bHoldByUse = false;
 			TimeSinceHoldFired = 0.f;
 			Target->Interact(this);
 		}
@@ -855,6 +927,7 @@ void ASaltPlayerCharacter::TickHold(float DeltaSeconds)
 	}
 	// Let go early (or looked away): the ink drains back in about 0.25 s.
 	bInteractHeld = false;
+	bHoldByUse = false;
 	HoldProgress = FMath::Max(HoldProgress - DeltaSeconds / 0.25f, 0.f);
 	if (HoldProgress <= 0.f)
 	{

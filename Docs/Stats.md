@@ -52,7 +52,7 @@ Every number from `Docs/Design/HubShip/HubShip_Data.json` (generated from `hub_d
 | Decks (D64) | the Deep -4.5, hold -1.5, dock deck +1.5, lower +4.5, middle +7.5, upper +10.5, gun +13.5, main +16.5 m; sterncastle 19.5 / 22.5 / 25.5, poop 28.5; forecastle 19.5, its deck 22.5 | 3 m floor to floor, 2.7 m under the slabs, 2.4 m under the beams |
 | Rooms (D64) | 893 rooms on 14 floors, corridors fore and aft and across every 24 m | `hub_plan.py`; every room has a door |
 | Open at the start | 5 602 of 47 720 m2 (11.7 %, D64; D61: 20.7 % of 31 234 m2) | more floors at 3 m |
-| Bulwarks | 0.9 m with a cap rail | the 1.4 m player's eyes see over them |
+| Bulwarks | 0.9 m with a cap rail | the player's eyes (1.5 m) see over them |
 | Water Hall (D64) | water 16 x 40 m (x 30..46), its floor -4; quays 4 m wide at +1.5; 13.2 m clear over the water | galleries over both quays on three decks; the slipway x 46..60 |
 | Side doors (D64) | a pair in each side at x 32..40, 4 m leaves, -2.5 to 13.0 m; open in 10 s (the aft leaf 10 degrees ahead); clear way 5.54 m at its narrowest (z 6), 7.1 m at the waterline | the watch opens for a boat within 45 m, shuts 20 s after; `sb.Hub.Doors` |
 | Stairs | 17 steps of 17.6 cm on 30 cm treads per storey (D64), 3 m wide in the Well, 2.5 m the dock stair | ramps in the collision |
@@ -118,7 +118,7 @@ On the boat's `USaltHullDamageComponent` (`Boat/SaltHullDamage.h`, Repair catego
 
 | Stat | Value | What it does |
 |---|---|---|
-| Walk / sprint | 250 / 420 cm/s | |
+| Walk / sprint | 250 / 600 cm/s | (D79; sprint was 420) |
 | Acceleration / braking | 2 800 / 2 600 cm/s2 | To full speed and to a stop in about a tenth of a second (D59; was 1 500 / 1 800) |
 | Ground friction | 10 | (was 8) |
 | Step height | 25 cm | Walked up without a jump |
@@ -127,7 +127,8 @@ On the boat's `USaltHullDamageComponent` (`Boat/SaltHullDamage.h`, Repair catego
 | Swim / swim fast | 300 / 460 cm/s | |
 | Ladder | 190 cm/s | The same up and down, eased in and out (D59) |
 | On to a ladder / over its top | 320 cm/s / 0.35 s | (D59) |
-| Eyes | 120 cm | Above the feet; body 1.4 m, 26 cm radius |
+| Body / eyes | 160 / 150 cm | The capsule's height and the eyes above the feet, 26 cm radius (D79, owner at the Keeper's 1.15 m counter: "still to small"; D29's values again; D54 had 1.4 m / 1.3 m, D55 the eyes at 1.2 m). `Height`, `EyeHeight` in `FSaltPlayerStats` |
+| Tool wheel | a 10-count pointer, 2.5 dead zone | A flick of the mouse picks the tool that way (D79; D55 had 150 / 40) |
 | Reach | 220 cm | How far E reaches |
 
 ## Items

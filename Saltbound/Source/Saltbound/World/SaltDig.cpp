@@ -134,6 +134,16 @@ USaltDigUseComponent::USaltDigUseComponent()
 	InitBoxExtent(FVector(45.f, 45.f, 30.f));
 }
 
+bool USaltDigUseComponent::UsesHeldThing(const ASaltPlayerCharacter* Player) const
+{
+	if (!HasShovelInHand(Player))
+	{
+		return false;
+	}
+	const ASaltDigSpot* Spot = Cast<ASaltDigSpot>(GetOwner());
+	return !Spot || Spot->GetStage() == 0;
+}
+
 bool USaltDigUseComponent::CanInteract(const ASaltPlayerCharacter* Player) const
 {
 	if (!Super::CanInteract(Player))

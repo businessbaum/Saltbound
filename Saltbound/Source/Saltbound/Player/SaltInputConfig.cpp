@@ -104,6 +104,7 @@ void USaltInputConfig::Build()
 	Sprint = MakeAction(this, TEXT("IA_Sprint"), EInputActionValueType::Boolean);
 	Dive = MakeAction(this, TEXT("IA_Dive"), EInputActionValueType::Boolean);
 	Interact = MakeAction(this, TEXT("IA_Interact"), EInputActionValueType::Boolean);
+	UseHeld = MakeAction(this, TEXT("IA_UseHeld"), EInputActionValueType::Boolean);
 	Menu = MakeAction(this, TEXT("IA_Menu"), EInputActionValueType::Boolean);
 	Menu->bTriggerWhenPaused = true;
 	Inventory = MakeAction(this, TEXT("IA_Inventory"), EInputActionValueType::Boolean);
@@ -145,6 +146,9 @@ void USaltInputConfig::BuildMappings()
 	C->MapKey(Dive, EKeys::Gamepad_FaceButton_Right);
 	C->MapKey(Interact, KeyOf(IdInteract));
 	C->MapKey(Interact, EKeys::Gamepad_FaceButton_Left);
+	// D80 (owner: "with left klick can you use it"): what is in hand.
+	C->MapKey(UseHeld, EKeys::LeftMouseButton);
+	C->MapKey(UseHeld, EKeys::Gamepad_RightTrigger);
 	C->MapKey(Menu, EKeys::Escape);
 	C->MapKey(Menu, EKeys::F10);
 	C->MapKey(Menu, EKeys::Gamepad_Special_Right);

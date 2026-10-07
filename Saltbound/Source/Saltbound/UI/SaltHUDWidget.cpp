@@ -206,6 +206,7 @@ TSharedRef<SWidget> USaltHUDWidget::RebuildWidget()
 		};
 		SignRing = SignLayer(TEXT("T_UI_SaveKnot_Ring"));
 		SignRose = SignLayer(TEXT("T_UI_SaveKnot_Rose"));
+		SignRose->SetRenderTransformPivot(SaltUI::RosePivot);
 
 		// Looking through the spyglass: dark round the view, a brass rim (section 4). Under the banners and the wheel.
 		SpyglassMask = WidgetTree->ConstructWidget<UImage>();
@@ -388,12 +389,14 @@ void USaltHUDWidget::TickPrompt(float DeltaSeconds)
 		}
 	}
 
-	// D66: the scrap shows the player's Use key (Keys and buttons).
+	// D66: the scrap shows the player's Use key (Keys and buttons). D80: the left mouse button for a use with what is in hand.
+	const bool bUseKey = Player && Player->IsPromptForUse();
 	PromptKeyAge -= DeltaSeconds;
-	if (PromptKeyAge <= 0.f)
+	if (PromptKeyAge <= 0.f || bUseKey != bPromptUseKey)
 	{
 		PromptKeyAge = 0.25f;
-		const FString Key = SaltMenu::ShownKey(TEXT("E"));
+		bPromptUseKey = bUseKey;
+		const FString Key = bUseKey ? FString(TEXT("LMB")) : SaltMenu::ShownKey(TEXT("E"));
 		if (Key != PromptKey)
 		{
 			PromptKey = Key;

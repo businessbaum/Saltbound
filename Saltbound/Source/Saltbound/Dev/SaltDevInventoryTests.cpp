@@ -288,13 +288,21 @@ namespace
 				}
 				break;
 			case 12:
-				if (T > 0.6f)
+				// D80: in hand the spyglass does not narrow the view; the left mouse button raises it to the eye.
+				if (T > 0.6f && T < 1.f && !P->GetHeldTools()->IsUsing())
+				{
+					S->Value = P->GetCamera()->FieldOfView;
+					P->DebugUse(true);
+				}
+				else if (T > 1.4f)
 				{
 					const float Fov = P->GetCamera()->FieldOfView;
 					const float Look = P->GetHeldTools()->GetLookScale();
 					const float Mask = Hud->GetSpyglassMaskOpacity();
-					Report(TEXT("HeldSpyglass"), FMath::Abs(Fov - USaltHeldToolsComponent::SpyglassFOV) < 0.5f && Look < 0.3f && Mask > 0.9f,
-						FString::Printf(TEXT("field of view %.1f, look speed x%.2f, round view %.2f"), Fov, Look, Mask));
+					Report(TEXT("HeldSpyglass"), FMath::Abs(S->Value - P->FieldOfView) < 0.5f && FMath::Abs(Fov - USaltHeldToolsComponent::SpyglassFOV) < 0.5f
+						&& Look < 0.3f && Mask > 0.9f,
+						FString::Printf(TEXT("in hand %.1f, raised to the eye: field of view %.1f, look speed x%.2f, round view %.2f"), S->Value, Fov, Look, Mask));
+					P->DebugUse(false);
 					P->SetHeldTool(TEXT("Lantern"));
 					Next();
 				}
@@ -910,6 +918,18 @@ namespace
 			if (ASaltPlayerCharacter* Player = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr)
 			{
 				Player->SetHeldTool(Args.Num() > 0 && Args[0] != TEXT("none") ? FName(*Args[0]) : NAME_None);
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdUse(
+		TEXT("sb.Dev.Use"),
+		TEXT("D80: the left mouse button on the player (captures, tests): sb.Dev.Use 1 (pressed) | 0 (let go)."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			APlayerController* PC = World ? UGameplayStatics::GetPlayerController(World, 0) : nullptr;
+			if (ASaltPlayerCharacter* Player = PC ? Cast<ASaltPlayerCharacter>(PC->GetPawn()) : nullptr)
+			{
+				Player->DebugUse(Args.Num() == 0 || Args[0] != TEXT("0"));
 			}
 		}));
 

@@ -3,6 +3,7 @@
 #include "Interaction/SaltInteractableComponent.h"
 
 #include "Core/SaltTypes.h"
+#include "Player/SaltPlayerCharacter.h"
 
 USaltInteractableComponent::USaltInteractableComponent()
 {
@@ -17,6 +18,11 @@ USaltInteractableComponent::USaltInteractableComponent()
 	bHiddenInGame = true;
 	ShapeColor = FColor(255, 196, 64);
 	PromptText = NSLOCTEXT("Saltbound", "UseDefault", "Use");
+}
+
+bool USaltInteractableComponent::UsesHeldThing(const ASaltPlayerCharacter* Player) const
+{
+	return Player && UseWith.Num() > 0 && UseWith.Contains(Player->GetHeldTool());
 }
 
 bool USaltInteractableComponent::CanInteract(const ASaltPlayerCharacter* Player) const

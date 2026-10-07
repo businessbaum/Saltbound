@@ -72,6 +72,8 @@ class SALTBOUND_API USaltDigUseComponent : public USaltInteractableComponent
 
 public:
 	USaltDigUseComponent();
+	/** D80: digging (the shovel in hand, something still buried) is done with the left mouse button. */
+	virtual bool UsesHeldThing(const ASaltPlayerCharacter* Player) const override;
 	virtual bool CanInteract(const ASaltPlayerCharacter* Player) const override;
 	virtual FText GetPromptText(const ASaltPlayerCharacter* Player) const override;
 	virtual void Interact(ASaltPlayerCharacter* Player) override;

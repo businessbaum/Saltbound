@@ -500,7 +500,12 @@ UNDER_SCALARS = dict({n: SCALARS[n] for n in VS_SCALARS + ["RippleFloor", "Rippl
 
 # --- underwater post-process (M_PP_Underwater) --------------------------------------------------------
 # Surface height above the camera from the same displacement as the vertex shader at the finest LOD (the
-# horizontal displacement is inverted by fixed-point iteration). Positive = the camera is under water.
+# horizontal displacement is inverted by fixed-point iteration), and its slope there. x: positive = the camera is
+# under water; yz: the surface's rise per cm along x and y.
+# D79 (owner: "Depending if the camera is more than 50% in the water or not the other part of the screen gets the wrong
+# filter"): the pass decides per pixel. A pixel is under water when its point on the near plane is (PP_PIXEL_DEPTH): the
+# surface there is the camera's plus its slope, so the line between the looks runs where the near plane cuts the water,
+# with a thin soft waterline on it (D28 decided for the whole screen by the camera's centre).
 PP_CAMERA_CODE = INIT + """
 float2 P = CamPos.xy;
 float3 D = 0;
@@ -510,19 +515,33 @@ float3 D = 0;
         Disp1, Disp1Sampler, QuietTex, QuietTexSampler, QuietTile, RippleOffsets.w, TroughCalm, QuietAmount, WindSeaVS1);
     P = CamPos.xy - D.xy;
 }
-return Globals.y + D.z - CamPos.z;
+const float E = 20.0;
+float3 DX = O.SurfaceDisplacement(P + float2(E, 0.0), CameraCellSize * 4.0, CameraCellSize, Cascade0, Cascade1, VSMipBias, Disp0, Disp0Sampler,
+        Disp1, Disp1Sampler, QuietTex, QuietTexSampler, QuietTile, RippleOffsets.w, TroughCalm, QuietAmount, WindSeaVS1);
+float3 DY = O.SurfaceDisplacement(P + float2(0.0, E), CameraCellSize * 4.0, CameraCellSize, Cascade0, Cascade1, VSMipBias, Disp0, Disp0Sampler,
+        Disp1, Disp1Sampler, QuietTex, QuietTexSampler, QuietTile, RippleOffsets.w, TroughCalm, QuietAmount, WindSeaVS1);
+return float3(Globals.y + D.z - CamPos.z, (DX.z - D.z) / E, (DY.z - D.z) / E);
 """
 
-PP_UV_CODE = """
+# How deep a pixel's point on the near plane lies (cm, positive = under water), from the camera's surface plane.
+PP_PIXEL_DEPTH = """
+float3 PixDir = PixelRel / max(length(PixelRel), 1e-3);
+float3 NearRel = PixDir * (View.NearPlane / max(dot(PixDir, View.ViewForward), 0.05));
+float PixDepth = CamDepth.x + dot(CamDepth.yz, NearRel.xy) - NearRel.z;
+"""
+
+PP_UV_CODE = PP_PIXEL_DEPTH + """
 // Slight wobble of the image under water.
 float2 W = float2(sin(UV.y * 37.0 + Time * 1.7) + sin(UV.y * 13.0 - Time * 1.1), cos(UV.x * 29.0 + Time * 1.3));
-return UV + W * (DistortAmount * step(0.0, CamDepth));
+return UV + W * (DistortAmount * step(0.0, PixDepth));
 """
 
-PP_FOG_CODE = """
-if (CamDepth <= 0.0)
+PP_FOG_CODE = PP_PIXEL_DEPTH + """
+// The waterline: a thin soft dark line where the near plane meets the water (about 0.02 cm of the near plane each side).
+float Waterline = 1.0 - 0.3 * exp(-PixDepth * PixDepth / (0.02 * 0.02));
+if (PixDepth <= -0.03)
 {
-    return SceneColor.rgb;
+    return SceneColor.rgb * Waterline;
 }
 FSaltUnderwaterLight U;
 U.Init(SunDir, SunIllum, LookAbsorption.rgb, LookScattering.rgb, UnderwaterFog, UnderwaterSky, UnderwaterColor);
@@ -538,7 +557,8 @@ if (DebugView > 0.5)
 }
 // Post-process materials see absolute luminance (pre-exposure is removed before and reapplied after), so
 // the in-scattered light (cd/m2) is added as is.
-return U.Apply(SceneColor.rgb, Dir, Dist, max(Globals.y - CamPos.z, 0.0), max(PointDepth, 0.0));
+float3 Under = U.Apply(SceneColor.rgb, Dir, Dist, max(Globals.y - CamPos.z, 0.0), max(PointDepth, 0.0));
+return lerp(SceneColor.rgb, Under, smoothstep(-0.03, 0.03, PixDepth)) * Waterline;
 """
 
 
@@ -808,24 +828,25 @@ def make_post_material(mpc, ush, under_ush, rts):
                    DebugView=(0.0, "Diagnostics"))
     ctx = ocean_inputs(m, mpc, rts, ["Disp0", "Disp1"], scalars)
     cam_in = ["CamPos", "QuietTex", "RippleOffsets", "Disp0", "Disp1", "CameraCellSize"] + VS_SCALARS + WAVE_PARAMS + FIELD_PARAMS
-    camera = custom(m, -1500, 300, "Surface above the camera (GPU)", ush + "\n" + PP_CAMERA_CODE, cam_in, F1)
+    camera = custom(m, -1500, 300, "Surface above the camera and its slope (GPU)", ush + "\n" + PP_CAMERA_CODE, cam_in, F3)
     link(ctx["cam"], "", camera, "CamPos")
     link(ctx["quiet_tex"], "", camera, "QuietTex")
     link_inputs(ctx, camera, [n for n in cam_in if n not in ("CamPos", "QuietTex")])
 
     screen = sb_ue.expr(m, unreal.MaterialExpressionScreenPosition, -1500, 700)
     time = sb_ue.expr(m, unreal.MaterialExpressionTime, -1500, 800)
-    uv = custom(m, -1100, 700, "Underwater wobble", PP_UV_CODE, ["UV", "Time", "CamDepth", "DistortAmount"],
+    # Camera to pixel, reconstructed from scene depth (post-process domain).
+    pixel_rel = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -800, 900,
+                           world_position_shader_offset=unreal.WorldPositionIncludedOffsets.WPT_CAMERA_RELATIVE)
+    uv = custom(m, -1100, 700, "Underwater wobble", PP_UV_CODE, ["UV", "Time", "CamDepth", "PixelRel", "DistortAmount"],
                 unreal.CustomMaterialOutputType.CMOT_FLOAT2)
     link(screen, "ViewportUV", uv, "UV")
     link(time, "", uv, "Time")
     link(camera, "", uv, "CamDepth")
+    link(pixel_rel, "", uv, "PixelRel")
     link(ctx["sp"]["DistortAmount"], "", uv, "DistortAmount")
     scene = sb_ue.expr(m, unreal.MaterialExpressionSceneTexture, -800, 700, scene_texture_id=unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
     link(uv, "", scene, "UVs")
-    # Camera to pixel, reconstructed from scene depth (post-process domain).
-    pixel_rel = sb_ue.expr(m, unreal.MaterialExpressionWorldPosition, -800, 900,
-                           world_position_shader_offset=unreal.WorldPositionIncludedOffsets.WPT_CAMERA_RELATIVE)
     sun_dir, sun_illum = sun_nodes(m, -800, 1200, above_water_position(m, ctx, -1100, 1300))
 
     fog_in = (["SceneColor", "PixelRel", "CamPos", "CamDepth", "SunDir", "SunIllum", "Globals", "MaxFogDistance", "DebugView"]

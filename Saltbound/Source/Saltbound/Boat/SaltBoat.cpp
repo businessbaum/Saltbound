@@ -1131,55 +1131,6 @@ FSaltLadderLine ASaltBoat::GetLadderLine(bool bStarboard, float CapsuleHalfHeigh
 	return Line;
 }
 
-void ASaltBoat::TakeLaddersOnTouch()
-{
-	// D59 (owner: "just running in the ladder does nothing"): moving into a ladder takes hold of it as E does. From the
-	// water: swimming at it, within its width and an arm's length of it. From the deck: walking out at its head (not where
-	// the gangway lies while moored: that way leads ashore).
-	ASaltPlayerCharacter* Player = Cast<ASaltPlayerCharacter>(GetWorld() ? GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr : nullptr);
-	if (!Player || !Hull || Player->IsOnLadder() || Player->IsClimbing() || Player->IsAtStation() || Player->IsViewFocused())
-	{
-		return;
-	}
-	const FTransform Xf = Hull->GetComponentTransform();
-	FVector Push = Xf.InverseTransformVectorNoScale(Player->GetLastMovementInputVector());
-	Push.Z = 0.0;
-	if (Push.Size() < 0.3)
-	{
-		return;
-	}
-	Push.Normalize();
-	const FVector Body = Xf.InverseTransformPosition(Player->GetActorLocation());
-	const float Half = Player->GetCapsuleHalfHeightForClimb();
-	const float Radius = Player->GetCapsuleComponent()->GetScaledCapsuleRadius();
-	for (const bool bStarboard : { false, true })
-	{
-		const float Side = bStarboard ? 1.f : -1.f;
-		const FSaltLadderLine Line = GetLadderLine(bStarboard, Half, Radius);
-		const bool bAlong = FMath::Abs(Body.X - Line.Bottom.X) < 45.f;
-		if (Player->IsSwimming())
-		{
-			// Outboard of the ladder by at most an arm's length, between its foot and its head, swimming towards the hull.
-			const float Out = (float)((Body.Y - Line.Bottom.Y) * Side);
-			if (bAlong && Out > -25.f && Out < 70.f && Body.Z > Line.Bottom.Z - 120.f && Body.Z < Line.Top.Z && Push.Y * Side < -0.55)
-			{
-				Player->MountLadder(Line, false);
-				return;
-			}
-		}
-		else if (Player->GetMovementBaseObject() == Hull && !(bStarboard && Hold == ESaltBoatHold::Moored))
-		{
-			// At the gap above it, walking out towards it.
-			const float Out = (float)((Body.Y - Line.TopExit.Y) * Side);
-			if (bAlong && Out > 35.f && FMath::Abs(Body.Z - Line.TopExit.Z) < 40.f && Push.Y * Side > 0.55)
-			{
-				Player->MountLadder(Line, true);
-				return;
-			}
-		}
-	}
-}
-
 void ASaltBoat::HandleLadder(USaltInteractableComponent* Interactable, ASaltPlayerCharacter* Player)
 {
 	if (!Player || Player->IsOnLadder())
@@ -1294,7 +1245,6 @@ void ASaltBoat::Tick(float DeltaSeconds)
 	UpdateLantern(Dt);
 	UpdateMastChart();
 	UpdateGangway();
-	TakeLaddersOnTouch();
 	UpdateTrail(Dt);
 	PushOceanMask(bMasksOcean);
 	UpdateHints();

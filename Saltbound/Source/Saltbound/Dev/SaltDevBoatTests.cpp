@@ -1213,23 +1213,19 @@ void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 		Report(TEXT("BoatLadderLetGo"), P && !P->IsOnLadder() && P->IsSwimming() && MaxValue > 0.1f,
 			FString::Printf(TEXT("let go at along %.2f, swimming=%d"), MaxValue, P && P->IsSwimming() ? 1 : 0));
 	}});
-	// D59 (owner: "just running in the ladder does nothing"): swimming at the ladder takes hold of it, no E needed.
+	// D79 (owner: "Deactivate the automatic attache on the ladders. The only way to climb ladders is to press the interaction
+	// button"): swimming at the ladder holding W for 1.5 s does not take hold of it (D59 did).
 	SwimToLadder(TEXT("LadderTouch"));
-	Steps.Add({TEXT("BoatLadderTouch"), 2.f, [this]()
+	Steps.Add({TEXT("BoatLadderNoTouch"), 1.5f, [this]()
 	{
 		MaxValue = 0.f;
 		if (ASaltPlayerCharacter* P = GetPlayer()) { P->SetDebugMoveInput(FVector2D(0.f, 1.f)); }
 	}, [this](float)
 	{
-		// Holding W it takes hold and climbs straight on up (on deck within about a second): note when it held on.
 		ASaltPlayerCharacter* P = GetPlayer();
-		if (P && P->IsOnLadder() && MaxValue <= 0.f)
+		if (P && (P->IsOnLadder() || P->IsClimbing()) && MaxValue <= 0.f)
 		{
 			MaxValue = FMath::Max(StepTime, 0.001f);
-		}
-		if (P && MaxValue > 0.f && !P->IsOnLadder() && !P->IsClimbing())
-		{
-			P->SetDebugMoveInput(FVector2D::ZeroVector);
 		}
 	}, [this]()
 	{
@@ -1239,7 +1235,8 @@ void USaltDevTestSubsystem::RunBoatSuite(const FString& Only)
 			P->SetDebugMoveInput(FVector2D::ZeroVector);
 			P->LetGoOfLadder();
 		}
-		Report(TEXT("BoatLadderTouch"), MaxValue > 0.f && MaxValue < 1.f, FString::Printf(TEXT("swam at the ladder: took hold after %.2f s"), MaxValue));
+		Report(TEXT("BoatLadderNoTouch"), MaxValue <= 0.f, MaxValue > 0.f ? FString::Printf(TEXT("took hold by itself after %.2f s"), MaxValue)
+			: FString(TEXT("swam at the ladder holding W for 1.5 s: did not take hold")));
 	}});
 
 	// 10) Waves: a beam reach in the Rough sea, then bare poles in the Storm sea (open water south-west of the home island,

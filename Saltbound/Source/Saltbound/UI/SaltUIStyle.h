@@ -52,6 +52,10 @@ namespace SaltUI
 		return LoadObject<UTexture2D>(nullptr, *FString::Printf(TEXT("/Game/Saltbound/UI/Textures/%s.%s"), Name, Name));
 	}
 
+	/** D79: where the save knot's rose has its centre in T_UI_SaveKnot_Rose (pixel 136 of 256 across and down, not the
+	 *  picture's middle): its render pivot, so it turns in place instead of circling a few pixels. */
+	inline const FVector2D RosePivot(136.f / 256.f, 136.f / 256.f);
+
 	/** A UI material from /Game/Saltbound/UI/Materials (Tools/ue_scripts/setup_ui_materials.py). */
 	SALTBOUND_API UMaterialInterface* Material(const TCHAR* Name);
 

@@ -106,6 +106,8 @@ private:
 	/** The Use key the prompt's scrap shows (D66), looked up a few times a second. */
 	FString PromptKey;
 	float PromptKeyAge = 0.f;
+	/** D80: the prompt is for the left mouse button (a use with what is in hand). */
+	bool bPromptUseKey = false;
 
 	float NoticeTime = 0.f;
 	float DotAlpha = 0.35f;

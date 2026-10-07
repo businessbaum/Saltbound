@@ -7,12 +7,12 @@
   SM_Dig_Stake    a weathered stake leaning in the sand, a faded red rag tied round its head (a sailor's mark)
   SM_Dig_Bundle   the Cartographer's cache: an oilcloth bundle tied with rope, 52 cm long
   SM_Dig_Box      a sailor's cache: a small planked box with iron corners, a lid and a rope handle, 44 x 30 x 26 cm
-  SM_Tool_Shovel  the shovel: an ash shaft with a T-grip, a socket and a rounded iron blade with two rivets (held, D55)
+  (the shovel, SM_Tool_Shovel, is built by build_tools.py since D80)
 
 The sand pieces carry the island's ground material (MI_HomeGround, D71: projected from the top in world space) with the
 ground's own vertex code (R grass, G litter, B path earth, A tone): dry sand on the mound and the heap, the hole's middle
 and the heap's inside damp and dark (earth). Their edges sink a few centimetres below zero so they melt into the ground.
-Origins on the ground; Unreal axes (+X forward). Run: Tools/Build-BlenderAsset.ps1 build_dig [mound hole heap stake bundle box shovel]
+Origins on the ground; Unreal axes (+X forward). Run: Tools/Build-BlenderAsset.ps1 build_dig [mound hole heap stake bundle box]
 """
 import math
 import os
@@ -232,48 +232,6 @@ def build_box():
     parts.append(bb.ring("box_handle", 0.045, 0.01, (0.0, w / 2 + 0.02, h * 0.62), (0, 1, 0), "MI_Rope_Hemp", 14))
     obj = bb.finish(parts, "SM_Dig_Box", wear=0.9, chips=0.6)
     export(obj)
-
-
-def build_shovel():
-    # Along +X from the grip (x 0) to the blade's tip (x 1.05); +Z is the blade's face. Pivot at the grip.
-    parts = []
-    shaft = bb.rod("shovel_shaft", (0.06, 0.0, 0.0), (0.78, 0.0, 0.0), 0.021, "MI_Wood_Teak", 10)
-    sb.jitter_vertices(shaft, 0.0015, 3)
-    parts.append(shaft)
-    # The T-grip: a short crosspiece pegged through the shaft's end.
-    parts.append(bb.rod("shovel_grip", (0.035, -0.08, 0.0), (0.035, 0.08, 0.0), 0.024, "MI_Wood_TeakDark", 10))
-    parts.append(bb.block("shovel_grip_cheek", (0.07, 0.04, 0.04), (0.055, 0.0, 0.0), "MI_Wood_TeakDark", 0.01))
-    # The socket: an iron sleeve tapering onto the shaft, two rivets.
-    parts.append(bb.lathe("shovel_socket", [(0.0, 0.0), (0.021, 0.0), (0.024, 0.09), (0.03, 0.16), (0.0, 0.16)], (0.74, 0.0, 0.0),
-                          "MI_Metal_Iron", 14, axis=(1, 0, 0)))
-    for x in (0.77, 0.83):
-        parts.append(bb.disc("shovel_rivet", 0.006, 0.006, (x, 0.0, 0.024), (0, 0, 1), "MI_Metal_Iron", 8))
-    # The blade: a rounded spade, a little dished, thick enough to read.
-    bm = bmesh.new()
-    outline = []
-    for k in range(25):
-        t = k / 24
-        a = math.pi * t
-        x = 0.9 + 0.19 * math.sin(a) ** 0.9
-        y = 0.13 * math.cos(a) * (1.0 - 0.15 * (math.sin(a) ** 4))
-        outline.append((x, y))
-    outline = [(0.88, 0.0)] + outline
-    top = [bm.verts.new(bb.U((x, y, 0.006 + 0.012 * (y / 0.13) ** 2))) for x, y in outline]
-    bot = [bm.verts.new(bb.U((x, y, -0.006 + 0.012 * (y / 0.13) ** 2))) for x, y in outline]
-    bm.faces.new(top)
-    bm.faces.new(list(reversed(bot)))
-    n = len(outline)
-    for i in range(n):
-        j = (i + 1) % n
-        bm.faces.new([top[i], bot[i], bot[j], top[j]])
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    blade = bb.mesh_object("shovel_blade", bm, ["MI_Metal_Iron"])
-    sb.world_box_uv(blade, 0.5)
-    parts.append(blade)
-    obj = bb.finish(parts, "SM_Tool_Shovel", wear=0.8, chips=0.3)
-    sb.save_blend(obj.name)
-    sb.export_fbx([obj], os.path.join("Tools", obj.name + ".fbx"))
-    print("SB_DIG", obj.name, len(obj.data.polygons))
 
 
 BUILDERS = {"mound": build_mound, "hole": build_hole, "heap": build_heap, "stake": build_stake, "bundle": build_bundle,

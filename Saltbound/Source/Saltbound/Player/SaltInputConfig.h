@@ -59,6 +59,8 @@ public:
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Dive;
 	/** Use the focused object; leaves a control station when at one. */
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Interact;
+	/** D80: use what is in hand (the left mouse button, the right trigger; held). */
+	UPROPERTY(Transient) TObjectPtr<UInputAction> UseHeld;
 	/** Opens the pause menu (Esc; F10 also works in the editor, where Esc ends the play session). */
 	UPROPERTY(Transient) TObjectPtr<UInputAction> Menu;
 	/** Opens the satchel (Tab, I, gamepad Back). D50; the map left it (D57: the chart is on the mast). */

@@ -282,13 +282,20 @@ PLANT_PARAMS = dict(ssm.FOLIAGE_PARAMS)
 PLANT_PARAMS.update({"DetailScale": ("v", (1.0, 1.0, 0.0, 0.0), "Detail"), "DetailAmount": ("s", 1.0, "Detail"),
                      "NormalAmount": ("s", 1.0, "Detail"), "RoughScale": ("s", 1.0, "Detail"), "AOAmount": ("s", 1.0, "Detail"),
                      "GroundMatch": ("s", 0.0, "Ground"), "GroundScale": ("s", 160.0, "Ground"), "GroundBlur": ("s", 3.0, "Ground"),
-                     "GroundMean": ("v", (0.087, 0.156, 0.0144, 1), "Ground")})
+                     "GroundMean": ("v", (0.087, 0.156, 0.0144, 1), "Ground"),
+                     # D79: the meadow's blades lit like the ground under them (M_SB_IslGrass only).
+                     "UpNormal": ("s", 0.0, "Detail")})
 for _k in ("RibDark", "Grain"):
     PLANT_PARAMS.pop(_k, None)
 
 
-def build_plant_master(name, leaves, detail):
-    """M_SB_IslFoliage (two-sided foliage) / M_SB_IslBark: D60's vertex-mask colours and wind, plus detail textures."""
+def build_plant_master(name, leaves, detail, grass=False):
+    """M_SB_IslFoliage (two-sided foliage) / M_SB_IslBark: D60's vertex-mask colours and wind, plus detail textures.
+    D79 grass=True (M_SB_IslGrass, the meadow's blades; owner: "the grass looks way to dark if you are further away ... crazy
+    differences in color based on lighting"): the normal is written in world space and bent up by UpNormal towards the ground's
+    (straight up), so a blade is lit as the ground it stands on whichever way it faces and wherever the sun is (lit by its own
+    faces the meadow swung from bright to dark with the sun's side, and its many faces turned away from the sun read dark far
+    off)."""
     m = sb_ue.reset_material(name, MASTER)
     for prop, value in (("two_sided", leaves), ("used_with_instanced_static_meshes", True), ("used_with_nanite", True)):
         m.set_editor_property(prop, value)
@@ -340,7 +347,27 @@ def build_plant_master(name, leaves, detail):
     sb_ue.connect(flat, "", nl, "A")
     sb_ue.connect(nsamp, "RGB", nl, "B")
     sb_ue.connect(pn["NormalAmount"], "", nl, "Alpha")
-    sb_ue.to_prop(nl, "", unreal.MaterialProperty.MP_NORMAL)
+    if grass:
+        # World space: the blade's own normal (its back faces turned to the viewer), bent up towards the ground's.
+        m.set_editor_property("tangent_space_normal", False)
+        to_world = sb_ue.expr(m, unreal.MaterialExpressionTransform, -500, 1000,
+                              transform_source_type=unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_TANGENT,
+                              transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
+        sb_ue.connect(nl, "", to_world, "")
+        sign = sb_ue.expr(m, unreal.MaterialExpressionTwoSidedSign, -500, 1100)
+        own = sb_ue.expr(m, unreal.MaterialExpressionMultiply, -350, 1000)
+        sb_ue.connect(to_world, "", own, "A")
+        sb_ue.connect(sign, "", own, "B")
+        up = sb_ue.expr(m, unreal.MaterialExpressionConstant3Vector, -350, 1150, constant=unreal.LinearColor(0, 0, 1, 1))
+        bend = sb_ue.expr(m, unreal.MaterialExpressionLinearInterpolate, -200, 1000)
+        sb_ue.connect(own, "", bend, "A")
+        sb_ue.connect(up, "", bend, "B")
+        sb_ue.connect(pn["UpNormal"], "", bend, "Alpha")
+        unit = sb_ue.expr(m, unreal.MaterialExpressionNormalize, -60, 1000)
+        sb_ue.connect(bend, "", unit, "")
+        sb_ue.to_prop(unit, "", unreal.MaterialProperty.MP_NORMAL)
+    else:
+        sb_ue.to_prop(nl, "", unreal.MaterialProperty.MP_NORMAL)
     wpo_in = ["LocalPos", "Pivot", "Time", "VA", "InstRand", "BendHeight", "BendAmount", "BendSpeed", "FlutterAmount", "FlutterSpeed",
               "WindX", "WindY"]
     wpo = ssm.custom(m, -650, 500, "Foliage wind (cm)", ssm.FOLIAGE_WPO_CODE, wpo_in, F3)
@@ -367,9 +394,11 @@ def tex_set(name):
     return {"DetailD": ISL + "/T_Isl%s_D" % name, "DetailN": ISL + "/T_Isl%s_N" % name, "DetailORM": ISL + "/T_Isl%s_ORM" % name}
 
 
-def plants():
-    leaf = build_plant_master("M_SB_IslFoliage", True, "LeafBroad")
-    bark = build_plant_master("M_SB_IslBark", False, "BarkTree")
+def plants(only=None):
+    """The island's plant masters and instances; only: a list of instance names to (re)make (their masters are rebuilt)."""
+    leaf = build_plant_master("M_SB_IslFoliage", True, "LeafBroad") if not only or any("Lawn" not in n for n in only) else         unreal.load_asset(MASTER + "/M_SB_IslFoliage")
+    bark = build_plant_master("M_SB_IslBark", False, "BarkTree") if not only or any("Lawn" not in n for n in only) else         unreal.load_asset(MASTER + "/M_SB_IslBark")
+    grass = build_plant_master("M_SB_IslGrass", True, "LeafPalm", grass=True)
     # A plant's bark and leaves share its bend (BendHeight / Amount / Speed), so the crown stays on its trunk (D60's values).
     palm_wind = {"BendHeight": 900.0, "BendAmount": 32.0, "BendSpeed": 0.55}
     tree_wind = {"BendHeight": 900.0, "BendAmount": 12.0, "BendSpeed": 0.45}
@@ -421,9 +450,12 @@ def plants():
     # root, lit at the tip, a little wind.
     # D78 (owner: "even denser grass ... change the green floor desing ... its horrible"): a deeper, less yellow green, less light
     # through the blades (they glowed neon against the sun), the ground's colour taken from its new thatch.
-    lib["MI_IslGrass_Lawn"] = (leaf, "LeafPalm", {"BendHeight": 40.0, "BendAmount": 2.5, "BendSpeed": 1.0, "FlutterAmount": 1.2,
-                                                 "FlutterSpeed": 3.0, "NormalAmount": 0.4, "Roughness": 0.62, "Specular": 0.3,
-                                                 "GroundMatch": 0.6, "PartVar": 0.1, "InstVar": 0.06, "HueShift": 0.04}, {
+    # D79 (owner: "the grass looks way to dark if you are further away"): on M_SB_IslGrass, its blades lit as the ground (UpNormal),
+    # matte (with the normals up, looking towards the sun the meadow shone silver like one wet sheet at Specular 0.3).
+    lib["MI_IslGrass_Lawn"] = (grass, "LeafPalm", {"BendHeight": 40.0, "BendAmount": 2.5, "BendSpeed": 1.0, "FlutterAmount": 1.2,
+                                                  "FlutterSpeed": 3.0, "NormalAmount": 0.4, "Roughness": 0.95, "Specular": 0.04,
+                                                  "GroundMatch": 0.6, "PartVar": 0.1, "InstVar": 0.06, "HueShift": 0.04,
+                                                  "UpNormal": 0.8, "RoughScale": 2.5}, {
         "DarkColor": (0.022, 0.045, 0.011, 1), "LightColor": (0.085, 0.185, 0.04, 1), "DryDark": (0.09, 0.075, 0.03, 1),
         "DryLight": (0.32, 0.27, 0.12, 1), "SubsurfaceColor": (0.07, 0.12, 0.025, 1), "GroundMean": (0.0261, 0.0409, 0.0083, 1)})
     # D78 (owner: "real leaves for the braun part"): the fallen leaves (SM_Litter_*): dry browns to ochre, some yellowed or green,
@@ -446,6 +478,8 @@ def plants():
         "DarkColor": (0.02, 0.025, 0.006, 1), "LightColor": (0.1, 0.11, 0.025, 1), "DryDark": (0.05, 0.035, 0.015, 1),
         "DryLight": (0.22, 0.16, 0.07, 1), "SubsurfaceColor": (0.1, 0.12, 0.02, 1)})
     for name, (parent, texset, scalars, vectors) in lib.items():
+        if only and name not in only:
+            continue
         make_mi_saved(name, MI, parent, scalars=scalars, vectors=vectors, textures=tex_set(texset))
     print("SB_PLANT_MATERIALS_OK", mel.get_statistics(leaf).num_pixel_shader_instructions, mel.get_statistics(bark).num_pixel_shader_instructions)
 
@@ -551,6 +585,8 @@ def main():
         print("SB_GROUND_MATERIAL_OK", mel.get_statistics(m).num_pixel_shader_instructions)
     if "plants" in args:
         plants()
+    elif "lawn" in args:
+        plants(["MI_IslGrass_Lawn"])
     if "smoke" in args or "plants" in args:
         smoke()
     if "pool" in args or "plants" in args:

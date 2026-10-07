@@ -255,8 +255,15 @@ namespace
 		Report(TEXT("MenuTitle"), T && !World->IsPaused() && !PC->GetHUDWidget()->IsVisible() && PC->bShowMouseCursor,
 			FString::Printf(TEXT("title=%d paused=%d hud=%d chosen=%d"), T ? 1 : 0, World->IsPaused() ? 1 : 0, PC->GetHUDWidget()->IsVisible() ? 1 : 0,
 				T ? T->GetChosenItem() : -1));
+		// D79: Continue lets go of the title over a second (still on the stack, no cursor), then play takes over.
 		PC->ContinueVoyage();
-		Report(TEXT("MenuTitleContinue"), !PC->IsMenuOpen() && PC->GetHUDWidget()->IsVisible(), FString::Printf(TEXT("open=%d"), PC->IsMenuOpen() ? 1 : 0));
+		const bool bLeaving = T && T->IsLeaving() && PC->IsMenuOpen() && !PC->bShowMouseCursor;
+		if (T)
+		{
+			T->FinishLeave();
+		}
+		Report(TEXT("MenuTitleContinue"), bLeaving && !PC->IsMenuOpen() && PC->GetHUDWidget()->IsVisible(),
+			FString::Printf(TEXT("leaving=%d open=%d"), bLeaving ? 1 : 0, PC->IsMenuOpen() ? 1 : 0));
 
 		// Restore what the owner had.
 		S->SetVSyncEnabled(bVSync);

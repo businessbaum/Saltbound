@@ -28,6 +28,15 @@ public:
 	virtual void Back() override {}
 	virtual void OnRevealed() override { Refresh(); }
 
+	/** D79 (owner: "Create a small animation between continue and actually loading into the game, its too sudden"): Continue
+	 *  lets go of the world. The lines and the title drift left and fade (0.35 s), the dusk shades lift (LeaveSeconds, eased),
+	 *  the cursor goes at once; then the screen leaves the stack and play (the HUD, the keys) takes over. */
+	void BeginLeave();
+	bool IsLeaving() const { return bLeaving; }
+	/** Ends the leave now (tests). */
+	void FinishLeave();
+	static constexpr float LeaveSeconds = 1.2f;
+
 	/** Where the title sits (the intro's last frame, cut to its box: Tools/textures/gen_menu_parts.py TITLE_BOX). */
 	static constexpr float TitleX = 101.f;
 	static constexpr float TitleY = 155.f;
@@ -37,5 +46,11 @@ public:
 protected:
 	virtual void Build() override;
 	virtual void NativeConstruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual void Navigate(int32 Dx, int32 Dy) override;
 	virtual void ItemUsed(int32 Index) override;
+
+private:
+	bool bLeaving = false;
+	float LeaveT = 0.f;
 };

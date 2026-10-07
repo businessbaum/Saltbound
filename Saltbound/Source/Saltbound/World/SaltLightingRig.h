@@ -243,9 +243,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Time")
 	float LanternSunElevation = 6.f;
 
-	/** The sun turns in steps of this many degrees: every step re-renders the cached shadows (virtual shadow maps). */
+	/** The sun and the moon turn once they have moved this many degrees (each turn re-renders the cached shadows of the virtual
+	 *  shadow maps). D79: 0, they turn every frame (owner: "the sun seems to tick ... You can see this in the shadows"; D72's
+	 *  0.2 degrees was a step every 1.3 s). */
 	UPROPERTY(EditAnywhere, Category = "Time", meta = (Units = "deg"))
-	float SunStepDegrees = 0.2f;
+	float SunStepDegrees = 0.f;
 
 	/** The moon: a second atmosphere light (index 1) the rig owns. It rises at MoonRiseHour in the east-south-east, crosses
 	 *  the south and sets at MoonSetHour in the west-south-west; it takes over as the sun sinks below -2 degrees. */
@@ -377,6 +379,12 @@ private:
 	// D72: the clock.
 	/** The look at Hour from the day's keys, with the sun's elevation and its (unwrapped) azimuth. */
 	FSaltLightingPreset ComposeTimeLook(float Hour, float& OutSunElevation, float& OutSunAzimuth) const;
+	/** The day's keys round Hour (A at or before it, B after it, T between them) and the sun's elevation and azimuth there. */
+	void DayKeysAt(float Hour, int32& OutA, int32& OutB, float& OutT, float& OutSunElevation, float& OutSunAzimuth) const;
+	/** Where the moon's light points at Hour. */
+	FRotator MoonRotationAt(float Hour) const;
+	/** D79: the sun and the moon to the clock's hour, every frame (the rest of the look follows four times a second). */
+	void TurnSunAndMoon();
 	const FSaltLightingPreset* FindLook(FName Look) const;
 	/** Adds the looks the clock needs (Morning, Dawn, Twilight, Night) when a placed rig was saved without them. */
 	void EnsureDefaultLooks();

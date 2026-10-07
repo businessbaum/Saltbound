@@ -72,6 +72,10 @@ public:
 	void DebugInteract() { HandleInteract(); }
 	/** Programmatic release of the interact key for automated tests (ends a hold). */
 	void DebugInteractRelease() { HandleInteractReleased(); }
+	/** D80: the left mouse button pressed (true) or let go, for automated tests. */
+	void DebugUse(bool bDown) { if (bDown) { HandleUseStarted(); } else { HandleUseCompleted(); } }
+	/** D80: the focused object is used with what is in hand (the prompt shows the left mouse button, not E). */
+	bool IsPromptForUse() const;
 
 	// Hold interactions (D55) ----------------------------------------------------
 	/** 0..1 while a hold action fills (and drains after letting go early). */
@@ -90,7 +94,7 @@ public:
 	float WalkSpeed = 250.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Movement", meta = (ClampMin = "0", Units = "cm/s"))
-	float SprintSpeed = 420.f;
+	float SprintSpeed = 600.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (ClampMin = "0", Units = "cm/s"))
 	float SwimSpeed = 300.f;
@@ -134,6 +138,8 @@ public:
 	bool IsWakingUp() const { return WakeSeconds > 0.f; }
 	/** Shows the held tool (compass, spyglass view, lantern). */
 	class USaltHeldToolsComponent* GetHeldTools() const { return HeldTools; }
+	/** D80: the arms that hold them. */
+	class USaltArmsComponent* GetArms() const { return Arms; }
 
 	/** Applies the look settings (field of view, mouse sensitivity, invert look) from USaltGameUserSettings. */
 	void ApplyUserSettings();
@@ -155,9 +161,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Swimming", meta = (Units = "s"))
 	float LadderTopTime = 0.35f;
 
-	/** Camera height above the feet (capsule height is 140 cm). */
+	/** Camera height above the feet (the capsule's height and the eyes come from the stats table, SaltStats.h). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "100", ClampMax = "180", Units = "cm"))
-	float EyeHeight = 120.f;   // D55: lower (owner: "camera perspective is too high"; was 130 cm)
+	float EyeHeight = 150.f;   // D79: 1.5 m (owner: "still to small"; D55 had 1.2 m)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Saltbound|Camera", meta = (ClampMin = "60", ClampMax = "110"))
 	float FieldOfView = 80.f;
@@ -215,6 +221,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class USaltHeldToolsComponent> HeldTools;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<class USaltArmsComponent> Arms;
+
 	/** Follows the view as rendered (set in CalcCamera); the held tools hang from it. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> ViewAnchor;
@@ -267,6 +276,8 @@ private:
 	void HandleDiveCompleted();
 	void HandleInteract();
 	void HandleInteractReleased();
+	void HandleUseStarted();
+	void HandleUseCompleted();
 	void TickHold(float DeltaSeconds);
 	void TickClimb(float DeltaSeconds);
 	void TickLadder(float DeltaSeconds, float Input);
@@ -295,6 +306,8 @@ private:
 
 	TWeakObjectPtr<USaltInteractableComponent> HoldTarget;
 	bool bInteractHeld = false;
+	/** D80: the hold was started by the left mouse button (E's release does not end it). */
+	bool bHoldByUse = false;
 	float HoldProgress = 0.f;
 	float TimeSinceHoldFired = 100.f;
 

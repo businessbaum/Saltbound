@@ -245,7 +245,24 @@ void ASaltPlayerController::Ask(const FText& Title, const FText& Body, const FTe
 
 void ASaltPlayerController::ContinueVoyage()
 {
-	CloseScreens();
+	// D79: from the title, the title lets go of the world over a second (USaltStartMenuWidget::BeginLeave) instead of vanishing;
+	// screens over it (the voyages) close at once.
+	USaltStartMenuWidget* Title = FindScreen<USaltStartMenuWidget>();
+	if (!Title)
+	{
+		CloseScreens();
+		return;
+	}
+	for (int32 I = Screens.Num() - 1; I >= 0; --I)
+	{
+		if (Screens[I] != Title)
+		{
+			Screens[I]->RemoveFromParent();
+			Screens.RemoveAt(I);
+		}
+	}
+	UpdateScreens();
+	Title->BeginLeave();
 }
 
 void ASaltPlayerController::NewVoyage()
@@ -704,8 +721,11 @@ void ASaltPlayerController::AimToolWheel(FVector2D Input, bool bStick)
 	}
 	else
 	{
-		WheelPointer = (WheelPointer + FVector2D(Input.X, -Input.Y)).GetClampedToMaxSize(150.f);
-		if (WheelPointer.Size() < 40.f)
+		// D79 (owner: "a light shift with the mouse needs to be enough to select the object in this direction", then "even more
+		// senitivity"): a very short pointer (mouse counts) whose direction follows the latest small move: a flick of a few counts
+		// selects. D55's 150 with a 40 dead zone needed long sweeps.
+		WheelPointer = (WheelPointer + FVector2D(Input.X, -Input.Y)).GetClampedToMaxSize(10.f);
+		if (WheelPointer.Size() < 2.5f)
 		{
 			return;
 		}

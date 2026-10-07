@@ -121,6 +121,7 @@ TSharedRef<SWidget> USaltLoadingWidget::RebuildWidget()
 		};
 		Ring = Layer(TEXT("T_UI_SaveKnot_Ring"));
 		Rose = Layer(TEXT("T_UI_SaveKnot_Rose"));
+		Rose->SetRenderTransformPivot(SaltUI::RosePivot);
 		Root->SetRenderOpacity(0.f);
 	}
 	return Super::RebuildWidget();

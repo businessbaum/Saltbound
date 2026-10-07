@@ -543,6 +543,17 @@ float ASaltLightingRig::GetLookHour(FName Look) const
 
 FSaltLightingPreset ASaltLightingRig::ComposeTimeLook(float Hour, float& OutSunElevation, float& OutSunAzimuth) const
 {
+	int32 IA = 0, IB = 0;
+	float T = 0.f;
+	DayKeysAt(Hour, IA, IB, T, OutSunElevation, OutSunAzimuth);
+	const FSaltLightingPreset* LookA = FindLook(DayCycle[IA].Look);
+	const FSaltLightingPreset* LookB = FindLook(DayCycle[IB].Look);
+	const FSaltLightingPreset Fallback = Presets.Num() > 0 ? Presets[0] : FSaltLightingPreset();
+	return LerpLook(LookA ? *LookA : Fallback, LookB ? *LookB : Fallback, Smooth(T));
+}
+
+void ASaltLightingRig::DayKeysAt(float Hour, int32& OutA, int32& OutB, float& OutT, float& OutSunElevation, float& OutSunAzimuth) const
+{
 	const int32 N = DayCycle.Num();
 	Hour = FMath::Fmod(Hour, 24.f);
 	if (Hour < 0.f)
@@ -579,14 +590,37 @@ FSaltLightingPreset ASaltLightingRig::ComposeTimeLook(float Hour, float& OutSunE
 			AzimuthB += 360.f;
 		}
 	}
-	const float T = HourB > HourA ? FMath::Clamp((Hour - HourA) / (HourB - HourA), 0.f, 1.f) : 0.f;
+	OutT = HourB > HourA ? FMath::Clamp((Hour - HourA) / (HourB - HourA), 0.f, 1.f) : 0.f;
+	OutA = I;
+	OutB = (I + 1) % N;
 	// The sun moves evenly between keys; the look eases from one to the next.
-	OutSunElevation = FMath::Lerp(A.SunElevation, B.SunElevation, T);
-	OutSunAzimuth = FMath::Lerp(AzimuthA, AzimuthB, T);
-	const FSaltLightingPreset* LookA = FindLook(A.Look);
-	const FSaltLightingPreset* LookB = FindLook(B.Look);
-	const FSaltLightingPreset Fallback = Presets.Num() > 0 ? Presets[0] : FSaltLightingPreset();
-	return LerpLook(LookA ? *LookA : Fallback, LookB ? *LookB : Fallback, Smooth(T));
+	OutSunElevation = FMath::Lerp(A.SunElevation, B.SunElevation, OutT);
+	OutSunAzimuth = FMath::Lerp(AzimuthA, AzimuthB, OutT);
+}
+
+void ASaltLightingRig::TurnSunAndMoon()
+{
+	float Elevation = 0.f, Azimuth = 0.f, T = 0.f;
+	int32 IA = 0, IB = 0;
+	DayKeysAt(TimeOfDay, IA, IB, T, Elevation, Azimuth);
+	if (Sun)
+	{
+		const FRotator SunRotation(-Elevation, Azimuth + 180.f, 0.f);   // as PushEnvironment: the light shines away from the sun
+		if (!LastSunRotation.Equals(SunRotation, SunStepDegrees))
+		{
+			Sun->SetActorRotation(SunRotation);
+			LastSunRotation = SunRotation;
+		}
+	}
+	if (Moon)
+	{
+		const FRotator MoonRotation = MoonRotationAt(TimeOfDay);
+		if (!LastMoonRotation.Equals(MoonRotation, SunStepDegrees))
+		{
+			Moon->SetWorldRotation(MoonRotation);
+			LastMoonRotation = MoonRotation;
+		}
+	}
 }
 
 FName ASaltLightingRig::GetDayPhase() const
@@ -706,6 +740,25 @@ void ASaltLightingRig::SetSkyDomeVisible(bool bVisible)
 	}
 }
 
+FRotator ASaltLightingRig::MoonRotationAt(float Hour) const
+{
+	float Span = MoonSetHour - MoonRiseHour;
+	if (Span <= 0.f)
+	{
+		Span += 24.f;
+	}
+	float Since = Hour - MoonRiseHour;
+	if (Since < 0.f)
+	{
+		Since += 24.f;
+	}
+	// Rises in the east-south-east, crosses the south, sets in the west-south-west.
+	const float P = FMath::Clamp(Since / Span, 0.f, 1.f);
+	const float Azimuth = 100.f + 160.f * P;
+	const float Elevation = 10.f + (MoonHighestElevation - 10.f) * FMath::Sin(PI * P);
+	return FRotator(-Elevation, Azimuth + 180.f, 0.f);
+}
+
 void ASaltLightingRig::PushMoon(float SunElevation, float Hour)
 {
 	// The moon takes over as the sun sinks from -2 to -9 degrees (and hands back at dawn).
@@ -724,21 +777,7 @@ void ASaltLightingRig::PushMoon(float SunElevation, float Hour)
 	{
 		return;
 	}
-	float Span = MoonSetHour - MoonRiseHour;
-	if (Span <= 0.f)
-	{
-		Span += 24.f;
-	}
-	float Since = Hour - MoonRiseHour;
-	if (Since < 0.f)
-	{
-		Since += 24.f;
-	}
-	// Rises in the east-south-east, crosses the south, sets in the west-south-west.
-	const float P = FMath::Clamp(Since / Span, 0.f, 1.f);
-	const float Azimuth = 100.f + 160.f * P;
-	const float Elevation = 10.f + (MoonHighestElevation - 10.f) * FMath::Sin(PI * P);
-	const FRotator Rotation(-Elevation, Azimuth + 180.f, 0.f);
+	const FRotator Rotation = MoonRotationAt(Hour);
 	if (bForceSunStep || !LastMoonRotation.Equals(Rotation, SunStepDegrees))
 	{
 		Moon->SetWorldRotation(Rotation);
@@ -1050,7 +1089,7 @@ void ASaltLightingRig::Tick(float DeltaSeconds)
 	Advance(RegionLayer);
 	Advance(WeatherLayer);
 	Advance(SeaLayer);
-	// D72: the clock. The look is recomposed four times a second; the sun itself turns in small steps (PushEnvironment).
+	// D72: the clock. The look is recomposed four times a second; D79: the sun and the moon turn every frame (TurnSunAndMoon).
 	UWorld* World = GetWorld();
 	if (DayCycle.Num() > 0 && bClockRuns && !bClockHeld && World && World->IsGameWorld())
 	{
@@ -1094,6 +1133,10 @@ void ASaltLightingRig::Tick(float DeltaSeconds)
 	}
 	else
 	{
+		if (DayCycle.Num() > 0 && bClockRuns && !bClockHeld && World && World->IsGameWorld())
+		{
+			TurnSunAndMoon();
+		}
 		ApplyInteriorFog();
 	}
 }
