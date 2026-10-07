@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; the hub's harbour D70; M6 steps 1-3: the day's clock D72, digging D73, the ship repair system D74; session 9: the hub's light D82).
+Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; the hub's harbour D70; M6 steps 1-3: the day's clock D72, digging D73, the ship repair system D74; session 9: the hub's light D82; the owner's review D79, hands and tools D80, the Harbour Keeper's figure D83, music D84).
 
 ## Milestone status
 
@@ -258,6 +258,19 @@ for a higher screen percentage (for example 75 %) and more content.
   frame: a wingbeat with the hand trailing the arm and the wing folding on the upstroke, the crooked glide, banking with the tail
   twisting into the turn, the head level and glancing about. `sb.Hub.Appear` (your boat 60 m off her doors), `sb.Hub.Appear dock`
   (on the quay in her harbour), `sb.Hub.Appear show`; watch a gull with `sb.Dev.BirdCam 0` and `sb.Birds.Flap 1` plus `slomo 0.1`.
+- **D79 (the owner's review, waiting for the owner's look):** the player 1.6 m with the eyes at 1.5 m (over the Keeper's counter); the
+  tool wheel picks on a flick of the mouse; the underwater view splits where the lens meets the water (a thin waterline); the meadow
+  even from near to far and from every side of the sun (its blades lit as the ground, matte); sprint 600 cm/s; the sun turns every
+  frame; ladders only with E; Continue fades the title out. Evidence: `Docs/Evidence/D79/D79_sheet.jpg`.
+- **D80 (hands and tools, waiting for the owner's look):** first-person arms (comic hands, rolled sleeves) holding every tool by its
+  grips; the left mouse button uses what is in hand: the compass close, the spyglass (a real three-draw brass one) to the eye drawing
+  out, the lantern lifted, the spade (a real worked one) digging: aim, drive in, lever, lift the spadeful, toss it (clods fly), the body
+  leaning into it; dig spots are dug with the left button (E takes the find). Try it: keys 1-6 or the wheel, then left click; `sb.Dev.GiveTool
+  Shovel`. Evidence: `Docs/Evidence/D80/`.
+- **D83 (the Harbour Keeper's figure, waiting for the owner's look):** an old salt behind his counter (cap, beard, pipe, waistcoat), who
+  breathes, looks at you when you come near and gestures while he talks (D81's lines). Evidence: `Docs/Evidence/D83/`.
+- **D84 (music, waiting for the owner's listen):** the owner's four tracks by mood: calm by day, the dark one from dusk, the drama one in a
+  storm or with the boat filling; long rests between tracks; the settings' Music volume. `sb.Music Calm|Night|Drama|off|auto|next|info`.
 - **D82 (the hub's light, waiting for the owner's look):** no more horror ship: below decks the eye may open to EV 0 with one exposure
   bias (-1) at every hour (the rooms went black at night), the lanterns at 2 800 K (1 900 K turned the golden wood orange-red) with a
   12 cm source, and the lanterns' own parts cast no shadow (the dark disc under each lantern and the stripes round it). A/B sheets in
@@ -405,6 +418,7 @@ the sail and cast off.
 | Jump / swim up (under water you hover when no key is pressed) | Space | A / Cross |
 | Dive (while swimming) | Left Ctrl / C | B / Circle |
 | Interact / leave station (raising the anchor: hold E) | E | X / Square |
+| Use what is in hand (D80): compass close, spyglass to the eye, lantern lifted, a stroke of the spade; hold on a dig spot to dig | Left mouse button | Right trigger |
 | At a station | W/S and A/D are routed to the station | Left stick |
 | Pause menu (D66: Resume, Save now, Voyages, Settings, Return to the title, Quit to desktop) | Esc (in the editor: F10) | Start |
 | In the menus (D66) | W / S or the arrows choose, A / D change, E / Enter use, Esc or right click back, Q / E turn the settings' pages; hold X on a voyage to scrap it; the mouse hovers and clicks | D-pad, A use, B back, bumpers turn pages, X (hold) scrap |
@@ -433,6 +447,9 @@ Developer console (`~`, non-shipping builds):
   `sb.Dev.MenuShots [quit]` (every screen to `Saved/MenuShots`), `sb.Dev.MenuFlow [quit]` (title, new voyage, save, voyages, back
   to the title; uses the real voyage slots, so run it in a test install), `sb.Dev.KeyShots [quit]` (prompts with other keys),
   `sb.Dev.DrawnKeyLetters 1` (draw every key letter at run time, to compare with the painted ones)
+- D80: `sb.Dev.Use 1|0` (the left mouse button on the player), `sb.Arms.World 1|0` (draw the arms and tools in the world, to look at them
+  from outside with `sb.Dev.Camera`), `sb.Tools.DigPhase <0..1>|-1` (hold the spade at a stroke's phase). D84: `sb.Music Calm|Night|Drama|off|auto|next|info`.
+  `Tools/pie_shot.py <dir> "<cmd>; @wait s; @shot name; @use 1"` (frames from play).
 - `sb.Dev.ResetPlayer`, `sb.MouseSensitivity <x>`, `sb.PromptOnObject 1|0`, `sb.Dev.ShowInteractionVolumes 1`,
   `sb.Dev.RunSaveTests` (test slot; the player's own save is untouched), `sb.Dev.RunInventoryTests`,
   `sb.Dev.Give <Item> [Count]`, `sb.Dev.Satchel [off]`, `sb.Dev.Store crate|barrel [demo [t]]|off`, `sb.Dev.Landfall <Id> [t]|reset`, `sb.Dev.Wheel 1 [n]|0`, `sb.Dev.Chart [off]`, `sb.Dev.Tool <Compass|Spyglass|Lantern|none>`, `sb.Dev.CameraTrace [s] [deck]`, `sb.Dev.EdgeTest [s]` (the view beside the deck's low steps in the open sea), `sb.Boat.RigTurn 0|1`, `sb.Camera.DeckKnees 0|1`, `sb.Camera.DeckTilt <share>` (0 = level view), `sb.Camera.StepSmooth 0|1`
@@ -482,8 +499,6 @@ Developer console (`~`, non-shipping builds):
   - No spray yet (`SprayAmount` is unused).
   - Cloud positions follow wall-clock time, so captures minutes apart reflect different clouds.
 - **Underwater (D28):**
-  - The waterline is not split: with the camera exactly at the surface, the near plane can show a thin band
-    of the wrong side for a frame.
   - No god rays, bubbles or particles yet. The underside does not show objects above the water (boat hulls
     above the waterline) through Snell's window.
   - Sea grass ignores the player (no bending). Caustics are emissive, so they also show in shadows under the
@@ -513,7 +528,7 @@ Developer console (`~`, non-shipping builds):
   and then (D58); the view glides through it (at most 3 cm a frame). With the flat base the feet ride 1-4 cm higher on a
   steeply tilted deck (its corner rests on it).
 - Mouse sensitivity has not been tested by a human (`sb.MouseSensitivity`). The prompt key label is fixed to "E".
-- No audio yet. No player body or hands.
+- No sounds yet besides the music (D84). The player has arms and hands (D80) but no body.
 - `BoardingRamp` in `L_DevTest` is not aligned. Template `LevelPrototyping` content is still in use for greyboxing.
 
 ## Next steps
@@ -529,7 +544,7 @@ Developer console (`~`, non-shipping builds):
 5. Water polish: spray at crests (`SprayAmount`), verification captures of all
    region × weather × time-of-day combinations, curved (non-Gerstner) crests against the remaining banding.
 6. Packaged benchmark with the D44 defaults (frame cap), the masked ocean and the wake (editor closed).
-7. Underwater after the owner's review: waterline split at the camera, god rays and bubbles, sea grass
+7. Underwater after the owner's review: god rays and bubbles (the waterline split came with D79), sea grass
    bending around the player, a packaged-build benchmark of the FFT ocean plus the underwater rendering.
 8. **Menus (D66), accessibility settings:** hold actions as press-to-toggle (raising the anchor, the tool wheel), text size,
    subtitles (with a parchment backing) and seasickness comfort (a steady horizon, less roll with the boat, a soft vignette in

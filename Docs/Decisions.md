@@ -2443,3 +2443,92 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   lines cannot be read.
 - **Tests:** `sb.Dev.RunTalkTests` 7/7 (LinesLoad, KeeperFirstTalk, AnswersByKey, EntriesFollowTheStory, ConditionsHideAnswers, WalkingAwayEnds, UnknownSpeaker); Prologue 7/7 and Dig 7/7 with the shovel now taken through the Keeper's talk. Seen in play (`shot showui`): the sheet centred low with its seal, name and rule, the words written out, keys 1 and E; the call pinned to the side.
 - **Next:** FH3, the log (the sea chest opens it; the Cartographer's page one with the palm sketch; notes from the beats).
+
+### D79 · The owner's review of D77-D78: a taller player, a quicker tool wheel, the underwater view split at the waterline, an even meadow (Adopted: waiting for the owner's look)
+- **Owner (2026-10-07), with screenshots:** "the grass looks way to dark if you are further away ... crazy differences in color based on
+  lighting"; "My charakter is still to small look how i view the harbour keeper, i cant even look over the desk"; "i need even more
+  senitivity when moving the mous in the q wheel"; "Underwater split is not fixed". (The editor the owner played still ran the build from
+  before the last session's fixes: eyes at 1.2 m, D55's wheel, no split.)
+- **The player:** 1.6 m with the eyes at 1.5 m (D29's values; D54 had 1.4 m and 1.3 m, D55 lowered the eyes to 1.2 m). The Keeper's counter
+  is 1.15 m above the sand: the eyes now look over it into the hut. The body's height is a stat now (`FSaltPlayerStats::Height`, the
+  capsule), next to `EyeHeight`. Swimming keeps the eyes 14 cm above the water; the bulwark (0.9 m) and the hub's 3.7 m headroom are clear.
+- **The tool wheel:** a 10-count pointer with a 2.5-count dead zone: its direction follows the latest flick of the mouse (D55: 150 and 40).
+- **The waterline:** the underwater post-process decides per pixel: a pixel is under water when its point on the near plane is (the
+  surface there is the camera's plus its slope), so the screen divides where the lens meets the water, with a thin soft waterline on it
+  (D28 decided for the whole screen by the camera's centre: half the screen showed the sand unfogged). Checked by stepping a camera
+  through the surface in 2 cm steps with the sea frozen.
+- **The meadow:** its blades get their own master, `M_SB_IslGrass` (`setup_island_materials.py lawn`), whose normal is written in world
+  space and bent up towards the ground's (`UpNormal` 0.8, the back faces turned to the viewer first), and matte (Specular 0.04,
+  roughness saturated). Lit by their own faces, the blades swung from bright to dark with the sun's side, and the many faces turned away
+  from the sun made the meadow read dark further off; with up-normals and Specular 0.3 the meadow turned silver-white towards the sun (one
+  shiny sheet), hence matte. A/B from four views (`Docs/Evidence/D79/D79_sheet.jpg`).
+- **From the last session, now built and tested:** sprint 600 cm/s (was 420); the sun and the moon turn every frame (D72 stepped them
+  every 0.2 degrees, about once a second); ladders are taken only with E (walking or swimming into one no longer grabs it); Continue lets
+  the title fade out over a second; the loading rose and the save sign turn about their drawing's real centre.
+- **Tests:** menus 22/22, clock 6/6, boat ladders 11/11 (`BoatLadderNoTouch`: holding W into the ladder no longer takes hold), hub ladder
+  1/1, swim 5/5, movement 10/10 (L_DevTest), inventory 43/44 (`SaveSignShows`, known), dig 7/7. The cost of turning the sun every
+  frame (its cached virtual shadow pages re-rendered) is not measured on its own yet.
+
+### D80 · Hands that hold every tool, a real spyglass and a real spade, the left mouse button uses what is in hand (Adopted: waiting for the owner's look)
+- **Owner (2026-10-07):** "Hands and left click: Complete everything, as for now there are no hands"; "Create a real spyglass, only using
+  on left click"; "Create a real shovel, create the digging animation when digging in. again when the shovel is in your hands you use left
+  klick".
+- **The arms** (`SK_Arms`, build_arms.py and sb_hand.py from the last session: comic hands, rolled linen sleeves, a hemp bracelet with a
+  shell, a leather wrist wrap) are posed every frame by `USaltArmsComponent`: two-bone IK from the shoulder (the elbow down and out), the
+  hand turned as asked with half its roll in the forearm's twist bone, each finger curled at its three joints (a fist, a cradle, relaxed).
+  What the hands hold sets each wrist's target from **grips set on the tool** (the compass on the palm under its case, a fist round the
+  spyglass's leather, the lantern's ring, the spade's crossbar and shaft), so the hands stay on the tool whatever it does.
+- **What it took:** first-person parts are squeezed towards the eye (`FirstPersonScale`) and everything nearer than the near plane over that
+  scale is cut: at 0.25 everything nearer than 20 cm, so a fist raised near the eyes showed its insides as shards and a straight arm
+  reaching too far ran through the lens as a flat flap. Now: 0.4 (12.5 cm); the shoulders hang 12 cm forward and 8 cm up of build_arms.py's
+  (first-person reach); a tool held further than its arm reaches is pulled back to the hand (`ClampToReach`), never the hand off the tool.
+  `sb.Arms.World 1` draws the arms and tools in the world to look at them from outside.
+- **The left mouse button** (and the right trigger) uses what is in hand: the compass comes up close and steep to read; the spyglass goes up
+  to the eye drawing out its three drawtubes and the view narrows (the HUD's round view; only on the click, no longer when merely in hand);
+  the lantern is lifted high and lights further; the spade strokes once. On things used with the tool in hand (a buried spot with the spade)
+  the prompt shows LMB and the button holds; E still takes the find and talks (`USaltInteractableComponent::UsesHeldThing`).
+- **The spyglass** (`build_tools.py`): a three-draw brass sea telescope: the barrel in stitched leather (a seam of cross stitches beneath)
+  between turned ferrules with beads, a band with the lanyard's ring, a sunshade with a rolled lip over the objective; three polished
+  drawtubes with collars, beads and an engraved line, the last ending in a flared eyecup with the eye lens set deep. 26 cm closed, 44 cm
+  drawn; the game slides the tubes (`SM_Tool_SpyglassDraw1-3`).
+- **The spade** (`build_tools.py`; D73's was build_dig.py): 1.13 m: split cheeks round a turned crossbar (a D-handle) with rivets, an iron
+  ferrule where the shaft splits, an ash shaft a little crooked, hemp whipping where the lower hand holds, a forged socket with two
+  riveted straps up the shaft, a dished round-mouth blade with a ridge behind, treads turned over at the shoulders, nicks along the edge;
+  `SM_Tool_ShovelLoad`, a spadeful of sand on its face.
+- **Carried,** the right fist holds the shaft at the whipping, the blade across the view in front. **The stroke** (three over a dig's
+  2.4 s hold, one at a click) aims at the sand looked at (within 65 cm of the feet): the right hand slides up to the D-handle and the left
+  takes the shaft, aim above the spot, drive the blade in (the spade is drawn in the world meanwhile, so the ground hides the blade), lever
+  back, lift the spadeful, toss it to the right turning the blade over: the sand flies off as clods; the eyes dip and pitch with the body
+  into the thrust. The hands' grips in the stroke are kept level at the waist whatever the look; `sb.Tools.DigPhase <0..1>` holds a phase.
+- **Tests:** inventory 43/44 (`HeldSpyglass` now presses the left button: the field of view only narrows on it), dig 7/7 (`TakesShovel`
+  checks the spot is used with the left button). Frames: `Docs/Evidence/D80/`.
+- **Open:** from above the spade is seen almost end-on while digging (as a real one would be) and reads smaller than in the sailing games;
+  the left hand finds the shaft only where it reaches; no sounds yet; the spade's blade is the project's dark iron.
+
+### D83 · The Harbour Keeper behind his counter (Adopted: waiting for the owner's look)
+- **Why:** the owner's choice for people (D77): "simple stylised figures behind counters"; FH2 (D81, the story session) gave him his lines
+  and asked for a figure (its D81 notes call this D82; D82 went to the hub's light).
+- **`SK_Keeper`** (`build_keeper.py` on sb_char / sb_hand, 32 000 faces, 44 bones): an old salt, 1.74 m, chunky and a little comic: a big
+  head under a knitted watch cap with a turned-up brim, a bulbous nose, small dark eyes under bushy white brows, a great white beard combed
+  in locks and a drooping moustache, white hair round the back, a clay pipe in the corner of his mouth; a barrel chest and a belly, a dark
+  wool waistcoat with brass buttons open over an off-white linen shirt with its sleeves rolled up over strong forearms; the player's hands a
+  size up resting on his counter (0.93 m above his feet); a belt with a brass buckle, canvas trousers, boots.
+- **`ASaltPerson`** poses him every frame (no animation asset): breathing (the chest, 4.2 s), the head turning to the player within 7 m and
+  in front of him (neck and chest taking a share, slowly), now and then a glance about; while the talk has him speaking
+  (`USaltTalkSubsystem::GetSpeakerId`) the right hand comes up off the counter in an open gesture and the head nods with the words.
+- **`USaltPeopleSubsystem`** stands each person at a target point tagged `<Speaker>Spot` when play begins (the map's `Keeper_Spot`, tag
+  `KeeperSpot`: no map edit) and tells the talks where the speaker stands (`SetSpeakerActor`).
+- **Open:** the owner's look at him; the Purser and the Shipwright (FH6) can use the same builder and actor.
+
+### D84 · Music by mood from the owner's tracks (Adopted: waiting for the owner's listen)
+- **Owner (2026-10-07):** four tracks put into `Audio/Music/Background/` (chill: two, dark: one, drama: one), Pixabay files by the artist
+  leberch (`Docs/ThirdParty.md`).
+- **`USaltMusicSubsystem`:** Calm by day (the chill tracks), Night from dusk (the dark track, at once when the night amount passes a half:
+  the dusk that calls the player out to the Spire), Drama in a storm (sea state or weather) or with the boat a third full of water (at once).
+  A track fades in over 4 s and plays to its end, then the music rests 70-160 s (rare enough to stay special); Night and Drama crossfade
+  in 5 s; back to Calm the playing track fades away over 8 s and a shorter rest follows. It plays on in the pause menu. Every track is in
+  `SC_Music`, so the settings' Music volume (D66) applies. `import_music.py` brings the files in as `SW_Music_<Mood>_<Name>`.
+- **Commands:** `sb.Music Calm|Night|Drama|off|auto|next|info`. Checked in play: the first calm track after 6 s, Night and Storm crossfade
+  to their tracks.
+- **Open:** the title screen plays what the world wants (Calm by day); no sea and wind sounds or effects yet (the other two volume groups
+  still have nothing to act on).
