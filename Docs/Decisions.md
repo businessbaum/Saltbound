@@ -2376,6 +2376,43 @@ Status: **Adopted**, **Provisional** (pending an experiment), or **Superseded**.
   far, the forest floor); the D71 views in `Docs/Evidence/D78/before/`.
 - **Open:** sandy fingers inside the meadow are fringed but still bare; flowers in the meadow (none now) could come back as geometry.
 
+### D82 · The hub's light: no horror ship, warm not red, lanterns that do not shadow themselves (Adopted: waiting for the owner's look)
+- **Owner (2026-10-07):** "start with the lighting problem. I dont want the boat to make a horror ship. Also the light is often too
+  red and the shadows look ugly." With a screenshot of two yellow virtual shadow map warnings in play.
+- **Found (captures in play, `Tools/hub_light_ab.py`: the same four views at Night and Day, the lanterns changed live per row):**
+  - *Horror at night:* the rooms below decks went black. Their exposure volumes let the eye open only down to EV 3 (set in D61 for the
+    Day look, which stops at EV 11), while the Night look opens it to EV -1.5 and darkens the image by 1.6 stops: below decks at night
+    the eye could neither open nor brighten, and only red pools round the lanterns showed. The Well was black.
+  - *Too red:* the lanterns burned at 1 900 K (D69); on the golden wood that read orange-red, by day as well (the interiors' eye opens
+    to the lanterns).
+  - *Ugly shadows:* every light hangs inside its own lantern. The lantern's base (a solid brass disc under the flame) threw a dark disc
+    on the floor right under each lantern, its four bars four dark stripes across floor, walls and ceiling; the Well's ring lantern
+    (one light inside a hoop of six lanterns) six wedges across the shaft. The 4 cm source drew those edges hard.
+- **Changed:**
+  - The lanterns' own parts cast no shadow: their faces go into material slots named `<material>__noshadow` (`hub_timber.NO_SHADOW`;
+    the hanging lanterns, the gallery lamps, the newel lanterns and their cups, the ring lantern's hoop, lanterns and chains), and
+    `import_assets.py` assigns the material without the suffix and turns those sections' shadow off (Nanite honours per-section
+    shadows in 5.8). Unlit lanterns keep their shadows.
+  - The light: 2 800 K (was 1 900 K), a 12 cm source (the glass, was 4 cm); 240 cd and the 11 m reach as before.
+  - Below decks the eye may open to EV 0 (was 3) and the exposure bias is -1 at every hour (the volumes override the looks' bias).
+- **The two warnings** (developer messages, not shown in a shipped game):
+  - *One-pass projection max lights:* more than 16 shadowed local lights in one cell of the light grid; the 17th and later fall back
+    to a single-sample shadow. No spot in the hub is within reach of more than 11 lanterns (81 lanterns, 11 m), so it happens only in
+    distant cells, which are deep and overlap many lanterns along the canal: hard to see. Not changed.
+  - *Non-Nanite marking job queue:* performance only (the result is the same). The hidden blockout's shells and decks cast shadows
+    since D69 and are non-Nanite and as big as the ship; with the sun turning every frame (D79) their shadow pages are redrawn more
+    often. Not changed yet: to be measured in a packaged build.
+- **Tools:** `Tools/hub_light_ab.py` (A/B sheets of the hub's lantern light in play: temperature, intensity, reach, source, shadows,
+  bounce and the interiors' exposure per row, nothing saved).
+- **Result (in play, `L_VisualTest`, the hub streamed in):** at Night the dock, the Tally House and the Well read warm and lit (the Well
+  was black), the main deck unchanged; by Day the interiors are golden instead of orange-red. The rebuild of `L_Hub`, `L_HubInside`
+  and `L_HubReview` places the same 81 lanterns. No collision, layout or C++ changed, so no hub tests were needed.
+- **Evidence:** `Docs/Evidence/D82/D82_hub_light_sheet.jpg` (before / after at Night and Day, four views; the first Day view was taken
+  right after the switch from Night in both runs, so its exposure may still have been adapting) and
+  `D82_lantern_self_shadow_before_after.jpg` (the stripes and the disc under the lanterns gone).
+- **Open:** the lanterns' glass still glows in D69's orange (`MI_LanternGlass` is shared with the boat's and the island's lanterns,
+  which burn at 2 100 K); the non-Nanite shadow casters (warning a) and a packaged performance check with her inside streamed.
+
 ### D81 · FH2, people's lines: the Harbour Keeper speaks (Adopted: waiting for the owner's look)
 - **Why:** the first hour's second step (`Docs/Design/FirstHour.md`): the first face, his words, the player's answers, the gift of the
   shovel and the lantern; before it, the Keeper's hand-over was one notice.

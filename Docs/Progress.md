@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; the hub's harbour D70; M6 steps 1-3: the day's clock D72, digging D73, the ship repair system D74).
+Last updated: 2026-10-06 (session 4: M4 sailing boat D36-D45, M5 save/load D46, Ruin Isle D47, swimming and wake D48, haze D49, satchel D50, lived-in boat D52, object overhaul D53, flags / player / ladders D54, new UI D55; session 6: the owner's review rounds D58, D59; the prompt's position and the home island D60; session 7: the hub ship D61-D64; the menus D66; session 8: the game concept D67, D68; the hub's second review D69; the hub's harbour D70; M6 steps 1-3: the day's clock D72, digging D73, the ship repair system D74; session 9: the hub's light D82).
 
 ## Milestone status
 
@@ -258,6 +258,10 @@ for a higher screen percentage (for example 75 %) and more content.
   frame: a wingbeat with the hand trailing the arm and the wing folding on the upstroke, the crooked glide, banking with the tail
   twisting into the turn, the head level and glancing about. `sb.Hub.Appear` (your boat 60 m off her doors), `sb.Hub.Appear dock`
   (on the quay in her harbour), `sb.Hub.Appear show`; watch a gull with `sb.Dev.BirdCam 0` and `sb.Birds.Flap 1` plus `slomo 0.1`.
+- **D82 (the hub's light, waiting for the owner's look):** no more horror ship: below decks the eye may open to EV 0 with one exposure
+  bias (-1) at every hour (the rooms went black at night), the lanterns at 2 800 K (1 900 K turned the golden wood orange-red) with a
+  12 cm source, and the lanterns' own parts cast no shadow (the dark disc under each lantern and the stripes round it). A/B sheets in
+  play: `Tools/hub_light_ab.py`.
 - **D81 (the first hour, FH2, waiting for the owner's look):** people's lines: the Harbour Keeper speaks on a torn half sheet with his
   wax mark, his words written out in ink, the answers on key scraps (1-3, E). What he says follows the story (the first meeting and his
   gift of the shovel and a lantern, the cache, the mending, ready to sail, the morning after); he calls after you when you cast off. The
