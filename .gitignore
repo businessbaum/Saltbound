@@ -43,3 +43,9 @@ Desktop.ini
 
 # Intermediate exports (regenerated from Art/Blender/Scripts)
 /Art/Export/
+
+# Notes and briefs for coding agents, kept locally only
+CLAUDE.md
+AGENTS.md
+Docs/Design/HubShip/HubShip_Agent_Prompt.md
+Docs/Design/UI/UI_Agent_Prompt.md
