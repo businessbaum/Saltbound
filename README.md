@@ -1,4 +1,29 @@
+<div align="center">
+
 # Saltbound
+
+![Unreal Engine 5.8](https://img.shields.io/badge/Unreal%20Engine-5.8%20C%2B%2B-0E1128?logo=unrealengine&logoColor=white)
+![Blender](https://img.shields.io/badge/Blender-5.2%2C%20built%20by%20script-F5792A?logo=blender&logoColor=white)
+![HLSL](https://img.shields.io/badge/shaders-FFT%20ocean%20%C2%B7%20HLSL-5C2D91)
+![Git LFS](https://img.shields.io/badge/assets-Git%20LFS-F64935?logo=git&logoColor=white)
+![Status](https://img.shields.io/badge/status-in%20development-E3B341)
+
+<img src="Docs/Images/readme_hero.jpg" width="860" alt="The starting boat leaving the hub ship's water hall through its side door">
+
+<sub>The starting boat leaving the hub ship through its side door. More: <a href="Docs/Evidence/D70/D70_harbour_sheet.jpg">harbour sheet</a> · <a href="Docs/Evidence/D88/D88_sea_light.jpg">sea at night</a> · <a href="Docs/Evidence/D86/D86_meadow.jpg">the island meadow</a></sub>
+
+</div>
+
+---
+
+| | |
+|---|---|
+| **Engine work** | own FFT ocean with Single Layer Water and an underwater pass · buoyant boat physics tuned to the real 10.9 t mass · first-person rig with tools held by solved hands · procedural seagulls on a poseable mesh · volumetric storm wall |
+| **Pipeline** | every asset is built by a versioned Python script (Blender headless or Unreal editor Python), so content can be regenerated and reviewed as code |
+| **Testing** | automated PIE suites for movement, sailing, clock, menus and save/load, run from the terminal; packaged-build benchmarks |
+| **Process** | 127 commits, 88 numbered design decisions in [Docs/Decisions.md](Docs/Decisions.md), progress and known issues in [Docs/Progress.md](Docs/Progress.md) |
+
+## About
 
 Atmospheric first-person sailing and exploration game. The player starts with a small sailing boat in a
 sheltered harbor and explores a mysterious sea of islands, ruins and traces of a lost civilization. The
@@ -85,3 +110,7 @@ Controls are listed in [Docs/Progress.md](Docs/Progress.md#controls); settings (
 - [Docs/Ideas.md](Docs/Ideas.md) – future ideas with benefits and prerequisites
 - [Docs/ArtDirection.md](Docs/ArtDirection.md) – visual principles, palette, lighting presets, boat proportions
 - [Docs/ThirdParty.md](Docs/ThirdParty.md) – external content, sources and licenses
+
+---
+
+<sub>**How this was built:** the game concept, art direction, every look and feel decision and the reviews of each step by me. The C++, shaders, Blender and editor scripts, tests and documentation were written by AI coding agents (Claude Code) working in the editor under the rules in [CLAUDE.md](CLAUDE.md).</sub>
